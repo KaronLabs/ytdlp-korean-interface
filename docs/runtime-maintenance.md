@@ -1,0 +1,25 @@
+# Runtime maintenance
+
+`tools/runtime-maintenance.ps1` is a dot-source-only PowerShell 5.1 module: loading it performs no repair or update.
+
+## Settings repair
+
+`RepairSettings -SettingsPath <copy-of-settings.json> -WhatIf` parses the file before taking action. Without `-WhatIf`, it backs up the settings file, resolves `FOLDERID_Downloads` through `SHGetKnownFolderPath`, repairs only stale `outpath`/`outpaths` values under the root and each preset, serializes to a sibling temporary file, reparses it, then uses `File.Replace`. Malformed input is never replaced. A failed replacement verification restores the backup.
+
+The stale prefixes are deliberately narrow: `D:\Luna-Youtube-Downloader` and `C:\Users\Administrator`. All other settings fields and preset fields are retained.
+
+## yt-dlp nightly update
+
+`UpdateYtDlp -TargetPath <candidate\yt-dlp.exe> -WhatIf` accepts only `yt-dlp/yt-dlp-nightly-builds`. In normal use it reads that repository's latest release metadata, downloads `yt-dlp.exe` plus `SHA2-256SUMS`, checks SHA-256, checks `--version` against the release tag, backs up the target, replaces it from sibling staging, verifies again, and records a local provenance manifest.
+
+The optional `AssetPath`, `ReleaseTag`, `ExpectedSha256`, and `VersionReader` parameters exist for offline fixture tests. They do not permit an alternate repository. `-WhatIf` runs validation but never backs up, replaces, or writes provenance.
+
+If a post-replacement operation fails, the script restores the saved executable and verifies the rollback version. The script intentionally does not target the preserved parent deployment; run it against a reviewed candidate copy only.
+
+## Tests
+
+The tests do not require Pester and only create temporary fixture directories:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/run_powershell_tests.ps1
+```
