@@ -765,6 +765,8 @@ function Test-HermeticBuildContextDisablesExternalPropsAndBindsEffectiveContext 
             Assert-True ($dependency.Arguments -contains '/p:ImportDirectoryBuildProps=false') "$($dependency.Name) MSBuild must disable Directory.Build.props."
             Assert-True (@($dependency.Arguments | Where-Object { $_ -like '/p:UserRootDir=*' }).Count -eq 1) "$($dependency.Name) MSBuild must redirect user props."
         }
+        Assert-Equal '/m' $plan[3].BuildArguments[7] 'CMake-generated MSBuild must use the sealed parallel build switch.'
+        Assert-Equal '/t:Build' $plan[3].BuildArguments[8] 'CMake-generated MSBuild must use the sealed Build target.'
         Assert-True ($plan[3].BuildArguments -contains '/p:ImportDirectoryBuildProps=false') 'CMake-generated MSBuild must disable Directory.Build.props.'
         Assert-True (@($plan[3].BuildArguments | Where-Object { $_ -like '/p:UserRootDir=*' }).Count -eq 1) 'CMake-generated MSBuild must redirect user props.'
         [IO.File]::WriteAllText((Join-Path $root 'Directory.Build.props'), '<Project><Target Name="Hostile" BeforeTargets="Build"><Error Text="hostile-parent-props-imported" /></Target></Project>', [Text.Encoding]::UTF8)

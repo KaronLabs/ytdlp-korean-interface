@@ -387,7 +387,7 @@ function Get-ReleaseX64DependencyPlan {
             Name = 'libjpeg-turbo'; SourceDirectory = (Join-Path $source 'libjpeg-turbo-3.1.2'); FilePath = $CmakePath
             Arguments = @('-S', (Join-Path $source 'libjpeg-turbo-3.1.2'), '-B', $jpegOutput, '-G', 'Visual Studio 17 2022', '-A', 'x64', '-T', 'v143') + @($(if (-not [string]::IsNullOrWhiteSpace($CmakeVsGlobalsArgument)) { $CmakeVsGlobalsArgument })) + @('-DENABLE_SHARED=OFF', '-DENABLE_STATIC=ON', '-DWITH_TURBOJPEG=ON', '-DWITH_CRT_DLL=OFF', ('-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE=' + $jpegOutput))
             LibraryPath = (Join-Path $jpegOutput 'turbojpeg-static.lib')
-            BuildArguments = @('--build', $jpegOutput, '--config', 'Release', '--target', 'turbojpeg-static', '--') + @($CommonMsBuildArguments)
+            BuildArguments = @('--build', $jpegOutput, '--config', 'Release', '--target', 'turbojpeg-static', '--') + @('/m', '/t:Build') + @($CommonMsBuildArguments)
         }
     )
 }
