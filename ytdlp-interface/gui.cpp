@@ -1,6 +1,7 @@
 ﻿#include "gui.hpp"
 #include "icons.hpp"
 #include "i18n.hpp"
+#include "subtitle_entry.hpp"
 
 #include <regex>
 #include <codecvt>
@@ -1874,7 +1875,7 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 								{
 									const auto &jsubs {vidinfo.at("subtitles")};
 									for(auto it {jsubs.begin()}; it != jsubs.end(); it++)
-										if(it.key() != "live_chat" && it->is_array() && it->size() && it->front().contains("name"))
+										if(it.key() != "live_chat" && subtitle_entry_available(*it))
 											++subcount;
 								}
 								catch(...) {}

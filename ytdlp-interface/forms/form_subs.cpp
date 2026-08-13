@@ -1,5 +1,6 @@
 #include "../i18n.hpp"
 #include "../gui.hpp"
+#include "../subtitle_entry.hpp"
 
 
 void GUI::fm_subs()
@@ -144,9 +145,9 @@ void GUI::fm_subs()
 			lb_lang.auto_draw(false);
 			for(auto it {jsubs.begin()}; it != jsubs.end(); it++)
 			{
-				if(it.key() != "live_chat" && it->is_array() && it->size() && it->front().contains("name"))
+				if(it.key() != "live_chat" && subtitle_entry_available(*it))
 				{
-					lb_lang.at(0).push_back(" " + it->front()["name"].get<std::string>());
+					lb_lang.at(0).push_back(" " + subtitle_display_name(it.key(), *it));
 					lb_lang.at(0).back().value(it.key());
 					if(!lang_codes.empty())
 					{

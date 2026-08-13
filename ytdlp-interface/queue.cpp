@@ -1,5 +1,6 @@
 ﻿#include "i18n.hpp"
 #include "gui.hpp"
+#include "subtitle_entry.hpp"
 #include <codecvt>
 #include <nana/gui/filebox.hpp>
 
@@ -566,7 +567,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 					{
 						const auto &jsubs {bottom.vidinfo.at("subtitles")};
 						for(auto it {jsubs.begin()}; it != jsubs.end(); it++)
-							if(it.key() != "live_chat" && it->is_array() && it->size() && it->front().contains("name"))
+							if(it.key() != "live_chat" && subtitle_entry_available(*it))
 								subcount++;
 					}
 					catch(...) {};
