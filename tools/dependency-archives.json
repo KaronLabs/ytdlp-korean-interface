@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "archives": [
+    {
+      "name": "ytdlp-interface dependencies.7z",
+      "sha256": "6D50D1F74978CFAB8E40439487D67EF21A4B43E31CFB00EE95D23AEDFC791BAE",
+      "roots": ["bit7z", "nana", "libpng", "libjpeg-turbo-3.1.2"]
+    }
+  ]
+}

@@ -47,18 +47,65 @@ function Get-RequiredRuntimeFiles {
     return @('yt-dlp.exe', 'ffmpeg.exe', 'ffprobe.exe', 'deno.exe', '7z.dll')
 }
 
+function Test-PathOverlap {
+    param([Parameter(Mandatory = $true)] [string] $First, [Parameter(Mandatory = $true)] [string] $Second)
+    return (Test-PathContained -Root $First -Path $Second) -or (Test-PathContained -Root $Second -Path $First) -or
+        ([IO.Path]::GetFullPath($First).TrimEnd('\', '/') -eq [IO.Path]::GetFullPath($Second).TrimEnd('\', '/'))
+}
+
+function Get-TrustedSevenZip {
+    $paths = @((Join-Path $env:ProgramFiles '7-Zip\7z.exe'), (Join-Path ${env:ProgramFiles(x86)} '7-Zip\7z.exe')) |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path -LiteralPath $_ -PathType Leaf) }
+    $sevenZip = $paths | Select-Object -First 1
+    if ($null -eq $sevenZip) { throw '7z.exe from the trusted Program Files 7-Zip installation is required to inspect dependencies.7z before extraction.' }
+    return $sevenZip
+}
+
+function Get-DependencyArchiveManifest {
+    param([Parameter(Mandatory = $true)] [string] $SourceRoot)
+    $path = Join-Path $SourceRoot 'tools\dependency-archives.json'
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Dependency archive manifest is missing.' }
+    $manifest = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+    if ($manifest.schemaVersion -ne 1 -or @($manifest.archives).Count -ne 1) { throw 'Dependency archive manifest is invalid.' }
+    return $manifest.archives[0]
+}
+
+function Test-ArchiveEntrySafe {
+    param([string] $Entry, [string[]] $ExpectedRoots)
+    if ([string]::IsNullOrWhiteSpace($Entry) -or $Entry -match '^[A-Za-z]:|^[/\\]|(^|[/\\])\.\.([/\\]|$)') { return $false }
+    $root = ($Entry -split '[/\\]')[0]
+    return $ExpectedRoots -contains $root
+}
+
 function Initialize-OfficialDependencies {
     param([Parameter(Mandatory = $true)] [string] $SourceRoot, [string] $DependencyArchiveDirectory)
-    $solutionParent = $SourceRoot
-    foreach ($name in @('bit7z', 'nana', 'libpng', 'libjpeg-turbo-3.1.2')) {
-        $target = Join-Path $solutionParent $name
-        if (Test-Path -LiteralPath $target -PathType Container) { continue }
-        if ([string]::IsNullOrWhiteSpace($DependencyArchiveDirectory)) { throw "Official dependency $name is absent; provide its reviewed archive directory." }
-        $archive = Join-Path $DependencyArchiveDirectory ($name + '.zip')
-        if (-not (Test-Path -LiteralPath $archive -PathType Leaf)) { throw "Reviewed dependency archive is missing: $archive" }
-        Expand-Archive -LiteralPath $archive -DestinationPath $solutionParent -Force
-        if (-not (Test-Path -LiteralPath $target -PathType Container)) { throw "Archive $archive did not produce $target." }
+    $manifest = Get-DependencyArchiveManifest -SourceRoot $SourceRoot
+    $roots = @($manifest.roots)
+    $missing = @($roots | Where-Object { -not (Test-Path -LiteralPath (Join-Path $SourceRoot $_) -PathType Container) })
+    if ($missing.Count -eq 0) { return }
+    if ([string]::IsNullOrWhiteSpace($DependencyArchiveDirectory)) { throw 'Reviewed dependency archive directory is required for missing dependencies.' }
+    $archive = Join-Path $DependencyArchiveDirectory $manifest.name
+    if (-not (Test-Path -LiteralPath $archive -PathType Leaf)) { throw "Reviewed dependency archive is missing: $archive" }
+    if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToUpperInvariant() -cne ([string]$manifest.sha256).ToUpperInvariant()) { throw 'Dependency archive SHA-256 does not match the source-controlled manifest.' }
+    $sevenZip = Get-TrustedSevenZip
+    $listing = @(& $sevenZip l -slt $archive)
+    if ($LASTEXITCODE -ne 0) { throw '7z.exe could not inspect the dependency archive.' }
+    $archiveLeaf = Split-Path -Leaf $archive
+    $entries = @($listing | Where-Object { $_ -match '^Path = ' } | ForEach-Object { $_.Substring(7) } | Where-Object { $_ -ne $archiveLeaf })
+    if ($entries.Count -eq 0) { throw 'Dependency archive contains no inspectable entries.' }
+    foreach ($entry in $entries) { if (-not (Test-ArchiveEntrySafe -Entry $entry -ExpectedRoots $roots)) { throw 'Dependency archive contains an unsafe or unexpected entry.' } }
+    $staging = Join-Path (Join-Path $SourceRoot 'dependencies') ('staging-' + [Guid]::NewGuid().ToString('N'))
+    [IO.Directory]::CreateDirectory($staging) | Out-Null
+    try {
+        & $sevenZip x $archive ("-o" + $staging) '-y' | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw '7z.exe failed to extract the reviewed dependency archive into unique staging.' }
+        foreach ($name in $missing) {
+            $source = Join-Path $staging $name; $target = Join-Path $SourceRoot $name
+            if (-not (Test-Path -LiteralPath $source -PathType Container) -or (Test-Path -LiteralPath $target)) { throw 'Dependency staging validation failed.' }
+            Move-Item -LiteralPath $source -Destination $target
+        }
     }
+    finally { if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue } }
 }
 
 function Copy-CandidateFile {
@@ -67,15 +114,46 @@ function Copy-CandidateFile {
     Copy-Item -LiteralPath $Source -Destination (Join-Path $DestinationDirectory (Split-Path -Leaf $Source)) -Force
 }
 
+function Invoke-CheckedExecutable {
+    param([Parameter(Mandatory = $true)] [string] $Path, [Parameter(Mandatory = $true)] [string[]] $Arguments, [string] $Name)
+    $info = New-Object Diagnostics.ProcessStartInfo
+    $info.FileName = $Path
+    $info.Arguments = ($Arguments | ForEach-Object { '"' + $_.Replace('"', '\"') + '"' }) -join ' '
+    $info.UseShellExecute = $false; $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true; $info.CreateNoWindow = $true
+    $process = [Diagnostics.Process]::Start($info)
+    $output = $process.StandardOutput.ReadToEnd().Trim(); $errorOutput = $process.StandardError.ReadToEnd().Trim(); $process.WaitForExit()
+    if ($process.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($output)) { throw "Candidate $Name version check failed." }
+    return $output
+}
+
+function Get-VerifiedParentRuntime {
+    param([Parameter(Mandatory = $true)] [string] $ParentRuntime)
+    $parent = [IO.Path]::GetFullPath($ParentRuntime)
+    $provenancePath = Join-Path $parent 'yt-dlp-provenance.json'
+    if (-not (Test-Path -LiteralPath $provenancePath -PathType Leaf)) { throw 'Parent runtime yt-dlp provenance is missing.' }
+    $provenance = Get-Content -LiteralPath $provenancePath -Raw | ConvertFrom-Json
+    if ($provenance.repository -ne 'yt-dlp/yt-dlp-nightly-builds' -or $provenance.channel -ne 'nightly' -or [string]::IsNullOrWhiteSpace($provenance.tag)) { throw 'Parent runtime provenance is not the official nightly channel.' }
+    $ytDlp = Join-Path $parent 'yt-dlp.exe'
+    if (-not (Test-Path -LiteralPath $ytDlp -PathType Leaf)) { throw 'Parent runtime yt-dlp.exe is missing.' }
+    $hash = (Get-FileHash -LiteralPath $ytDlp -Algorithm SHA256).Hash.ToUpperInvariant()
+    if ($hash -cne ([string]$provenance.sha256).ToUpperInvariant()) { throw 'Parent runtime yt-dlp hash does not match provenance.' }
+    $version = Invoke-CheckedExecutable -Path $ytDlp -Arguments @('--version') -Name 'yt-dlp'
+    if ($version.Trim() -ne ([string]$provenance.tag).Trim()) { throw 'Parent runtime yt-dlp version does not match provenance tag.' }
+    foreach ($check in @(@('ffmpeg.exe', '-version', 'ffmpeg'), @('ffprobe.exe', '-version', 'ffprobe'), @('deno.exe', '--version', 'deno'))) {
+        Invoke-CheckedExecutable -Path (Join-Path $parent $check[0]) -Arguments @($check[1]) -Name $check[2] | Out-Null
+    }
+    return [pscustomobject]@{ Path = $parent; YtDlpHash = $hash; YtDlpVersion = $version.Trim(); Provenance = $provenance }
+}
+
 function Get-CandidateManifest {
     param([Parameter(Mandatory = $true)] [string] $CandidateRoot)
     $files = Get-ChildItem -LiteralPath $CandidateRoot -File -Recurse | Sort-Object FullName
     $versions = [ordered]@{
         product = (Get-Item -LiteralPath (Join-Path $CandidateRoot 'ytdlp-interface.exe')).VersionInfo.ProductVersion
-        ytdlp = ((& (Join-Path $CandidateRoot 'yt-dlp.exe') '--version' 2>&1 | Select-Object -First 1) -as [string]).Trim()
-        ffmpeg = ((& (Join-Path $CandidateRoot 'ffmpeg.exe') '-version' 2>&1 | Select-Object -First 1) -as [string]).Trim()
-        ffprobe = ((& (Join-Path $CandidateRoot 'ffprobe.exe') '-version' 2>&1 | Select-Object -First 1) -as [string]).Trim()
-        deno = ((& (Join-Path $CandidateRoot 'deno.exe') '--version' 2>&1 | Select-Object -First 1) -as [string]).Trim()
+        ytdlp = Invoke-CheckedExecutable -Path (Join-Path $CandidateRoot 'yt-dlp.exe') -Arguments @('--version') -Name 'yt-dlp'
+        ffmpeg = Invoke-CheckedExecutable -Path (Join-Path $CandidateRoot 'ffmpeg.exe') -Arguments @('-version') -Name 'ffmpeg'
+        ffprobe = Invoke-CheckedExecutable -Path (Join-Path $CandidateRoot 'ffprobe.exe') -Arguments @('-version') -Name 'ffprobe'
+        deno = Invoke-CheckedExecutable -Path (Join-Path $CandidateRoot 'deno.exe') -Arguments @('--version') -Name 'deno'
     }
     foreach ($name in $versions.Keys) { if ([string]::IsNullOrWhiteSpace($versions[$name])) { throw "Candidate $name version verification produced no output." } }
     return [ordered]@{
@@ -101,23 +179,28 @@ function Invoke-BuildCandidate {
     param([string] $SourceRoot, [string] $ParentRuntime, [string] $CandidateBase, [string] $DependencyArchiveDirectory)
     $source = [IO.Path]::GetFullPath($SourceRoot)
     if ([string]::IsNullOrWhiteSpace($ParentRuntime)) { $ParentRuntime = Split-Path -Parent $source }
-    if ([string]::IsNullOrWhiteSpace($CandidateBase)) { $CandidateBase = Join-Path $source 'candidate-runtime' }
+    $parent = [IO.Path]::GetFullPath($ParentRuntime)
+    if ([string]::IsNullOrWhiteSpace($CandidateBase)) { $CandidateBase = Join-Path ([IO.Path]::GetTempPath()) 'ytdlp-interface-candidates' }
+    $candidateBase = [IO.Path]::GetFullPath($CandidateBase)
+    if (Test-PathOverlap -First $parent -Second $candidateBase) { throw 'Candidate base must not contain, or be contained by, the preserved parent runtime.' }
     $solution = Join-Path $source 'ytdlp-interface\ytdlp-interface.sln'
     $project = Join-Path $source 'ytdlp-interface\ytdlp-interface.vcxproj'
     $catalog = Join-Path $source 'locales\ko-KR.json'
     $settings = Join-Path $ParentRuntime 'ytdlp-interface.json'
     foreach ($path in @($solution, $project, $catalog, $settings)) { if (-not (Test-Path -LiteralPath $path)) { throw "Required build input is missing: $path" } }
     if (-not (Select-String -LiteralPath $project -Pattern '<PlatformToolset>v143</PlatformToolset>' -Quiet)) { throw 'The project does not declare v143.' }
+    $verifiedParent = Get-VerifiedParentRuntime -ParentRuntime $parent
     Initialize-OfficialDependencies -SourceRoot $source -DependencyArchiveDirectory $DependencyArchiveDirectory
     $tools = Get-VsBuildTools
     & $tools.MsBuildPath $solution '/m' '/t:Build' '/p:Configuration=Release' '/p:Platform=x64'
     if ($LASTEXITCODE -ne 0) { throw "Release x64 build failed with exit code $LASTEXITCODE." }
     $product = Join-Path $source 'ytdlp-interface\x64\Release\ytdlp-interface.exe'
     if (-not (Test-Path -LiteralPath $product -PathType Leaf)) { throw "Release x64 product is missing: $product" }
-    $candidate = New-CandidateRoot -BaseDirectory $CandidateBase
+    $candidate = New-CandidateRoot -BaseDirectory $candidateBase
     try {
         Copy-CandidateFile -Source $product -DestinationDirectory $candidate
-        foreach ($name in Get-RequiredRuntimeFiles) { Copy-CandidateFile -Source (Join-Path $ParentRuntime $name) -DestinationDirectory $candidate }
+        foreach ($name in Get-RequiredRuntimeFiles) { Copy-CandidateFile -Source (Join-Path $parent $name) -DestinationDirectory $candidate }
+        if ((Get-FileHash -LiteralPath (Join-Path $candidate 'yt-dlp.exe') -Algorithm SHA256).Hash.ToUpperInvariant() -cne $verifiedParent.YtDlpHash) { throw 'Candidate yt-dlp copy hash does not match verified parent runtime.' }
         Copy-CandidateFile -Source $settings -DestinationDirectory $candidate
         Import-Module -Name (Join-Path $source 'tools\runtime-maintenance.psm1') -Force
         RepairSettings -SettingsPath (Join-Path $candidate 'ytdlp-interface.json') -Confirm:$false | Out-Null

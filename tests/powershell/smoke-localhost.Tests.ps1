@@ -50,7 +50,7 @@ function Test-FinalMp3AndPartRejection {
         [IO.File]::WriteAllText((Join-Path $output 'result.mp3.part'), 'partial', [Text.Encoding]::ASCII)
         $part = Test-SmokeOutput -OutputDirectory $output -FfprobeAction { param($path) "codec_name=mp3`nduration=2.0" }
         Assert-False $part.Valid 'A .part file must reject the result.'
-        Assert-True ($part.Reason -match 'part') 'Part-file rejection must identify the reason.'
+        Assert-Equal 'part_file' $part.ReasonCode 'Part-file rejection must identify the stable reason code.'
     }
     finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
 }
@@ -60,15 +60,69 @@ function Test-FailureEvidenceAndSuccessCleanup {
     try {
         $evidence = Join-Path $root 'evidence'; [IO.Directory]::CreateDirectory($evidence) | Out-Null
         $failureWorkspace = Join-Path $root 'failed'; [IO.Directory]::CreateDirectory($failureWorkspace) | Out-Null
-        Complete-SmokeWorkspace -Workspace $failureWorkspace -EvidenceDirectory $evidence -Succeeded:$false -Reason 'fixture failure'
+        Complete-SmokeWorkspace -Workspace $failureWorkspace -EvidenceDirectory $evidence -Succeeded:$false -ReasonCode 'fixture_failure'
         Assert-True (Test-Path -LiteralPath $failureWorkspace) 'Failed smoke workspace must be retained.'
         Assert-True (Test-Path -LiteralPath (Join-Path $evidence 'failure.json')) 'Failed smoke must retain evidence.'
         $successWorkspace = Join-Path $root 'success'; [IO.Directory]::CreateDirectory($successWorkspace) | Out-Null
-        Complete-SmokeWorkspace -Workspace $successWorkspace -EvidenceDirectory $evidence -Succeeded:$true -Reason 'fixture success'
+        Complete-SmokeWorkspace -Workspace $successWorkspace -EvidenceDirectory $evidence -Succeeded:$true -ReasonCode 'ok'
         Assert-False (Test-Path -LiteralPath $successWorkspace) 'Successful smoke workspace must be cleaned up.'
         Assert-True (Test-Path -LiteralPath (Join-Path $evidence 'result.json')) 'Successful smoke must retain the result manifest.'
     }
     finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+function Test-SmokeOutputRequiresFreshFiles {
+    $root = New-FixtureRoot
+    try {
+        $output = Join-Path $root 'output'; [IO.Directory]::CreateDirectory($output) | Out-Null
+        $mp3 = Join-Path $output 'stale.mp3'; [IO.File]::WriteAllText($mp3, 'stale', [Text.Encoding]::ASCII)
+        $started = [DateTime]::UtcNow
+        $result = Test-SmokeOutput -OutputDirectory $output -StartedAtUtc $started -FfprobeAction { param($path) "codec_name=mp3`nduration=2.0" }
+        Assert-False $result.Valid 'An output created before the smoke start must be rejected.'
+        Assert-Equal 'stale_output' $result.ReasonCode 'Stale output must have a stable reason code.'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+function Test-AutomationCompletionIsBoundToGuiUrlAndOutput {
+    $root = New-FixtureRoot
+    try {
+        $output = Join-Path $root 'output'; [IO.Directory]::CreateDirectory($output) | Out-Null
+        $url = 'http://127.0.0.1:18888/input.mp4'
+        $good = [pscustomobject]@{ Completed = $true; GuiProcessId = 71; Url = $url; OutputDirectory = $output }
+        Assert-True (Test-AutomationCompletion -Marker $good -GuiProcessId 71 -Url $url -OutputDirectory $output) 'Completion marker must bind GUI PID, URL, and output.'
+        $bad = [pscustomobject]@{ Completed = $true; GuiProcessId = 72; Url = $url; OutputDirectory = $output }
+        Assert-False (Test-AutomationCompletion -Marker $bad -GuiProcessId 71 -Url $url -OutputDirectory $output) 'Mismatched GUI PID must be rejected.'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+function Test-ParentOverlapAndSanitizedEvidenceAreRejected {
+    $root = New-FixtureRoot
+    try {
+        $parent = Join-Path $root 'parent'; $candidate = Join-Path $parent 'candidate'; [IO.Directory]::CreateDirectory($candidate) | Out-Null
+        Assert-True (Test-PathOverlap -First $parent -Second $candidate) 'Nested candidate and parent roots must overlap.'
+        $evidence = Join-Path $root 'evidence'; $workspace = Join-Path $root 'workspace'; [IO.Directory]::CreateDirectory($workspace) | Out-Null
+        Complete-SmokeWorkspace -Workspace $workspace -EvidenceDirectory $evidence -Succeeded:$false -ReasonCode 'gui_start_failed'
+        $manifest = Get-Content -LiteralPath (Join-Path $evidence 'failure.json') -Raw | ConvertFrom-Json
+        Assert-Equal 'gui_start_failed' $manifest.reasonCode 'Evidence must retain only the stable reason code.'
+        Assert-Equal 'workspace' $manifest.workspaceId 'Evidence must contain the relative workspace identifier only.'
+        Assert-False ($manifest.PSObject.Properties.Name -contains 'reason') 'Evidence must not expose exception text.'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+function Test-DependencyArchiveAndRuntimeVerificationBoundaries {
+    $manifest = Get-Content -LiteralPath (Join-Path $repositoryRoot 'tools/dependency-archives.json') -Raw | ConvertFrom-Json
+    Assert-Equal 'ytdlp-interface dependencies.7z' $manifest.archives[0].name 'The reviewed dependency archive name must be fixed.'
+    Assert-Equal '6D50D1F74978CFAB8E40439487D67EF21A4B43E31CFB00EE95D23AEDFC791BAE' $manifest.archives[0].sha256 'The reviewed dependency archive hash must be fixed.'
+    Assert-True (Test-ArchiveEntrySafe -Entry 'nana/include/nana/gui.hpp' -ExpectedRoots @('bit7z', 'nana', 'libpng', 'libjpeg-turbo-3.1.2')) 'Expected dependency paths must be accepted.'
+    Assert-False (Test-ArchiveEntrySafe -Entry '..\parent\overwrite' -ExpectedRoots @('bit7z')) 'Archive traversal must be rejected.'
+    Assert-False (Test-ArchiveEntrySafe -Entry 'C:\absolute\overwrite' -ExpectedRoots @('bit7z')) 'Absolute archive paths must be rejected.'
+    $buildSource = Get-Content -LiteralPath (Join-Path $repositoryRoot 'tools/build-candidate.ps1') -Raw
+    Assert-True ($buildSource -match 'Get-VerifiedParentRuntime') 'Candidate assembly must verify the parent runtime before copy.'
+    Assert-True ($buildSource -match 'yt-dlp-provenance.json') 'Parent provenance must be required.'
+    Assert-True ($buildSource -match 'Wait-LoopbackServer' -or (Get-Content -LiteralPath (Join-Path $repositoryRoot 'tools/smoke-localhost.ps1') -Raw) -match 'Wait-LoopbackServer') 'Smoke must wait for loopback server readiness.'
 }
 
 Test-CandidateRootsAreUniqueAndContained
@@ -76,6 +130,10 @@ Test-LocalhostOnlyUrls
 Test-FakeProcessesAreCleanedUp
 Test-FinalMp3AndPartRejection
 Test-FailureEvidenceAndSuccessCleanup
+Test-SmokeOutputRequiresFreshFiles
+Test-AutomationCompletionIsBoundToGuiUrlAndOutput
+Test-ParentOverlapAndSanitizedEvidenceAreRejected
+Test-DependencyArchiveAndRuntimeVerificationBoundaries
 
 if ($script:failures.Count -ne 0) { $script:failures | ForEach-Object { Write-Error $_ }; exit 1 }
 Write-Output 'smoke-localhost fixture tests passed.'
