@@ -33,11 +33,14 @@ function Test-LocalhostOnlyUrls {
 
 function Test-FakeProcessesAreCleanedUp {
     $stopped = New-Object System.Collections.Generic.List[int]
+    $waited = New-Object System.Collections.Generic.List[int]
     $running = [pscustomobject]@{ Id = 41; HasExited = $false }
     $exited = [pscustomobject]@{ Id = 42; HasExited = $true }
-    Stop-TrackedProcesses -Processes @($running, $exited) -StopAction { param($process) $stopped.Add($process.Id) } 
+    Stop-TrackedProcesses -Processes @($running, $exited) -StopAction { param($process) $stopped.Add($process.Id) } -WaitAction { param($process, $milliseconds) $waited.Add($process.Id); $true }
     Assert-Equal 1 $stopped.Count 'Only running fake processes should be stopped.'
     Assert-Equal 41 $stopped[0] 'The running fake process must be stopped.'
+    Assert-Equal 1 $waited.Count 'A stopped process must be waited for before cleanup completes.'
+    Assert-Equal 41 $waited[0] 'The running fake process must be waited for.'
 }
 
 function Test-FinalMp3AndPartRejection {
@@ -76,6 +79,8 @@ function Test-SmokeOutputRequiresFreshFiles {
     try {
         $output = Join-Path $root 'output'; [IO.Directory]::CreateDirectory($output) | Out-Null
         $mp3 = Join-Path $output 'stale.mp3'; [IO.File]::WriteAllText($mp3, 'stale', [Text.Encoding]::ASCII)
+        $staleTime = [DateTime]::UtcNow.AddMinutes(-5)
+        [IO.File]::SetCreationTimeUtc($mp3, $staleTime); [IO.File]::SetLastWriteTimeUtc($mp3, $staleTime)
         $started = [DateTime]::UtcNow
         $result = Test-SmokeOutput -OutputDirectory $output -StartedAtUtc $started -FfprobeAction { param($path) "codec_name=mp3`nduration=2.0" }
         Assert-False $result.Valid 'An output created before the smoke start must be rejected.'
@@ -119,10 +124,25 @@ function Test-DependencyArchiveAndRuntimeVerificationBoundaries {
     Assert-True (Test-ArchiveEntrySafe -Entry 'nana/include/nana/gui.hpp' -ExpectedRoots @('bit7z', 'nana', 'libpng', 'libjpeg-turbo-3.1.2')) 'Expected dependency paths must be accepted.'
     Assert-False (Test-ArchiveEntrySafe -Entry '..\parent\overwrite' -ExpectedRoots @('bit7z')) 'Archive traversal must be rejected.'
     Assert-False (Test-ArchiveEntrySafe -Entry 'C:\absolute\overwrite' -ExpectedRoots @('bit7z')) 'Absolute archive paths must be rejected.'
+    $entries = Get-ArchiveEntriesFromListing -Listing @('Path = C:\fixtures\ytdlp-interface dependencies.7z', 'Path = nana\include\nana\gui.hpp', 'Path = bit7z\include\bit7z\bit7z.hpp')
+    Assert-Equal 2 $entries.Count 'The 7z archive header must not be treated as an extractable entry.'
+    Assert-Equal 'nana\include\nana\gui.hpp' $entries[0] 'The first actual archive entry must remain after header removal.'
     $buildSource = Get-Content -LiteralPath (Join-Path $repositoryRoot 'tools/build-candidate.ps1') -Raw
     Assert-True ($buildSource -match 'Get-VerifiedParentRuntime') 'Candidate assembly must verify the parent runtime before copy.'
     Assert-True ($buildSource -match 'yt-dlp-provenance.json') 'Parent provenance must be required.'
     Assert-True ($buildSource -match 'Wait-LoopbackServer' -or (Get-Content -LiteralPath (Join-Path $repositoryRoot 'tools/smoke-localhost.ps1') -Raw) -match 'Wait-LoopbackServer') 'Smoke must wait for loopback server readiness.'
+}
+
+function Test-CheckedProcessUsesExitCodeAndCapturesOutput {
+    $shell = $env:ComSpec
+    $ok = Invoke-CheckedProcess -FilePath $shell -Arguments @('/d', '/c', 'echo', 'fixture-process') -Name 'fixture process'
+    Assert-Equal 0 $ok.ExitCode 'A successful child process must report its explicit ExitCode.'
+    Assert-True ($ok.StandardOutput -match 'fixture-process') 'A successful child process must retain stdout.'
+    Assert-Equal '"path with spaces"' (Quote-WindowsArgument 'path with spaces') 'Arguments with spaces must be quoted exactly once.'
+    Assert-Equal 'plain' (Quote-WindowsArgument 'plain') 'Plain arguments must not be gratuitously quoted.'
+    Assert-Equal '"say \"hello\""' (Quote-WindowsArgument 'say "hello"') 'Embedded quotes must be escaped for CreateProcess.'
+    try { Invoke-CheckedProcess -FilePath $shell -Arguments @('/d', '/c', 'exit 7') -Name 'failing fixture process' | Out-Null; $threw = $false } catch { $threw = $true }
+    Assert-True $threw 'A nonzero child ExitCode must fail without reading LASTEXITCODE.'
 }
 
 Test-CandidateRootsAreUniqueAndContained
@@ -134,6 +154,7 @@ Test-SmokeOutputRequiresFreshFiles
 Test-AutomationCompletionIsBoundToGuiUrlAndOutput
 Test-ParentOverlapAndSanitizedEvidenceAreRejected
 Test-DependencyArchiveAndRuntimeVerificationBoundaries
+Test-CheckedProcessUsesExitCodeAndCapturesOutput
 
 if ($script:failures.Count -ne 0) { $script:failures | ForEach-Object { Write-Error $_ }; exit 1 }
 Write-Output 'smoke-localhost fixture tests passed.'

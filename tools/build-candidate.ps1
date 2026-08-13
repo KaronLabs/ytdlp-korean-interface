@@ -27,6 +27,42 @@ function New-CandidateRoot {
     return $candidate
 }
 
+function ConvertTo-ProcessArgumentLine {
+    param([string[]] $Arguments)
+    return (($Arguments | ForEach-Object { Quote-WindowsArgument ([string]$_) }) -join ' ')
+}
+
+function Quote-WindowsArgument {
+    param([Parameter(Mandatory = $true)] [string] $Argument)
+    if ($Argument.Length -ne 0 -and $Argument -notmatch '[\s"]') { return $Argument }
+    $quoted = '"'; $backslashes = 0
+    foreach ($character in $Argument.ToCharArray()) {
+        if ($character -eq '\') { $backslashes++; continue }
+        if ($character -eq '"') { $quoted += [string]::new([char]92, ($backslashes * 2 + 1)) + '"'; $backslashes = 0; continue }
+        if ($backslashes -gt 0) { $quoted += [string]::new([char]92, $backslashes); $backslashes = 0 }
+        $quoted += $character
+    }
+    if ($backslashes -gt 0) { $quoted += [string]::new([char]92, ($backslashes * 2)) }
+    return $quoted + '"'
+}
+
+function Invoke-CheckedProcess {
+    param([Parameter(Mandatory = $true)] [string] $FilePath, [string[]] $Arguments = @(), [Parameter(Mandatory = $true)] [string] $Name)
+    $stdoutPath = Join-Path ([IO.Path]::GetTempPath()) ('ytdlp-interface-process-' + [Guid]::NewGuid().ToString('N') + '.out')
+    $stderrPath = Join-Path ([IO.Path]::GetTempPath()) ('ytdlp-interface-process-' + [Guid]::NewGuid().ToString('N') + '.err')
+    try {
+        $process = Start-Process -FilePath $FilePath -ArgumentList (ConvertTo-ProcessArgumentLine -Arguments $Arguments) -Wait -PassThru -NoNewWindow -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+        $stdout = if (Test-Path -LiteralPath $stdoutPath) { [IO.File]::ReadAllText($stdoutPath).Trim() } else { '' }
+        $stderr = if (Test-Path -LiteralPath $stderrPath) { [IO.File]::ReadAllText($stderrPath).Trim() } else { '' }
+        if ($process.ExitCode -ne 0) { throw "$Name exited with code $($process.ExitCode). stdout=$stdout stderr=$stderr" }
+        return [pscustomobject]@{ ExitCode = $process.ExitCode; StandardOutput = $stdout; StandardError = $stderr }
+    }
+    finally {
+        if (Test-Path -LiteralPath $stdoutPath) { Remove-Item -LiteralPath $stdoutPath -Force -ErrorAction SilentlyContinue }
+        if (Test-Path -LiteralPath $stderrPath) { Remove-Item -LiteralPath $stderrPath -Force -ErrorAction SilentlyContinue }
+    }
+}
+
 function Get-VsBuildTools {
     $candidates = @(
         (Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'),
@@ -34,7 +70,7 @@ function Get-VsBuildTools {
     ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path -LiteralPath $_) }
     $vswhere = $candidates | Select-Object -First 1
     if ($null -eq $vswhere) { throw 'vswhere.exe was not found; install or configure Visual Studio Build Tools v143 before building.' }
-    $installationPath = (& $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath).Trim()
+    $installationPath = (Invoke-CheckedProcess -FilePath $vswhere -Arguments @('-latest', '-products', '*', '-requires', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', '-property', 'installationPath') -Name 'vswhere C++ Build Tools lookup').StandardOutput.Trim()
     if ([string]::IsNullOrWhiteSpace($installationPath)) { throw 'No Visual Studio C++ Build Tools installation with the x86/x64 workload was found.' }
     $msbuild = Join-Path $installationPath 'MSBuild\Current\Bin\MSBuild.exe'
     if (-not (Test-Path -LiteralPath $msbuild)) { throw 'The selected Visual Studio installation has no MSBuild.exe.' }
@@ -77,6 +113,13 @@ function Test-ArchiveEntrySafe {
     return $ExpectedRoots -contains $root
 }
 
+function Get-ArchiveEntriesFromListing {
+    param([string[]] $Listing)
+    $paths = @($Listing | Where-Object { $_ -match '^Path = ' } | ForEach-Object { $_.Substring(7) })
+    if ($paths.Count -lt 2) { throw 'Dependency archive listing has no entries beyond its archive header.' }
+    return @($paths | Select-Object -Skip 1)
+}
+
 function Initialize-OfficialDependencies {
     param([Parameter(Mandatory = $true)] [string] $SourceRoot, [string] $DependencyArchiveDirectory)
     $manifest = Get-DependencyArchiveManifest -SourceRoot $SourceRoot
@@ -88,17 +131,14 @@ function Initialize-OfficialDependencies {
     if (-not (Test-Path -LiteralPath $archive -PathType Leaf)) { throw "Reviewed dependency archive is missing: $archive" }
     if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToUpperInvariant() -cne ([string]$manifest.sha256).ToUpperInvariant()) { throw 'Dependency archive SHA-256 does not match the source-controlled manifest.' }
     $sevenZip = Get-TrustedSevenZip
-    $listing = @(& $sevenZip l -slt $archive)
-    if ($LASTEXITCODE -ne 0) { throw '7z.exe could not inspect the dependency archive.' }
-    $archiveLeaf = Split-Path -Leaf $archive
-    $entries = @($listing | Where-Object { $_ -match '^Path = ' } | ForEach-Object { $_.Substring(7) } | Where-Object { $_ -ne $archiveLeaf })
+    $listing = (Invoke-CheckedProcess -FilePath $sevenZip -Arguments @('l', '-slt', $archive) -Name '7z dependency inspection').StandardOutput -split "`r?`n"
+    $entries = Get-ArchiveEntriesFromListing -Listing $listing
     if ($entries.Count -eq 0) { throw 'Dependency archive contains no inspectable entries.' }
     foreach ($entry in $entries) { if (-not (Test-ArchiveEntrySafe -Entry $entry -ExpectedRoots $roots)) { throw 'Dependency archive contains an unsafe or unexpected entry.' } }
     $staging = Join-Path (Join-Path $SourceRoot 'dependencies') ('staging-' + [Guid]::NewGuid().ToString('N'))
     [IO.Directory]::CreateDirectory($staging) | Out-Null
     try {
-        & $sevenZip x $archive ("-o" + $staging) '-y' | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw '7z.exe failed to extract the reviewed dependency archive into unique staging.' }
+        Invoke-CheckedProcess -FilePath $sevenZip -Arguments @('x', $archive, ("-o" + $staging), '-y') -Name '7z dependency extraction' | Out-Null
         foreach ($name in $missing) {
             $source = Join-Path $staging $name; $target = Join-Path $SourceRoot $name
             if (-not (Test-Path -LiteralPath $source -PathType Container) -or (Test-Path -LiteralPath $target)) { throw 'Dependency staging validation failed.' }
@@ -116,14 +156,9 @@ function Copy-CandidateFile {
 
 function Invoke-CheckedExecutable {
     param([Parameter(Mandatory = $true)] [string] $Path, [Parameter(Mandatory = $true)] [string[]] $Arguments, [string] $Name)
-    $info = New-Object Diagnostics.ProcessStartInfo
-    $info.FileName = $Path
-    $info.Arguments = ($Arguments | ForEach-Object { '"' + $_.Replace('"', '\"') + '"' }) -join ' '
-    $info.UseShellExecute = $false; $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true; $info.CreateNoWindow = $true
-    $process = [Diagnostics.Process]::Start($info)
-    $output = $process.StandardOutput.ReadToEnd().Trim(); $errorOutput = $process.StandardError.ReadToEnd().Trim(); $process.WaitForExit()
-    if ($process.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($output)) { throw "Candidate $Name version check failed." }
-    return $output
+    $result = Invoke-CheckedProcess -FilePath $Path -Arguments $Arguments -Name "Candidate $Name version check"
+    if ([string]::IsNullOrWhiteSpace($result.StandardOutput)) { throw "Candidate $Name version check produced no output." }
+    return $result.StandardOutput
 }
 
 function Get-VerifiedParentRuntime {
@@ -192,8 +227,7 @@ function Invoke-BuildCandidate {
     $verifiedParent = Get-VerifiedParentRuntime -ParentRuntime $parent
     Initialize-OfficialDependencies -SourceRoot $source -DependencyArchiveDirectory $DependencyArchiveDirectory
     $tools = Get-VsBuildTools
-    & $tools.MsBuildPath $solution '/m' '/t:Build' '/p:Configuration=Release' '/p:Platform=x64'
-    if ($LASTEXITCODE -ne 0) { throw "Release x64 build failed with exit code $LASTEXITCODE." }
+    Invoke-CheckedProcess -FilePath $tools.MsBuildPath -Arguments @($solution, '/m', '/t:Build', '/p:Configuration=Release', '/p:Platform=x64') -Name 'Release x64 MSBuild' | Out-Null
     $product = Join-Path $source 'ytdlp-interface\x64\Release\ytdlp-interface.exe'
     if (-not (Test-Path -LiteralPath $product -PathType Leaf)) { throw "Release x64 product is missing: $product" }
     $candidate = New-CandidateRoot -BaseDirectory $candidateBase

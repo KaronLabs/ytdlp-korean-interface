@@ -24,9 +24,17 @@ function Test-PathOverlap {
 }
 
 function Stop-TrackedProcesses {
-    param([object[]] $Processes, [scriptblock] $StopAction = { param($process) Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue })
+    param(
+        [object[]] $Processes,
+        [scriptblock] $StopAction = { param($process) Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue },
+        [scriptblock] $WaitAction = { param($process, $milliseconds) $process.WaitForExit($milliseconds) },
+        [int] $WaitMilliseconds = 5000
+    )
     foreach ($process in @($Processes)) {
-        if ($null -ne $process -and -not $process.HasExited) { & $StopAction $process }
+        if ($null -ne $process -and -not $process.HasExited) {
+            & $StopAction $process
+            if (-not (& $WaitAction $process $WaitMilliseconds)) { throw 'process_cleanup_timeout' }
+        }
     }
 }
 
@@ -100,8 +108,7 @@ function Invoke-LocalhostSmoke {
     $processes = @(); $succeeded = $false; $reasonCode = 'smoke_failed'
     try {
         $media = Join-Path $workspace 'input.mp4'
-        & (Join-Path $candidate 'ffmpeg.exe') '-y' '-f' 'lavfi' '-i' 'sine=frequency=1000:duration=2' '-t' '2' $media
-        if ($LASTEXITCODE -ne 0) { throw 'fixture_generation_failed' }
+        Invoke-CheckedProcess -FilePath (Join-Path $candidate 'ffmpeg.exe') -Arguments @('-y', '-f', 'lavfi', '-i', 'sine=frequency=1000:duration=2', '-t', '2', $media) -Name 'smoke fixture generation' | Out-Null
         $port = Get-LoopbackPort
         $url = "http://127.0.0.1:$port/input.mp4"
         if (-not (Test-LocalhostUrl -Url $url)) { throw 'url_rejected' }
@@ -123,7 +130,7 @@ function Invoke-LocalhostSmoke {
             if ((Read-Host "Observe the candidate GUI and complete MP3 download for $url. Type YES after verifying completion") -cne 'YES') { throw 'operator_not_confirmed' }
         }
         else { throw 'automation_required' }
-        $result = Test-SmokeOutput -OutputDirectory $output -StartedAtUtc $startedAtUtc -FfprobeAction { param($path) & (Join-Path $candidate 'ffprobe.exe') '-v' 'error' '-show_entries' 'format=duration:stream=codec_name' '-of' 'default=noprint_wrappers=1' $path }
+        $result = Test-SmokeOutput -OutputDirectory $output -StartedAtUtc $startedAtUtc -FfprobeAction { param($path) (Invoke-CheckedProcess -FilePath (Join-Path $candidate 'ffprobe.exe') -Arguments @('-v', 'error', '-show_entries', 'format=duration:stream=codec_name', '-of', 'default=noprint_wrappers=1', $path) -Name 'smoke ffprobe').StandardOutput }
         if (-not $result.Valid) { throw $result.ReasonCode }
         $succeeded = $true; $reasonCode = 'ok'; return $result
     }

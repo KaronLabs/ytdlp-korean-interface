@@ -30,7 +30,7 @@ match the parent executable hash and `--version` tag, and FFmpeg/FFprobe/Deno
 must each exit successfully with version output.
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/build-candidate.ps1 -Run
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/build-candidate.ps1 -Run -DependencyArchiveDirectory <src>
 ```
 
 The script accepts only the reviewed `ytdlp-interface dependencies.7z` through
