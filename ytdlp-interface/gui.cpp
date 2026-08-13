@@ -342,6 +342,7 @@ bool GUI::process_queue_item(std::wstring url)
 			btndl.caption(stop_download_label);
 		bottom.started = true;
 		bottom.idx_error = 0;
+		bottom.playlist_item_index = 0;
 		taskbar_overall_progress();
 		auto item {lbq.item_from_value(url)};
 		if(item.checked())
@@ -808,6 +809,8 @@ bool GUI::process_queue_item(std::wstring url)
 
 			auto cb_progress = [&, url](ULONGLONG completed, ULONGLONG total, std::string text, int playlist_completed, int playlist_total)
 			{
+				if(playlist_total > 0 && playlist_completed >= 0)
+					bottom.playlist_item_index = playlist_completed + 1;
 				if(text.find("Unknown B/s") != -1)
 					return;
 
@@ -1010,22 +1013,7 @@ bool GUI::process_queue_item(std::wstring url)
 					tbpipe.append(url, error_text);
 					lbq.set_line_text(url, {"", "", error_status_label, "", "", "", ""});
 					lbq.item_from_value(url).value<lbqval_t>().state = queue_item_state::error;
-					auto progtext {prog.nana::progress::caption()};
-					auto pos1 {progtext.find('[')};
-					if(pos1 != -1)
-					{
-						auto pos2 {progtext.find(" of ")};
-						if(pos2 != -1)
-						{
-							auto pos3 {progtext.find(']')};
-							if(pos3 != -1 && pos1 < pos2 && pos2 < pos3)
-							{
-								auto strval {progtext.substr(++pos1, pos2 - pos1)};
-								try { bottom.idx_error = std::stoi(strval); }
-								catch(...) { }
-							}
-						}
-					}
+					bottom.idx_error = bottom.playlist_item_index;
 				}
 				else
 				{
@@ -1099,9 +1087,11 @@ bool GUI::process_queue_item(std::wstring url)
 		auto text {item.text(3)};
 		auto pos {text.find(']')};
 		if(pos != -1)
+		{
 			auto status {stopped_detail_template};
 			replace_placeholder(status, "{detail}", text.substr(1, pos - 1));
 			lbq.set_line_text(url, {"", "", status, "", "", "", ""});
+		}
 		else if(text.find('%') != -1)
 		{
 			auto status {stopped_detail_template};
@@ -1160,6 +1150,7 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 		{
 			bottom.vidinfo.clear();
 			bottom.playlist_info.clear();
+			bottom.live_scheduled = false;
 		}
 
 		bottom.working_info = true;
@@ -1443,6 +1434,7 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 									auto title {i18n::tr("queue.live_scheduled", "[live event scheduled to begin in {time}]")};
 									replace_placeholder(title, "{time}", strtime);
 									lbq.set_line_text(url, {"youtube.com", title, "---", "---", "---", "---"});
+									bottom.live_scheduled = true;
 									bottom.vidinfo.clear();
 									if(--active_info_threads == 0)
 										queue_save();
@@ -1710,20 +1702,24 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 											media_title = playlist_title(bottom.playlist_info["id"].get<std::string>());
 										else media_title = to_utf8(url);
 									}
-									if(vidsel_item.m && lbq.item_from_value(url).selected())
+									if(vidsel_item.m && lbq.item_from_value(url).selected() &&
+										vidsel_item.playlist_item_pos == lbq.item_from_value(url).pos().item)
 									{
 										auto &m {*vidsel_item.m};
-										auto pos {vidsel_item.pos};
 										auto str {std::to_string(playlist_size)};
 										auto selected {bottom.playsel_string.empty() ? str : std::to_string(bottom.playlist_selected())};
 										auto menu_text {bottom.is_ytplaylist ? i18n::tr("main.menu.select_videos_count", "Select videos ({selected}/{total})") : i18n::tr("main.menu.select_songs_count", "Select songs ({selected}/{total})")};
 										replace_placeholder(menu_text, "{selected}", selected);
 										replace_placeholder(menu_text, "{total}", str);
-										m.text(pos, menu_text);
-										m.enabled(pos, true);
-										m.enabled(pos + 1, true);
-										m.enabled(pos + 2, true);
-										m.enabled(pos + 3, true);
+										if(vidsel_item.playlist_menu_pos < static_cast<std::size_t>(m.size()) &&
+											m.size() - vidsel_item.playlist_menu_pos >= 4)
+										{
+											m.text(vidsel_item.playlist_menu_pos, menu_text);
+											m.enabled(vidsel_item.playlist_menu_pos, true);
+											m.enabled(vidsel_item.playlist_menu_pos + 1, true);
+											m.enabled(vidsel_item.playlist_menu_pos + 2, true);
+											m.enabled(vidsel_item.playlist_menu_pos + 3, true);
+										}
 										SendMessage(hwnd, WM_REFRESH, reinterpret_cast<WPARAM>(m.handle()), 0);
 										vidsel_item.m = nullptr;
 									}

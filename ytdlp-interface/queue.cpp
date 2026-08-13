@@ -388,6 +388,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 		if(sel.size() == 1)
 		{
 			auto item {lbq.at(sel.front())};
+			vidsel_item.playlist_item_pos = item.pos().item;
 			auto item_name {replace_placeholder(i18n::tr("queue.item", "item #{item_number}"), "{item_number}", item.text(0))};
 			auto url {item.value<lbqval_t>().url};
 			auto &bottom {bottoms.current()};
@@ -505,7 +506,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 					if(!count || bottom.playlist_info.empty())
 					{
 						mitem.enabled(false);
-						vidsel_item.pos = mitem.index();
+						vidsel_item.playlist_menu_pos = mitem.index();
 					}
 					else m.append(i18n::tr("queue.split_playlist", "Split playlist (add videos to queue)"), [&, count, url](menu::item_proxy)
 					{
@@ -537,7 +538,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 						add_url(url, true);
 					}).enabled(item.text(2) != "...");
 				}
-				else if(!bottom.is_ytchan && !bottom.is_bcchan && !is_live && item.text(2).find("[live event scheduled to begin in") != 0)
+				else if(!bottom.is_ytchan && !bottom.is_bcchan && !is_live && !bottom.live_scheduled)
 				{
 					m.append(i18n::tr("queue.download_sections", "Download sections"), [this](menu::item_proxy)
 					{
@@ -740,7 +741,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 
 			m.append(i18n::tr("queue.refresh_selected", "Refresh selected"), [&, sel](menu::item_proxy)
 			{
-				vidsel_item = {&m, sel.front().item};
+				vidsel_item.playlist_item_pos = sel.front().item;
 				for(auto &el : sel)
 				{
 					auto item {lbq.at(el)};

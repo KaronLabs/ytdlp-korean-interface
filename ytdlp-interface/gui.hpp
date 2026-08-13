@@ -77,7 +77,8 @@ private:
 	struct
 	{
 		nana::menu *m {nullptr};
-		std::size_t pos {0};
+		std::size_t playlist_item_pos {static_cast<std::size_t>(-1)};
+		std::size_t playlist_menu_pos {static_cast<std::size_t>(-1)};
 		std::size_t formats_pos {static_cast<std::size_t>(-1)};
 		std::size_t subtitles_pos {static_cast<std::size_t>(-1)};
 	} vidsel_item;
@@ -107,7 +108,7 @@ private:
 
 		bool is_ytlink {false}, use_strfmt {false}, received_procmsg {false}, info_thread_active {false}, is_gen_playlist {false},
 			is_ytplaylist {false}, is_ytchan {false}, is_bcplaylist {false}, is_bclink {false}, is_bcchan {false}, is_yttab {false},
-			is_scplaylist {false}, cbtime {false}, cbthumb {false}, cbsubs {false}, cbkeyframes {false}, cbmp3 {false}, cbargs {false};
+			is_scplaylist {false}, live_scheduled {false}, cbtime {false}, cbthumb {false}, cbsubs {false}, cbkeyframes {false}, cbmp3 {false}, cbargs {false};
 
 		std::atomic_bool working {false}, graceful_exit {false}, working_info {true}, started {false};
 		fs::path outpath, outfile, merger_path, download_path, printed_path;
@@ -118,7 +119,7 @@ private:
 		std::string media_title, argset, rate, progtext, sub_langs, sub_format;
 		std::thread dl_thread, info_thread;
 		DWORD dl_thread_id {0}, info_thread_id {0};
-		unsigned idx_error {0}, ratelim_unit {0}, com_chap {0}, prog_amount {1000}, progval {0}, progval_shadow {0};
+		unsigned idx_error {0}, playlist_item_index {0}, ratelim_unit {0}, com_chap {0}, prog_amount {1000}, progval {0}, progval_shadow {0};
 		nana::timer timer_proc;
 
 		bool btnfmt_visible() { return pgui->get_place().field_visible("btn_ytfmtlist"); }
