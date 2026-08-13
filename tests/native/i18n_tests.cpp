@@ -37,7 +37,7 @@ namespace
 	};
 
 	const std::string valid_catalog {
-		R"({"locale":"ko-KR","schemaVersion":1,"strings":{"hello":"안녕하세요","count":"{total}개 중 {current}","markup":"<bold color={accent}>안내</>"}})"
+		R"({"locale":"ko-KR","schemaVersion":1,"strings":{"hello":"안녕하세요","dotted.key":"점 키","count":"{total}개 중 {current}","markup":"<bold color={accent}>안내</>","named-markup":"<bold>안내</bold>"}})"
 	};
 
 	void test_valid_catalog_and_fallbacks()
@@ -49,10 +49,12 @@ namespace
 		expect(result.diagnostics.empty(), "result.diagnostics.empty()", __func__);
 		expect(i18n::active_locale() == "ko-KR", "i18n::active_locale() == \"ko-KR\"", __func__);
 		expect(i18n::tr("hello", "Hello") == "안녕하세요", "i18n::tr(\"hello\", \"Hello\") == \"안녕하세요\"", __func__);
+		expect(i18n::tr("dotted.key", "Dotted key") == "점 키", "valid dotted key uses Korean value", __func__);
 		expect(i18n::tr("missing", "English fallback") == "English fallback", "missing key uses English fallback", __func__);
 		expect(i18n::tr("count", "{total} of {current}") == "{total}개 중 {current}", "matching placeholders use Korean value", __func__);
 		expect(i18n::tr("count", "{total} only") == "{total} only", "mismatched placeholders use English fallback", __func__);
 		expect(i18n::tr("markup", "<bold color={accent}>Notice</>") == "<bold color={accent}>안내</>", "balanced Nana markup uses Korean value", __func__);
+		expect(i18n::tr("named-markup", "<bold>Notice</bold>") == "<bold>안내</bold>", "balanced named Nana markup uses Korean value", __func__);
 	}
 
 	void test_rejects_bad_catalog_structure_and_utf8()
@@ -96,13 +98,13 @@ namespace
 	void test_rejects_bad_entries_and_reset()
 	{
 		catalog_file catalog(
-			R"({"locale":"ko-KR","schemaVersion":1,"strings":{"valid":"정상","number":3,"empty":"","markup":"<bold>broken","bad\nkey":"잘못된 키"}})",
+			R"({"locale":"ko-KR","schemaVersion":1,"strings":{"valid":"정상","number":3,"empty":"","markup":"<bold>broken","mismatch":"<bold>잘못됨</color>","bad\nkey":"잘못된 키"}})",
 			"bad-entries"
 		);
 		i18n::reset_for_tests();
 		auto result = i18n::load_catalog(catalog.path);
 		expect(result.catalog_loaded, "valid entries load despite rejected entries", __func__);
-		expect(result.diagnostics.size() == 4, "each rejected entry reports a diagnostic", __func__);
+		expect(result.diagnostics.size() == 5, "each rejected entry reports a diagnostic", __func__);
 		bool has_sanitized_key {};
 		for(const auto &entry : result.diagnostics)
 			has_sanitized_key = has_sanitized_key || entry.key == "invalid-key";
@@ -111,6 +113,8 @@ namespace
 		expect(i18n::tr("number", "Number") == "Number", "non-string entry uses English fallback", __func__);
 		expect(i18n::tr("empty", "Empty") == "Empty", "empty entry uses English fallback", __func__);
 		expect(i18n::tr("markup", "Markup") == "Markup", "malformed markup uses English fallback", __func__);
+		expect(i18n::tr("mismatch", "Mismatch") == "Mismatch", "mismatched named markup uses English fallback", __func__);
+		expect(i18n::tr("bad\nkey", "Bad key") == "Bad key", "invalid catalog key uses English fallback", __func__);
 		i18n::reset_for_tests();
 		expect(i18n::active_locale() == "en-US", "reset returns English locale", __func__);
 		expect(i18n::tr("valid", "Valid") == "Valid", "reset removes stale translations", __func__);

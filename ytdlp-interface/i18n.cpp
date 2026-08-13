@@ -99,6 +99,17 @@ namespace
 				index += 2;
 				continue;
 			}
+			if(value.substr(index, 2) == "</")
+			{
+				size_t cursor = index + 2;
+				while(cursor < value.size() && (std::isalnum(static_cast<unsigned char>(value[cursor])) || value[cursor] == '_' || value[cursor] == '-'))
+					++cursor;
+				if(cursor == index + 2 || cursor == value.size() || value[cursor] != '>' || open_tags.empty() || open_tags.back() != std::string(value.substr(index + 2, cursor - index - 2)))
+					return false;
+				open_tags.pop_back();
+				index = cursor;
+				continue;
+			}
 			if(index + 1 >= value.size() || !std::isalpha(static_cast<unsigned char>(value[index + 1])))
 				return false;
 			size_t cursor = index + 1;
@@ -205,6 +216,11 @@ namespace i18n
 		for(auto iterator = catalog["strings"].begin(); iterator != catalog["strings"].end(); ++iterator)
 		{
 			const auto key = iterator.key();
+			if(sanitized_key(key) != key)
+			{
+				add_catalog_diagnostic(result, key, "invalid key");
+				continue;
+			}
 			if(!iterator.value().is_string())
 			{
 				add_catalog_diagnostic(result, key, "non-string value");
