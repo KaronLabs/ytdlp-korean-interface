@@ -214,6 +214,20 @@ class RecoveryContractTests(unittest.TestCase):
         self.assertTrue(I18N_SOURCE.is_file(), f"missing i18n source: {I18N_SOURCE}")
         self.assertTrue(I18N_HEADER.is_file(), f"missing i18n header: {I18N_HEADER}")
 
+    def test_i18n_header_declares_localization_core_api(self):
+        header = I18N_HEADER.read_text(encoding="utf-8")
+        for declaration in (
+            r"struct\s+load_result",
+            r"bool\s+catalog_loaded",
+            r"std::vector<diagnostic>\s+diagnostics",
+            r"load_result\s+load_catalog\s*\(",
+            r"std::string\s+tr\s*\(",
+            r"std::string\s+active_locale\s*\(\s*\)",
+            r"void\s+reset_for_tests\s*\(\s*\)",
+        ):
+            with self.subTest(declaration=declaration):
+                self.assertRegex(header, declaration)
+
     def test_recovered_catalog_has_524_nonempty_string_entries(self):
         strings = recovered_strings()
         self.assertEqual(524, len(strings))
