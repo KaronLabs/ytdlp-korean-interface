@@ -1,6 +1,6 @@
 # Runtime maintenance
 
-`tools/runtime-maintenance.ps1` is a dot-source-only PowerShell 5.1 module: loading it performs no repair or update.
+`tools/runtime-maintenance.psm1` is the PowerShell 5.1 module and exports only `RepairSettings` and `UpdateYtDlp`. `tools/runtime-maintenance.ps1` is a safe compatibility loader that imports that module; loading either file performs no repair or update.
 
 ## Settings repair
 

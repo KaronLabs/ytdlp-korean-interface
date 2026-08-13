@@ -1,11 +1,11 @@
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$toolPath = Join-Path $repositoryRoot 'tools/runtime-maintenance.ps1'
-if (-not (Test-Path -LiteralPath $toolPath)) {
-    throw 'runtime-maintenance.ps1 is missing'
+$modulePath = Join-Path $repositoryRoot 'tools/runtime-maintenance.psm1'
+if (-not (Test-Path -LiteralPath $modulePath)) {
+    throw 'runtime-maintenance.psm1 is missing'
 }
-. $toolPath
+$script:runtimeMaintenanceModule = Import-Module -Name $modulePath -Force -PassThru
 
 $script:failures = New-Object System.Collections.Generic.List[string]
 
@@ -121,6 +121,29 @@ function New-VersionReader {
     return { param([string] $Path) $ExpectedVersion }.GetNewClosure()
 }
 
+function Invoke-FixtureYtDlpTransaction {
+    param(
+        [string] $TargetPath,
+        [string] $AssetPath,
+        [string] $ReleaseTag,
+        [string] $ExpectedSha256,
+        [scriptblock] $VersionReader,
+        [switch] $SimulatePostReplaceFailure,
+        [switch] $WhatIf
+    )
+    $module = $script:runtimeMaintenanceModule
+    & $module {
+        param($TargetPath, $AssetPath, $ReleaseTag, $ExpectedSha256, $VersionReader, $SimulatePostReplaceFailure, $WhatIf)
+        Invoke-YtDlpTransaction -TargetPath $TargetPath -AssetPath $AssetPath -ReleaseTag $ReleaseTag -ExpectedSha256 $ExpectedSha256 -VersionReader $VersionReader -SimulatePostReplaceFailure:$SimulatePostReplaceFailure -WhatIf:$WhatIf -Confirm:$false
+    } $TargetPath $AssetPath $ReleaseTag $ExpectedSha256 $VersionReader $SimulatePostReplaceFailure $WhatIf
+}
+
+function Test-RuntimeMaintenanceModuleExportsOnlyPublicCommands {
+    $exported = (@($script:runtimeMaintenanceModule.ExportedFunctions.Keys | Sort-Object) -join ',')
+    Assert-Equal 'RepairSettings,UpdateYtDlp' $exported 'The module must export exactly the two public maintenance commands.'
+    Assert-True ($null -eq (Get-Command -Name Invoke-YtDlpTransaction -ErrorAction SilentlyContinue)) 'The transaction core must not be callable from the importer scope.'
+}
+
 function Test-UpdateYtDlpRejectsCallerControlledSeams {
     $root = New-FixtureRoot
     try {
@@ -141,6 +164,74 @@ function Test-UpdateYtDlpRejectsCallerControlledSeams {
     finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
+function Test-UpdateYtDlpDeclinedConfirmDoesNotReplace {
+    $root = New-FixtureRoot
+    try {
+        $target = Join-Path $root 'yt-dlp.exe'
+        $asset = Join-Path $root 'asset.exe'
+        $childScript = Join-Path $root 'declined-confirm.ps1'
+        [System.IO.File]::WriteAllText($target, 'old-binary', [System.Text.Encoding]::ASCII)
+        [System.IO.File]::WriteAllText($asset, 'new-binary', [System.Text.Encoding]::ASCII)
+        $child = @"
+`$ErrorActionPreference = 'Stop'
+`$module = Import-Module -Name '$modulePath' -Force -PassThru
+& `$module {
+    param(`$TargetPath, `$AssetPath)
+    function Get-OfficialNightlyAsset {
+        param([string] `$StagingPath)
+        return [pscustomobject]@{ AssetPath = `$AssetPath; ReleaseTag = 'fixture-tag'; ExpectedSha256 = (Get-FileHash -LiteralPath `$AssetPath -Algorithm SHA256).Hash }
+    }
+    function Get-YtDlpVersion { param([string] `$Path, [scriptblock] `$VersionReader) return 'fixture-tag' }
+    `$result = UpdateYtDlp -TargetPath `$TargetPath -Confirm
+    Write-Output ('DECLINED=' + [bool]`$result.Declined)
+} '$target' '$asset'
+"@
+        [IO.File]::WriteAllText($childScript, $child, [Text.Encoding]::UTF8)
+        $startInfo = New-Object Diagnostics.ProcessStartInfo
+        $startInfo.FileName = (Join-Path $PSHOME 'powershell.exe')
+        $startInfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$childScript`""
+        $startInfo.UseShellExecute = $false
+        $startInfo.RedirectStandardInput = $true
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
+        $process = [Diagnostics.Process]::Start($startInfo)
+        $process.StandardInput.WriteLine('N')
+        $process.StandardInput.Close()
+        $output = $process.StandardOutput.ReadToEnd() + $process.StandardError.ReadToEnd()
+        $process.WaitForExit()
+        Assert-Equal 0 $process.ExitCode "A declined public confirmation should complete without a transaction error. Output=$output"
+        Assert-True ($output -match 'DECLINED=True') 'A declined public confirmation must report Declined.'
+        Assert-Equal 'old-binary' ([IO.File]::ReadAllText($target)) 'A declined public confirmation must not replace the target.'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+function Test-UpdateYtDlpWhatIfVerifiesWithoutReplacing {
+    $root = New-FixtureRoot
+    try {
+        $target = Join-Path $root 'yt-dlp.exe'
+        $asset = Join-Path $root 'asset.exe'
+        [IO.File]::WriteAllText($target, 'old-binary', [Text.Encoding]::ASCII)
+        [IO.File]::WriteAllText($asset, 'new-binary', [Text.Encoding]::ASCII)
+        $module = $script:runtimeMaintenanceModule
+        $verification = & $module {
+            param($TargetPath, $AssetPath)
+            $script:fixtureVersionCalls = 0
+            function Get-OfficialNightlyAsset {
+                param([string] $StagingPath)
+                return [pscustomobject]@{ AssetPath = $AssetPath; ReleaseTag = 'fixture-tag'; ExpectedSha256 = (Get-FileHash -LiteralPath $AssetPath -Algorithm SHA256).Hash }
+            }
+            function Get-YtDlpVersion { param([string] $Path, [scriptblock] $VersionReader) $script:fixtureVersionCalls++; return 'fixture-tag' }
+            $result = UpdateYtDlp -TargetPath $TargetPath -WhatIf
+            return [pscustomobject]@{ Updated = $result.Updated; VersionCalls = $script:fixtureVersionCalls }
+        } $target $asset
+        Assert-True (-not $verification.Updated) 'Public WhatIf must not replace the target.'
+        Assert-True ($verification.VersionCalls -gt 0) 'Public WhatIf must still verify the staged asset version.'
+        Assert-Equal 'old-binary' ([IO.File]::ReadAllText($target)) 'Public WhatIf must retain the target.'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
 function Test-YtDlpTransactionBlocksHashMismatch {
     $root = New-FixtureRoot
     try {
@@ -148,7 +239,7 @@ function Test-YtDlpTransactionBlocksHashMismatch {
         $asset = Join-Path $root 'asset.exe'
         [System.IO.File]::WriteAllText($target, 'old-binary', [System.Text.Encoding]::ASCII)
         [System.IO.File]::WriteAllText($asset, 'new-binary', [System.Text.Encoding]::ASCII)
-        try { Invoke-YtDlpTransaction -TargetPath $target -AssetPath $asset -ReleaseTag 'test-tag' -ExpectedSha256 ('0' * 64) -VersionReader (New-VersionReader 'test-tag') -Confirm:$false | Out-Null; $threw = $false } catch { $threw = $true }
+        try { Invoke-FixtureYtDlpTransaction -TargetPath $target -AssetPath $asset -ReleaseTag 'test-tag' -ExpectedSha256 ('0' * 64) -VersionReader (New-VersionReader 'test-tag') | Out-Null; $threw = $false } catch { $threw = $true }
         Assert-True $threw 'A hash mismatch must block replacement.'
         Assert-Equal 'old-binary' ([System.IO.File]::ReadAllText($target)) 'A hash mismatch must retain the target.'
     }
@@ -163,7 +254,7 @@ function Test-YtDlpTransactionBlocksVersionMismatch {
         [System.IO.File]::WriteAllText($target, 'old-binary', [System.Text.Encoding]::ASCII)
         [System.IO.File]::WriteAllText($asset, 'new-binary', [System.Text.Encoding]::ASCII)
         $hash = (Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash
-        try { Invoke-YtDlpTransaction -TargetPath $target -AssetPath $asset -ReleaseTag 'expected-tag' -ExpectedSha256 $hash -VersionReader (New-VersionReader 'wrong-tag') -Confirm:$false | Out-Null; $threw = $false } catch { $threw = $true }
+        try { Invoke-FixtureYtDlpTransaction -TargetPath $target -AssetPath $asset -ReleaseTag 'expected-tag' -ExpectedSha256 $hash -VersionReader (New-VersionReader 'wrong-tag') | Out-Null; $threw = $false } catch { $threw = $true }
         Assert-True $threw 'A staged version mismatch must block replacement.'
         Assert-Equal 'old-binary' ([System.IO.File]::ReadAllText($target)) 'A version mismatch must retain the target.'
     }
@@ -178,7 +269,7 @@ function Test-YtDlpTransactionRejectsNonCanonicalTarget {
         [System.IO.File]::WriteAllText($target, 'old-binary', [System.Text.Encoding]::ASCII)
         [System.IO.File]::WriteAllText($asset, 'new-binary', [System.Text.Encoding]::ASCII)
         $hash = (Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash
-        try { Invoke-YtDlpTransaction -TargetPath $target -AssetPath $asset -ReleaseTag 'test-tag' -ExpectedSha256 $hash -VersionReader (New-VersionReader 'test-tag') -Confirm:$false | Out-Null; $threw = $false } catch { $threw = $true }
+        try { Invoke-FixtureYtDlpTransaction -TargetPath $target -AssetPath $asset -ReleaseTag 'test-tag' -ExpectedSha256 $hash -VersionReader (New-VersionReader 'test-tag') | Out-Null; $threw = $false } catch { $threw = $true }
         Assert-True $threw 'The transaction must reject an arbitrary target leaf.'
         Assert-Equal 'old-binary' ([System.IO.File]::ReadAllText($target)) 'A rejected target must remain unchanged.'
     }
@@ -196,7 +287,7 @@ function Test-YtDlpTransactionRejectsTraversalTarget {
         [System.IO.File]::WriteAllText($asset, 'new-binary', [System.Text.Encoding]::ASCII)
         $hash = (Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash
         $traversalTarget = Join-Path $nested '..\yt-dlp.exe'
-        try { Invoke-YtDlpTransaction -TargetPath $traversalTarget -AssetPath $asset -ReleaseTag 'test-tag' -ExpectedSha256 $hash -VersionReader (New-VersionReader 'test-tag') -Confirm:$false | Out-Null; $threw = $false } catch { $threw = $true }
+        try { Invoke-FixtureYtDlpTransaction -TargetPath $traversalTarget -AssetPath $asset -ReleaseTag 'test-tag' -ExpectedSha256 $hash -VersionReader (New-VersionReader 'test-tag') | Out-Null; $threw = $false } catch { $threw = $true }
         Assert-True $threw 'The transaction must reject a traversal target path.'
         Assert-Equal 'old-binary' ([System.IO.File]::ReadAllText($target)) 'A traversal target must remain unchanged.'
     }
@@ -213,7 +304,7 @@ function Test-YtDlpTransactionWritesCanonicalSiblingProvenance {
         [System.IO.File]::WriteAllText($asset, 'new-binary', [System.Text.Encoding]::ASCII)
         $hash = (Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash
 
-        $result = Invoke-YtDlpTransaction -TargetPath $target -AssetPath $asset -ReleaseTag 'test-tag' -ExpectedSha256 $hash -VersionReader (New-VersionReader 'test-tag') -Confirm:$false
+        $result = Invoke-FixtureYtDlpTransaction -TargetPath $target -AssetPath $asset -ReleaseTag 'test-tag' -ExpectedSha256 $hash -VersionReader (New-VersionReader 'test-tag')
         $manifest = Get-Content -LiteralPath $provenance -Raw | ConvertFrom-Json
 
         Assert-True $result.Updated 'Verified asset should replace the target.'
@@ -233,7 +324,7 @@ function Test-YtDlpTransactionRollsBackPostReplacementFailure {
         [System.IO.File]::WriteAllText($target, 'old-binary', [System.Text.Encoding]::ASCII)
         [System.IO.File]::WriteAllText($asset, 'new-binary', [System.Text.Encoding]::ASCII)
         $hash = (Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash
-        try { Invoke-YtDlpTransaction -TargetPath $target -AssetPath $asset -ReleaseTag 'test-tag' -ExpectedSha256 $hash -VersionReader (New-VersionReader 'test-tag') -SimulatePostReplaceFailure -Confirm:$false | Out-Null; $threw = $false } catch { $threw = $true }
+        try { Invoke-FixtureYtDlpTransaction -TargetPath $target -AssetPath $asset -ReleaseTag 'test-tag' -ExpectedSha256 $hash -VersionReader (New-VersionReader 'test-tag') -SimulatePostReplaceFailure | Out-Null; $threw = $false } catch { $threw = $true }
         Assert-True $threw 'A post-replacement failure must be reported.'
         Assert-Equal 'old-binary' ([System.IO.File]::ReadAllText($target)) 'A post-replacement failure must restore the backup.'
     }
@@ -248,7 +339,7 @@ function Test-YtDlpTransactionWhatIfDoesNotReplace {
         [System.IO.File]::WriteAllText($target, 'old-binary', [System.Text.Encoding]::ASCII)
         [System.IO.File]::WriteAllText($asset, 'new-binary', [System.Text.Encoding]::ASCII)
         $hash = (Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash
-        Invoke-YtDlpTransaction -TargetPath $target -AssetPath $asset -ReleaseTag 'test-tag' -ExpectedSha256 $hash -VersionReader (New-VersionReader 'test-tag') -WhatIf | Out-Null
+        Invoke-FixtureYtDlpTransaction -TargetPath $target -AssetPath $asset -ReleaseTag 'test-tag' -ExpectedSha256 $hash -VersionReader (New-VersionReader 'test-tag') -WhatIf | Out-Null
         Assert-Equal 'old-binary' ([System.IO.File]::ReadAllText($target)) 'WhatIf must not replace the target.'
         Assert-Equal 0 @((Get-ChildItem -LiteralPath $root -Filter 'yt-dlp.exe.staging.*')).Count 'WhatIf must remove its staging fixture.'
     }
@@ -259,7 +350,10 @@ Test-RepairSettingsPreservesUnrelatedValues
 Test-RepairSettingsLeavesMalformedInputUntouched
 Test-RepairSettingsWhatIfDoesNotReplace
 Test-RepairSettingsPreservesValidJsonBomAndNoBom
+Test-RuntimeMaintenanceModuleExportsOnlyPublicCommands
 Test-UpdateYtDlpRejectsCallerControlledSeams
+Test-UpdateYtDlpDeclinedConfirmDoesNotReplace
+Test-UpdateYtDlpWhatIfVerifiesWithoutReplacing
 Test-YtDlpTransactionBlocksHashMismatch
 Test-YtDlpTransactionBlocksVersionMismatch
 Test-YtDlpTransactionRejectsNonCanonicalTarget
