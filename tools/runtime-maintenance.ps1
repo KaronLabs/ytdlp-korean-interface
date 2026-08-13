@@ -45,6 +45,26 @@ function Set-PropertyValue {
     else { $property.Value = $Value }
 }
 
+function Get-JsonFile {
+    param([string] $Path)
+    $bytes = [IO.File]::ReadAllBytes($Path)
+    if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+        $encoding = New-Object Text.UTF8Encoding($true)
+    }
+    elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) {
+        $encoding = [Text.Encoding]::Unicode
+    }
+    elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF) {
+        $encoding = [Text.Encoding]::BigEndianUnicode
+    }
+    else {
+        $encoding = New-Object Text.UTF8Encoding($false)
+    }
+    try { $value = ([IO.File]::ReadAllText($Path, $encoding) | ConvertFrom-Json -ErrorAction Stop) }
+    catch { throw 'Settings JSON is malformed; the original file was not changed.' }
+    return [pscustomobject]@{ Value = $value; Encoding = $encoding }
+}
+
 function Repair-PathFields {
     param([object] $Settings, [string] $DownloadsPath)
     $changed = $false
@@ -56,16 +76,20 @@ function Repair-PathFields {
 
     $outpaths = Get-PropertyValue $Settings 'outpaths'
     if ($null -ne $outpaths) {
-        $kept = New-Object System.Collections.Generic.List[string]
+        $kept = New-Object System.Collections.Generic.List[object]
+        $outpathsChanged = $false
+        $hasDownloadsPath = $false
         foreach ($path in @($outpaths)) {
-            if (Test-StaleDownloadPath $path) { $changed = $true; continue }
-            if ($path -is [string]) { $kept.Add($path) }
+            if (Test-StaleDownloadPath $path) {
+                if (-not $hasDownloadsPath) { $kept.Add($DownloadsPath); $hasDownloadsPath = $true }
+                $changed = $true
+                $outpathsChanged = $true
+                continue
+            }
+            $kept.Add($path)
+            if ($path -is [string] -and $path.Equals($DownloadsPath, [StringComparison]::OrdinalIgnoreCase)) { $hasDownloadsPath = $true }
         }
-        if (-not ($kept | Where-Object { $_.Equals($DownloadsPath, [StringComparison]::OrdinalIgnoreCase) })) {
-            $kept.Insert(0, $DownloadsPath)
-            $changed = $true
-        }
-        if ($changed) { Set-PropertyValue $Settings 'outpaths' @($kept) }
+        if ($outpathsChanged) { Set-PropertyValue $Settings 'outpaths' $kept.ToArray() }
     }
     return $changed
 }
@@ -76,10 +100,10 @@ function New-SiblingPath {
 }
 
 function Write-JsonTransactionFile {
-    param([object] $Value, [string] $Path, [string] $BackupPath)
+    param([object] $Value, [string] $Path, [string] $BackupPath, [Text.Encoding] $Encoding)
     $temporaryPath = New-SiblingPath $Path 'temporary'
     try {
-        [IO.File]::WriteAllText($temporaryPath, ($Value | ConvertTo-Json -Depth 100), [Text.Encoding]::UTF8)
+        [IO.File]::WriteAllText($temporaryPath, ($Value | ConvertTo-Json -Depth 100), $Encoding)
         Get-Content -LiteralPath $temporaryPath -Raw | ConvertFrom-Json | Out-Null
         [IO.File]::Replace($temporaryPath, $Path, $BackupPath, $true)
     }
@@ -98,8 +122,8 @@ function RepairSettings {
     $resolvedSettingsPath = (Resolve-Path -LiteralPath $SettingsPath -ErrorAction Stop).Path
     if ([string]::IsNullOrWhiteSpace($DownloadsPath)) { $DownloadsPath = Get-DownloadsKnownFolderPath }
     $downloadsFullPath = [IO.Path]::GetFullPath($DownloadsPath)
-    try { $settings = (Get-Content -LiteralPath $resolvedSettingsPath -Raw | ConvertFrom-Json -ErrorAction Stop) }
-    catch { throw 'Settings JSON is malformed; the original file was not changed.' }
+    $settingsFile = Get-JsonFile $resolvedSettingsPath
+    $settings = $settingsFile.Value
 
     $changed = Repair-PathFields $settings $downloadsFullPath
     foreach ($preset in @((Get-PropertyValue $settings 'presets'))) {
@@ -112,11 +136,11 @@ function RepairSettings {
 
     $backupPath = New-SiblingPath $resolvedSettingsPath ('backup-' + (Get-Date -Format 'yyyyMMddHHmmss'))
     try {
-        Write-JsonTransactionFile $settings $resolvedSettingsPath $backupPath
+        Write-JsonTransactionFile $settings $resolvedSettingsPath $backupPath $settingsFile.Encoding
         Get-Content -LiteralPath $resolvedSettingsPath -Raw | ConvertFrom-Json -ErrorAction Stop | Out-Null
     }
     catch {
-        if (Test-Path -LiteralPath $backupPath) { [IO.File]::Copy($backupPath, $resolvedSettingsPath, $true) }
+        if (Test-Path -LiteralPath $backupPath) { Restore-BackupFile $backupPath $resolvedSettingsPath }
         throw
     }
     return [pscustomobject]@{ Changed = $true; BackupPath = $backupPath; WhatIf = $false }
@@ -129,6 +153,7 @@ function Get-Sha256 {
 
 function Get-OfficialNightlyAsset {
     param([string] $StagingPath)
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
     $release = Invoke-RestMethod -Uri ('https://api.github.com/repos/{0}/releases/latest' -f $script:OfficialNightlyRepository) -Headers @{ 'User-Agent' = 'ytdlp-interface-runtime-maintenance' }
     $asset = @($release.assets | Where-Object { $_.name -eq 'yt-dlp.exe' }) | Select-Object -First 1
     $sums = @($release.assets | Where-Object { $_.name -match '^SHA2-256SUMS(\.txt)?$' }) | Select-Object -First 1
@@ -168,31 +193,30 @@ function Restore-BackupFile {
     }
 }
 
-function UpdateYtDlp {
+function Resolve-CanonicalYtDlpTargetPath {
+    param([string] $TargetPath)
+    if (@($TargetPath -split '[\\/]' | Where-Object { $_ -eq '..' }).Count -ne 0) { throw 'The target path must not contain traversal components.' }
+    $resolvedTargetPath = (Resolve-Path -LiteralPath $TargetPath -ErrorAction Stop).Path
+    if ((Split-Path -Leaf $resolvedTargetPath) -cne 'yt-dlp.exe') { throw 'The target must be the canonical yt-dlp.exe file.' }
+    return $resolvedTargetPath
+}
+
+function Invoke-YtDlpTransaction {
     [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
     param(
         [Parameter(Mandatory = $true)] [string] $TargetPath,
-        [string] $Repository = 'yt-dlp/yt-dlp-nightly-builds',
-        [string] $AssetPath,
-        [string] $ReleaseTag,
-        [string] $ExpectedSha256,
+        [Parameter(Mandatory = $true)] [string] $AssetPath,
+        [Parameter(Mandatory = $true)] [string] $ReleaseTag,
+        [Parameter(Mandatory = $true)] [string] $ExpectedSha256,
         [scriptblock] $VersionReader,
-        [string] $ProvenancePath,
         [switch] $SimulatePostReplaceFailure
     )
 
-    if ($Repository -cne $script:OfficialNightlyRepository) { throw 'Only yt-dlp/yt-dlp-nightly-builds is permitted.' }
-    $resolvedTargetPath = (Resolve-Path -LiteralPath $TargetPath -ErrorAction Stop).Path
+    $resolvedTargetPath = Resolve-CanonicalYtDlpTargetPath $TargetPath
+    if (-not (Test-Path -LiteralPath $AssetPath)) { throw 'The supplied asset fixture does not exist.' }
     $stagingPath = New-SiblingPath $resolvedTargetPath 'staging'
     [IO.Directory]::CreateDirectory($stagingPath) | Out-Null
     try {
-        if ([string]::IsNullOrWhiteSpace($AssetPath)) {
-            $official = Get-OfficialNightlyAsset $stagingPath
-            $AssetPath = $official.AssetPath; $ReleaseTag = $official.ReleaseTag; $ExpectedSha256 = $official.ExpectedSha256
-        }
-        elseif (-not (Test-Path -LiteralPath $AssetPath)) { throw 'The supplied asset fixture does not exist.' }
-        if ([string]::IsNullOrWhiteSpace($ReleaseTag) -or [string]::IsNullOrWhiteSpace($ExpectedSha256)) { throw 'ReleaseTag and ExpectedSha256 are required for a supplied asset fixture.' }
-
         $stagedAssetPath = Join-Path $stagingPath 'yt-dlp.exe'
         [IO.File]::Copy((Resolve-Path -LiteralPath $AssetPath).Path, $stagedAssetPath, $true)
         $actualHash = Get-Sha256 $stagedAssetPath
@@ -207,9 +231,9 @@ function UpdateYtDlp {
         try {
             if ($SimulatePostReplaceFailure) { throw 'Simulated post-replacement failure.' }
             if ((Get-YtDlpVersion $resolvedTargetPath $VersionReader) -cne $ReleaseTag) { throw 'The deployed yt-dlp version does not match the release tag.' }
-            if ([string]::IsNullOrWhiteSpace($ProvenancePath)) { $ProvenancePath = Join-Path (Split-Path -Parent $resolvedTargetPath) 'yt-dlp-provenance.json' }
+            $provenancePath = Join-Path (Split-Path -Parent $resolvedTargetPath) 'yt-dlp-provenance.json'
             $provenance = [ordered]@{ repository = $script:OfficialNightlyRepository; channel = 'nightly'; tag = $ReleaseTag; asset = 'yt-dlp.exe'; sha256 = $actualHash; installedAtUtc = [DateTime]::UtcNow.ToString('o'); backupPath = $backupPath }
-            [IO.File]::WriteAllText($ProvenancePath, ($provenance | ConvertTo-Json), [Text.Encoding]::UTF8)
+            [IO.File]::WriteAllText($provenancePath, ($provenance | ConvertTo-Json), [Text.Encoding]::UTF8)
         }
         catch {
             Restore-BackupFile $backupPath $resolvedTargetPath
@@ -220,5 +244,21 @@ function UpdateYtDlp {
     }
     finally {
         if (Test-Path -LiteralPath $stagingPath) { Remove-Item -LiteralPath $stagingPath -Recurse -Force -WhatIf:$false -ErrorAction SilentlyContinue }
+    }
+}
+
+function UpdateYtDlp {
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
+    param([Parameter(Mandatory = $true)] [string] $TargetPath)
+
+    $resolvedTargetPath = Resolve-CanonicalYtDlpTargetPath $TargetPath
+    $metadataStagingPath = New-SiblingPath $resolvedTargetPath 'metadata'
+    [IO.Directory]::CreateDirectory($metadataStagingPath) | Out-Null
+    try {
+        $official = Get-OfficialNightlyAsset $metadataStagingPath
+        Invoke-YtDlpTransaction -TargetPath $resolvedTargetPath -AssetPath $official.AssetPath -ReleaseTag $official.ReleaseTag -ExpectedSha256 $official.ExpectedSha256 -WhatIf:$WhatIfPreference -Confirm:$false
+    }
+    finally {
+        if (Test-Path -LiteralPath $metadataStagingPath) { Remove-Item -LiteralPath $metadataStagingPath -Recurse -Force -WhatIf:$false -ErrorAction SilentlyContinue }
     }
 }

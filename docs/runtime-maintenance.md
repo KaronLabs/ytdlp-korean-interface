@@ -10,9 +10,9 @@ The stale prefixes are deliberately narrow: `D:\Luna-Youtube-Downloader` and `C:
 
 ## yt-dlp nightly update
 
-`UpdateYtDlp -TargetPath <candidate\yt-dlp.exe> -WhatIf` accepts only `yt-dlp/yt-dlp-nightly-builds`. In normal use it reads that repository's latest release metadata, downloads `yt-dlp.exe` plus `SHA2-256SUMS`, checks SHA-256, checks `--version` against the release tag, backs up the target, replaces it from sibling staging, verifies again, and records a local provenance manifest.
+`UpdateYtDlp -TargetPath <candidate\yt-dlp.exe> -WhatIf` accepts only the canonical `yt-dlp.exe` target leaf and derives its release metadata, asset, checksum, and version from `yt-dlp/yt-dlp-nightly-builds`. In normal use it downloads `yt-dlp.exe` plus `SHA2-256SUMS`, checks SHA-256, checks `--version` against the release tag, backs up the target, replaces it from sibling staging, verifies again, and records `yt-dlp-provenance.json` beside the target.
 
-The optional `AssetPath`, `ReleaseTag`, `ExpectedSha256`, and `VersionReader` parameters exist for offline fixture tests. They do not permit an alternate repository. `-WhatIf` runs validation but never backs up, replaces, or writes provenance.
+The public updater has no caller-controlled asset, checksum, tag, or version-reader overrides. Fixture tests use the internal transaction directly. `-WhatIf` runs validation but never backs up, replaces, or writes provenance.
 
 If a post-replacement operation fails, the script restores the saved executable and verifies the rollback version. The script intentionally does not target the preserved parent deployment; run it against a reviewed candidate copy only.
 
