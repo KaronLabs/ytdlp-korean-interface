@@ -7,6 +7,7 @@
 #include <thread>
 #include <mutex>
 #include "json.hpp"
+#include "state_tokens.hpp"
 
 #define WM_SET_QLINE_TEXT (WM_APP + 0x0001)
 #define WM_LBQ_AUTODRAW (WM_APP + 0x0002)

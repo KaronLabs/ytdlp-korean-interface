@@ -10,6 +10,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = REPOSITORY_ROOT / "ytdlp-interface"
 I18N_SOURCE = SOURCE_ROOT / "i18n.cpp"
 I18N_HEADER = SOURCE_ROOT / "i18n.hpp"
+STATE_TOKENS_HEADER = SOURCE_ROOT / "state_tokens.hpp"
 STRING_LITERAL = r'"(?:[^"\\]|\\.)*"'
 FORBIDDEN_ARTIFACT_COMPONENTS = {
     ".superpowers",
@@ -210,13 +211,26 @@ def is_tracked_runtime_artifact(path):
 
 
 class RecoveryContractTests(unittest.TestCase):
+    def test_task_3_state_tokens_preserve_queue_state_without_visible_caption_logic(self):
+        self.assertTrue(STATE_TOKENS_HEADER.is_file(), "missing stable state token header")
+        source = STATE_TOKENS_HEADER.read_text(encoding="utf-8")
+        for token in ("queued", "active", "stopped", "done", "error", "skipped"):
+            with self.subTest(token=token):
+                self.assertIn(f'"{token}"', source)
+        self.assertIn("queue_item_state_from_token", source)
+        self.assertIn("queue_item_state_from_legacy_status", source)
+        self.assertIn('j["queue_state"]', (SOURCE_ROOT / "queue.cpp").read_text(encoding="utf-8-sig"))
+        self.assertIn('j["queue_state"]', (SOURCE_ROOT / "forms" / "form_loading.cpp").read_text(encoding="utf-8-sig"))
+        self.assertIn("queue_item_state_from_legacy_status", (SOURCE_ROOT / "gui.cpp").read_text(encoding="utf-8-sig"))
+
     def test_task_3_settings_language_defaults_persists_and_falls_back(self):
         header = (SOURCE_ROOT / "types.hpp").read_text(encoding="utf-8-sig")
         source = (SOURCE_ROOT / "types.cpp").read_text(encoding="utf-8-sig")
         self.assertRegex(header, r'std::string\s+language\s*\{\s*"en-US"\s*\}')
         self.assertIn('j["language"] = language;', source)
-        self.assertRegex(source, r'language\s*=\s*"en-US";')
-        self.assertRegex(source, r'value\s*==\s*"ko-KR"\s*\|\|\s*value\s*==\s*"en-US"')
+        self.assertIn('return language == "ko-KR" ? language : "en-US";', STATE_TOKENS_HEADER.read_text(encoding="utf-8"))
+        self.assertIn("normalized_language", source)
+        self.assertIn('#include "state_tokens.hpp"', header)
 
     def test_task_3_loads_selected_catalog_before_gui_construction(self):
         source = (SOURCE_ROOT / "main.cpp").read_text(encoding="utf-8-sig", errors="replace")

@@ -1087,6 +1087,13 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 				const auto &j {unfinished_qitems_data[url8]};
 				bottom.from_json(j);
 				auto item {lbq.item_from_value(url)};
+				if(item != lbq.empty_item)
+				{
+					if(j.contains("queue_state") && j["queue_state"].is_string())
+						item.value<lbqval_t>().state = queue_item_state_from_token(j["queue_state"].get<std::string>());
+					else if(j.contains("columns") && j["columns"].contains("status") && j["columns"]["status"].is_string())
+						item.value<lbqval_t>().state = queue_item_state_from_legacy_status(j["columns"]["status"].get<std::string>());
+				}
 				if(item != lbq.empty_item && item.selected())
 					bottoms.show(url);
 				if(j.contains("columns"))

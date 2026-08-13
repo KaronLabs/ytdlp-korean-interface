@@ -61,6 +61,7 @@ void GUI::fm_loading(bool saving)
 							{
 								auto &j {unfinished_qitems_data[url]};
 								bottom.to_json(j);
+								j["queue_state"] = queue_item_state_token(state);
 								j["columns"]["website"] = item.text(1);
 								j["columns"]["status"] = text;
 								j["columns"]["format"] = item.text(4);

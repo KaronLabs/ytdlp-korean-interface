@@ -767,13 +767,7 @@ void settings_t::to_json(nlohmann::json &j) const
 void settings_t::from_json(const nlohmann::json &j)
 {
 	using nana::to_wstring;
-	language = "en-US";
-	if(j.contains("language") && j["language"].is_string())
-	{
-		const auto value {j["language"].get<std::string>()};
-		if(value == "ko-KR" || value == "en-US")
-			language = value;
-	}
+	language = normalized_language(j.contains("language") && j["language"].is_string() ? j["language"].get<std::string>() : "");
 
 	ytdlp_path = j["ytdlp_path"].get<std::string>();
 	if(!ytdlp_path.empty())

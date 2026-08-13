@@ -34,17 +34,9 @@
 	#undef min
 #endif
 
-namespace fs = std::filesystem;
+#include "state_tokens.hpp"
 
-enum class queue_item_state
-{
-	queued,
-	active,
-	stopped,
-	done,
-	error,
-	skipped,
-};
+namespace fs = std::filesystem;
 
 struct lbqval_t
 {

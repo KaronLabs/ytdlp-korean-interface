@@ -1124,8 +1124,9 @@ void GUI::queue_save_data(size_t max_qitems_to_process)
 							{
 								auto &j {unfinished_qitems_data[url]};
 								bottom.to_json(j);
+								j["queue_state"] = queue_item_state_token(state);
 								j["columns"]["website"] = item.text(1);
-								j["columns"]["status"] = text;
+								j["columns"]["status"] = item.text(3);
 								j["columns"]["format"] = item.text(4);
 								j["columns"]["format_note"] = item.text(5);
 								j["columns"]["ext"] = item.text(6);

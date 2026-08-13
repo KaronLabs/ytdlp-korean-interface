@@ -26,8 +26,9 @@
   <ItemGroup>
     <ClCompile Include="test_main.cpp" />
     <ClCompile Include="i18n_tests.cpp" />
+    <ClCompile Include="state_token_tests.cpp" />
     <ClCompile Include="..\..\ytdlp-interface\i18n.cpp" />
   </ItemGroup>
-  <ItemGroup><ClInclude Include="..\..\ytdlp-interface\i18n.hpp" /></ItemGroup>
+  <ItemGroup><ClInclude Include="..\..\ytdlp-interface\i18n.hpp" /><ClInclude Include="..\..\ytdlp-interface\state_tokens.hpp" /></ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
