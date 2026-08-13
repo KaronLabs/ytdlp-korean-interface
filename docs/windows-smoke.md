@@ -19,8 +19,11 @@ rejection; retained failure evidence; and success-only workspace cleanup.
 ## Candidate build
 
 `tools/build-candidate.ps1` is inert until `-Run` is supplied. It locates
-`vswhere.exe`, MSBuild, and the v143 C++ toolset; builds `Release|x64`; checks
-the `2.19.1.0` product version and Korean catalog; then creates a GUID-named
+`vswhere.exe`, MSBuild, CMake, and the v143 C++ toolset; builds the four
+source dependencies for `Release|x64` first, verifies the exact linker inputs
+(`bit7z64.lib`, `nana_v143_Release_x64.lib`, `libpng.lib`, and
+`turbojpeg-static.lib`), then builds the product. It checks the `2.19.1.0`
+product version and Korean catalog; then creates a GUID-named
 candidate under a GUID-named directory outside the preserved parent runtime. The candidate receives copies of the
 new GUI, parent runtime executables, catalog, and a repaired *copy* of
 `ytdlp-interface.json`. `candidate-manifest.json` records SHA-256 values, file

@@ -4,7 +4,7 @@
 
 void GUI::fm_suspend()
 {
-	using widgets::theme;
+	using ::widgets::theme;
 	using std::string;
 	using namespace nana;
 
@@ -79,7 +79,7 @@ void GUI::fm_suspend()
 		}
 	});
 
-	::widgets::Button btn {fm, widgets::localized_cancel()};
+	::widgets::Button btn {fm, ::widgets::localized_cancel()};
 	fm["btn"] << btn;
 
 	btn.events().click([&] {fm.close();});

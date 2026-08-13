@@ -214,7 +214,10 @@ void GUI::make_form()
 		if(thr_ver_deno.joinable())
 			thr_ver_deno.detach();
 		if(i_taskbar)
-			i_taskbar.Release();
+		{
+			i_taskbar->Release();
+			i_taskbar = nullptr;
+		}
 
 		conf.argset = bottoms.current().argset;
 
@@ -823,12 +826,14 @@ void GUI::make_message_handlers()
 	{
 		msg.make_after(WM_TASKBAR_BUTTON_CREATED, [&](UINT, WPARAM, LPARAM, LRESULT *)
 		{
-			if(FAILED(i_taskbar.CoCreateInstance(CLSID_TaskbarList)))
+			if(FAILED(CoCreateInstance(CLSID_TaskbarList, nullptr, CLSCTX_INPROC_SERVER,
+				IID_PPV_ARGS(&i_taskbar))))
 				return false;
 
 			if(i_taskbar->HrInit() != S_OK)
 			{
-				i_taskbar.Release();
+				i_taskbar->Release();
+				i_taskbar = nullptr;
 				return false;
 			}
 			msg.umake_after(WM_TASKBAR_BUTTON_CREATED);

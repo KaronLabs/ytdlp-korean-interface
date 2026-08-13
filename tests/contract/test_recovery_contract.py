@@ -545,3 +545,68 @@ class RecoveryContractTests(unittest.TestCase):
             if is_tracked_runtime_artifact(path)
         ]
         self.assertEqual([], forbidden, f"tracked runtime artifacts are forbidden: {forbidden}")
+
+    def test_product_build_does_not_require_atl_for_taskbar_com(self):
+        header = (SOURCE_ROOT / "gui.hpp").read_text(encoding="utf-8-sig")
+        source = (SOURCE_ROOT / "gui_make.cpp").read_text(encoding="utf-8-sig")
+
+        self.assertNotIn("<atlbase.h>", header)
+        self.assertNotIn("CComPtr", header)
+        self.assertIn("ITaskbarList3 *i_taskbar {nullptr};", header)
+        self.assertIn("IID_PPV_ARGS(&i_taskbar)", source)
+        self.assertIn("i_taskbar = nullptr;", source)
+
+    def test_windows_process_runner_waits_for_direct_child_not_process_tree(self):
+        scripts = ((REPOSITORY_ROOT / "tools" / "build-candidate.ps1"),)
+        for script in scripts:
+            source = script.read_text(encoding="utf-8-sig")
+            with self.subTest(script=script.name):
+                self.assertNotIn("-Wait -PassThru", source)
+                self.assertIn("$process.Handle | Out-Null", source)
+                self.assertIn("$process.WaitForExit()", source)
+                self.assertIn("$process.Refresh()", source)
+
+    def test_smoke_entrypoint_preserves_parameters_across_dot_sourcing(self):
+        source = (REPOSITORY_ROOT / "tools" / "smoke-localhost.ps1").read_text(encoding="utf-8-sig")
+
+        self.assertIn("$smokeRun = $Run", source)
+        self.assertIn("$smokeParentRuntime = $ParentRuntime", source)
+        self.assertIn("if (-not $smokeRun)", source)
+        self.assertIn("-ParentRuntime $smokeParentRuntime", source)
+        self.assertIn("[string] $PythonPath", source)
+        self.assertIn("-Arguments @('--version') -Name 'Python runtime check'", source)
+
+    def test_task_7_forms_qualify_widgets_namespace_against_nana_widgets(self):
+        form_paths = (
+            SOURCE_ROOT / "forms" / "form_subs.cpp",
+            SOURCE_ROOT / "forms" / "form_input.cpp",
+            SOURCE_ROOT / "forms" / "form_suspend.cpp",
+            SOURCE_ROOT / "forms" / "form_colors.cpp",
+        )
+        unqualified_widgets = re.compile(r"(?<!:)\bwidgets::")
+        for path in form_paths:
+            source = path.read_text(encoding="utf-8-sig", errors="replace")
+            with self.subTest(path=path.name):
+                self.assertEqual(
+                    [],
+                    unqualified_widgets.findall(source),
+                    "using namespace nana makes unqualified widgets:: ambiguous with nana::widgets",
+                )
+
+    def test_task_7_settings_uses_title_and_combox_value_apis(self):
+        source = (SOURCE_ROOT / "forms" / "form_settings.cpp").read_text(
+            encoding="utf-8-sig", errors="replace"
+        )
+
+        self.assertIn(
+            'widgets::Title libtitle {about, i18n::tr("about.libraries", "*  Libraries used  *")}',
+            source,
+        )
+        self.assertIn(
+            'kbtitle {about, i18n::tr("about.shortcuts", "*  Keyboard shortcuts  *")}',
+            source,
+        )
+        self.assertNotIn('to_wstring(i18n::tr("about.libraries"', source)
+        self.assertNotIn('to_wstring(i18n::tr("about.shortcuts"', source)
+        self.assertIn('conf.language = arg.widget.option() == 1 ? "ko-KR" : "en-US";', source)
+        self.assertNotIn("arg.widget->option()", source)

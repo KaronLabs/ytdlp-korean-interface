@@ -34,7 +34,7 @@ void GUI::fm_subs()
 	::widgets::Label l_sub_format {fm, i18n::tr("subtitles.format", "Subtitle format:")};
 	::widgets::Text l_info {fm}, l_help {fm, i18n::tr("subtitles.help", "Selection applies when using <bold>--embed-subs</> or <bold>--write-subs</>")};
 	::widgets::cbox cb_sub_selection {fm, i18n::tr("subtitles.make_default", "Make this selection the default for all downloads")};
-	::widgets::Button btn_ok {fm, widgets::localized_ok()}, btn_cancel {fm, widgets::localized_cancel()}, btn_clear {fm};
+	::widgets::Button btn_ok {fm, ::widgets::localized_ok()}, btn_cancel {fm, ::widgets::localized_cancel()}, btn_clear {fm};
 	nana::picture pic_help {fm};
 
 	nana::paint::image img_help;	

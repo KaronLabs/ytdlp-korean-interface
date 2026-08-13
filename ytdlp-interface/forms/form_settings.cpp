@@ -141,8 +141,8 @@ void GUI::fm_settings()
 	about_label l_about_ver {about, ""};
 	nana::panel<true> pnl_header {about.handle()};
 	widgets::Separator about_sep1 {about}, about_sep2 {about};
-	widgets::Title libtitle {about, to_wstring(i18n::tr("about.libraries", "*  Libraries used  *"))},
-		kbtitle {about, to_wstring(i18n::tr("about.shortcuts", "*  Keyboard shortcuts  *"))};
+	widgets::Title libtitle {about, i18n::tr("about.libraries", "*  Libraries used  *")},
+		kbtitle {about, i18n::tr("about.shortcuts", "*  Keyboard shortcuts  *")};
 	widgets::Label l_nana {about, i18n::tr("about.nana", "Nana C++ GUI library")}, l_jpeg {about, "libjpeg-turbo"}, l_bit7z {about, "bit7z"},
 		l_png {about, "libpng"}, l_json {about, "JSON for Modern C++"}, l_ctrls {about, "Ctrl+S"}, l_ctrlc {about, "Ctrl+C"}, l_ctrlf {about, "Ctrl+F"},
 		l_ctrltab {about, "Ctrl+Tab"}, l_f2 {about, "F2"}, l_del {about, i18n::tr("common.delete", "Delete")}, l_esc {about, "Esc"}, l_ctrlnum0 {about, "Ctrl+Num0"};
@@ -915,7 +915,7 @@ void GUI::fm_settings()
 	com_language.option(conf.language == "ko-KR" ? 1 : 0);
 	com_language.events().selected([&](const nana::arg_combox &arg)
 	{
-		conf.language = arg.widget->option() == 1 ? "ko-KR" : "en-US";
+		conf.language = arg.widget.option() == 1 ? "ko-KR" : "en-US";
 	});
 
 	l_opendlg_origin.text_align(nana::align::left, nana::align_v::center);

@@ -19,7 +19,7 @@ void container::refresh_buttons(bool state)
 
 void GUI::fm_colors(themed_form &parent)
 {
-	using widgets::theme;
+	using ::widgets::theme;
 	using namespace nana;
 
 	fs::path theme_path;
@@ -137,7 +137,7 @@ void GUI::fm_colors(themed_form &parent)
 	l_itext_error.error_mode(true);
 	::widgets::Separator sep {fm};
 	::widgets::cbox cbox {c_cbox, i18n::tr("colors.checkbox", "Checkbox")};
-	::widgets::Button btnapply {fm, i18n::tr("colors.apply_changes", "Apply changes")}, btndef {fm, widgets::localized_reset_default()}, btnsave {fm, i18n::tr("common.save", "Save")}, btnload {fm, i18n::tr("common.load", "Load")};
+	::widgets::Button btnapply {fm, i18n::tr("colors.apply_changes", "Apply changes")}, btndef {fm, ::widgets::localized_reset_default()}, btnsave {fm, i18n::tr("common.save", "Save")}, btnload {fm, i18n::tr("common.load", "Load")};
 	::widgets::Title title {c_title, i18n::tr("colors.large_header", "Large header")};
 	std::wstring url {to_wstring(i18n::tr("colors.url_box", "URL box"))};
 	fs::path path {"c:\\path\\box"};

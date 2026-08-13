@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <unordered_set>
 #include <iostream>
-#include <atlbase.h> // CComPtr
 #include <Shobjidl.h> // ITaskbarList3
 #include <nana/gui/timer.hpp>
 
@@ -65,7 +64,7 @@ private:
 		close_when_finished {false}, bot_showing {false};
 	std::thread thr_updater, thr_releases, thr_versions, thr_ver_ffmpeg, thr_thumb, thr_menu_start_stop, thr_releases_ffmpeg, thr_releases_ytdlp,
 		thr_qitem_data, thr_queue_remove, thr_ver_deno, thr_releases_deno, thr_updater_deno;
-	CComPtr<ITaskbarList3> i_taskbar;
+	ITaskbarList3 *i_taskbar {nullptr};
 	UINT WM_TASKBAR_BUTTON_CREATED {0};
 	const std::string ver_tag {"v2.19.1"}, title {"ytdlp-interface " + ver_tag/*.substr(0, 5)*/};
 	const unsigned MINW {900}, MINH {700}; // min client area size

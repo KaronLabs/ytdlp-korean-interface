@@ -51,7 +51,10 @@ function Invoke-CheckedProcess {
     $stdoutPath = Join-Path ([IO.Path]::GetTempPath()) ('ytdlp-interface-process-' + [Guid]::NewGuid().ToString('N') + '.out')
     $stderrPath = Join-Path ([IO.Path]::GetTempPath()) ('ytdlp-interface-process-' + [Guid]::NewGuid().ToString('N') + '.err')
     try {
-        $process = Start-Process -FilePath $FilePath -ArgumentList (ConvertTo-ProcessArgumentLine -Arguments $Arguments) -Wait -PassThru -NoNewWindow -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+        $process = Start-Process -FilePath $FilePath -ArgumentList (ConvertTo-ProcessArgumentLine -Arguments $Arguments) -PassThru -NoNewWindow -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+        $process.Handle | Out-Null
+        $process.WaitForExit()
+        $process.Refresh()
         $stdout = if (Test-Path -LiteralPath $stdoutPath) { [IO.File]::ReadAllText($stdoutPath).Trim() } else { '' }
         $stderr = if (Test-Path -LiteralPath $stderrPath) { [IO.File]::ReadAllText($stderrPath).Trim() } else { '' }
         if ($process.ExitCode -ne 0) { throw "$Name exited with code $($process.ExitCode). stdout=$stdout stderr=$stderr" }
@@ -77,6 +80,15 @@ function Get-VsBuildTools {
     $v143 = Join-Path $installationPath 'VC\Tools\MSVC'
     if (-not (Test-Path -LiteralPath $v143)) { throw 'The selected Visual Studio installation has no v143 C++ toolset directory.' }
     return [pscustomobject]@{ InstallationPath = $installationPath; MsBuildPath = $msbuild; V143Path = $v143 }
+}
+
+function Get-CmakeExecutable {
+    param([Parameter(Mandatory = $true)] [string] $VisualStudioInstallation)
+    $fromPath = Get-Command -Name 'cmake.exe' -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -ne $fromPath) { return $fromPath.Path }
+    $fromVisualStudio = Join-Path $VisualStudioInstallation 'Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe'
+    if (Test-Path -LiteralPath $fromVisualStudio -PathType Leaf) { return $fromVisualStudio }
+    throw 'cmake.exe was not found; install or configure CMake before building libjpeg-turbo.'
 }
 
 function Get-RequiredRuntimeFiles {
@@ -146,6 +158,65 @@ function Initialize-OfficialDependencies {
         }
     }
     finally { if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue } }
+}
+
+function Get-ReleaseX64DependencyPlan {
+    param(
+        [Parameter(Mandatory = $true)] [string] $SourceRoot,
+        [string] $MsBuildPath = 'MSBuild.exe',
+        [string] $CmakePath = 'cmake.exe'
+    )
+    $source = [IO.Path]::GetFullPath($SourceRoot)
+    $release = @('/m', '/t:Build', '/p:Configuration=Release', '/p:Platform=x64', '/p:PlatformToolset=v143')
+    $libPngOutput = Join-Path $source 'libpng\x64\Release'
+    $jpegOutput = Join-Path $source 'libjpeg-turbo-3.1.2\out\build\x64-Release'
+    return @(
+        [pscustomobject]@{
+            Name = 'bit7z'; SourceDirectory = (Join-Path $source 'bit7z'); FilePath = $MsBuildPath
+            Arguments = @((Join-Path $source 'bit7z\bit7z.sln')) + $release
+            LibraryPath = (Join-Path $source 'bit7z\bin\x64\bit7z64.lib'); BuildArguments = @()
+        },
+        [pscustomobject]@{
+            Name = 'Nana'; SourceDirectory = (Join-Path $source 'nana'); FilePath = $MsBuildPath
+            Arguments = @((Join-Path $source 'nana\build\vc2022\nana.sln')) + $release
+            LibraryPath = (Join-Path $source 'nana\build\bin\nana_v143_Release_x64.lib'); BuildArguments = @()
+        },
+        [pscustomobject]@{
+            Name = 'libpng'; SourceDirectory = (Join-Path $source 'libpng'); FilePath = $MsBuildPath
+            Arguments = @((Join-Path $source 'libpng\libpng.sln')) + $release + ('/p:OutDir=' + $libPngOutput + '\\')
+            LibraryPath = (Join-Path $libPngOutput 'libpng.lib'); BuildArguments = @()
+        },
+        [pscustomobject]@{
+            Name = 'libjpeg-turbo'; SourceDirectory = (Join-Path $source 'libjpeg-turbo-3.1.2'); FilePath = $CmakePath
+            Arguments = @('-S', (Join-Path $source 'libjpeg-turbo-3.1.2'), '-B', $jpegOutput, '-G', 'Visual Studio 17 2022', '-A', 'x64', '-T', 'v143', '-DENABLE_SHARED=OFF', '-DENABLE_STATIC=ON', '-DWITH_TURBOJPEG=ON', '-DWITH_CRT_DLL=OFF', ('-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE=' + $jpegOutput))
+            LibraryPath = (Join-Path $jpegOutput 'turbojpeg-static.lib')
+            BuildArguments = @('--build', $jpegOutput, '--config', 'Release', '--target', 'turbojpeg-static')
+        }
+    )
+}
+
+function Test-ReleaseX64DependencyLibraries {
+    param([Parameter(Mandatory = $true)] [object[]] $Plan)
+    return (@($Plan | Where-Object { -not (Test-Path -LiteralPath $_.LibraryPath -PathType Leaf) }).Count -eq 0)
+}
+
+function Invoke-ReleaseX64Dependencies {
+    param(
+        [Parameter(Mandatory = $true)] [string] $SourceRoot,
+        [Parameter(Mandatory = $true)] [string] $MsBuildPath,
+        [Parameter(Mandatory = $true)] [string] $CmakePath
+    )
+    $plan = Get-ReleaseX64DependencyPlan -SourceRoot $SourceRoot -MsBuildPath $MsBuildPath -CmakePath $CmakePath
+    foreach ($dependency in $plan) {
+        if (-not (Test-Path -LiteralPath $dependency.SourceDirectory -PathType Container)) { throw "Dependency source is missing: $($dependency.Name)" }
+        Invoke-CheckedProcess -FilePath $dependency.FilePath -Arguments $dependency.Arguments -Name "$($dependency.Name) Release x64 build" | Out-Null
+        if ($dependency.BuildArguments.Count -ne 0) {
+            Invoke-CheckedProcess -FilePath $dependency.FilePath -Arguments $dependency.BuildArguments -Name "$($dependency.Name) Release x64 build" | Out-Null
+        }
+    }
+    $missing = @($plan | Where-Object { -not (Test-Path -LiteralPath $_.LibraryPath -PathType Leaf) })
+    if ($missing.Count -ne 0) { throw ('Release x64 dependency libraries are missing: ' + (($missing | ForEach-Object { Split-Path -Leaf $_.LibraryPath }) -join ', ')) }
+    return $plan
 }
 
 function Copy-CandidateFile {
@@ -227,6 +298,8 @@ function Invoke-BuildCandidate {
     $verifiedParent = Get-VerifiedParentRuntime -ParentRuntime $parent
     Initialize-OfficialDependencies -SourceRoot $source -DependencyArchiveDirectory $DependencyArchiveDirectory
     $tools = Get-VsBuildTools
+    $cmake = Get-CmakeExecutable -VisualStudioInstallation $tools.InstallationPath
+    Invoke-ReleaseX64Dependencies -SourceRoot $source -MsBuildPath $tools.MsBuildPath -CmakePath $cmake | Out-Null
     Invoke-CheckedProcess -FilePath $tools.MsBuildPath -Arguments @($solution, '/m', '/t:Build', '/p:Configuration=Release', '/p:Platform=x64') -Name 'Release x64 MSBuild' | Out-Null
     $product = Join-Path $source 'ytdlp-interface\x64\Release\ytdlp-interface.exe'
     if (-not (Test-Path -LiteralPath $product -PathType Leaf)) { throw "Release x64 product is missing: $product" }

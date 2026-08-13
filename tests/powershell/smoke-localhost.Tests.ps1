@@ -74,6 +74,29 @@ function Test-FailureEvidenceAndSuccessCleanup {
     finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
+function Test-CleanupTimeoutStillWritesSanitizedFailureEvidence {
+    $root = New-FixtureRoot
+    try {
+        $workspace = Join-Path $root 'workspace'; [IO.Directory]::CreateDirectory($workspace) | Out-Null
+        $evidence = Join-Path $root 'evidence'
+        try { Complete-SmokeRun -Workspace $workspace -EvidenceDirectory $evidence -Succeeded:$true -ReasonCode 'ok' -CleanupAction { throw 'process_cleanup_timeout' }; $threw = $false }
+        catch { $threw = $_.Exception.Message -eq 'process_cleanup_timeout' }
+        Assert-True $threw 'A cleanup timeout must fail the smoke after recording evidence.'
+        $manifest = Get-Content -LiteralPath (Join-Path $evidence 'failure.json') -Raw | ConvertFrom-Json
+        Assert-Equal 'process_cleanup_timeout' $manifest.reasonCode 'Cleanup timeout evidence must use the stable reason code.'
+        Assert-False ($manifest.PSObject.Properties.Name -contains 'reason') 'Cleanup timeout evidence must not expose exception text.'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+function Test-SmokeProcessFailuresMapToStableReasonCodes {
+    foreach ($case in @(@('fixture_generation_failed', 'fixture failure'), @('ffprobe_failed', 'probe failure'))) {
+        try { Invoke-SmokeProcess -ReasonCode $case[0] -Action { throw $case[1] } | Out-Null; $actual = 'no_failure' }
+        catch { $actual = $_.Exception.Message }
+        Assert-Equal $case[0] $actual 'Smoke process failure must preserve its stable reason code.'
+    }
+}
+
 function Test-SmokeOutputRequiresFreshFiles {
     $root = New-FixtureRoot
     try {
@@ -145,16 +168,51 @@ function Test-CheckedProcessUsesExitCodeAndCapturesOutput {
     Assert-True $threw 'A nonzero child ExitCode must fail without reading LASTEXITCODE.'
 }
 
+function Test-ReleaseX64DependencyPlanBuildsAndValidatesProductLibraries {
+    $root = New-FixtureRoot
+    try {
+        $planCommand = Get-Command -Name Get-ReleaseX64DependencyPlan -ErrorAction SilentlyContinue
+        $validateCommand = Get-Command -Name Test-ReleaseX64DependencyLibraries -ErrorAction SilentlyContinue
+        Assert-True ($null -ne $planCommand) 'Candidate build must declare the Release x64 dependency plan.'
+        Assert-True ($null -ne $validateCommand) 'Candidate build must validate the Release x64 libraries before product MSBuild.'
+        if ($null -eq $planCommand -or $null -eq $validateCommand) { return }
+
+        $plan = Get-ReleaseX64DependencyPlan -SourceRoot $root
+        Assert-Equal 4 $plan.Count 'The Release x64 plan must build all four source dependencies.'
+        Assert-Equal 'bit7z64.lib' (Split-Path -Leaf $plan[0].LibraryPath) 'bit7z must produce the product linker library name.'
+        Assert-Equal 'nana_v143_Release_x64.lib' (Split-Path -Leaf $plan[1].LibraryPath) 'Nana must be built with the v143 linker library name.'
+        Assert-Equal 'libpng.lib' (Split-Path -Leaf $plan[2].LibraryPath) 'libpng must produce the product linker library name.'
+        Assert-Equal 'turbojpeg-static.lib' (Split-Path -Leaf $plan[3].LibraryPath) 'libjpeg-turbo must produce the product linker library name.'
+        Assert-False (Test-ReleaseX64DependencyLibraries -Plan $plan) 'Missing Release x64 libraries must block product MSBuild.'
+        foreach ($dependency in $plan) {
+            [IO.Directory]::CreateDirectory((Split-Path -Parent $dependency.LibraryPath)) | Out-Null
+            [IO.File]::WriteAllText($dependency.LibraryPath, 'fixture', [Text.Encoding]::ASCII)
+        }
+        Assert-True (Test-ReleaseX64DependencyLibraries -Plan $plan) 'All four expected Release x64 libraries must satisfy the pre-product gate.'
+        Assert-True ($plan[0].Arguments -contains '/p:PlatformToolset=v143') 'bit7z must be built with the installed v143 toolset.'
+        Assert-True ($plan[1].Arguments -contains '/p:PlatformToolset=v143') 'Nana must be built with the installed v143 toolset.'
+        Assert-True ($plan[2].Arguments -contains '/p:PlatformToolset=v143') 'libpng must be built with the installed v143 toolset.'
+        Assert-True ($plan[3].Arguments -contains '-T') 'libjpeg-turbo CMake generation must select a toolset.'
+        Assert-True ($plan[3].Arguments -contains 'v143') 'libjpeg-turbo CMake generation must select v143.'
+        $buildSource = Get-Content -LiteralPath (Join-Path $repositoryRoot 'tools/build-candidate.ps1') -Raw
+        Assert-True ($buildSource.LastIndexOf('Invoke-ReleaseX64Dependencies') -lt $buildSource.LastIndexOf("-Name 'Release x64 MSBuild'")) 'All dependency builds and library validation must complete before product MSBuild.'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
 Test-CandidateRootsAreUniqueAndContained
 Test-LocalhostOnlyUrls
 Test-FakeProcessesAreCleanedUp
 Test-FinalMp3AndPartRejection
 Test-FailureEvidenceAndSuccessCleanup
+Test-CleanupTimeoutStillWritesSanitizedFailureEvidence
 Test-SmokeOutputRequiresFreshFiles
 Test-AutomationCompletionIsBoundToGuiUrlAndOutput
 Test-ParentOverlapAndSanitizedEvidenceAreRejected
 Test-DependencyArchiveAndRuntimeVerificationBoundaries
 Test-CheckedProcessUsesExitCodeAndCapturesOutput
+Test-SmokeProcessFailuresMapToStableReasonCodes
+Test-ReleaseX64DependencyPlanBuildsAndValidatesProductLibraries
 
 if ($script:failures.Count -ne 0) { $script:failures | ForEach-Object { Write-Error $_ }; exit 1 }
 Write-Output 'smoke-localhost fixture tests passed.'

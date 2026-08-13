@@ -2,6 +2,7 @@
 param(
     [string] $CandidateRoot,
     [string] $ParentRuntime,
+    [string] $PythonPath,
     [switch] $Run,
     [switch] $OperatorGuided,
     [scriptblock] $AutomationCommand
@@ -9,6 +10,8 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$smokeRun = $Run
+$smokeParentRuntime = $ParentRuntime
 . (Join-Path $PSScriptRoot 'build-candidate.ps1')
 
 function Test-LocalhostUrl {
@@ -71,6 +74,30 @@ function Complete-SmokeWorkspace {
     if ($Succeeded -and (Test-Path -LiteralPath $Workspace)) { Remove-Item -LiteralPath $Workspace -Recurse -Force }
 }
 
+function Complete-SmokeRun {
+    param(
+        [string] $Workspace,
+        [string] $EvidenceDirectory,
+        [bool] $Succeeded,
+        [string] $ReasonCode,
+        [Parameter(Mandatory = $true)] [scriptblock] $CleanupAction
+    )
+    $cleanupFailed = $false; $wasSuccessful = $Succeeded
+    try { & $CleanupAction }
+    catch {
+        $cleanupFailed = $true
+        if ($Succeeded) { $Succeeded = $false; $ReasonCode = 'process_cleanup_timeout' }
+    }
+    finally { Complete-SmokeWorkspace -Workspace $Workspace -EvidenceDirectory $EvidenceDirectory -Succeeded:$Succeeded -ReasonCode $ReasonCode }
+    if ($cleanupFailed -and $wasSuccessful) { throw 'process_cleanup_timeout' }
+}
+
+function Invoke-SmokeProcess {
+    param([Parameter(Mandatory = $true)] [string] $ReasonCode, [Parameter(Mandatory = $true)] [scriptblock] $Action)
+    try { return & $Action }
+    catch { throw $ReasonCode }
+}
+
 function Get-LoopbackPort {
     $listener = New-Object Net.Sockets.TcpListener ([Net.IPAddress]::Parse('127.0.0.1')), 0
     try { $listener.Start(); return ([Net.IPEndPoint]$listener.LocalEndpoint).Port }
@@ -91,7 +118,7 @@ function Wait-LoopbackServer {
 }
 
 function Invoke-LocalhostSmoke {
-    param([string] $CandidateRoot, [string] $ParentRuntime, [switch] $OperatorGuided, [scriptblock] $AutomationCommand)
+    param([string] $CandidateRoot, [string] $ParentRuntime, [string] $PythonPath, [switch] $OperatorGuided, [scriptblock] $AutomationCommand)
     if ([string]::IsNullOrWhiteSpace($ParentRuntime)) { throw 'parent_runtime_required' }
     $candidate = [IO.Path]::GetFullPath($CandidateRoot)
     $parent = [IO.Path]::GetFullPath($ParentRuntime)
@@ -108,13 +135,19 @@ function Invoke-LocalhostSmoke {
     $processes = @(); $succeeded = $false; $reasonCode = 'smoke_failed'
     try {
         $media = Join-Path $workspace 'input.mp4'
-        Invoke-CheckedProcess -FilePath (Join-Path $candidate 'ffmpeg.exe') -Arguments @('-y', '-f', 'lavfi', '-i', 'sine=frequency=1000:duration=2', '-t', '2', $media) -Name 'smoke fixture generation' | Out-Null
+        Invoke-SmokeProcess -ReasonCode 'fixture_generation_failed' -Action { Invoke-CheckedProcess -FilePath (Join-Path $candidate 'ffmpeg.exe') -Arguments @('-y', '-f', 'lavfi', '-i', 'sine=frequency=1000:duration=2', '-t', '2', $media) -Name 'smoke fixture generation' } | Out-Null
         $port = Get-LoopbackPort
         $url = "http://127.0.0.1:$port/input.mp4"
         if (-not (Test-LocalhostUrl -Url $url)) { throw 'url_rejected' }
-        $python = Get-Command python.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($null -eq $python) { throw 'python_missing' }
-        $server = Start-Process -FilePath $python.Source -ArgumentList @('-m', 'http.server', $port, '--bind', '127.0.0.1', '--directory', $workspace) -PassThru -RedirectStandardOutput (Join-Path $workspace 'server.out') -RedirectStandardError (Join-Path $workspace 'server.err')
+        if ([string]::IsNullOrWhiteSpace($PythonPath)) {
+            $python = Get-Command python.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($null -eq $python) { throw 'python_missing' }
+            $PythonPath = $python.Source
+        }
+        if (-not (Test-Path -LiteralPath $PythonPath -PathType Leaf)) { throw 'python_missing' }
+        try { Invoke-CheckedProcess -FilePath $PythonPath -Arguments @('--version') -Name 'Python runtime check' | Out-Null }
+        catch { throw 'python_missing' }
+        $server = Start-Process -FilePath $PythonPath -ArgumentList @('-m', 'http.server', $port, '--bind', '127.0.0.1', '--directory', $workspace) -PassThru -RedirectStandardOutput (Join-Path $workspace 'server.out') -RedirectStandardError (Join-Path $workspace 'server.err')
         $processes += $server
         Wait-LoopbackServer -Url $url
         $startedAtUtc = [DateTime]::UtcNow
@@ -130,19 +163,19 @@ function Invoke-LocalhostSmoke {
             if ((Read-Host "Observe the candidate GUI and complete MP3 download for $url. Type YES after verifying completion") -cne 'YES') { throw 'operator_not_confirmed' }
         }
         else { throw 'automation_required' }
-        $result = Test-SmokeOutput -OutputDirectory $output -StartedAtUtc $startedAtUtc -FfprobeAction { param($path) (Invoke-CheckedProcess -FilePath (Join-Path $candidate 'ffprobe.exe') -Arguments @('-v', 'error', '-show_entries', 'format=duration:stream=codec_name', '-of', 'default=noprint_wrappers=1', $path) -Name 'smoke ffprobe').StandardOutput }
+        $result = Test-SmokeOutput -OutputDirectory $output -StartedAtUtc $startedAtUtc -FfprobeAction { param($path) (Invoke-SmokeProcess -ReasonCode 'ffprobe_failed' -Action { (Invoke-CheckedProcess -FilePath (Join-Path $candidate 'ffprobe.exe') -Arguments @('-v', 'error', '-show_entries', 'format=duration:stream=codec_name', '-of', 'default=noprint_wrappers=1', $path) -Name 'smoke ffprobe').StandardOutput }) }
         if (-not $result.Valid) { throw $result.ReasonCode }
         $succeeded = $true; $reasonCode = 'ok'; return $result
     }
     catch {
-        $known = @('candidate_parent_overlap', 'candidate_missing', 'workspace_containment', 'output_not_empty', 'fixture_generation_failed', 'url_rejected', 'python_missing', 'server_not_ready', 'gui_start_failed', 'automation_marker_invalid', 'operator_not_confirmed', 'automation_required', 'output_missing', 'part_file', 'mp3_missing', 'stale_output', 'codec_not_mp3', 'duration_invalid')
+        $known = @('candidate_parent_overlap', 'candidate_missing', 'workspace_containment', 'output_not_empty', 'fixture_generation_failed', 'url_rejected', 'python_missing', 'server_not_ready', 'gui_start_failed', 'automation_marker_invalid', 'operator_not_confirmed', 'automation_required', 'output_missing', 'part_file', 'mp3_missing', 'stale_output', 'ffprobe_failed', 'codec_not_mp3', 'duration_invalid')
         if ($known -contains $_.Exception.Message) { $reasonCode = $_.Exception.Message } else { $reasonCode = 'unexpected_failure' }
         throw
     }
-    finally { Stop-TrackedProcesses -Processes $processes; Complete-SmokeWorkspace -Workspace $workspace -EvidenceDirectory $evidence -Succeeded:$succeeded -ReasonCode $reasonCode }
+    finally { Complete-SmokeRun -Workspace $workspace -EvidenceDirectory $evidence -Succeeded:$succeeded -ReasonCode $reasonCode -CleanupAction { Stop-TrackedProcesses -Processes $processes } }
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
-    if (-not $Run) { Write-Output 'No action taken. Re-run with -Run and either -AutomationCommand or -OperatorGuided.' }
-    else { Invoke-LocalhostSmoke -CandidateRoot $CandidateRoot -ParentRuntime $ParentRuntime -OperatorGuided:$OperatorGuided -AutomationCommand $AutomationCommand }
+    if (-not $smokeRun) { Write-Output 'No action taken. Re-run with -Run and either -AutomationCommand or -OperatorGuided.' }
+    else { Invoke-LocalhostSmoke -CandidateRoot $CandidateRoot -ParentRuntime $smokeParentRuntime -PythonPath $PythonPath -OperatorGuided:$OperatorGuided -AutomationCommand $AutomationCommand }
 }
