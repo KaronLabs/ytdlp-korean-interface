@@ -336,15 +336,31 @@ class RecoveryContractTests(unittest.TestCase):
         gui_source = sources["gui.cpp"]
         queue_source = sources["queue.cpp"]
         header = (SOURCE_ROOT / "gui.hpp").read_text(encoding="utf-8-sig")
+        bottom_source = (SOURCE_ROOT / "gui_bottom.cpp").read_text(encoding="utf-8-sig")
         self.assertNotIn('progtext.find(" of ")', gui_source)
         self.assertIn("playlist_item_index", header)
         self.assertIn("bottom.playlist_item_index", gui_source)
         self.assertNotIn('item.text(2).find("[live event scheduled to begin in")', queue_source)
         self.assertIn("live_scheduled", header)
         self.assertIn("bottom.live_scheduled", queue_source)
+        self.assertIn('if(j.contains("live_scheduled"))', bottom_source)
+        self.assertIn('live_scheduled = j["live_scheduled"];', bottom_source)
+        self.assertIn("else live_scheduled = false;", bottom_source)
+        self.assertIn('j["live_scheduled"] = live_scheduled;', bottom_source)
         self.assertIn("playlist_menu_pos", header)
+        self.assertIn("nana::listbox::index_pair playlist_item_pos", header)
+        self.assertIn("playlist_item_pos_valid", header)
         self.assertNotIn("vidsel_item = {&m, sel.front().item}", queue_source)
+        self.assertIn("vidsel_item.playlist_item_pos.cat == list_item.pos().cat", gui_source)
+        self.assertIn("vidsel_item.playlist_item_pos.item == list_item.pos().item", gui_source)
+        self.assertIn("vidsel_item.playlist_item_pos_valid", gui_source)
         self.assertRegex(gui_source, r"m\.size\(\)\s*-\s*vidsel_item\.playlist_menu_pos\s*>=\s*4")
+
+        def restored_live_scheduled(data):
+            return data.get("live_scheduled", False)
+
+        self.assertFalse(restored_live_scheduled({}))
+        self.assertTrue(restored_live_scheduled({"live_scheduled": True}))
 
     def test_i18n_source_and_header_exist(self):
         self.assertTrue(I18N_SOURCE.is_file(), f"missing i18n source: {I18N_SOURCE}")

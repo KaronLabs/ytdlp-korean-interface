@@ -77,7 +77,8 @@ private:
 	struct
 	{
 		nana::menu *m {nullptr};
-		std::size_t playlist_item_pos {static_cast<std::size_t>(-1)};
+		nana::listbox::index_pair playlist_item_pos {};
+		bool playlist_item_pos_valid {false};
 		std::size_t playlist_menu_pos {static_cast<std::size_t>(-1)};
 		std::size_t formats_pos {static_cast<std::size_t>(-1)};
 		std::size_t subtitles_pos {static_cast<std::size_t>(-1)};

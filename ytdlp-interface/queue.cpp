@@ -388,7 +388,8 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 		if(sel.size() == 1)
 		{
 			auto item {lbq.at(sel.front())};
-			vidsel_item.playlist_item_pos = item.pos().item;
+			vidsel_item.playlist_item_pos = item.pos();
+			vidsel_item.playlist_item_pos_valid = true;
 			auto item_name {replace_placeholder(i18n::tr("queue.item", "item #{item_number}"), "{item_number}", item.text(0))};
 			auto url {item.value<lbqval_t>().url};
 			auto &bottom {bottoms.current()};
@@ -741,7 +742,8 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 
 			m.append(i18n::tr("queue.refresh_selected", "Refresh selected"), [&, sel](menu::item_proxy)
 			{
-				vidsel_item.playlist_item_pos = sel.front().item;
+				vidsel_item.playlist_item_pos = sel.front();
+				vidsel_item.playlist_item_pos_valid = true;
 				for(auto &el : sel)
 				{
 					auto item {lbq.at(el)};

@@ -328,6 +328,9 @@ void GUI::gui_bottom::from_json(const nlohmann::json &j)
 		playlist_vid_cmdinfo = to_wstring(j["playlist_vid_cmdinfo"].get<std::string>());
 	if(j.contains("idx_error"))
 		idx_error = j["idx_error"].get<int>();
+	if(j.contains("live_scheduled"))
+		live_scheduled = j["live_scheduled"];
+	else live_scheduled = false;
 	if(j.contains("is_yttab"))
 		is_yttab = j["is_yttab"];
 	if(j.contains("is_ytplaylist"))
@@ -398,6 +401,7 @@ void GUI::gui_bottom::to_json(nlohmann::json &j)
 		j["playsel_string"] = to_utf8(playsel_string);
 	if(idx_error)
 		j["idx_error"] = idx_error;
+	j["live_scheduled"] = live_scheduled;
 	if(is_yttab)
 		j["is_yttab"] = true;
 	if(is_ytplaylist)

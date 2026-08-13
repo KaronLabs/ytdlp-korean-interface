@@ -1702,8 +1702,10 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 											media_title = playlist_title(bottom.playlist_info["id"].get<std::string>());
 										else media_title = to_utf8(url);
 									}
-									if(vidsel_item.m && lbq.item_from_value(url).selected() &&
-										vidsel_item.playlist_item_pos == lbq.item_from_value(url).pos().item)
+									auto list_item {lbq.item_from_value(url)};
+									if(vidsel_item.m && vidsel_item.playlist_item_pos_valid && list_item != lbq.empty_item && list_item.selected() &&
+										vidsel_item.playlist_item_pos.cat == list_item.pos().cat &&
+										vidsel_item.playlist_item_pos.item == list_item.pos().item)
 									{
 										auto &m {*vidsel_item.m};
 										auto str {std::to_string(playlist_size)};
