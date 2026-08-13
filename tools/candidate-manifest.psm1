@@ -47,14 +47,14 @@ function Test-NormalizedArgumentPath {
 }
 
 function Assert-HermeticMsBuildTail {
-    param([string[]] $Arguments, [int] $Offset, [string] $OutDirectory)
+    param([string[]] $Arguments, [int] $Offset, [string] $OutDirectory, [string] $VCToolsVersion, [string] $WindowsSdkVersion)
     $expectedCount = $Offset + 10 + $(if ([string]::IsNullOrWhiteSpace($OutDirectory)) { 0 } else { 1 })
     if ($Arguments.Count -ne $expectedCount) { throw 'candidate_manifest_invalid' }
     $fixed = @('/m', '/t:Build', '/p:Configuration=Release', '/p:Platform=x64', '/p:PlatformToolset=v143', '/p:ImportDirectoryBuildProps=false', '/p:ImportDirectoryBuildTargets=false')
     for ($index = 0; $index -lt $fixed.Count; $index++) { if ($Arguments[$Offset + $index] -cne $fixed[$index]) { throw 'candidate_manifest_invalid' } }
-    if ($Arguments[$Offset + 7] -notlike '/p:UserRootDir=<hermetic-user-root>*' -or
-        $Arguments[$Offset + 8] -notlike '/p:VCToolsVersion=?*' -or
-        $Arguments[$Offset + 9] -notlike '/p:WindowsTargetPlatformVersion=?*') { throw 'candidate_manifest_invalid' }
+    if ($Arguments[$Offset + 7] -cne '/p:UserRootDir=<hermetic-user-root>\' -or
+        $Arguments[$Offset + 8] -cne ('/p:VCToolsVersion=' + $VCToolsVersion) -or
+        $Arguments[$Offset + 9] -cne ('/p:WindowsTargetPlatformVersion=' + $WindowsSdkVersion)) { throw 'candidate_manifest_invalid' }
     if (-not [string]::IsNullOrWhiteSpace($OutDirectory) -and -not (Test-NormalizedArgumentPath $Arguments[$Offset + 10] ('/p:OutDir=' + $OutDirectory))) { throw 'candidate_manifest_invalid' }
 }
 
@@ -63,6 +63,12 @@ function Assert-CommandSemantics {
     $name = [string](Get-ManifestField -Value $Command -Name 'name')
     $executable = [string](Get-ManifestField -Value $Command -Name 'executable')
     $arguments = @((Get-ManifestField -Value $Command -Name 'arguments') | ForEach-Object { [string]$_ })
+    $properties = Get-ManifestField -Value $Command -Name 'effectiveProperties'
+    $userRoot = [string](Get-ManifestField -Value $properties -Name 'UserRootDir')
+    $vcToolsVersion = [string](Get-ManifestField -Value $properties -Name 'VCToolsVersion')
+    $windowsSdkVersion = [string](Get-ManifestField -Value $properties -Name 'WindowsTargetPlatformVersion')
+    if ($userRoot -cne '<hermetic-user-root>' -or $vcToolsVersion -notmatch '^[0-9]+(?:\.[0-9]+)+$' -or
+        $windowsSdkVersion -notmatch '^[0-9]+(?:\.[0-9]+)+$') { throw 'candidate_manifest_invalid' }
     if ($name -eq 'libjpeg-turbo Release x64 configure') {
         if ($executable -ine 'cmake.exe' -or $arguments.Count -ne 16 -or $arguments[0] -cne '-S' -or
             -not (Test-NormalizedArgumentPath $arguments[1] '<source>/libjpeg-turbo-3.1.2') -or $arguments[2] -cne '-B' -or
@@ -71,10 +77,14 @@ function Assert-CommandSemantics {
             $arguments[7] -cne 'x64' -or $arguments[8] -cne '-T' -or $arguments[9] -cne 'v143') { throw 'candidate_manifest_invalid' }
         $globals = @($arguments | Where-Object { $_ -like '-DCMAKE_VS_GLOBALS=*' })
         if ($globals.Count -ne 1) { throw 'candidate_manifest_invalid' }
-        $globalValues = @($globals[0].Substring('-DCMAKE_VS_GLOBALS='.Length) -split ';')
-        if ($globalValues.Count -ne 5 -or $globalValues[0] -cne 'ImportDirectoryBuildProps=false' -or
-            $globalValues[1] -cne 'ImportDirectoryBuildTargets=false' -or $globalValues[2] -notlike 'UserRootDir=?*' -or
-            $globalValues[3] -notlike 'VCToolsVersion=?*' -or $globalValues[4] -notlike 'WindowsTargetPlatformVersion=?*') { throw 'candidate_manifest_invalid' }
+        $expectedGlobals = '-DCMAKE_VS_GLOBALS=' + (@(
+            'ImportDirectoryBuildProps=false',
+            'ImportDirectoryBuildTargets=false',
+            'UserRootDir=<hermetic-user-root>\',
+            ('VCToolsVersion=' + $vcToolsVersion),
+            ('WindowsTargetPlatformVersion=' + $windowsSdkVersion)
+        ) -join ';')
+        if ($globals[0] -cne $expectedGlobals) { throw 'candidate_manifest_invalid' }
         $expectedTail = @('-DENABLE_SHARED=OFF', '-DENABLE_STATIC=ON', '-DWITH_TURBOJPEG=ON', '-DWITH_CRT_DLL=OFF')
         for ($index = 0; $index -lt $expectedTail.Count; $index++) { if ($arguments[11 + $index] -cne $expectedTail[$index]) { throw 'candidate_manifest_invalid' } }
         if (-not (Test-NormalizedArgumentPath $arguments[15] '-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE=<source>/libjpeg-turbo-3.1.2/out/build/x64-Release')) { throw 'candidate_manifest_invalid' }
@@ -85,7 +95,7 @@ function Assert-CommandSemantics {
             -not (Test-NormalizedArgumentPath $arguments[1] '<source>/libjpeg-turbo-3.1.2/out/build/x64-Release') -or
             $arguments[2] -cne '--config' -or $arguments[3] -cne 'Release' -or $arguments[4] -cne '--target' -or
             $arguments[5] -cne 'turbojpeg-static' -or $arguments[6] -cne '--') { throw 'candidate_manifest_invalid' }
-        Assert-HermeticMsBuildTail -Arguments $arguments -Offset 7
+        Assert-HermeticMsBuildTail -Arguments $arguments -Offset 7 -VCToolsVersion $vcToolsVersion -WindowsSdkVersion $windowsSdkVersion
         return
     }
     if ($executable -ine 'MSBuild.exe') { throw 'candidate_manifest_invalid' }
@@ -98,7 +108,7 @@ function Assert-CommandSemantics {
     }
     if (-not (Test-NormalizedArgumentPath $arguments[0] ('<source>/' + $requiredSuffix))) { throw 'candidate_manifest_invalid' }
     $outDirectory = if ($name -eq 'libpng Release x64 build') { '<source>/libpng/x64/Release/' } else { $null }
-    Assert-HermeticMsBuildTail -Arguments $arguments -Offset 1 -OutDirectory $outDirectory
+    Assert-HermeticMsBuildTail -Arguments $arguments -Offset 1 -OutDirectory $outDirectory -VCToolsVersion $vcToolsVersion -WindowsSdkVersion $windowsSdkVersion
 }
 
 function Assert-AttestationShape {
@@ -156,7 +166,7 @@ function Assert-AttestationShape {
             if ([string](Get-ManifestField -Value $properties -Name $name) -cne [string]$requiredProperties[$name]) { throw 'candidate_manifest_invalid' }
         }
         foreach ($name in @('VCToolsVersion', 'WindowsTargetPlatformVersion')) {
-            if ([string]::IsNullOrWhiteSpace([string](Get-ManifestField -Value $properties -Name $name))) { throw 'candidate_manifest_invalid' }
+            if ([string](Get-ManifestField -Value $properties -Name $name) -notmatch '^[0-9]+(?:\.[0-9]+)+$') { throw 'candidate_manifest_invalid' }
         }
         $environment = Get-ManifestField -Value $entry -Name 'environment'
         if ([string](Get-ManifestField -Value $environment -Name 'PreferredToolArchitecture') -cne 'x64') { throw 'candidate_manifest_invalid' }

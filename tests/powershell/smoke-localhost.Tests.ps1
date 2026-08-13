@@ -921,6 +921,35 @@ function Test-CandidateManifestCommandsRejectRogueOperands {
     finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
+function Test-CandidateManifestCommandsBindHermeticValues {
+    $root = New-FixtureRoot
+    try {
+        foreach ($case in @('user-root-suffix', 'msvc-version-mismatch', 'sdk-version-mismatch', 'configure-global-mismatch')) {
+            $fixture = New-MinimalSealedCandidate -Root (Join-Path $root ([Guid]::NewGuid().ToString('N')))
+            $commands = $fixture.Manifest.attestation.commands
+            $bit7z = $commands | Where-Object name -eq 'bit7z Release x64 build'
+            $configure = $commands | Where-Object name -eq 'libjpeg-turbo Release x64 configure'
+            switch ($case) {
+                'user-root-suffix' {
+                    $bit7z.arguments[7] = '/p:UserRootDir=<hermetic-user-root>\rogue'
+                }
+                'msvc-version-mismatch' {
+                    $bit7z.arguments[8] = '/p:VCToolsVersion=99.99.99'
+                }
+                'sdk-version-mismatch' {
+                    $bit7z.arguments[9] = '/p:WindowsTargetPlatformVersion=99.99.99'
+                }
+                'configure-global-mismatch' {
+                    $configure.arguments[10] = $configure.arguments[10].Replace('VCToolsVersion=14.40.1', 'VCToolsVersion=99.99.99')
+                }
+            }
+            try { Assert-CandidateManifestSeal -CandidateRoot $fixture.Root -Manifest $fixture.Manifest; $actual = 'no_failure' } catch { $actual = $_.Exception.Message }
+            Assert-Equal 'candidate_manifest_invalid' $actual "Hermetic value case $case must be rejected."
+        }
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
 function Test-SmokeConsumerEnforcesBuildAttestationAndExactInventory {
     $root = New-FixtureRoot
     try {
@@ -950,6 +979,7 @@ $buildAttestationRedTests = @(
     'Test-CandidateManifestAttestationInventoriesAreExactSets',
     'Test-CandidateManifestCommandsRequireExactSemantics',
     'Test-CandidateManifestCommandsRejectRogueOperands',
+    'Test-CandidateManifestCommandsBindHermeticValues',
     'Test-SmokeConsumerEnforcesBuildAttestationAndExactInventory'
 )
 
