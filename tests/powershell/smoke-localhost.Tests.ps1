@@ -645,6 +645,21 @@ function Test-SmokeExecutionOverlayAllowsOnlyOutpathSettingsChange {
     finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
+function Test-SmokeExecutionOverlayRejectsBaseRootOverlap {
+    $root = New-FixtureRoot
+    try {
+        $command = Get-Command -Name Assert-SmokeExecutionOverlay -ErrorAction SilentlyContinue
+        Assert-True ($null -ne $command) 'Smoke must reject an execution overlay rooted at the sealed candidate.'
+        if ($null -eq $command) { return }
+        $fixture = New-MinimalSealedCandidate -Root $root
+        $baseHash = (Get-FileHash -LiteralPath $fixture.ManifestPath -Algorithm SHA256).Hash
+        try { Assert-SmokeExecutionOverlay -ExecutionCandidate $fixture.Root -BaseCandidateRoot $fixture.Root -BaseCandidateManifestSha256 $baseHash -ExpectedOutputDirectory 'C:\old' -Phase 'pre-run'; $actual = 'no_failure' }
+        catch { $actual = $_.Exception.Message }
+        Assert-Equal 'candidate_execution_base_overlap' $actual 'The execution overlay must never target the sealed candidate root.'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
 function Test-SmokeEvidenceLivesOutsideCandidateAndPreservesWholeTree {
     $root = New-FixtureRoot
     try {
@@ -1045,6 +1060,7 @@ $sealRedTests = @(
     'Test-SmokeSettingsOverrideProducesExplicitDerivativeAttestation',
     'Test-SmokeExecutionOverlayRejectsBaseMismatchAndNonSettingsMutation',
     'Test-SmokeExecutionOverlayAllowsOnlyOutpathSettingsChange',
+    'Test-SmokeExecutionOverlayRejectsBaseRootOverlap',
     'Test-SmokeEvidenceLivesOutsideCandidateAndPreservesWholeTree',
     'Test-CleanupFailureOnFailedRunIsRecordedAndThrown',
     'Test-SmokeSuccessEvidenceSeparatesProofClaims',

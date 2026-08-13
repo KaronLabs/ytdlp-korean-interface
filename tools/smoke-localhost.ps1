@@ -298,6 +298,7 @@ function Assert-SmokeExecutionOverlay {
     if ($BaseCandidateManifestSha256 -notmatch '^[A-Fa-f0-9]{64}$') { throw 'candidate_execution_base_manifest_mismatch' }
     $base = [IO.Path]::GetFullPath($BaseCandidateRoot)
     $execution = [IO.Path]::GetFullPath($ExecutionCandidate)
+    if (Test-PathOverlap -First $base -Second $execution) { throw 'candidate_execution_base_overlap' }
     $baseManifestPath = Join-Path $base 'candidate-manifest.json'
     $executionManifestPath = Join-Path $execution 'candidate-manifest.json'
     if (-not (Test-Path -LiteralPath $baseManifestPath -PathType Leaf) -or -not (Test-Path -LiteralPath $executionManifestPath -PathType Leaf)) { throw 'candidate_execution_base_manifest_mismatch' }
@@ -491,7 +492,7 @@ function Invoke-LocalhostSmoke {
         $succeeded = $true; $reasonCode = 'ok'; return $result
     }
     catch {
-        $known = @('candidate_parent_overlap', 'candidate_missing', 'candidate_manifest_missing', 'candidate_manifest_invalid', 'candidate_manifest_digest_mismatch', 'candidate_manifest_mismatch', 'candidate_copy_mismatch', 'candidate_execution_base_manifest_mismatch', 'candidate_execution_payload_changed', 'settings_overlay_invalid', 'smoke_execution_attestation_invalid', 'smoke_success_evidence_invalid', 'workspace_containment', 'output_not_empty', 'fixture_generation_failed', 'url_rejected', 'python_missing', 'server_not_ready', 'gui_start_failed', 'automation_marker_invalid', 'operator_not_confirmed', 'automation_required', 'output_missing', 'part_file', 'mp3_missing', 'stale_output', 'ffprobe_failed', 'codec_not_mp3', 'duration_invalid')
+        $known = @('candidate_parent_overlap', 'candidate_missing', 'candidate_manifest_missing', 'candidate_manifest_invalid', 'candidate_manifest_digest_mismatch', 'candidate_manifest_mismatch', 'candidate_copy_mismatch', 'candidate_execution_base_overlap', 'candidate_execution_base_manifest_mismatch', 'candidate_execution_payload_changed', 'settings_overlay_invalid', 'smoke_execution_attestation_invalid', 'smoke_success_evidence_invalid', 'workspace_containment', 'output_not_empty', 'fixture_generation_failed', 'url_rejected', 'python_missing', 'server_not_ready', 'gui_start_failed', 'automation_marker_invalid', 'operator_not_confirmed', 'automation_required', 'output_missing', 'part_file', 'mp3_missing', 'stale_output', 'ffprobe_failed', 'codec_not_mp3', 'duration_invalid')
         if ($known -contains $_.Exception.Message) { $reasonCode = $_.Exception.Message } else { $reasonCode = 'unexpected_failure' }
         throw
     }
