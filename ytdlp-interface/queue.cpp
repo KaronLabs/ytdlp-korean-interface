@@ -1057,17 +1057,22 @@ bool GUI::queue_save()
 	if(fn_write_conf && lbq.item_count())
 	{
 		conf.unfinished_queue_items.clear();
+		conf.unfinished_queue_states.clear();
 		for(size_t cat {0}; cat < lbq.size_categ(); cat++)
 		{
 			auto icat {lbq.at(cat)};
 			if(icat.size())
 			{
 				auto &qitems {conf.unfinished_queue_items.emplace_back(icat.text(), std::vector<std::string>{}).second};
+				auto &qstates {conf.unfinished_queue_states.emplace_back()};
 				for(auto item : icat)
 				{
 					const auto state {item.value<lbqval_t>().state};
 					if(state != queue_item_state::done && (state != queue_item_state::error || conf.cb_save_errors))
+					{
 						qitems.push_back(nana::to_utf8(item.value<lbqval_t>().url));
+						qstates.push_back(state);
+					}
 				}
 			}
 		}
@@ -1080,6 +1085,7 @@ bool GUI::queue_save()
 void GUI::queue_save_data(size_t max_qitems_to_process)
 {
 	conf.unfinished_queue_items.clear();
+	conf.unfinished_queue_states.clear();
 	unfinished_qitems_data.clear();
 	unsigned unfinished_qitems_with_data {0};
 	for(size_t cat {0}; cat < lbq.size_categ(); cat++)
@@ -1109,6 +1115,7 @@ void GUI::queue_save_data(size_t max_qitems_to_process)
 			if(icat.size())
 			{
 				auto &qitems {conf.unfinished_queue_items.emplace_back(icat.text(), std::vector<std::string>{}).second};
+				auto &qstates {conf.unfinished_queue_states.emplace_back()};
 				for(auto item : icat)
 				{
 					const auto state {item.value<lbqval_t>().state};
@@ -1117,6 +1124,7 @@ void GUI::queue_save_data(size_t max_qitems_to_process)
 						const auto wurl {item.value<lbqval_t>().url};
 						const auto url {nana::to_utf8(wurl)};
 						qitems.push_back(url);
+						qstates.push_back(state);
 						auto &bottom {bottoms.at(url)};
 						if(!bottom.vidinfo.empty() || !bottom.playlist_info.empty())
 						{

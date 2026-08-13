@@ -29,6 +29,6 @@
     <ClCompile Include="state_token_tests.cpp" />
     <ClCompile Include="..\..\ytdlp-interface\i18n.cpp" />
   </ItemGroup>
-  <ItemGroup><ClInclude Include="..\..\ytdlp-interface\i18n.hpp" /><ClInclude Include="..\..\ytdlp-interface\state_tokens.hpp" /></ItemGroup>
+  <ItemGroup><ClInclude Include="..\..\ytdlp-interface\i18n.hpp" /><ClInclude Include="..\..\ytdlp-interface\state_tokens.hpp" /><ClInclude Include="..\..\ytdlp-interface\settings_json.hpp" /></ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

@@ -11,6 +11,7 @@ SOURCE_ROOT = REPOSITORY_ROOT / "ytdlp-interface"
 I18N_SOURCE = SOURCE_ROOT / "i18n.cpp"
 I18N_HEADER = SOURCE_ROOT / "i18n.hpp"
 STATE_TOKENS_HEADER = SOURCE_ROOT / "state_tokens.hpp"
+SETTINGS_JSON_HEADER = SOURCE_ROOT / "settings_json.hpp"
 STRING_LITERAL = r'"(?:[^"\\]|\\.)*"'
 FORBIDDEN_ARTIFACT_COMPONENTS = {
     ".superpowers",
@@ -211,6 +212,15 @@ def is_tracked_runtime_artifact(path):
 
 
 class RecoveryContractTests(unittest.TestCase):
+    def test_task_3_settings_round_trip_persists_queue_states_without_sidecar(self):
+        self.assertTrue(SETTINGS_JSON_HEADER.is_file(), "missing GUI-free settings serialization")
+        source = SETTINGS_JSON_HEADER.read_text(encoding="utf-8")
+        self.assertIn('j["unfinished_queue_states"]', source)
+        self.assertIn("unfinished_queue_states", source)
+        gui_source = (SOURCE_ROOT / "gui.hpp").read_text(encoding="utf-8-sig")
+        self.assertIn("conf.unfinished_queue_states", gui_source)
+        self.assertIn("queue_item_state::skipped", gui_source)
+
     def test_task_3_state_tokens_preserve_queue_state_without_visible_caption_logic(self):
         self.assertTrue(STATE_TOKENS_HEADER.is_file(), "missing stable state token header")
         source = STATE_TOKENS_HEADER.read_text(encoding="utf-8")
@@ -229,8 +239,9 @@ class RecoveryContractTests(unittest.TestCase):
         self.assertRegex(header, r'std::string\s+language\s*\{\s*"en-US"\s*\}')
         self.assertIn('j["language"] = language;', source)
         self.assertIn('return language == "ko-KR" ? language : "en-US";', STATE_TOKENS_HEADER.read_text(encoding="utf-8"))
-        self.assertIn("normalized_language", source)
-        self.assertIn('#include "state_tokens.hpp"', header)
+        self.assertIn("settings_json_t", source)
+        self.assertIn("normalized_language", SETTINGS_JSON_HEADER.read_text(encoding="utf-8"))
+        self.assertIn('#include "settings_json.hpp"', header)
 
     def test_task_3_loads_selected_catalog_before_gui_construction(self):
         source = (SOURCE_ROOT / "main.cpp").read_text(encoding="utf-8-sig", errors="replace")

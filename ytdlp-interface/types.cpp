@@ -646,23 +646,7 @@ void settings_t::to_json(nlohmann::json &j) const
 	theme_dark.to_json(j["theme"]["dark"]);
 	theme_light.to_json(j["theme"]["light"]);
 
-	auto &jitems {j["unfinished_queue_items"] = nlohmann::json::array()};
-
-	for(const auto &el : unfinished_queue_items)
-	{
-		if(el.first.empty())
-			for(const auto &url : el.second)
-				jitems.push_back(url);
-		else if(!el.second.empty())
-		{
-			jitems.push_back(nlohmann::json::object());
-			auto &jobj {jitems.back()};
-			jobj["name"] = el.first;
-			auto &jcat {jobj["items"] = nlohmann::json::array()};
-			for(const auto &url : el.second)
-				jcat.push_back(url);
-		}
-	}
+	settings_json_t {language, unfinished_queue_items, unfinished_queue_states}.to_json(j);
 
 	auto &jpresets {j["presets"] = nlohmann::json::array()};
 	for(const auto &el : GUI::conf_presets)
@@ -767,7 +751,11 @@ void settings_t::to_json(nlohmann::json &j) const
 void settings_t::from_json(const nlohmann::json &j)
 {
 	using nana::to_wstring;
-	language = normalized_language(j.contains("language") && j["language"].is_string() ? j["language"].get<std::string>() : "");
+	settings_json_t saved_settings;
+	saved_settings.from_json(j);
+	language = std::move(saved_settings.language);
+	unfinished_queue_items = std::move(saved_settings.unfinished_queue_items);
+	unfinished_queue_states = std::move(saved_settings.unfinished_queue_states);
 
 	ytdlp_path = j["ytdlp_path"].get<std::string>();
 	if(!ytdlp_path.empty())
@@ -825,21 +813,6 @@ void settings_t::from_json(const nlohmann::json &j)
 		max_concurrent_downloads = j["max_concurrent_downloads"];
 		cb_lengthyproc = j["cb_lengthyproc"];
 		max_proc_dur = std::chrono::milliseconds {j["max_proc_dur"].get<int>()};
-		if(!j["unfinished_queue_items"].empty())
-		{
-			auto &cat0 {unfinished_queue_items.emplace_back("", std::vector<std::string>{}).second};
-			for(auto &el : j["unfinished_queue_items"])
-			{
-				if(el.is_string())
-					cat0.push_back(el);
-				else if(el.is_object())
-				{
-					auto &cat {unfinished_queue_items.emplace_back(el["name"], std::vector<std::string>{}).second};
-					for(auto &url : el["items"])
-						cat.push_back(url);
-				}
-			}
-		}
 		if(j.contains("outpaths"))
 			for(auto &el : j["outpaths"])
 				outpaths.insert(to_wstring(el.get<std::string>()));

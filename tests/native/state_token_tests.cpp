@@ -1,4 +1,5 @@
 #include "state_tokens.hpp"
+#include "settings_json.hpp"
 
 #include <array>
 #include <iostream>
@@ -50,11 +51,43 @@ namespace
 		expect(queue_item_state_from_legacy_status("stopped") == queue_item_state::stopped, "legacy stopped", __func__);
 		expect(queue_item_state_from_legacy_status("한국어 표시") == queue_item_state::queued, "unknown visible status is queued", __func__);
 	}
+
+	void test_settings_json_round_trip_preserves_language_and_queue_states()
+	{
+		settings_json_t settings;
+		settings.language = "ko-KR";
+		settings.unfinished_queue_items = {
+			{"", {"duplicate", "duplicate", "skipped-without-sidecar"}},
+			{"playlist", {"queued-item"}},
+		};
+		settings.unfinished_queue_states = {
+			{queue_item_state::queued, queue_item_state::stopped, queue_item_state::skipped},
+			{queue_item_state::queued},
+		};
+		nlohmann::json serialized;
+		settings.to_json(serialized);
+		settings_json_t restored;
+		restored.from_json(serialized);
+		expect(restored.language == "ko-KR", "ko-KR survives settings round trip", __func__);
+		expect(restored.unfinished_queue_items == settings.unfinished_queue_items, "queue URLs preserve order and duplicates", __func__);
+		expect(restored.unfinished_queue_states == settings.unfinished_queue_states, "queue states survive without sidecar", __func__);
+
+		serialized.erase("language");
+		restored.from_json(serialized);
+		expect(restored.language == "en-US", "missing language falls back to en-US", __func__);
+		serialized["language"] = "unsupported";
+		restored.from_json(serialized);
+		expect(restored.language == "en-US", "unsupported language falls back to en-US", __func__);
+		serialized["language"] = 1;
+		restored.from_json(serialized);
+		expect(restored.language == "en-US", "non-string language falls back to en-US", __func__);
+	}
 }
 
 int run_state_token_tests()
 {
 	test_language_defaults_and_accepts_supported_locales();
 	test_queue_state_round_trip_and_legacy_statuses();
+	test_settings_json_round_trip_preserves_language_and_queue_states();
 	return failures;
 }

@@ -365,15 +365,21 @@ private:
 		{
 			lbq.auto_draw(false);
 			size_t cat {0};
-			for(auto &el : conf.unfinished_queue_items)
+			for(size_t saved_category {0}; saved_category < conf.unfinished_queue_items.size(); saved_category++)
 			{
+				auto &el {conf.unfinished_queue_items[saved_category]};
 				if(!el.first.empty())
 				{
 					cat++;
 					lbq.append(el.first).inline_factory(1, nana::pat::make_factory<inline_widget>());
 				}
-				for(auto &url : el.second)
+				for(size_t item {0}; item < el.second.size(); item++)
+				{
+					auto &url {el.second[item]};
 					add_url(nana::to_wstring(url), false, false, cat);
+					lbq.at(cat).back().value<lbqval_t>().state = saved_category < conf.unfinished_queue_states.size() &&
+						item < conf.unfinished_queue_states[saved_category].size() ? conf.unfinished_queue_states[saved_category][item] : queue_item_state::queued;
+				}
 			}
 			if(unfinished_qitems_data.empty())
 				lbq.auto_draw(true);
@@ -381,11 +387,15 @@ private:
 
 			if(conf.cb_queue_autostart)
 			{
-				size_t cat {0};
-				for(; cat < lbq.size_categ(); cat++)
-					if(lbq.size_item(cat)) break;
-				if(cat < lbq.size_categ())
-					on_btn_dl(lbq.at(cat).at(0).value<lbqval_t>());
+				for(size_t cat {0}; cat < lbq.size_categ(); cat++)
+					for(auto item : lbq.at(cat))
+						if(item.value<lbqval_t>().state != queue_item_state::skipped &&
+							item.value<lbqval_t>().state != queue_item_state::done &&
+							item.value<lbqval_t>().state != queue_item_state::error)
+						{
+							on_btn_dl(item.value<lbqval_t>());
+							return;
+						}
 			}
 		}
 		else items_initialized = true;

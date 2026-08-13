@@ -1266,6 +1266,7 @@ void GUI::fm_settings()
 			thr_ver_ffmpeg.detach();
 
 		conf.unfinished_queue_items.clear();
+		conf.unfinished_queue_states.clear();
 		lbq.auto_draw(false);
 		for(size_t cat {0}; cat < lbq.size_categ(); cat++)
 		{
@@ -1273,6 +1274,7 @@ void GUI::fm_settings()
 			if(icat.size())
 			{
 				auto &qitems {conf.unfinished_queue_items.emplace_back(icat.text(), std::vector<std::string>{}).second};
+				auto &qstates {conf.unfinished_queue_states.emplace_back()};
 				for(auto item : icat)
 				{
 					const auto &bottom {bottoms.at(item.value<lbqval_t>().url)};
@@ -1302,7 +1304,10 @@ void GUI::fm_settings()
 
 					const auto state {item.value<lbqval_t>().state};
 					if(state != queue_item_state::done && (state != queue_item_state::error || conf.cb_save_errors))
+					{
 						qitems.push_back(nana::to_utf8(item.value<lbqval_t>().url));
+						qstates.push_back(state);
+					}
 				}
 			}
 		}

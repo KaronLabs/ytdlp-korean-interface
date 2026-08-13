@@ -233,6 +233,8 @@
     <ClInclude Include="gui.hpp" />
     <ClInclude Include="hsl_picker.hpp" />
 	<ClInclude Include="i18n.hpp" />
+	<ClInclude Include="settings_json.hpp" />
+	<ClInclude Include="state_tokens.hpp" />
     <ClInclude Include="icons.hpp" />
     <ClInclude Include="json.hpp" />
     <ClInclude Include="log.hpp" />

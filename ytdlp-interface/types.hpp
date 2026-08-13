@@ -7,7 +7,7 @@
 #include <thread>
 #include <mutex>
 #include "json.hpp"
-#include "state_tokens.hpp"
+#include "settings_json.hpp"
 
 #define WM_SET_QLINE_TEXT (WM_APP + 0x0001)
 #define WM_LBQ_AUTODRAW (WM_APP + 0x0002)
@@ -109,7 +109,8 @@ struct settings_t
 		output_template_bandcamp {output_template_default_bandcamp}, proxy;
 	std::string language {"en-US"}, argset, cookie_options, aria_options {"-x 6"}, sub_langs, sub_format;
 	std::vector<std::string> argsets;
-	std::vector<std::pair<std::string, std::vector<std::string>>> unfinished_queue_items;
+	settings_json_t::queue_items_t unfinished_queue_items;
+	settings_json_t::queue_states_t unfinished_queue_states;
 	std::unordered_set<std::wstring> outpaths;
 	std::map<std::wstring, std::string> playsel_strings;
 	double ratelim {0}, contrast {.1};

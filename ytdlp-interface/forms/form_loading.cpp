@@ -41,12 +41,15 @@ void GUI::fm_loading(bool saving)
 	{
 		if(saving)
 		{
+			conf.unfinished_queue_items.clear();
+			conf.unfinished_queue_states.clear();
 			for(size_t cat {0}; cat < lbq.size_categ(); cat++)
 			{
 				auto icat {lbq.at(cat)};
 				if(icat.size())
 				{
 					auto &qitems {conf.unfinished_queue_items.emplace_back(icat.text(), std::vector<std::string>{}).second};	
+					auto &qstates {conf.unfinished_queue_states.emplace_back()};
 					for(auto item : icat)
 					{
 						auto text {item.text(3)};
@@ -56,6 +59,7 @@ void GUI::fm_loading(bool saving)
 							const auto wurl {item.value<lbqval_t>().url};
 							const auto url {to_utf8(wurl)};
 							qitems.push_back(url);
+							qstates.push_back(state);
 							auto &bottom {bottoms.at(url)};
 							if(!bottom.vidinfo.empty() || !bottom.playlist_info.empty())
 							{
