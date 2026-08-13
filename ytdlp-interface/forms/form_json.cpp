@@ -1,3 +1,4 @@
+#include "../i18n.hpp"
 #include "../gui.hpp"
 #include <nana/gui/filebox.hpp>
 
@@ -9,7 +10,9 @@ void GUI::fm_json()
 
 	themed_form fm {nullptr, *this, {}, appear::decorate<appear::sizable, appear::minimize, appear::maximize>{}};
 	fm.center(1000, 1006);
-	fm.caption(title + " - JSON viewer");
+	auto form_caption {i18n::tr("json.viewer", "{title} - JSON viewer")};
+	form_caption.replace(form_caption.find("{title}"), 7, title);
+	fm.caption(form_caption);
 	fm.bgcolor(theme::fmbg);
 	fm.snap(conf.cbsnap);
 
@@ -26,9 +29,11 @@ void GUI::fm_json()
 	lcmd.text_align(align::left, align_v::top);
 	lcmd.format(true);
 
-	std::string lcmd_text_dark {"<color=0xb0b0b0>The data was obtained from yt-dlp using this command line:</>\n"
+	const auto command_intro {i18n::tr("json.command_intro", "The data was obtained from yt-dlp using this command line:")};
+	const auto data_filter {i18n::tr("json.data_filter", "JSON data format")};
+	std::string lcmd_text_dark {"<color=0xb0b0b0>" + command_intro + "</>\n"
 		"<bold color=0xa09080>" + to_utf8(bottom.cmdinfo) + "</>"};
-	std::string lcmd_text_light {"<color=0x707070>The data was obtained from yt-dlp using this command line:</>\n"
+	std::string lcmd_text_light {"<color=0x707070>" + command_intro + "</>\n"
 		"<bold color=0x8090a0>" + to_utf8(bottom.cmdinfo) + "</>"};
 	lcmd.events().expose([&]
 	{
@@ -55,7 +60,7 @@ void GUI::fm_json()
 				}
 				fb.allow_multi_select(false);
 				fb.add_filter(desc, filter);
-				fb.title("Save as");
+				fb.title(i18n::tr("json.save_as", "Save as"));
 				auto res {fb()};
 				if(res.size())
 					return res.front();
@@ -79,7 +84,7 @@ void GUI::fm_json()
 						seltext.pop_back();
 					}
 					auto val {seltext.substr(pos)};
-					m.append("Copy selected value", [val, this](menu::item_proxy ip)
+					m.append(i18n::tr("json.copy_selected", "Copy selected value"), [val, this](menu::item_proxy ip)
 					{
 						util::set_clipboard_text(hwnd, to_wstring(val));
 					});
@@ -87,12 +92,14 @@ void GUI::fm_json()
 				}
 			}
 
-			m.append("Save as .txt", [&](menu::item_proxy ip)
+			m.append(i18n::tr("json.save_txt", "Save as .txt"), [&](menu::item_proxy ip)
 			{
-				auto path {file_selector("Text file", "*.txt")};
+				auto path {file_selector(i18n::tr("json.text_filter", "Text file"), "*.txt")};
 				if(!path.empty())
 				{
-					std::string text {"Text version of the JSON data for URL: " + to_utf8(bottom.url) + "\n\n"};
+					std::string text {i18n::tr("json.text_export_intro", "Text version of the JSON data for URL: {url}")};
+					text.replace(text.find("{url}"), 5, to_utf8(bottom.url));
+					text += "\n\n";
 					std::function<void(treebox::item_proxy)> recfn = [&](treebox::item_proxy parent)
 					{
 						for(auto node : parent)
@@ -111,23 +118,23 @@ void GUI::fm_json()
 				}
 			});
 
-			m.append("Save as .json", [&](menu::item_proxy ip)
+			m.append(i18n::tr("json.save_json", "Save as .json"), [&](menu::item_proxy ip)
 			{
-				auto path {file_selector("JSON data format", "*.json")};
+				auto path {file_selector(data_filter, "*.json")};
 				if(!path.empty())
 					std::ofstream {path} << *t.jdata();
 			});
 
-			m.append("Save as .json (prettified)", [&](menu::item_proxy ip)
+			m.append(i18n::tr("json.save_json_pretty", "Save as .json (prettified)"), [&](menu::item_proxy ip)
 			{
-				auto path {file_selector("JSON data format", "*.json")};
+				auto path {file_selector(data_filter, "*.json")};
 				if(!path.empty())
 					std::ofstream {path} << std::setw(4) << *t.jdata();
 			});
 
 			m.append_splitter();
 
-			m.append("Hide null values", [&](menu::item_proxy ip)
+			m.append(i18n::tr("json.hide_null", "Hide null values"), [&](menu::item_proxy ip)
 			{
 				conf.json_hide_null = !conf.json_hide_null;
 				ip.checked(conf.json_hide_null);

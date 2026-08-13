@@ -1,4 +1,5 @@
 #include "../gui.hpp"
+#include "../i18n.hpp"
 
 
 void GUI::fm_changes(nana::window parent)
@@ -8,7 +9,7 @@ void GUI::fm_changes(nana::window parent)
 	themed_form fm {nullptr, parent, {}, appear::decorate<appear::sizable>{}};
 	fm.center(1030, 543);
 	fm.snap(conf.cbsnap);
-	fm.caption("ytdlp-interface - release notes");
+	fm.caption(i18n::tr("changes.release_notes", "ytdlp-interface - release notes"));
 	fm.bgcolor(theme::fmbg);
 	fm.div(R"(vert margin=20 <tb> <weight=20>
 				<weight=25 <> <l_history weight=164> <weight=10> <com_history weight=75> <weight=20> <cblogview weight=140> <> >)");
@@ -22,7 +23,7 @@ void GUI::fm_changes(nana::window parent)
 		tb.editable(false);
 	}
 
-	widgets::cbox cblogview {fm, "Changelog view"};
+	widgets::cbox cblogview {fm, i18n::tr("changes.changelog_view", "Changelog view")};
 	fm["cblogview"] << cblogview;
 
 	auto display_release_notes = [&](const unsigned ver)
@@ -75,7 +76,7 @@ void GUI::fm_changes(nana::window parent)
 
 	display_release_notes(0);
 
-	widgets::Label l_history {fm, "Show release notes for:"};
+	widgets::Label l_history {fm, i18n::tr("changes.show_release_notes_for", "Show release notes for:")};
 	fm["l_history"] << l_history;
 
 	widgets::Combox com_history {fm};

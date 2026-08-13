@@ -12,6 +12,11 @@ namespace
 	}
 }
 
+std::string localized_json_error_title()
+{
+	return i18n::tr("startup.json_error_title", "ytdlp-interface JSON error");
+}
+
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 {
@@ -56,9 +61,11 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 			fs::remove(fs::temp_directory_path() / "7z.dll", ec);
 			if(!res.empty())
 			{
-				msgbox mbox {"ytdlp-interface - updating failed"};
+				msgbox mbox {i18n::tr("updater.failed_title", "ytdlp-interface - updating failed")};
 				mbox.icon(msgbox::icon_error);
-				(mbox << "failed to extract the downloaded 7z archive: " << res)();
+				auto message {i18n::tr("startup.updater_failed_body", "Failed to extract the downloaded 7z archive: {error}")};
+				message.replace(message.find("{error}"), 7, res);
+				(mbox << message)();
 			}
 			else
 			{
@@ -121,7 +128,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 		g_logfile.open(appdir / "debug_log.txt", std::ofstream::trunc);
 		if(!g_logfile.good())
 		{
-			msgbox mbox {"failed to open debug_log.txt for writing"};
+			msgbox mbox {i18n::tr("startup.debug_log_failed_title", "failed to open debug_log.txt for writing")};
 			mbox.icon(msgbox::icon_error);
 			(mbox << std::strerror(errno))();
 		}
@@ -159,9 +166,12 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 		try { f >> jconf; }
 		catch(nlohmann::detail::exception e)
 		{
-			msgbox mbox {"ytdlp-interface JSON error"};
+			msgbox mbox {localized_json_error_title()};
 			mbox.icon(msgbox::icon_error);
-			(mbox << confpath.string() << "\n\nAn exception occured when trying to load the settings file:\n\n" << e.what())();
+			auto message {i18n::tr("startup.json_error_body", "{path}\n\nAn exception occurred while loading the settings file:\n\n{error}")};
+			message.replace(message.find("{path}"), 6, confpath.string());
+			message.replace(message.find("{error}"), 7, e.what());
+			(mbox << message)();
 		}
 		if(!jconf.empty())
 		{
@@ -214,9 +224,14 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 		if(!gui.fn_write_conf() && errno)
 		{
 			std::string error {std::strerror(errno)};
-			msgbox mbox {"ytdlp-interface - error writing settings file"};
+			msgbox mbox {i18n::tr("startup.settings_write_title", "ytdlp-interface - error writing settings file")};
 			mbox.icon(msgbox::icon_error);
-			(mbox << confpath.string() << "\n\nAn error occured when trying to save the settings file:\n\n" << error)();
+			auto summary {i18n::tr("startup.settings_write_body", "Unable to save settings to:\n{path}")};
+			summary.replace(summary.find("{path}"), 6, confpath.string());
+			auto message {i18n::tr("error.settings_write_detail", "{path}\n\nAn error occurred while saving the settings file:\n\n{error}")};
+			message.replace(message.find("{path}"), 6, confpath.string());
+			message.replace(message.find("{error}"), 7, error);
+			(mbox << summary << "\n\n" << i18n::tr("error.settings_write_body", "error writing settings to disk") << "\n\n" << message)();
 		}
 	});
 	nana::exec();

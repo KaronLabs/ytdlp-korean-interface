@@ -1,3 +1,4 @@
+#include "i18n.hpp"
 #include "log.hpp"
 
 bool g_enable_log {false};
@@ -10,7 +11,7 @@ void logger::make_form(nana::window owner)
 	if(!fm && g_enable_log)
 	{
 		fm = std::make_unique<themed_form>(nullptr, owner, rectangle {0, 200, 645, 1000}, appear::decorate<appear::minimize, appear::sizable> {});
-		fm->caption("debug log");
+		fm->caption(i18n::tr("debug_log.title", "debug log"));
 		fm->snap(true);
 		fm->div("vert margin=15 <tb>");
 		tb = std::make_unique<::widgets::Textbox>(*fm);

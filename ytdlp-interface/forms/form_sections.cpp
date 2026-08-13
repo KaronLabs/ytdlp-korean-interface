@@ -1,3 +1,4 @@
+#include "../i18n.hpp"
 #include "../gui.hpp"
 #include <regex>
 
@@ -10,7 +11,9 @@ void GUI::fm_sections()
 
 	auto &bottom {bottoms.current()};
 	themed_form fm {nullptr, *this, {}, appear::decorate<appear::minimize>{}};
-	fm.caption(title + " - media sections");
+	auto form_caption {i18n::tr("sections.title", "{title} - media sections")};
+	form_caption.replace(form_caption.find("{title}"), 7, title);
+	fm.caption(form_caption);
 	fm.snap(conf.cbsnap);
 	fm.center(788, 678);
 	fm.div(R"(vert margin=[15,20,20,20] 
@@ -62,10 +65,10 @@ void GUI::fm_sections()
 		}
 	};
 
-	::widgets::Text l_start {fm, "Define section from"}, l_end {fm, "to"};
+	::widgets::Text l_start {fm, i18n::tr("sections.define_from", "Define section from")}, l_end {fm, i18n::tr("sections.to", "to")};
 	::widgets::Label l_help {fm, ""};
-	::widgets::Button btnadd {fm, "Add to list", true}, btnremove {fm, "Remove from list", true}, btnclear {fm, "Clear list", true},
-		btnclose {fm, "Close"};
+	::widgets::Button btnadd {fm, i18n::tr("sections.add", "Add to list"), true}, btnremove {fm, i18n::tr("sections.remove", "Remove from list"), true}, btnclear {fm, i18n::tr("sections.clear", "Clear list"), true},
+		btnclose {fm, i18n::tr("common.close", "Close")};
 	::widgets::Listbox lbs {fm, nullptr, true};
 	tbox tbfirst {fm}, tbsecond {fm};
 
@@ -90,18 +93,16 @@ void GUI::fm_sections()
 	l_help.typeface(paint::font_info {"Tahoma", 10});
 	l_help.text_align(align::left, align_v::top);
 	l_help.format(true);
-	std::string helptext {"Here you can tell yt-dlp to download only a section (or multiple sections) of the media. "
-		"Define a section by specifying a start point and an end point, then add it to the list. The time points are "
-		"in the format <bold color=0x>[hour:][minute:]second</>.\n\nFor example, <bold color=0x>54</> means second 54, "
-		"<bold color=0x>9:54</> means minute 9 second 54, "
-		"and <bold color=0x>1:9:54</> means hour 1 minute 9 second 54.\nTo indicate the end of the media, put <bold color=0x>0</> "
-		"in the \"to\" field or leave it blank. \n\nThe downloading of sections is done through FFmpeg (which is much slower), "
-		"and each section is downloaded to its own file."};
+	std::string helptext {i18n::tr("sections.help", "Here you can tell yt-dlp to download only a section (or multiple sections) of the media. Define a section by specifying a start point and an end point, then add it to the list. The time points are in the format <bold color={accent}>[hour:][minute:]second</>.\n\nFor example, <bold color={accent}>54</> means second 54, <bold color={accent}>9:54</> means minute 9 second 54, and <bold color={accent}>1:9:54</> means hour 1 minute 9 second 54.\nTo indicate the end of the media, put <bold color={accent}>0</> in the \"to\" field or leave it blank.\n\nThe downloading of sections is done through FFmpeg (which is much slower), and each section is downloaded to its own file.")};
+	for(size_t offset {}; (offset = helptext.find("{accent}", offset)) != std::string::npos; offset += 2)
+		helptext.replace(offset, 8, "0x");
+	const auto end_label {i18n::tr("sections.end", "end")};
+	const auto validation_title {i18n::tr("sections.validation_title", "validation error")};
 
 	for(auto &val : bottom.sections)
 	{
 		const auto text {to_utf8(val.first.empty() ? L"0" : val.first) + " -> " +
-			(val.second.empty() || val.second == L"0" ? "end" : to_utf8(val.second))};
+			(val.second.empty() || val.second == L"0" ? end_label : to_utf8(val.second))};
 		lbs.at(0).push_back(text);
 		lbs.at(0).back().value(val);
 	}
@@ -178,22 +179,22 @@ void GUI::fm_sections()
 		timepoint tp1 {first}, tp2 {second};
 		if(first == "0" && second == "0")
 		{
-			(::widgets::msgbox {fm, "validation error"}.icon(nana::msgbox::icon_error) << "section spans entire length")();
+			(::widgets::msgbox {fm, validation_title}.icon(nana::msgbox::icon_error) << i18n::tr("sections.validation_entire", "section spans entire length"))();
 			return;
 		}
 		if(tp1.equal(tp2))
 		{
-			(::widgets::msgbox {fm, "validation error"}.icon(nana::msgbox::icon_error) << "timepoints are identical")();
+			(::widgets::msgbox {fm, validation_title}.icon(nana::msgbox::icon_error) << i18n::tr("sections.validation_identical", "timepoints are identical"))();
 			return;
 		}
 		else if(tp1 > tp2 && second != "0")
 		{
-			(::widgets::msgbox {fm, "validation error"}.icon(nana::msgbox::icon_error) << "second timepoint precedes the first one")();
+			(::widgets::msgbox {fm, validation_title}.icon(nana::msgbox::icon_error) << i18n::tr("sections.validation_order", "second timepoint precedes the first one"))();
 			return;
 		}
 
 
-		const auto text {first + " -> " + (second == "0" ? "end" : second)};
+		const auto text {first + " -> " + (second == "0" ? end_label : second)};
 		for(auto item : lbs.at(0))
 			if(item.text(0) == text)
 			{

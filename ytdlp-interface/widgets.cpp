@@ -1,4 +1,5 @@
-﻿#include "widgets.hpp"
+﻿#include "i18n.hpp"
+#include "widgets.hpp"
 #include "util.hpp"
 #include <codecvt>
 #include <Windows.h>
@@ -243,7 +244,7 @@ void path_label::update_caption()
 {
 	const std::wstring wstr {is_path ? std::get<fs::path*>(v)->wstring() : *std::get<std::wstring*>(v)};
 	if(!is_path && wstr.empty())
-		caption("Press Ctrl+V or click here to paste and add media link");
+		caption(i18n::tr("main.paste_media_link", "Press Ctrl+V or click here to paste and add media link"));
 	else if(!size().empty())
 	{
 		caption(wstr);
@@ -811,7 +812,7 @@ void Slider::refresh_theme()
 void Overlay::create(nana::window parent, nana::widget *outbox, std::string_view text, bool visible)
 {
 	if(text.empty())
-		caption("output from yt-dlp.exe appears here\n\nright-click for options\n\ndouble-click to show queue");
+		caption(i18n::tr("main.output_empty_help", "output from yt-dlp.exe appears here\n\nright-click for options\n\ndouble-click to show queue"));
 	label::create(parent, visible);
 	fgcolor(theme::overlay_fg);
 	text_align(nana::align::center, nana::align_v::center);

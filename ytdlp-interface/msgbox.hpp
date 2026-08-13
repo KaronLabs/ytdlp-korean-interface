@@ -2,6 +2,7 @@
 
 #include "themed_form.hpp"
 #include "msgbox_icons.hpp"
+#include "i18n.hpp"
 
 #ifdef max
 	#undef max
@@ -9,6 +10,12 @@
 
 namespace widgets
 {
+	inline std::string localized_ok() { return i18n::tr("common.ok", "OK"); }
+	inline std::string localized_cancel() { return i18n::tr("common.cancel", "Cancel"); }
+	inline std::string localized_yes() { return i18n::tr("common.yes", "Yes"); }
+	inline std::string localized_no() { return i18n::tr("common.no", "No"); }
+	inline std::string localized_reset_default() { return i18n::tr("common.reset_default", "Reset to default"); }
+
 	class msgbox : public themed_form
 	{
 		class msg_label : public nana::label
@@ -74,15 +81,15 @@ namespace widgets
 			{
 			default:
 			case MB_OK:
-				btn3.create(bot_panel, "OK");
+				btn3.create(bot_panel, localized_ok());
 				btn3.events().click([this] {close(); });
 				plc_bot["btn3"] << btn3;
 				break;
 
 			case nana::msgbox::yes_no:
 			case MB_YESNO:
-				btn2.create(bot_panel, "Yes");
-				btn3.create(bot_panel, "No");
+				btn2.create(bot_panel, localized_yes());
+				btn3.create(bot_panel, localized_no());
 				btn2.events().click([this] {user_choice = IDYES; close(); });
 				btn3.events().click([this] {user_choice = IDNO; close(); });
 				plc_bot["btn2"] << btn2;
@@ -91,9 +98,9 @@ namespace widgets
 
 			case nana::msgbox::yes_no_cancel:
 			case MB_YESNOCANCEL:
-				btn1.create(bot_panel, "Yes");
-				btn2.create(bot_panel, "No");
-				btn3.create(bot_panel, "Cancel");
+				btn1.create(bot_panel, localized_yes());
+				btn2.create(bot_panel, localized_no());
+				btn3.create(bot_panel, localized_cancel());
 				btn1.events().click([this] {user_choice = IDYES; close(); });
 				btn2.events().click([this] {user_choice = IDNO; close(); });
 				btn3.events().click([this] {user_choice = IDCANCEL; close(); });

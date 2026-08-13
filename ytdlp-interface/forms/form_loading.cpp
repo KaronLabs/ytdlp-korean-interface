@@ -1,3 +1,4 @@
+#include "../i18n.hpp"
 #include "../gui.hpp"
 
 
@@ -16,8 +17,8 @@ void GUI::fm_loading(bool saving)
 
 	fm.div("vert <weight=20> <title weight=30> <text> <weight=10>");
 
-	::widgets::Title title {fm, saving ? "Compiling data for unfinished queue items" : "Loading data for queue items"};
-	::widgets::Text text {fm, "Please wait..."};
+	::widgets::Title title {fm, saving ? i18n::tr("loading.compiling", "Compiling data for unfinished queue items") : i18n::tr("loading.loading", "Loading data for queue items")};
+	::widgets::Text text {fm, i18n::tr("loading.please_wait", "Please wait...")};
 	fm["title"] << title;
 	fm["text"] << text;
 
@@ -77,7 +78,7 @@ void GUI::fm_loading(bool saving)
 					}
 				}
 			}
-			title.caption("Saving the data");
+			title.caption(i18n::tr("loading.saving", "Saving the data"));
 			std::ofstream {infopath} << unfinished_qitems_data;
 			if(thr_qitem_data.joinable())
 				thr_qitem_data.detach();
@@ -96,7 +97,7 @@ void GUI::fm_loading(bool saving)
 			std::error_code ec;
 			fs::remove(infopath, ec);
 			if(good)
-				title.caption("Recreating the queue");
+				title.caption(i18n::tr("loading.recreating", "Recreating the queue"));
 			init_qitems();
 			if(thr_qitem_data.joinable())
 				thr_qitem_data.detach();

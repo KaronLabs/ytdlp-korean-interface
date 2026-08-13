@@ -1,3 +1,4 @@
+#include "../i18n.hpp"
 #include "../gui.hpp"
 
 
@@ -11,7 +12,9 @@ void GUI::fm_subs()
 
 	themed_form fm {nullptr, *this, {}, appear::decorate<appear::minimize, appear::sizable>{}};
 	fm.center(425, 505);
-	fm.caption(title + " - subtitle selection");
+	auto form_caption {i18n::tr("subtitles.title", "{title} - subtitle selection")};
+	form_caption.replace(form_caption.find("{title}"), 7, title);
+	fm.caption(form_caption);
 	fm.bgcolor(theme::fmbg);
 	fm.snap(conf.cbsnap);
 	fm.div(R"(
@@ -27,11 +30,11 @@ void GUI::fm_subs()
 	)");
 
 	::widgets::Combox com_subs {fm};
-	::widgets::Title l_message {fm, "No subtitles available!"};
-	::widgets::Label l_sub_format {fm, "Subtitle format:"};
-	::widgets::Text l_info {fm}, l_help {fm, "Selection applies when using <bold>--embed-subs</> or <bold>--write-subs</>"};
-	::widgets::cbox cb_sub_selection {fm, "Make this selection the default for all downloads"};
-	::widgets::Button btn_ok {fm, "OK"}, btn_cancel {fm, "Cancel"}, btn_clear {fm};
+	::widgets::Title l_message {fm, i18n::tr("subtitles.none_available", "No subtitles available!")};
+	::widgets::Label l_sub_format {fm, i18n::tr("subtitles.format", "Subtitle format:")};
+	::widgets::Text l_info {fm}, l_help {fm, i18n::tr("subtitles.help", "Selection applies when using <bold>--embed-subs</> or <bold>--write-subs</>")};
+	::widgets::cbox cb_sub_selection {fm, i18n::tr("subtitles.make_default", "Make this selection the default for all downloads")};
+	::widgets::Button btn_ok {fm, widgets::localized_ok()}, btn_cancel {fm, widgets::localized_cancel()}, btn_clear {fm};
 	nana::picture pic_help {fm};
 
 	nana::paint::image img_help;	
@@ -61,8 +64,8 @@ void GUI::fm_subs()
 	lb_lang.column_resizable(false);
 	lb_lang.show_header(false);
 
-	btn_ok.tooltip("Use this selection when <bold>--embed-subs</> or <bold>--write-subs</> are used.");
-	btn_clear.tooltip("Stop using this for all downloads by default");
+	btn_ok.tooltip(i18n::tr("subtitles.use_selection", "Use this selection when <bold>--embed-subs</> or <bold>--write-subs</> are used."));
+	btn_clear.tooltip(i18n::tr("common.clear", "Clear") + "\n" + i18n::tr("subtitles.clear_default", "Stop using this for all downloads by default"));
 	btn_clear.events().click([&]
 	{
 		conf.sub_langs.clear();
@@ -117,7 +120,10 @@ void GUI::fm_subs()
 	{
 		fm.change_field_attr("spacer2", "weight", 10);
 		std::string strfmt {conf.sub_format.empty() ? "" : conf.sub_format};
-		l_info.caption("Current default: " + strfmt + (conf.sub_langs.empty() ? "" : (strfmt.empty() ? conf.sub_langs : " | " + conf.sub_langs)));
+		auto current_default {i18n::tr("subtitles.current_default", "Current default: {selection}")};
+		const auto selection {strfmt + (conf.sub_langs.empty() ? "" : (strfmt.empty() ? conf.sub_langs : " | " + conf.sub_langs))};
+		current_default.replace(current_default.find("{selection}"), 11, selection);
+		l_info.caption(current_default);
 		fm.change_field_attr("l_info", "weight", l_info.measure(0).width);
 	}
 
@@ -150,7 +156,7 @@ void GUI::fm_subs()
 					}
 					if(com_subs.the_number_of_options() == 0)
 					{
-						com_subs["<any>"].text("<any>");
+						com_subs["<any>"].text(i18n::tr("subtitles.any", "Any format"));
 						com_subs.option(0);
 					}
 					if(it == jsubs.begin())
@@ -220,7 +226,7 @@ void GUI::fm_subs()
 			conf.sub_langs.clear();
 
 		auto &bottom {bottoms.current()};
-		if(com_subs.caption() == "<any>")
+		if(com_subs.option() == 0)
 			bottom.sub_format.clear();
 		else bottom.sub_format = com_subs.caption();
 		bottom.sub_langs.clear();

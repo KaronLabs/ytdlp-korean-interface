@@ -1,6 +1,77 @@
-﻿#include "gui.hpp"
+﻿#include "i18n.hpp"
+#include "gui.hpp"
 #include <codecvt>
 #include <nana/gui/filebox.hpp>
+
+
+namespace
+{
+	std::string replace_placeholder(std::string text, std::string_view placeholder, std::string_view value)
+	{
+		if(const auto position {text.find(placeholder)}; position != std::string::npos)
+			text.replace(position, placeholder.size(), value);
+		return text;
+	}
+
+	std::string queue_format_label() { return i18n::tr("queue.format", "Format"); }
+	std::string queue_format_note_label() { return i18n::tr("queue.format_note", "Format note"); }
+	std::string queue_extension_label() { return i18n::tr("queue.extension", "Ext"); }
+	std::string queue_filesize_label() { return i18n::tr("queue.filesize", "Filesize"); }
+	std::string queue_select_formats_label() { return i18n::tr("queue.select_formats", "Select formats"); }
+	std::string queue_do_not_download_label() { return i18n::tr("queue.do_not_download", "Do not download"); }
+	std::string queue_status_queued_label() { return i18n::tr("queue.status.queued", "queued"); }
+	std::string queue_status_skipped_label() { return i18n::tr("queue.status.skipped", "skip"); }
+	std::string queue_shutdown_wait_title() { return i18n::tr("queue.shutdown_wait_title", "Shutting down active yt-dlp instances"); }
+	std::string queue_shutdown_wait_body() { return i18n::tr("queue.shutdown_wait_body", "Please wait..."); }
+}
+
+
+std::string localized_queue_website()
+{
+	return i18n::tr("queue.website", "Website");
+}
+
+
+std::string localized_queue_select_subtitles_count(std::string_view selected, std::string_view available)
+{
+	return replace_placeholder(replace_placeholder(i18n::tr("queue.select_subtitles_count", "Select subtitles ({selected}/{available})"), "{selected}", selected), "{available}", available);
+}
+
+
+std::string localized_queue_dynamic_website()
+{
+	return i18n::tr("queue.dynamic_website", "Website");
+}
+
+
+std::string localized_queue_select_playlist_items(std::string_view playlist_type)
+{
+	return replace_placeholder(i18n::tr("queue.select_playlist_items", "Select {playlist_type} items"), "{playlist_type}", playlist_type);
+}
+
+
+std::string localized_queue_do_nothing()
+{
+	return i18n::tr("queue.do_nothing", "Do nothing");
+}
+
+
+std::string localized_queue_close_application()
+{
+	return i18n::tr("queue.close_application", "Close application");
+}
+
+
+std::string localized_queue_status_downloading()
+{
+	return i18n::tr("queue.status.downloading", "downloading");
+}
+
+
+std::string localized_queue_status_processing()
+{
+	return i18n::tr("queue.status.processing", "processing");
+}
 
 
 void GUI::queue_make_listbox()
@@ -14,14 +85,14 @@ void GUI::queue_make_listbox()
 	lbq.column_movable(false);
 	lbq.typeface(paint::font_info {"Calibri", 12});
 	lbq.scheme().item_height_ex = 8;
-	lbq.append_header("#", scale(30));
-	lbq.append_header("Website", scale(20 + !conf.col_site_text * 10) * conf.col_site_icon + scale(110) * conf.col_site_text);
-	lbq.append_header("Media title", scale(584));
-	lbq.append_header("Status", scale(116));
-	lbq.append_header("Format", scale(130));
-	lbq.append_header("Format note", scale(150));
-	lbq.append_header("Ext", scale(60));
-	lbq.append_header("Filesize", scale(100));
+	lbq.append_header(i18n::tr("queue.number", "#"), scale(30));
+	lbq.append_header(localized_queue_website(), scale(20 + !conf.col_site_text * 10) * conf.col_site_icon + scale(110) * conf.col_site_text);
+	lbq.append_header(i18n::tr("queue.media_title", "Media title"), scale(584));
+	lbq.append_header(i18n::tr("queue.status", "Status"), scale(116));
+	lbq.append_header(queue_format_label(), scale(130));
+	lbq.append_header(queue_format_note_label(), scale(150));
+	lbq.append_header(queue_extension_label(), scale(60));
+	lbq.append_header(queue_filesize_label(), scale(100));
 	lbq.column_movable(false);
 	lbq.column_resizable(false);
 	lbq.column_at(4).visible(conf.col_format);
@@ -310,13 +381,14 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 	std::wstring url_of_item_to_delete;
 	::widgets::Menu m;
 	m.item_pixels(24);
+	vidsel_item = {&m};
 	auto sel {lbq.selected()};
 	if(!sel.empty() && !thr_menu_start_stop.joinable())
 	{
 		if(sel.size() == 1)
 		{
 			auto item {lbq.at(sel.front())};
-			auto item_name {"item #" + item.text(0)};
+			auto item_name {replace_placeholder(i18n::tr("queue.item", "item #{item_number}"), "{item_number}", item.text(0))};
 			auto url {item.value<lbqval_t>().url};
 			auto &bottom {bottoms.current()};
 			const auto is_live {bottom.vidinfo_contains("is_live") && bottom.vidinfo["is_live"] ||
@@ -338,20 +410,19 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 				else startable.push_back(item);
 			}
 
-			if(vidsel_item.m)
-				vidsel_item.m = &m;
-
-			auto verb {btndl.caption().substr(0, 5)};
-			if(verb.back() == ' ')
-				verb.pop_back();
-			if(item.value<lbqval_t>().state == queue_item_state::stopped)
-				verb = "Resume";
-			m.append(verb + " " + item_name, [&, url, this](menu::item_proxy)
+			const auto state {item.value<lbqval_t>().state};
+			std::string action;
+			if(state == queue_item_state::active)
+				action = replace_placeholder(i18n::tr("queue.action_stop", "Stop {item_name}"), "{item_name}", item_name);
+			else if(state == queue_item_state::stopped)
+				action = replace_placeholder(i18n::tr("queue.action_resume", "Resume {item_name}"), "{item_name}", item_name);
+			else action = replace_placeholder(i18n::tr("queue.action_start", "Start {item_name}"), "{item_name}", item_name);
+			m.append(action, [&, url, this](menu::item_proxy)
 			{
 				on_btn_dl(url);
 				api::refresh_window(btndl);
 			});
-			m.append("Remove " + item_name, [&, url, this](menu::item_proxy)
+			m.append(replace_placeholder(i18n::tr("queue.remove_item", "Remove {item_name}"), "{item_name}", item_name), [&, url, this](menu::item_proxy)
 			{
 				url_of_item_to_delete = url;
 			});
@@ -368,7 +439,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 				}
 			}
 
-			m.append("Open folder of " + item_name, [&, file](menu::item_proxy)
+			m.append(replace_placeholder(i18n::tr("queue.open_folder", "Open folder of {item_name}"), "{item_name}", item_name), [&, file](menu::item_proxy)
 			{
 				if(!file.empty())
 				{
@@ -390,7 +461,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 				}
 			});
 
-			if(!file.empty()) m.append("Open file of " + item_name, [&, file](menu::item_proxy)
+			if(!file.empty()) m.append(replace_placeholder(i18n::tr("queue.open_file", "Open file of {item_name}"), "{item_name}", item_name), [&, file](menu::item_proxy)
 			{
 				ShellExecuteW(NULL, L"open", file.wstring().data(), NULL, NULL, SW_NORMAL);
 			});
@@ -398,7 +469,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 			if(!bottom.started && !bottom.is_ytplaylist && !bottom.is_bcplaylist && !bottom.is_ytchan && 
 				!bottom.is_yttab && !bottom.is_bcchan)
 			{
-				m.append("Set file name of " + item_name, [&](menu::item_proxy)
+				m.append(replace_placeholder(i18n::tr("queue.set_filename", "Set file name of {item_name}"), "{item_name}", item_name), [&](menu::item_proxy)
 				{
 					bottom.browse_for_filename();
 				});
@@ -406,7 +477,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 
 			if(!bottom.outfile.empty())
 			{
-				m.append("Clear custom filename", [&](menu::item_proxy)
+				m.append(i18n::tr("queue.clear_filename", "Clear custom filename"), [&](menu::item_proxy)
 				{
 					bottom.outfile.clear();
 					l_outpath.tooltip("");
@@ -419,8 +490,12 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 				if(bottom.is_ytplaylist || bottom.is_bcplaylist || bottom.is_scplaylist || bottom.is_gen_playlist)
 				{
 					auto count {bottom.playlist_selection.size()};
-					std::string item_text {(bottom.is_ytplaylist || bottom.is_gen_playlist ? "Select videos (" : "Select songs (") + (count && !bottom.playlist_info.empty() ?
-						std::to_string(bottom.playlist_selected()) + '/' + std::to_string(count) + ")" : "getting data...)")};
+					const auto selection {count && !bottom.playlist_info.empty() ? std::to_string(bottom.playlist_selected()) + '/' + std::to_string(count) :
+						i18n::tr("queue.getting_data", "getting data...")};
+					std::string item_text;
+					if(bottom.is_ytplaylist || bottom.is_gen_playlist)
+						item_text = replace_placeholder(i18n::tr("queue.select_videos_progress", "Select videos ({selection})"), "{selection}", selection);
+					else item_text = replace_placeholder(i18n::tr("queue.select_songs_progress", "Select songs ({selection})"), "{selection}", selection);
 
 					auto mitem = m.append(item_text, [this](menu::item_proxy)
 					{
@@ -430,9 +505,9 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 					if(!count || bottom.playlist_info.empty())
 					{
 						mitem.enabled(false);
-						vidsel_item = {&m, mitem.index()};
+						vidsel_item.pos = mitem.index();
 					}
-					else m.append("Split playlist (add videos to queue)", [&, count, url](menu::item_proxy)
+					else m.append(i18n::tr("queue.split_playlist", "Split playlist (add videos to queue)"), [&, count, url](menu::item_proxy)
 					{
 						lbq.item_from_value(url).select(false);
 						url_of_item_to_delete = url;
@@ -456,7 +531,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 				}
 				else if(bottom.is_yttab)
 				{
-					m.append("Treat as playlist", [&, url](menu::item_proxy)
+					m.append(i18n::tr("queue.treat_as_playlist", "Treat as playlist"), [&, url](menu::item_proxy)
 					{
 						bottom.is_ytplaylist = true;
 						add_url(url, true);
@@ -464,7 +539,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 				}
 				else if(!bottom.is_ytchan && !bottom.is_bcchan && !is_live && item.text(2).find("[live event scheduled to begin in") != 0)
 				{
-					m.append("Download sections", [this](menu::item_proxy)
+					m.append(i18n::tr("queue.download_sections", "Download sections"), [this](menu::item_proxy)
 					{
 						fm_sections();
 					});
@@ -472,15 +547,18 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 
 				if(item.text(2) == "..." && !bottom.is_ytchan)
 				{
-					m.append("Select formats", [this](menu::item_proxy) { fm_formats(); }).enabled(false);
-					m.append("Select subtitles", [this](menu::item_proxy) { fm_subs(); }).enabled(false);
+					auto formats_item {m.append(queue_select_formats_label(), [this](menu::item_proxy) { fm_formats(); }).enabled(false)};
+					vidsel_item.formats_pos = formats_item.index();
+					auto subtitles_item {m.append(i18n::tr("queue.select_subtitles", "Select subtitles"), [this](menu::item_proxy) { fm_subs(); }).enabled(false)};
+					vidsel_item.subtitles_pos = subtitles_item.index();
 				}
 				else if(bottom.btnfmt_visible())
 				{
-					m.append("Select formats", [this](menu::item_proxy)
+					auto formats_item {m.append(queue_select_formats_label(), [this](menu::item_proxy)
 					{
 						fm_formats();
-					});
+					})};
+					vidsel_item.formats_pos = formats_item.index();
 					int subcount {0}, selcount {0};
 					try
 					{
@@ -492,43 +570,44 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 					catch(...) {};
 					if(subcount && !bottom.sub_langs.empty())
 						selcount = std::ranges::count(bottom.sub_langs, ',') + 1;
-					m.append("Select subtitles (" + std::to_string(selcount) + '/' + std::to_string(subcount) + ')', [this](menu::item_proxy)
+					auto subtitles_item {m.append(localized_queue_select_subtitles_count(std::to_string(selcount), std::to_string(subcount)), [this](menu::item_proxy)
 					{
 						fm_subs();
-					});
+					})};
+					vidsel_item.subtitles_pos = subtitles_item.index();
 				}
 
-				auto jitem = m.append("View JSON data", [this](menu::item_proxy)
+				auto jitem = m.append(i18n::tr("queue.view_json", "View JSON data"), [this](menu::item_proxy)
 				{
 					fm_json();
 				});
 				jitem.enabled(item.text(2) != "...");
 				if(!jitem.enabled())
-					vidsel_item = {&m, vidsel_item.pos};				
+					vidsel_item.m = &m;
 			}
 
 			if(item.text(2) != "...")
 			{
-				m.append("Refresh (reacquire data)", [&, url](menu::item_proxy ip)
+				m.append(i18n::tr("queue.refresh", "Refresh (reacquire data)"), [&, url](menu::item_proxy ip)
 				{
-					vidsel_item = {&m, vidsel_item.pos};
+					vidsel_item.m = &m;
 					show_btnfmt(false);
 					add_url(url, true, false);
 				});
 			}
 
 			if(std::find(startable.begin(), startable.end(), item) != startable.end())
-				m.append("Do not download", [&](menu::item_proxy)
+				m.append(queue_do_not_download_label(), [&](menu::item_proxy)
 				{
 					item.check(!item.checked());
 					if(item.checked())
 					{
-						item.text(3, "skip");
+						item.text(3, queue_status_skipped_label());
 						item.value<lbqval_t>().state = queue_item_state::skipped;
 					}
 					else
 					{
-						item.text(3, "queued");
+						item.text(3, queue_status_queued_label());
 						item.value<lbqval_t>().state = queue_item_state::queued;
 					}
 					lbq.refresh_theme();
@@ -540,14 +619,14 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 				m.append_splitter();
 				if(!completed.empty())
 				{
-					m.append("Clear completed", [&](menu::item_proxy)
+					m.append(i18n::tr("queue.clear_completed", "Clear completed"), [&](menu::item_proxy)
 					{
 						queue_remove_items(completed);
 					});
 				}
 				if(!startable.empty())
 				{
-					m.append("Start all", [&](menu::item_proxy)
+					m.append(i18n::tr("queue.start_all", "Start all"), [&](menu::item_proxy)
 					{
 						//thr_menu_start_stop = std::thread([&]
 						//{
@@ -569,7 +648,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 				}
 				if(!stoppable.empty())
 				{
-					m.append("Stop all", [&](menu::item_proxy)
+					m.append(i18n::tr("queue.stop_all", "Stop all"), [&](menu::item_proxy)
 					{
 						thr_menu_start_stop = std::thread([&]
 						{
@@ -593,7 +672,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 				if(completed.size() != lbq.at(item.pos().cat).size())
 				{
 					const auto cat {lbq.selected().front().cat};
-					m.append(cat ? "Remove this playlist" : "Remove all", [this, cat](menu::item_proxy)
+					m.append(cat ? i18n::tr("queue.remove_playlist", "Remove this playlist") : i18n::tr("queue.remove_all", "Remove all"), [this, cat](menu::item_proxy)
 					{
 						queue_remove_all(cat);
 					});
@@ -621,11 +700,11 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 				}
 			}
 
-			std::string cmdtext {"Start/stop selected"};
+			std::string cmdtext {i18n::tr("queue.start_stop_selected", "Start/stop selected")};
 			if(startables.empty())
-				cmdtext = "Stop selected";
+				cmdtext = i18n::tr("queue.stop_selected", "Stop selected");
 			if(stoppables.empty())
-				cmdtext = "Start selected";
+				cmdtext = i18n::tr("queue.start_selected", "Start selected");
 
 			m.append(cmdtext, [startables, stoppables, this](menu::item_proxy)
 			{
@@ -651,7 +730,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 				});
 			});
 
-			m.append("Remove selected", [this](menu::item_proxy)
+			m.append(i18n::tr("queue.remove_selected", "Remove selected"), [this](menu::item_proxy)
 			{
 				const auto sel {lbq.selected()};
 				if(sel.size() == lbq.at(sel.front().cat).size())
@@ -659,7 +738,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 				else queue_remove_items(sel);
 			});
 
-			m.append("Refresh selected", [&, sel](menu::item_proxy)
+			m.append(i18n::tr("queue.refresh_selected", "Refresh selected"), [&, sel](menu::item_proxy)
 			{
 				vidsel_item = {&m, sel.front().item};
 				for(auto &el : sel)
@@ -676,7 +755,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 
 			if((startables_not_done.empty() || skippers.empty()) && (!startables_not_done.empty() || !skippers.empty()))
 			{
-				m.append("Do not download", [skippers, startables_not_done, this](menu::item_proxy)
+				m.append(queue_do_not_download_label(), [skippers, startables_not_done, this](menu::item_proxy)
 				{
 					bool check {false};
 					if(startables_not_done.empty())
@@ -685,7 +764,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 					check = !check;
 					for(auto item : src)
 					{
-						item.text(3, check ? "skip" : "queued");
+						item.text(3, check ? queue_status_skipped_label() : queue_status_queued_label());
 						item.value<lbqval_t>().state = check ? queue_item_state::skipped : queue_item_state::queued;
 						item.check(check);
 					}
@@ -697,12 +776,12 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 			{
 				if(!startables_not_done.empty())
 				{
-					m.append("Do not download", [startables_not_done, this](menu::item_proxy)
+					m.append(queue_do_not_download_label(), [startables_not_done, this](menu::item_proxy)
 					{
 						lbq.auto_draw(false);
 						for(auto item : startables_not_done)
 						{
-							item.text(3, "skip");
+							item.text(3, queue_status_skipped_label());
 							item.value<lbqval_t>().state = queue_item_state::skipped;
 							item.check(true);
 						}
@@ -712,12 +791,12 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 
 				if(!skippers.empty())
 				{
-					m.append("Make downloadable", [skippers, this](menu::item_proxy)
+					m.append(i18n::tr("queue.make_downloadable", "Make downloadable"), [skippers, this](menu::item_proxy)
 					{
 						lbq.auto_draw(false);
 						for(auto item : skippers)
 						{
-							item.text(3, "queued");
+							item.text(3, queue_status_queued_label());
 							item.value<lbqval_t>().state = queue_item_state::queued;
 							item.check(false);
 						}
@@ -727,18 +806,18 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 
 				if(!skippers.empty() && !startables_not_done.empty())
 				{
-					m.append("Toggle download ability", [startables_not_done, skippers, this](menu::item_proxy)
+					m.append(i18n::tr("queue.toggle_downloadable", "Toggle download ability"), [startables_not_done, skippers, this](menu::item_proxy)
 					{
 						lbq.auto_draw(false);
 						for(auto item : startables_not_done)
 						{
-							item.text(3, "skip");
+							item.text(3, queue_status_skipped_label());
 							item.value<lbqval_t>().state = queue_item_state::skipped;
 							item.check(true);
 						}
 						for(auto item : skippers)
 						{
-							item.text(3, "queued");
+							item.text(3, queue_status_queued_label());
 							item.value<lbqval_t>().state = queue_item_state::queued;
 							item.check(false);
 						}
@@ -761,60 +840,59 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 		adjust_lbq_headers();
 	};
 
-	make_columns_menu(m.create_sub_menu(m.append("Extra columns").index()));
-	auto m2 {m.create_sub_menu(m.append("Website column").index())};
+	make_columns_menu(m.create_sub_menu(m.append(i18n::tr("queue.extra_columns", "Extra columns")).index()));
+	auto m2 {m.create_sub_menu(m.append(i18n::tr("queue.website_column", "Website column")).index())};
 
-	m2->append("Favicon", [&](menu::item_proxy)
+	m2->append(i18n::tr("queue.favicon", "Favicon"), [&](menu::item_proxy)
 	{
 		conf.col_site_icon = !conf.col_site_icon;
 		update_inline_widgets();
 	}).checked(conf.col_site_icon);
 
-	m2->append("Text", [&](menu::item_proxy)
+	m2->append(i18n::tr("queue.text", "Text"), [&](menu::item_proxy)
 	{
 		conf.col_site_text = !conf.col_site_text;
 		update_inline_widgets();
 	}).checked(conf.col_site_text);
 
 	m.append_splitter();
-	auto m3 {m.create_sub_menu(m.append("When finished...").index())};
+	auto m3 {m.create_sub_menu(m.append(i18n::tr("queue.when_finished", "When finished...")).index())};
 
 	auto warning_msg = [this](std::string action)
 	{
 		::widgets::msgbox mbox {*this, title};
-		mbox << "The process does not seem to have shutdown privilege, possibly because it's running in a non-administrator "
-			"user session. The program will attempt to " << action << ", but it might fail.";
+		mbox << replace_placeholder(i18n::tr("queue.privilege_warning", "The process does not seem to have shutdown privilege, possibly because it is running in a non-administrator user session. The program will attempt to {action}, but it might fail."), "{action}", action);
 		mbox.icon(MB_ICONEXCLAMATION)();
 	};
 
-	m3->append("Shutdown", [&](menu::item_proxy)
+	m3->append(i18n::tr("queue.shut_down", "Shut down"), [&](menu::item_proxy)
 	{
 		pwr_shutdown = !pwr_shutdown;
 		pwr_hibernate = false;
 		pwr_sleep = false;
 		close_when_finished = false;
-		if(pwr_shutdown && !pwr_can_shutdown) warning_msg("shut down the system");
+		if(pwr_shutdown && !pwr_can_shutdown) warning_msg(i18n::tr("queue.action_shutdown_system", "shut down the system"));
 	}).checked(pwr_shutdown);
 
-	m3->append("Hibernate", [&](menu::item_proxy)
+	m3->append(i18n::tr("queue.hibernate", "Hibernate"), [&](menu::item_proxy)
 	{
 		pwr_hibernate = !pwr_hibernate;
 		pwr_sleep = false;
 		pwr_shutdown = false;
 		close_when_finished = false;
-		if(pwr_hibernate && !pwr_can_shutdown) warning_msg("initiate hibernation");
+		if(pwr_hibernate && !pwr_can_shutdown) warning_msg(i18n::tr("queue.action_hibernate_system", "initiate hibernation"));
 	}).checked(pwr_hibernate).enabled(util::pwr_can_hibernate());
 
-	m3->append("Sleep", [&](menu::item_proxy)
+	m3->append(i18n::tr("queue.sleep", "Sleep"), [&](menu::item_proxy)
 	{
 		pwr_sleep = !pwr_sleep;
 		pwr_hibernate = false;
 		pwr_shutdown = false;
 		close_when_finished = false;
-		if(pwr_sleep && !pwr_can_shutdown) warning_msg("put the system to sleep");
+		if(pwr_sleep && !pwr_can_shutdown) warning_msg(i18n::tr("queue.action_sleep_system", "put the system to sleep"));
 	}).checked(pwr_sleep);
 
-	m3->append("Exit", [&](menu::item_proxy)
+	m3->append(i18n::tr("queue.exit", "Exit"), [&](menu::item_proxy)
 	{
 		close_when_finished = !close_when_finished;
 		pwr_hibernate = false;
@@ -836,7 +914,7 @@ void GUI::queue_remove_all(size_t cat)
 		bottoms.show(L"");
 		qurl.clear();
 		l_url.update_caption();
-		auto *pfm {fm_alert("Shutting down active yt-dlp instances", "Please wait...", false).release()};
+		auto *pfm {fm_alert(queue_shutdown_wait_title(), queue_shutdown_wait_body(), false).release()};
 		activate();
 		thr_queue_remove = std::thread([this, cat, pfm]
 		{
@@ -931,7 +1009,7 @@ void GUI::queue_remove_items(const nana::listbox::index_pairs &items)
 		lbq.auto_draw(false);
 		lbq.force_no_thread_safe_ops(true);
 
-		auto *pfm {fm_alert("Shutting down active yt-dlp instances", "Please wait...", false).release()};
+		auto *pfm {fm_alert(queue_shutdown_wait_title(), queue_shutdown_wait_body(), false).release()};
 		activate();
 
 		thr_queue_remove = std::thread([this, pfm, sel_urls, val]
@@ -1007,7 +1085,7 @@ void GUI::make_columns_menu(nana::menu *m)
 
 	if(m)
 	{
-		m->append("Format", [this](menu::item_proxy ip)
+		m->append(queue_format_label(), [this](menu::item_proxy ip)
 		{
 			conf.col_format = !conf.col_format;
 			ip.checked(conf.col_format);
@@ -1017,7 +1095,7 @@ void GUI::make_columns_menu(nana::menu *m)
 			lbq.auto_draw(true);
 		}).checked(conf.col_format);
 
-		m->append("Format note", [this](menu::item_proxy ip)
+		m->append(queue_format_note_label(), [this](menu::item_proxy ip)
 		{
 			conf.col_format_note = !conf.col_format_note;
 			ip.checked(conf.col_format_note);
@@ -1027,7 +1105,7 @@ void GUI::make_columns_menu(nana::menu *m)
 			lbq.auto_draw(true);
 		}).checked(conf.col_format_note);
 
-		m->append("Ext", [this](menu::item_proxy ip)
+		m->append(queue_extension_label(), [this](menu::item_proxy ip)
 		{
 			conf.col_ext = !conf.col_ext;
 			ip.checked(conf.col_ext);
@@ -1037,7 +1115,7 @@ void GUI::make_columns_menu(nana::menu *m)
 			lbq.auto_draw(true);
 		}).checked(conf.col_ext);
 
-		m->append("Filesize", [this](menu::item_proxy ip)
+		m->append(queue_filesize_label(), [this](menu::item_proxy ip)
 		{
 			conf.col_fsize = !conf.col_fsize;
 			ip.checked(conf.col_fsize);

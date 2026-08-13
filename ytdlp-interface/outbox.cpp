@@ -1,3 +1,4 @@
+#include "i18n.hpp"
 #include "gui.hpp"
 
 
@@ -130,7 +131,7 @@ void GUI::Outbox::create(GUI *parent, bool visible)
 			::widgets::Menu m;
 			m.item_pixels(24);			
 
-			m.append("Copy selection", [&](menu::item_proxy)
+			m.append(i18n::tr("outbox.copy_selection", "Copy selection"), [&](menu::item_proxy)
 			{
 				if(!t_selcopy_flash.started())
 					t_selcopy_flash.start();
@@ -139,7 +140,7 @@ void GUI::Outbox::create(GUI *parent, bool visible)
 
 			if(commands.contains(current_))
 			{
-				m.append("Copy command line", [this](menu::item_proxy)
+				m.append(i18n::tr("outbox.copy_command", "Copy command line"), [this](menu::item_proxy)
 				{
 					if(!t_cmdcopy_flash.started())
 						t_cmdcopy_flash.start();
@@ -149,7 +150,7 @@ void GUI::Outbox::create(GUI *parent, bool visible)
 				m.append_splitter();
 			}
 
-			m.append("Keyword highlighting", [this](menu::item_proxy)
+			m.append(i18n::tr("outbox.keyword_highlighting", "Keyword highlighting"), [this](menu::item_proxy)
 			{
 				conf.kwhilite = !conf.kwhilite;
 				highlight(conf.kwhilite);
@@ -180,7 +181,7 @@ void GUI::Outbox::create(GUI *parent, bool visible)
 				}
 			}).checked(conf.kwhilite);
 
-			m.append("Limited buffer size", [this](menu::item_proxy)
+			m.append(i18n::tr("outbox.limited_buffer", "Limited buffer size"), [this](menu::item_proxy)
 			{
 				conf.limit_output_buffer = !conf.limit_output_buffer;
 			}).checked(conf.limit_output_buffer);

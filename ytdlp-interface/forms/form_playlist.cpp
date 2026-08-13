@@ -1,3 +1,4 @@
+#include "../i18n.hpp"
 #include "../gui.hpp"
 #include <codecvt>
 
@@ -20,14 +21,16 @@ void GUI::fm_playlist()
 	)");
 
 	auto &bottom {bottoms.current()};
-	::widgets::Title l_title {fm, bottom.is_bcplaylist ? "Select which songs to download from the album" :
-		"Select which videos to download from the playlist"};
+	::widgets::Title l_title {fm, bottom.is_bcplaylist ? i18n::tr("playlist.choose_songs", "Select which songs to download from the album") :
+		i18n::tr("playlist.choose_videos", "Select which videos to download from the playlist")};
 	if(bottom.is_scplaylist)
-		l_title.caption("Select which items to download from the playlist");
-	::widgets::Button btnall {fm, "Select all", true}, btnnone {fm, "Select none", true}, btnclose {fm, "Close"},
-		btnrange {fm, "Select range", true};
+		l_title.caption(i18n::tr("playlist.choose_items", "Select which items to download from the playlist"));
+	::widgets::Button btnall {fm, i18n::tr("playlist.select_all", "Select all"), true}, btnnone {fm, i18n::tr("playlist.select_none", "Select none"), true}, btnclose {fm, "Close"},
+		btnrange {fm, i18n::tr("playlist.select_range", "Select range"), true};
+	btnall.tooltip(i18n::tr("common.select_all", "Select all"));
+	btnnone.tooltip(i18n::tr("common.select_none", "Select none"));
 	::widgets::Listbox lbv {fm, nullptr, true};
-	::widgets::Label l_first {fm, "First:"}, l_last {fm, "Last:"};
+	::widgets::Label l_first {fm, i18n::tr("playlist.first", "First:")}, l_last {fm, i18n::tr("playlist.last", "Last:")};
 	::widgets::Textbox tbfirst {fm}, tblast {fm};
 	::widgets::Slider slfirst {fm}, sllast {fm};
 
@@ -83,8 +86,8 @@ void GUI::fm_playlist()
 	lbv.scheme().item_height_ex = 8;
 	lbv.append_header("", dpi_scale(25));
 	lbv.append_header("#", dpi_scale(45));
-	lbv.append_header(bottom.is_bcplaylist || bottom.is_scplaylist ? "Song title" : "Video title", dpi_scale(theme::is_dark() ? 743 : 739));
-	lbv.append_header("Duration", dpi_scale(75));
+	lbv.append_header(bottom.is_bcplaylist || bottom.is_scplaylist ? i18n::tr("playlist.song_title", "Song title") : i18n::tr("playlist.video_title", "Video title"), dpi_scale(theme::is_dark() ? 743 : 739));
+	lbv.append_header(i18n::tr("playlist.duration", "Duration"), dpi_scale(75));
 	lbv.column_movable(false);
 	lbv.column_resizable(false);
 
@@ -113,7 +116,7 @@ void GUI::fm_playlist()
 			durstr += ':' + ss.str();
 		}
 
-		string title {"title not available"};
+		string title {i18n::tr("playlist.title_unavailable", "title not available")};
 		if(entry.contains("title"))
 			title = entry["title"].get<std::string>();
 		else if(entry.contains("id"))

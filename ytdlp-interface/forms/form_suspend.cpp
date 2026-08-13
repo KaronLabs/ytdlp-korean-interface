@@ -1,3 +1,4 @@
+#include "../i18n.hpp"
 #include "../gui.hpp"
 
 
@@ -8,7 +9,9 @@ void GUI::fm_suspend()
 	using namespace nana;
 
 	themed_form fm {nullptr, *this};
-	fm.caption(title + " - queue finished");
+	auto form_caption {i18n::tr("suspend.title", "{title} - queue finished")};
+	form_caption.replace(form_caption.find("{title}"), 7, title);
+	fm.caption(form_caption);
 	fm.snap(conf.cbsnap);
 	fm.center(400, 170);
 
@@ -18,12 +21,15 @@ void GUI::fm_suspend()
 	fm["title"] << l_title;
 	fm["countdown"] << l_countdown;
 
+	const auto shutdown_countdown {i18n::tr("suspend.shutdown_countdown", "Shutting down in {seconds} seconds")};
+	const auto hibernate_countdown {i18n::tr("suspend.hibernate_countdown", "Hibernating in {seconds} seconds")};
+	const auto sleep_countdown {i18n::tr("suspend.sleep_countdown", "Sleeping in {seconds} seconds")};
 	if(pwr_shutdown)
-		l_title.caption(pwr_can_shutdown ? "shutting down in:" : "attempting to shut down in:");
+		l_title.caption(pwr_can_shutdown ? i18n::tr("suspend.shutdown_in", "shutting down in:") : i18n::tr("suspend.shutdown_attempt", "attempting to shut down in:"));
 	else if(pwr_hibernate)
-		l_title.caption(pwr_can_shutdown ? "hibernating in:" : "attempting to hibernate in:");
+		l_title.caption(pwr_can_shutdown ? i18n::tr("suspend.hibernate_in", "hibernating in:") : i18n::tr("suspend.hibernate_attempt", "attempting to hibernate in:"));
 	else if(pwr_sleep)
-		l_title.caption(pwr_can_shutdown ? "sleeping in:" : "attempting to sleep in:");
+		l_title.caption(pwr_can_shutdown ? i18n::tr("suspend.sleep_in", "sleeping in:") : i18n::tr("suspend.sleep_attempt", "attempting to sleep in:"));
 
 	int cnt {15};
 	l_countdown.caption(std::to_string(cnt));
@@ -38,11 +44,16 @@ void GUI::fm_suspend()
 		auto errmsg = [&](std::string action)
 		{
 			::widgets::msgbox mbox {fm, title};
-			mbox << "The attempt to " << action << " has failed. Error message from the system:\n\n" << util::get_last_error_str();
+			auto message {i18n::tr("suspend.action_failed", "The attempt to {action} has failed. Error message from the system:\n\n{error}")};
+			message.replace(message.find("{action}"), 8, action);
+			message.replace(message.find("{error}"), 7, util::get_last_error_str());
+			mbox << message;
 			mbox.icon(MB_ICONERROR)();
 		};
 
-		l_countdown.caption(std::to_string(--cnt));
+		auto countdown {pwr_shutdown ? shutdown_countdown : pwr_hibernate ? hibernate_countdown : sleep_countdown};
+		countdown.replace(countdown.find("{seconds}"), 9, std::to_string(--cnt));
+		l_countdown.caption(countdown);
 		if(cnt == 0)
 		{
 			t.stop();
@@ -68,7 +79,7 @@ void GUI::fm_suspend()
 		}
 	});
 
-	::widgets::Button btn {fm, "Cancel"};
+	::widgets::Button btn {fm, widgets::localized_cancel()};
 	fm["btn"] << btn;
 
 	btn.events().click([&] {fm.close();});

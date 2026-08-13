@@ -34,7 +34,7 @@ std::pair<bool, std::string> GUI::input_box(nana::window owner, std::string capt
 		}
 	});
 
-	::widgets::Button btn_ok {fm, "OK"}, btn_cancel {fm, "Cancel"};
+	::widgets::Button btn_ok {fm, widgets::localized_ok()}, btn_cancel {fm, widgets::localized_cancel()};
 	btn_ok.events().click([&] { ret = {true, tb.caption()}; fm.close(); });
 	btn_cancel.events().click([&] { ret = {false, ""}; fm.close(); });
 	

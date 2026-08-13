@@ -200,6 +200,65 @@ def i18n_tr_calls(text):
         index += 1
 
 
+def direct_i18n_calls():
+    direct_call = re.compile(
+        r"\s*(?P<key>" + STRING_LITERAL + r")\s*,\s*"
+        r"(?P<fallback>" + STRING_LITERAL + r")\s*",
+        re.DOTALL,
+    )
+    calls = {}
+    failures = []
+    for path, text in source_texts().items():
+        for offset, arguments in i18n_tr_calls(text):
+            location = f"{path.relative_to(REPOSITORY_ROOT)}:{text.count(chr(10), 0, offset) + 1}"
+            if arguments is None:
+                failures.append(f"{location}: unclosed i18n::tr()")
+                continue
+            match = direct_call.fullmatch(arguments)
+            if not match:
+                failures.append(f"{location}: i18n::tr() must have two direct string literals")
+                continue
+            key = json.loads(match.group("key"))
+            fallback = json.loads(match.group("fallback"))
+            if not fallback:
+                failures.append(f"{location}: {key}: empty English fallback")
+            if key in calls:
+                failures.append(f"{location}: duplicate key {key} (first at {calls[key][1]})")
+            else:
+                calls[key] = (fallback, location)
+
+    resource_path = SOURCE_ROOT / "ytdlp-interface.rc"
+    resource_text = resource_path.read_text(encoding="utf-8-sig", errors="replace")
+    resource = re.search(r'VALUE\s+"FileDescription",\s+"([^"]+)"', resource_text)
+    if resource:
+        calls["windows.file_description"] = (
+            resource.group(1),
+            f"{resource_path.relative_to(REPOSITORY_ROOT)}:FileDescription",
+        )
+    else:
+        failures.append("ytdlp-interface/ytdlp-interface.rc: missing FileDescription resource")
+    return calls, failures
+
+
+def placeholders(value):
+    return sorted(re.findall(r"\{[A-Za-z_][A-Za-z0-9_]*\}", value))
+
+
+def valid_nana_markup(value):
+    stack = []
+    for token in re.finditer(r"</>|</([A-Za-z][A-Za-z0-9_-]*)>|<([A-Za-z][A-Za-z0-9_-]*)[^<>\n]*>", value):
+        if token.group(0) == "</>":
+            if not stack:
+                return False
+            stack.pop()
+        elif token.group(1):
+            if not stack or stack.pop() != token.group(1):
+                return False
+        else:
+            stack.append(token.group(2))
+    return "<" not in re.sub(r"</>|</[A-Za-z][A-Za-z0-9_-]*>|<[A-Za-z][A-Za-z0-9_-]*[^<>\n]*>", "", value) and not stack
+
+
 def is_tracked_runtime_artifact(path):
     parts = PurePosixPath(path).parts
     return (
@@ -298,20 +357,27 @@ class RecoveryContractTests(unittest.TestCase):
         self.assertTrue(all(isinstance(value, str) and value for value in strings.values()))
 
     def test_every_catalog_key_has_a_source_reference(self):
-        key_literal = re.compile(r'\s*"(?P<key>[^"\\]+)"')
-        referenced = set()
-        for text in source_texts().values():
-            for _, arguments in i18n_tr_calls(text):
-                if arguments:
-                    match = key_literal.match(arguments)
-                    if match:
-                        referenced.add(match.group("key"))
+        referenced = set(direct_i18n_calls()[0])
         missing = [
             key
             for key in recovered_strings()
             if key not in referenced
         ]
         self.assertEqual([], missing, f"catalog keys have no tr() source references: {missing}")
+
+    def test_catalog_and_active_i18n_calls_have_exact_parity(self):
+        catalog = recovered_strings()
+        calls, failures = direct_i18n_calls()
+        self.assertEqual([], failures)
+        self.assertEqual(524, len(catalog))
+        self.assertEqual(524, len(calls))
+        self.assertEqual(set(catalog), set(calls))
+        for key in sorted(catalog):
+            fallback, location = calls[key]
+            with self.subTest(key=key, location=location):
+                self.assertTrue(fallback)
+                self.assertEqual(placeholders(catalog[key]), placeholders(fallback))
+                self.assertTrue(valid_nana_markup(catalog[key]))
 
     def test_every_tr_call_has_a_nonempty_english_fallback(self):
         direct_call = re.compile(

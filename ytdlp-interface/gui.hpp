@@ -1,5 +1,6 @@
 #pragma once
 
+#include "i18n.hpp"
 #include <thread>
 #include <sstream>
 #include <algorithm>
@@ -22,6 +23,16 @@ namespace fs = std::filesystem;
 const int YTDLP_DOWNLOAD {0}, YTDLP_POSTPROCESS {1}, ADD_URL {2};
 const bool X64 {INTPTR_MAX == INT64_MAX}, win7 {util::is_win7()};
 const std::string ytdlp_fname {X64 ? (win7 ? "yt-dlp_win7.exe" : "yt-dlp.exe") : (win7 ? "yt-dlp_x86_win7.exe" : "yt-dlp_x86.exe")};
+
+std::string localized_json_error_title();
+std::string localized_queue_website();
+std::string localized_queue_select_subtitles_count(std::string_view selected, std::string_view available);
+std::string localized_queue_dynamic_website();
+std::string localized_queue_select_playlist_items(std::string_view playlist_type);
+std::string localized_queue_do_nothing();
+std::string localized_queue_close_application();
+std::string localized_queue_status_downloading();
+std::string localized_queue_status_processing();
 
 
 class GUI : public themed_form, IDropTarget
@@ -63,7 +74,13 @@ private:
 	std::string tmsg_title, tmsg_text;
 	nana::window tmsg_parent;
 
-	struct { nana::menu *m {nullptr}; std::size_t pos {0}; } vidsel_item;
+	struct
+	{
+		nana::menu *m {nullptr};
+		std::size_t pos {0};
+		std::size_t formats_pos {static_cast<std::size_t>(-1)};
+		std::size_t subtitles_pos {static_cast<std::size_t>(-1)};
+	} vidsel_item;
 
 	const std::vector<std::wstring>
 		com_res_options {L"none", L"4320", L"2160", L"1440", L"1080", L"720", L"480", L"360", L"240", L"144"},
@@ -220,7 +237,14 @@ private:
 	nana::panel<false> queue_panel {*this};
 	nana::place plc_queue {queue_panel};
 	widgets::Listbox lbq {queue_panel, &g_exiting};
-	widgets::Button btn_qact {queue_panel, "Queue actions", true}, btn_settings {queue_panel, "Settings", true};
+	widgets::Button btn_qact {queue_panel, i18n::tr("main.queue_actions", "Queue actions"), true}, btn_settings {queue_panel, i18n::tr("main.settings", "Settings"), true};
+	std::string start_download_label {i18n::tr("main.start_download", "Start download")};
+	std::string stop_download_label {i18n::tr("main.stop_download", "Stop download")};
+	std::string show_output_label {i18n::tr("main.show_output", "Show output")};
+	std::string custom_filename_template {i18n::tr("main.custom_filename", "Custom file name:\n<bold>{filename}</>\n(this overrides the output template from the settings)")};
+	std::string error_status_label {i18n::tr("queue.status.error", "error")};
+	std::string stopped_detail_template {i18n::tr("queue.status.stopped_detail", "stopped ({detail})")};
+	std::string zero_playlist_label {i18n::tr("queue.zero_playlist", "error: playlist with zero entries!")};
 	std::wstring qurl;
 	widgets::path_label l_url {queue_panel, &qurl};
 	std::unordered_map<std::string, favicon_t> favicons;
@@ -232,14 +256,14 @@ private:
 	nana::place plcopt {*this};
 	widgets::Textbox tbrate {gpopt};
 	widgets::Progress prog {*this, this};
-	widgets::Button btn_ytfmtlist {*this, "Select formats"}, btndl {*this, "Start download"}, btnlabel {gpopt}, btnerase {gpopt},
-		btnq {*this, "Show output"}, btncopy {*this, "Apply options to all queue items"};
-	widgets::Label l_out {gpopt, "Download folder:"}, l_rate {gpopt, "Download rate limit:"}, l_chap {gpopt, "Chapters:"};
+	widgets::Button btn_ytfmtlist {*this, i18n::tr("main.select_formats", "Select formats")}, btndl {*this, start_download_label}, btnlabel {gpopt}, btnerase {gpopt},
+		btnq {*this, show_output_label}, btncopy {*this, i18n::tr("main.apply_options_all", "Apply options to all queue items")};
+	widgets::Label l_out {gpopt, i18n::tr("main.download_folder", "Download folder:")}, l_rate {gpopt, i18n::tr("main.download_rate_limit", "Download rate limit:")}, l_chap {gpopt, i18n::tr("main.chapters", "Chapters:")};
 	widgets::path_label l_outpath {gpopt, &conf.outpath};
 	widgets::Combox com_rate {gpopt}, com_args {gpopt}, com_chap {gpopt};
-	widgets::cbox cbkeyframes {gpopt, "Force keyframes at cuts"}, cbmp3 {gpopt, "Convert audio to MP3"}, 
-		cbsubs {gpopt, "Embed subtitles"}, cbthumb {gpopt, "Embed thumbnail"}, 
-		cbtime {gpopt, "File modification time = time of writing"}, cbargs {gpopt, "Custom arguments:"};
+	widgets::cbox cbkeyframes {gpopt, i18n::tr("main.force_keyframes", "Force keyframes at cuts")}, cbmp3 {gpopt, i18n::tr("main.convert_mp3", "Convert audio to MP3")},
+		cbsubs {gpopt, i18n::tr("main.embed_subtitles", "Embed subtitles")}, cbthumb {gpopt, i18n::tr("main.embed_thumbnail", "Embed thumbnail")},
+		cbtime {gpopt, i18n::tr("main.no_mtime", "File modification time = time of writing")}, cbargs {gpopt, i18n::tr("main.custom_arguments", "Custom arguments:")};
 	widgets::Separator separator {*this};
 	widgets::Expcol expcol {*this};
 
@@ -326,32 +350,32 @@ private:
 
 	std::unordered_map<std::string, std::pair<std::string, std::string>> sblock_infos
 	{
-		{"all", {"All", "Select this to indicate all categories."}},
-		{"sponsor", {"Sponsor", "Segments promoting a product or service not directly related to the creator."}},
+		{"all", {i18n::tr("settings.sponsorblock.category.all.label", "All"), i18n::tr("settings.sponsorblock.category.all.description", "Select this to indicate all categories.")}},
+		{"sponsor", {i18n::tr("settings.sponsorblock.category.sponsor.label", "Sponsor"), "Segments promoting a product or service not directly related to the creator."}},
 
-		{"intro", {"Intermission/Intro Animation", "Segments typically found at the start of a video that include an animation, "
+		{"intro", {i18n::tr("settings.sponsorblock.category.intro.label", "Intermission/Intro Animation"), "Segments typically found at the start of a video that include an animation, "
 		          "still frame or clip which are also seen in other videos by the same creator. This can include livestream pauses "
 		          "with no content\n(looping animations or chat windows) and Copyright / Fair Use disclaimers."}},
 
-		{"outro", {"Endcards/Credits (Outro)", "Typically near or at the end of the video when the credits pop up and/or endcards are shown."}},
+		{"outro", {i18n::tr("settings.sponsorblock.category.outro.label", "Endcards/Credits (Outro)"), i18n::tr("settings.sponsorblock.category.outro.description", "Typically near or at the end of the video when the credits pop up and/or endcards are shown.")}},
 
-		{"selfpromo", {"Unpaid/Self Promotion", "Segments promoting a product or service that is directly related to the creator themselves.\n"
+		{"selfpromo", {i18n::tr("settings.sponsorblock.category.selfpromo.label", "Unpaid/Self Promotion"), "Segments promoting a product or service that is directly related to the creator themselves.\n"
 		              "This usually includes merchandise or promotion of monetized platforms."}},
 
-		{"preview", {"Preview/Recap", "Collection of clips that show what is coming up in in this video or other videos in a series."}},
+		{"preview", {i18n::tr("settings.sponsorblock.category.preview.label", "Preview/Recap"), "Collection of clips that show what is coming up in in this video or other videos in a series."}},
 
-		{"hook", {"Hook/Greetings", "Narrated trailers for the upcoming video, greetings and goodbyes. Does not include conclusions with information."}},
+		{"hook", {i18n::tr("settings.sponsorblock.category.hook.label", "Hook/Greetings"), i18n::tr("settings.sponsorblock.category.hook.description", "Narrated trailers for the upcoming video, greetings and goodbyes. Does not include conclusions with information.")}},
 
-		{"filler", {"Filler Tangent/Jokes", "Tangential scenes added only for filler or humor, that are not required to understand the main "
+		{"filler", {i18n::tr("settings.sponsorblock.category.filler.label", "Filler Tangent/Jokes"), "Tangential scenes added only for filler or humor, that are not required to understand the main "
 		           "content of the video. This can also include: Timelapses / B-Roll, Fake Sponsors and slow-motion clips that do not provide "
 		           "any context or are used as replays or B-roll."}},
 
-		{"interaction", {"Interaction Reminder (Subscribe)", "Explicit reminders to like, subscribe or interact with them on any paid or "
+		{"interaction", {i18n::tr("settings.sponsorblock.category.interaction.label", "Interaction Reminder (Subscribe)"), "Explicit reminders to like, subscribe or interact with them on any paid or "
 			            "free platform(s)\n(e.g. click on a video)."}},
 
-		{"music_offtopic", {"Music: Non-Music Section", "Section devoid of music in videos which feature music as the primary content."}},
-		{"poi_highlight", {"Highlight", "A point of interest in the video, possibly the most important part of the video."}},
-		{"chapter", {"Chapter", "Chapters designated by SponsorBlock (presumably in a video that doesn't have chapters otherwise)."}}
+		{"music_offtopic", {i18n::tr("settings.sponsorblock.category.music_offtopic.label", "Music: Non-Music Section"), i18n::tr("settings.sponsorblock.category.music_offtopic.description", "Section devoid of music in videos which feature music as the primary content.")}},
+		{"poi_highlight", {i18n::tr("settings.sponsorblock.category.poi_highlight.label", "Highlight"), i18n::tr("settings.sponsorblock.category.poi_highlight.description", "A point of interest in the video, possibly the most important part of the video.")}},
+		{"chapter", {i18n::tr("settings.sponsorblock.category.chapter.label", "Chapter"), "Chapters designated by SponsorBlock (presumably in a video that doesn't have chapters otherwise)."}}
 	};
 
 	public:

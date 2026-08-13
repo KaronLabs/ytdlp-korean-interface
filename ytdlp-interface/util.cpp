@@ -1,4 +1,5 @@
 #include "util.hpp"
+#include "i18n.hpp"
 #include "log.hpp"
 #include "bitextractor.hpp"
 #include "bitexception.hpp"
@@ -506,7 +507,11 @@ std::string util::dl_inet_res(std::string res, fs::path fname, bool *working, st
 	std::string ret;
 	std::ofstream f {fname, std::ios::binary};
 	if(!f.good())
-		return "Failed to open file for writing: " + fname.string();
+	{
+		auto message {i18n::tr("error.download_open_file", "Could not open the file for writing: {path}")};
+		message.replace(message.find("{path}"), 6, fname.string());
+		return message;
+	}
 
 	auto hinet {InternetOpenA("ytdlp-interface", INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0)};
 	if(hinet)
@@ -532,7 +537,9 @@ std::string util::dl_inet_res(std::string res, fs::path fname, bool *working, st
 					f.write(buf.data(), buf.size());
 					if(!f.good())
 					{
-						ret = "Failed writing to file: " + fname.string();
+						auto message {i18n::tr("error.download_write_file", "Could not write to the file: {path}")};
+						message.replace(message.find("{path}"), 6, fname.string());
+						ret = message;
 						break;
 					}
 					if(cb)

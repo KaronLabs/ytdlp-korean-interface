@@ -1,3 +1,4 @@
+#include "../i18n.hpp"
 #include "../gui.hpp"
 
 
@@ -10,7 +11,9 @@ void GUI::fm_formats()
 	auto &vidinfo {bottom.is_scplaylist ? bottom.playlist_info["entries"][0] : bottom.vidinfo};
 
 	themed_form fm {nullptr, *this, {}, appear::decorate<appear::minimize, appear::sizable>{}};
-	fm.caption(title + " - manual selection of formats");
+	auto form_caption {i18n::tr("formats.manual_selection", "{title} - manual selection of formats")};
+	form_caption.replace(form_caption.find("{title}"), 7, title);
+	fm.caption(form_caption);
 	fm.bgcolor(theme::fmbg);
 	fm.snap(conf.cbsnap);
 	fm.div(R"(
@@ -33,16 +36,15 @@ void GUI::fm_formats()
 		)");
 
 	::widgets::Title l_title {fm};
-	::widgets::Label l_dur {fm, "Duration:"}, l_chap {fm, "Chapters:"},
-		l_upl {fm, "Uploader:"}, l_date {fm, "Upload date:"};
+	::widgets::Label l_dur {fm, i18n::tr("formats.duration", "Duration:")}, l_chap {fm, i18n::tr("formats.chapters", "Chapters:")},
+		l_upl {fm, i18n::tr("formats.uploader", "Uploader:")}, l_date {fm, i18n::tr("formats.upload_date", "Upload date:")};
 	::widgets::Text l_durtext {fm, ""}, l_chaptext {fm, ""}, l_upltext {fm, ""}, l_datetext {fm, ""};
 	nana::picture thumb {fm};
 	::widgets::thumb_label thumb_label {fm};
 	::widgets::Separator sep1 {fm}, sep2 {fm};
-	::widgets::cbox cb_streams {fm, "Select multiple audio formats to merge into .mkv file as audio tracks "
-		"(this passes --audio-multistreams to yt-dlp)"};
+	::widgets::cbox cb_streams {fm, i18n::tr("formats.multistream", "Select multiple audio formats to merge into .mkv file as audio tracks (this passes --audio-multistreams to yt-dlp)")};
 	::widgets::Listbox list {fm, nullptr, true};
-	::widgets::Button btnok {fm, "Use the selected format(s)"}, btncancel {fm, "Let yt-dlp choose the best formats (default)"};
+	::widgets::Button btnok {fm, i18n::tr("formats.use_selected", "Use the selected format(s)")}, btncancel {fm, i18n::tr("formats.use_default", "Let yt-dlp choose the best formats (default)")};
 	const auto no_category {static_cast<size_t>(-1)};
 	size_t audio_category {1}, video_category {2};
 
@@ -71,7 +73,7 @@ void GUI::fm_formats()
 	list.checkable(true);
 	list.enable_single(true, false);
 	list.scheme().text_margin = dpi_scale(10) + (api::screen_dpi(true) > 96) * 4;
-	list.append_header("format", dpi_scale(280));
+	list.append_header(i18n::tr("formats.header.format", "format"), dpi_scale(280));
 	list.append_header("acodec", dpi_scale(90));
 	list.append_header("vcodec", dpi_scale(90));
 	list.append_header("ext", dpi_scale(50));
@@ -81,7 +83,7 @@ void GUI::fm_formats()
 	list.append_header("abr", dpi_scale(40));
 	list.append_header("tbr", dpi_scale(40));
 	list.append_header("asr", dpi_scale(50));
-	list.append_header("filesize", dpi_scale(160));
+	list.append_header(i18n::tr("formats.header.filesize", "filesize"), dpi_scale(160));
 
 	list.events().selected([&](const arg_listbox &arg)
 	{
@@ -348,9 +350,8 @@ void GUI::fm_formats()
 		bottom.use_strfmt = true;
 		if(bottom.using_custom_fmt())
 		{
-			::widgets::msgbox mbox {fm, "Warning: conflicting -f arguments"};
-			std::string text {"The \"Custom arguments\" checkbox is checked, and \"-f\" is present as a custom argument.\n\n"
-				"If you don't uncheck that checkbox, the \"-f\" custom argument will override the selection you have made here."};
+			::widgets::msgbox mbox {fm, i18n::tr("formats.conflict_title", "Warning: conflicting -f arguments")};
+			std::string text {i18n::tr("formats.conflict_body", "The \"Custom arguments\" checkbox is checked, and \"-f\" is present as a custom argument.\n\nIf you don't uncheck that checkbox, the \"-f\" custom argument will override the selection you have made here.")};
 			mbox.icon(nana::msgbox::icon_warning);
 			(mbox << text)();
 		}
@@ -360,7 +361,7 @@ void GUI::fm_formats()
 	btnok.enabled(false);
 	thumb.transparent(true);
 
-	std::string thumb_url, title {"[title missing]"};
+	std::string thumb_url, title {i18n::tr("formats.title_missing", "[title missing]")};
 	if(bottom.vidinfo_contains("title"))
 		title = vidinfo["title"];
 	if(!bottom.is_ytlink)
@@ -388,7 +389,7 @@ void GUI::fm_formats()
 	}
 
 	l_title.caption(title);
-	list.append({"Audio only", "Video only"});
+	list.append({i18n::tr("formats.audio_only", "Audio only"), i18n::tr("formats.video_only", "Video only")});
 
 	int dur {0};
 	bool live {bottom.vidinfo_contains("is_live") && bottom.vidinfo["is_live"] ||
@@ -397,7 +398,7 @@ void GUI::fm_formats()
 		dur = vidinfo["duration"];
 	int hr {(dur / 60) / 60}, min {(dur / 60) % 60}, sec {dur % 60};
 	if(dur < 60) sec = dur;
-	std::string durstr {live ? "live" : "---"};
+	std::string durstr {live ? i18n::tr("formats.live", "live") : "---"};
 	if(dur)
 	{
 		std::stringstream ss;
@@ -423,7 +424,7 @@ void GUI::fm_formats()
 	if(bottom.vidinfo_contains("chapters"))
 		strchap = std::to_string(vidinfo["chapters"].size());
 	if(strchap.empty() || strchap == "0")
-		l_chaptext.caption("none");
+		l_chaptext.caption(i18n::tr("formats.none", "none"));
 	else l_chaptext.caption(strchap);
 
 	if(bottom.vidinfo_contains("uploader"))
@@ -460,8 +461,13 @@ void GUI::fm_formats()
 						ext = thumb_url.substr(pos, idx-pos);
 					}
 					if(ext.empty())
-						thumb_label.caption("thumbnail format unsupported");
-					else thumb_label.caption("thumbnail format unsupported\n(" + ext + ')');
+						thumb_label.caption(i18n::tr("formats.thumbnail_unsupported", "thumbnail format unsupported"));
+					else
+					{
+						auto unsupported {i18n::tr("formats.thumbnail_unsupported_ext", "thumbnail format unsupported\n({extension})")};
+						unsupported.replace(unsupported.find("{extension}"), 11, ext);
+						thumb_label.caption(unsupported);
+					}
 					fm.get_place().field_display("thumb_label", true);
 					fm.collocate();
 				}
@@ -474,7 +480,7 @@ void GUI::fm_formats()
 			else
 			{
 				if(error.empty())
-					thumb_label.caption("error downloading thumbnail");
+					thumb_label.caption(i18n::tr("formats.thumbnail_error", "error downloading thumbnail"));
 				else thumb_label.caption(error);
 				fm.get_place().field_display("thumb_label", true);
 				fm.collocate();
@@ -483,7 +489,7 @@ void GUI::fm_formats()
 	}
 	else
 	{
-		thumb_label.caption("thumbnail not available");
+		thumb_label.caption(i18n::tr("formats.thumbnail_unavailable", "thumbnail not available"));
 		fm.get_place().field_display("thumb_label", true);
 		fm.collocate();
 	}

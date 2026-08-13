@@ -1,3 +1,4 @@
+#include "i18n.hpp"
 #include "gui.hpp"
 #include <nana/gui/filebox.hpp>
 #include <TlHelp32.h>
@@ -57,7 +58,7 @@ void GUI::make_form()
 	else btnlabel.image(arr_text_field_16_png, sizeof arr_text_field_16_png);
 
 	btn_settings.events().click([this] { fm_settings(); });
-	btn_qact.tooltip("Pops up a menu with actions that can be performed on\nthe queue items (same as right-clicking on the queue).");
+	btn_qact.tooltip(i18n::tr("main.queue_actions_tooltip", "Pops up a menu with actions that can be performed on\nthe queue items (same as right-clicking on the queue)."));
 
 	l_url.events().mouse_enter([this]
 	{
@@ -70,9 +71,9 @@ void GUI::make_form()
 		}
 
 		if(text.empty())
-			l_url.caption("the clipboard does not contain any text");
+			l_url.caption(i18n::tr("main.clipboard_empty", "the clipboard does not contain any text"));
 		else if(text.find('\n') != -1)
-			l_url.caption("* multiple lines of text, make sure they're URLs *");
+			l_url.caption(i18n::tr("main.clipboard_multiple", "* multiple lines of text, make sure they're URLs *"));
 		else
 		{
 			auto item {lbq.item_from_value(text)};
@@ -88,7 +89,9 @@ void GUI::make_form()
 			{
 				//qurl = text + L" (queue item #" + to_wstring(item.text(0)) + L")";
 				//l_url.update_caption();
-				l_url.caption(text + L" (queue item #" + to_wstring(item.text(0)) + L")");
+				auto suffix {i18n::tr("main.clipboard_queue_item_suffix", " (queue item #{item_number})")};
+				suffix.replace(suffix.find("{item_number}"), 13, item.text(0));
+				l_url.caption(text + nana::to_wstring(suffix));
 			}
 		}
 		if(theme::is_dark())
@@ -150,7 +153,12 @@ void GUI::make_form()
 				if(items_initialized)
 					lbq.auto_draw(true);
 			}
-			else l_url.caption("The URL in the clipboard is already added (queue item #" + item.text(0) + ").");
+			else
+			{
+				auto message {i18n::tr("main.clipboard_duplicate", "The URL in the clipboard is already added (queue item #{item_number}).")};
+				message.replace(message.find("{item_number}"), 13, item.text(0));
+				l_url.caption(message);
+			}
 
 			if(theme::is_dark())
 				l_url.fgcolor(theme::path_link_fg);
@@ -428,7 +436,7 @@ void GUI::make_form_bottom()
 	btnlabel.events().click([&]
 	{
 		const auto existing_label {label_from_argset(com_args.caption())};
-		auto input {input_box(*this, "Argset label", "Label for argument set:", existing_label.data())};
+		auto input {input_box(*this, i18n::tr("main.argset_label_title", "Argset label"), i18n::tr("main.argset_label_prompt", "Label for argument set:"), existing_label.data())};
 		if(input.first)
 		{
 			while(!input.second.empty() && input.second.front() == '[')
@@ -524,9 +532,9 @@ void GUI::make_form_bottom()
 	});
 
 	com_chap.editable(false);
-	com_chap.push_back(" ignore");
-	com_chap.push_back(" embed");
-	com_chap.push_back(" split");
+	com_chap.push_back(i18n::tr("main.chapter_mode.ignore", " ignore"));
+	com_chap.push_back(i18n::tr("main.chapter_mode.embed", " embed"));
+	com_chap.push_back(i18n::tr("main.chapter_mode.split", " split"));
 
 	com_rate.editable(false);
 	com_rate.push_back(" KB/s");
@@ -606,35 +614,17 @@ void GUI::make_form_bottom()
 		}
 	});
 
-	com_chap.tooltip("<bold>--embed-chapters</>\tAdd chapter markers to the video file.\n"
-		"<bold>--split-chapters</> \t\tSplit video into multiple files based on chapters.");
-	cbkeyframes.tooltip("Force keyframes around the chapters before\nremoving/splitting them. Requires a\n"
-		"reencode and thus is very slow, but the\nresulting video may have fewer artifacts\n"
-		"around the cuts. (<bold>--force-keyframes-at-cuts</>)");
-	cbtime.tooltip("Do not use the Last-modified header to set the file modification time (<bold>--no-mtime</>)");
-	cbsubs.tooltip("Embed subtitles in the video (only for mp4, webm and mkv videos) (<bold>--embed-subs</>)");
-	cbthumb.tooltip("Embed thumbnail in the video as cover art (<bold>--embed-thumbnail</>)");
-	cbmp3.tooltip("Convert the source audio to MPEG Layer 3 format and save it to an .mp3 file.\n"
-		"The video is discarded if present, so it's preferable to download an audio-only\n"
-		"format if one is available. (<bold>-x --audio-format mp3</>)\n\n"
-		"To download the best audio-only format available, use the custom\nargument <bold>-f ba</>");
-	btnlabel.tooltip("Label this argument set");
-	btnerase.tooltip("Remove this argument set from the list");
-	btncopy.tooltip("Copy the options for this queue item to all the other queue items.");
-	btn_ytfmtlist.tooltip("Choose formats manually, instead of letting yt-dlp\nchoose automatically. "
-		"By default, yt-dlp chooses the\nbest formats, according to the preferences you set\n"
-		"(if you press the \"Settings\" button, you can set\nthe preferred resolution, container, and framerate).");
-	std::string args_tip
-	{
-		"Custom options for yt-dlp, separated by space. Some useful examples:\n\n"
-			"<bold>-f ba</> : best audio (downloads just audio-only format, if available)\n"
-			"<bold>-f wa</> : worst audio\n"
-			"<bold>-f wv+wa</> : combines the worst video format with the worst audio format\n"
-			"<bold>--live-from-start</> : Downloads livestreams from the start. Currently \n"
-			"								  only supported for YouTube (experimental).\n\n"
-			"For more, read the yt-dlp documentation:\n"
-			"https://github.com/yt-dlp/yt-dlp#usage-and-options"
-	};
+	com_chap.tooltip(i18n::tr("main.tooltip.chapters", "<bold>--embed-chapters</> adds chapter markers.\n<bold>--split-chapters</> splits the video into files by chapter."));
+	cbkeyframes.tooltip(i18n::tr("main.tooltip.force_keyframes", "Force keyframes around chapter cuts. This requires re-encoding and is slow, but may reduce artifacts. (<bold>--force-keyframes-at-cuts</>)"));
+	cbtime.tooltip(i18n::tr("main.tooltip.no_mtime", "Do not use the Last-Modified header for the file time. (<bold>--no-mtime</>)"));
+	cbsubs.tooltip(i18n::tr("main.tooltip.embed_subtitles", "Embed subtitles in mp4, webm, or mkv video. (<bold>--embed-subs</>)"));
+	cbthumb.tooltip(i18n::tr("main.tooltip.embed_thumbnail", "Embed the thumbnail as video cover art. (<bold>--embed-thumbnail</>)"));
+	cbmp3.tooltip(i18n::tr("main.tooltip.convert_mp3", "Convert source audio to an .mp3 file and discard video. For best audio-only format, use <bold>-f ba</>."));
+	btnlabel.tooltip(i18n::tr("main.tooltip.label_argset", "Label this argument set"));
+	btnerase.tooltip(i18n::tr("main.tooltip.remove_argset", "Remove this argument set from the list"));
+	btncopy.tooltip(i18n::tr("main.tooltip.copy_options", "Copy this queue item's options to every other queue item."));
+	btn_ytfmtlist.tooltip(i18n::tr("main.tooltip.manual_formats", "Choose formats manually instead of letting yt-dlp choose from the preferences in Settings."));
+	std::string args_tip {i18n::tr("main.tooltip.custom_arguments", "Custom yt-dlp options separated by spaces.\n\n<bold>-f ba</>: best audio\n<bold>-f wa</>: worst audio\n<bold>-f wv+wa</>: worst video plus worst audio\n<bold>--live-from-start</>: download a livestream from the start\n\nhttps://github.com/yt-dlp/yt-dlp#usage-and-options")};
 	cbargs.tooltip(args_tip);
 	com_args.tooltip(args_tip);
 
@@ -672,7 +662,7 @@ void GUI::make_form_bottom()
 		{
 			nana::folderbox fb {*this, conf.open_dialog_origin ? outpath : appdir};
 			fb.allow_multi_select(false);
-			fb.title("Locate and select the desired download folder");
+			fb.title(i18n::tr("main.choose_download_folder", "Choose download folder"));
 			auto res {fb()};
 			if(res.size())
 			{
@@ -694,14 +684,14 @@ void GUI::make_form_bottom()
 		else
 		{
 			::widgets::Menu m;
-			m.append("Choose folder...", [&](menu::item_proxy &)
+			m.append(i18n::tr("main.choose_folder", "Choose folder..."), [&](menu::item_proxy &)
 			{
 				pop_folder_selection_box();
 				if(conf.outpaths.size() >= 11 && conf.outpaths.find(outpath) == conf.outpaths.end())
 					conf.outpaths.erase(conf.outpaths.begin());
 				conf.outpaths.insert(outpath);
 			});
-			m.append("Clear folder history", [&](menu::item_proxy &)
+			m.append(i18n::tr("main.clear_folder_history", "Clear folder history"), [&](menu::item_proxy &)
 			{
 				conf.outpaths.clear();
 				conf.outpaths.insert(outpath);
@@ -807,7 +797,7 @@ void GUI::make_form_bottom()
 
 			auto cliptext {util::get_clipboard_text()};
 
-			m.append("Paste", [&](menu::item_proxy)
+			m.append(i18n::tr("common.paste", "Paste"), [&](menu::item_proxy)
 			{
 				com_args.focus();
 				keybd_event(VK_LCONTROL, 0, 0, 0);
@@ -859,7 +849,7 @@ void GUI::make_message_handlers()
 			case YTDLP_POSTPROCESS:
 				if(bottoms.at(url).started)
 				{
-					item.text(3, "processing");
+					item.text(3, localized_queue_status_processing());
 					item.value<lbqval_t>().state = queue_item_state::active;
 				}
 				else return true;
@@ -885,7 +875,7 @@ void GUI::make_message_handlers()
 				break;
 
 			case YTDLP_DOWNLOAD:
-				item.text(3, "downloading");
+				item.text(3, localized_queue_status_downloading());
 				item.value<lbqval_t>().state = queue_item_state::active;
 				break;
 			}

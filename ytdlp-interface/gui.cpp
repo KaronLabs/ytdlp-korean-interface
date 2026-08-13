@@ -1,5 +1,6 @@
 ﻿#include "gui.hpp"
 #include "icons.hpp"
+#include "i18n.hpp"
 
 #include <regex>
 #include <codecvt>
@@ -10,6 +11,92 @@
 
 settings_t GUI::conf;
 std::unordered_map<std::string, settings_t> GUI::conf_presets;
+
+namespace
+{
+	void replace_placeholder(std::string &text, std::string_view placeholder, std::string_view value)
+	{
+		text.replace(text.find(placeholder), placeholder.size(), value);
+	}
+
+	std::string update_response(std::string_view component, std::string_view detail, std::string_view response)
+	{
+		auto text {i18n::tr("main.update_check.unexpected_response", "Unexpected response while checking GitHub for {component}{detail}:\n\n{response}")};
+		replace_placeholder(text, "{component}", component);
+		replace_placeholder(text, "{detail}", detail);
+		replace_placeholder(text, "{response}", response);
+		return text;
+	}
+
+	std::string update_parser_error(std::string_view response, std::string_view error)
+	{
+		auto text {i18n::tr("main.update_check.parser_error", "{response}\n\nJSON parser error:\n\n{error}")};
+		replace_placeholder(text, "{response}", response);
+		replace_placeholder(text, "{error}", error);
+		return text;
+	}
+
+	std::string update_truncation()
+	{
+		return i18n::tr("main.update_check.truncated", " (showing the first 600 characters)");
+	}
+
+	std::string main_error_title()
+	{
+		return i18n::tr("main.error.title", "ytdlp-interface error");
+	}
+
+	std::string playlist_title(std::string_view title)
+	{
+		auto text {i18n::tr("main.media.playlist", "[playlist] {title}")};
+		replace_placeholder(text, "{title}", title);
+		return text;
+	}
+
+	std::string update_missing_tag(std::string_view component)
+	{
+		auto text {i18n::tr("main.update_check.missing_tag", "GitHub returned valid JSON for {component}, but \"tag_name\" was missing or invalid.")};
+		replace_placeholder(text, "{component}", component);
+		return text;
+	}
+
+	std::string user_page_title(std::string_view title)
+	{
+		auto text {i18n::tr("main.media.user_page", "[user page] {title}")};
+		replace_placeholder(text, "{title}", title);
+		return text;
+	}
+
+	std::string whole_channel_title(std::string_view title)
+	{
+		auto text {i18n::tr("main.media.whole_channel", "[whole channel] {title}")};
+		replace_placeholder(text, "{title}", title);
+		return text;
+	}
+
+	std::string channel_tab_title(std::string_view title)
+	{
+		auto text {i18n::tr("main.media.channel_tab", "[channel tab] {title}")};
+		replace_placeholder(text, "{title}", title);
+		return text;
+	}
+
+	std::string progress_count(std::string_view current, std::string_view total)
+	{
+		auto text {i18n::tr("progress.count", "{current} of {total}")};
+		replace_placeholder(text, "{current}", current);
+		replace_placeholder(text, "{total}", total);
+		return text;
+	}
+
+	std::string main_select_subtitles_count(std::string_view selected, std::string_view total)
+	{
+		auto text {i18n::tr("main.menu.select_subtitles_count", "Select subtitles ({selected}/{total})")};
+		replace_placeholder(text, "{selected}", selected);
+		replace_placeholder(text, "{total}", total);
+		return text;
+	}
+}
 
 
 GUI::GUI() : themed_form {std::bind(&GUI::apply_theme, this, std::placeholders::_1)}
@@ -229,9 +316,11 @@ GUI::GUI() : themed_form {std::bind(&GUI::apply_theme, this, std::placeholders::
 		i.fMask = MIIM_FTYPE | MIIM_STRING | MIIM_ID;
 		i.fType = MFT_STRING;
 		i.wID = 1337;
-		i.dwTypeData = (CHAR*)"Reset size and position\tCtrl+Num0";
+		auto reset_size_position {i18n::tr("main.reset_size_position", "Reset size and position\tCtrl+Num0")};
+		i.dwTypeData = reset_size_position.data();
 		InsertMenuItemA(m, SC_CLOSE, FALSE, &i);
-		i.dwTypeData = (CHAR*)"Close\tEsc, Alt+F4";
+		auto close {i18n::tr("main.close", "Close\tEsc, Alt+F4")};
+		i.dwTypeData = close.data();
 		i.fMask = MIIM_STRING;
 		SetMenuItemInfoA(m, SC_CLOSE, FALSE, &i);
 	}
@@ -250,7 +339,7 @@ bool GUI::process_queue_item(std::wstring url)
 	if(!bottom.started)
 	{
 		if(qurl == url)
-			btndl.caption("Stop download");
+			btndl.caption(stop_download_label);
 		bottom.started = true;
 		bottom.idx_error = 0;
 		taskbar_overall_progress();
@@ -683,9 +772,18 @@ bool GUI::process_queue_item(std::wstring url)
 				SendMessage(hwnd, WM_COLORED_AREA_CLEAR, reinterpret_cast<WPARAM>(ca), 0);
 				ca_change = true;
 			}
-			if(fs::exists(conf.ytdlp_path))
-				tbpipe.append(url, L"[GUI] executing command line: " + display_cmd + L"\n\n");
-			else tbpipe.append(url, L"ytdlp.exe not found: " + conf.ytdlp_path.wstring());
+		if(fs::exists(conf.ytdlp_path))
+		{
+			auto text {i18n::tr("main.output.executing", "[GUI] Executing command line:\n{command}")};
+			replace_placeholder(text, "{command}", nana::to_utf8(display_cmd));
+			tbpipe.append(url, nana::to_wstring(text));
+		}
+		else
+		{
+			auto text {i18n::tr("main.output.ytdlp_missing", "yt-dlp.exe not found: {path}")};
+			replace_placeholder(text, "{path}", conf.ytdlp_path.string());
+			tbpipe.append(url, nana::to_wstring(text));
+		}
 			auto p {ca_change ? ca->get(0) : nullptr};
 			if(ca_change)
 				p->count = 1;
@@ -695,7 +793,7 @@ bool GUI::process_queue_item(std::wstring url)
 					p->fgcolor = theme::is_dark() ? nana::color {"#f99"} : nana::color {"#832"};
 				SendMessage(hwnd, WM_REFRESH, reinterpret_cast<WPARAM>(tbpipe.handle()), 0);
 				if(qurl == url)
-					btndl.caption("Start download");
+					btndl.caption(start_download_label);
 				bottom.started = false;
 				working = false;
 				if(bottom.dl_thread.joinable())
@@ -744,7 +842,7 @@ bool GUI::process_queue_item(std::wstring url)
 				if(completed < 1000 && total != -1)
 				{
 					if(playlist_progress)
-						text = "[" + std::to_string(playlist_completed + 1) + " of " + std::to_string(playlist_total) + "]\t" + text;
+						text = "[" + progress_count(std::to_string(playlist_completed + 1), std::to_string(playlist_total)) + "]\t" + text;
 					if(current)
 					{
 						thread_local std::string caption;
@@ -788,7 +886,7 @@ bool GUI::process_queue_item(std::wstring url)
 							{
 								bottom.progval_shadow = completed;
 								bottom.progval = playlist_completed + 1;
-								auto strprog {"[" + std::to_string(playlist_completed + 1) + " of " + std::to_string(playlist_total) + "]\t"};
+								auto strprog {"[" + progress_count(std::to_string(playlist_completed + 1), std::to_string(playlist_total)) + "]\t"};
 								bottom.progtext = strprog + text;
 								if(current)
 								{
@@ -858,7 +956,7 @@ bool GUI::process_queue_item(std::wstring url)
 			bottom.progtext = "";
 			if(i_taskbar && lbq.item_count() == 1)
 				i_taskbar->SetProgressState(hwnd, TBPF_NORMAL);
-			lbq.set_line_text(url, {"", "", "started", "", "", "", ""});
+			lbq.set_line_text(url, {"", "", i18n::tr("queue.status.started", "started"), "", "", "", ""});
 			lbq.item_from_value(url).value<lbqval_t>().state = queue_item_state::active;
 
 			auto cb_append = [url, this](std::string text, bool keyword)
@@ -869,9 +967,11 @@ bool GUI::process_queue_item(std::wstring url)
 			};
 			bottom.printed_path.clear();
 			bottom.merger_path.clear();
-			bottom.download_path.clear();
-			auto outpath {bottom.outpath};
-			auto res {util::run_piped_process(cmd, &working, cb_append, cb_progress, &graceful_exit, tempfile.filename().string())};
+		bottom.download_path.clear();
+		auto outpath {bottom.outpath};
+		if(!conf.ffmpeg_path.empty() && !fs::exists(conf.ffmpeg_path / "ffmpeg.exe"))
+			tbpipe.append(url, i18n::tr("main.output.ffmpeg_fallback", "[GUI] FFmpeg was not found at the configured location; using yt-dlp's default lookup."));
+		auto res {util::run_piped_process(cmd, &working, cb_append, cb_progress, &graceful_exit, tempfile.filename().string())};
 			bottom.received_procmsg = false;
 			if(!tempfile.empty() && fs::exists(tempfile))
 			{
@@ -905,7 +1005,10 @@ bool GUI::process_queue_item(std::wstring url)
 					bottom.timer_proc.stop();
 				if(res == "failed")
 				{
-					lbq.set_line_text(url, {"", "", "error", "", "", "", ""});
+					auto error_text {i18n::tr("main.output.execute_error", "[GUI] Error while executing: {error}")};
+					replace_placeholder(error_text, "{error}", res);
+					tbpipe.append(url, error_text);
+					lbq.set_line_text(url, {"", "", error_status_label, "", "", "", ""});
 					lbq.item_from_value(url).value<lbqval_t>().state = queue_item_state::error;
 					auto progtext {prog.nana::progress::caption()};
 					auto pos1 {progtext.find('[')};
@@ -926,7 +1029,7 @@ bool GUI::process_queue_item(std::wstring url)
 				}
 				else
 				{
-					lbq.set_line_text(url, {"", "", "done", "", "", "", ""});
+					lbq.set_line_text(url, {"", "", i18n::tr("queue.status.done", "done"), "", "", "", ""});
 					lbq.item_from_value(url).value<lbqval_t>().state = queue_item_state::done;
 				}
 
@@ -934,7 +1037,9 @@ bool GUI::process_queue_item(std::wstring url)
 				if(i_taskbar && lbq.item_count() == 1)
 					i_taskbar->SetProgressState(hwnd, TBPF_NOPROGRESS);
 				btndl.enabled(true);
-				tbpipe.append(url, "\n[GUI] " + conf.ytdlp_path.filename().string() + " process has exited\n");
+				auto text {i18n::tr("main.output.process_exit", "[GUI] {process} process has exited")};
+				replace_placeholder(text, "{process}", conf.ytdlp_path.filename().string());
+				tbpipe.append(url, "\n" + text + "\n");
 				if(tbpipe.current() == url)
 				{
 					ca = tbpipe.colored_area_access();
@@ -944,7 +1049,7 @@ bool GUI::process_queue_item(std::wstring url)
 					SendMessage(hwnd, WM_REFRESH, reinterpret_cast<WPARAM>(tbpipe.handle()), 0);
 				}
 				if(qurl == url)
-					btndl.caption("Start download");
+					btndl.caption(start_download_label);
 				bottom.started = false;
 				if(!start_next_urls(url)) // if no more urls are startable
 				{
@@ -979,16 +1084,31 @@ bool GUI::process_queue_item(std::wstring url)
 		bottom.received_procmsg = false;
 		const auto fname {conf.ytdlp_path.filename().string()};
 		if(graceful_exit)
-			tbpipe.append(url, "\n[GUI] " + fname + " process was ended gracefully via Ctrl+C signal\n");
-		else tbpipe.append(url, "\n[GUI] " + fname + " process was ended forcefully via WM_CLOSE message\n");
+		{
+			auto text {i18n::tr("main.output.process_graceful", "[GUI] {process} process ended gracefully via Ctrl+C")};
+			replace_placeholder(text, "{process}", fname);
+			tbpipe.append(url, "\n" + text + "\n");
+		}
+		else
+		{
+			auto text {i18n::tr("main.output.process_forced", "[GUI] {process} process was ended forcefully via WM_CLOSE")};
+			replace_placeholder(text, "{process}", fname);
+			tbpipe.append(url, "\n" + text + "\n");
+		}
 		auto item {lbq.item_from_value(url)};
 		auto text {item.text(3)};
 		auto pos {text.find(']')};
 		if(pos != -1)
-			lbq.set_line_text(url, {"", "", "stopped (" + text.substr(1, pos - 1) + ")", "", "", "", ""});
+			auto status {stopped_detail_template};
+			replace_placeholder(status, "{detail}", text.substr(1, pos - 1));
+			lbq.set_line_text(url, {"", "", status, "", "", "", ""});
 		else if(text.find('%') != -1)
-			lbq.set_line_text(url, {"", "", "stopped (" + text + ")", "", "", "", ""});
-		else lbq.set_line_text(url, {"", "", "stopped", "", "", "", ""});
+		{
+			auto status {stopped_detail_template};
+			replace_placeholder(status, "{detail}", text);
+			lbq.set_line_text(url, {"", "", status, "", "", "", ""});
+		}
+		else lbq.set_line_text(url, {"", "", i18n::tr("queue.status.stopped", "stopped"), "", "", "", ""});
 		item.value<lbqval_t>().state = queue_item_state::stopped;
 		if(tbpipe.current() == url)
 		{
@@ -1002,7 +1122,7 @@ bool GUI::process_queue_item(std::wstring url)
 		nana::API::refresh_window(tbpipe);
 		btndl.enabled(true);
 		if(qurl == url)
-			btndl.caption("Start download");
+			btndl.caption(start_download_label);
 		bottom.started = false;
 		if(conf.cb_autostart)
 			start_next_urls(url);
@@ -1117,7 +1237,7 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 					{
 						if(j["columns"].contains("title"))
 							media_title = j["columns"]["title"].get<std::string>();
-						else media_title = "!!! failed to restore the media title !!!";
+						else media_title = i18n::tr("queue.restore_title_failed", "!!! failed to restore the media title !!!");
 					}
 					auto status {j["columns"]["status"].get<std::string>()};
 					auto format {j["columns"]["format"].get<std::string>()},
@@ -1176,8 +1296,8 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 				std::string media_info, media_website {"---"}, media_title, format_id {"---"}, format_note {"---"}, ext {"---"}, filesize {"---"};
 				auto json_error = [&](const nlohmann::detail::exception &e)
 				{
-					media_title = "Can't parse the JSON data produced by yt-dlp! See output for details.";
-					lbq.set_line_text(url, {"", "", "error", "", "", "", ""});
+					media_title = i18n::tr("queue.json_parse_failed", "Can't parse the JSON data produced by yt-dlp! See output for details.");
+					lbq.set_line_text(url, {"", "", error_status_label, "", "", "", ""});
 					lbq.item_from_value(url).value<lbqval_t>().state = queue_item_state::error;
 					outbox.caption(e.what() + std::string {"\n\n"} + media_info, url);
 					if(outbox.current() == url)
@@ -1257,7 +1377,7 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 									const auto &jpl {bottom.playlist_info["entries"]};
 									if(jpl.size() == 0)
 									{
-										lbq.set_line_text(url, {"---", "error: playlist with zero entries!", "---", "---", "---", "---"});
+										lbq.set_line_text(url, {"---", zero_playlist_label, "---", "---", "---", "---"});
 										bottom.vidinfo.clear();
 										bottom.playlist_info.clear();
 										lbq.set_item_bg(url, ::widgets::theme::lbbg);
@@ -1320,7 +1440,9 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 								if(pos != -1)
 								{
 									auto strtime {media_info.substr(pos + 30, media_info.rfind('.') - pos - 30)};
-									lbq.set_line_text(url, {"youtube.com", "[live event scheduled to begin in " + strtime + ']', "---", "---", "---", "---"});
+									auto title {i18n::tr("queue.live_scheduled", "[live event scheduled to begin in {time}]")};
+									replace_placeholder(title, "{time}", strtime);
+									lbq.set_line_text(url, {"youtube.com", title, "---", "---", "---", "---"});
 									bottom.vidinfo.clear();
 									if(--active_info_threads == 0)
 										queue_save();
@@ -1386,13 +1508,14 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 						}
 						if(!bottom.playlist_info.empty())
 						{
-							std::string tab {bottom.is_bcchan ? "[user page] " : "[whole channel] "};
+							enum class channel_title_kind { user_page, whole_channel, tab };
+							channel_title_kind tab_kind {bottom.is_bcchan ? channel_title_kind::user_page : channel_title_kind::whole_channel};
 							std::vector<std::string> tabs {"videos", "featured", "playlists", "shorts", "streams", "community", "podcasts"};
 							if(bottom.is_ytchan)
 								for(const auto &t : tabs)
 									if(url.rfind(L"/" + to_wstring(t)) == url.size() - t.size() - 1)
 									{
-										tab = "[channel tab] ";
+										tab_kind = channel_title_kind::tab;
 										if(t == "videos" || t == "shorts" || t == "streams" || t == "podcasts")
 											bottom.is_yttab = true;
 										break;
@@ -1441,17 +1564,22 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 							}
 							else
 							{
-								lbq.set_line_text(url, {bottom.is_bcchan ? "bandcamp.com" : "youtube.com", tab + media_title, "", "---", "---", "---", "---"});
+									std::string display_title;
+									switch(tab_kind)
+									{
+									case channel_title_kind::user_page: display_title = user_page_title(media_title); break;
+									case channel_title_kind::tab: display_title = channel_tab_title(media_title); break;
+									default: display_title = whole_channel_title(media_title); break;
+									}
+									lbq.set_line_text(url, {bottom.is_bcchan ? "bandcamp.com" : "youtube.com", display_title, "", "---", "---", "---", "---"});
 								bottom.vidinfo.clear();
 								if(vidsel_item.m && lbq.item_from_value(url).selected())
-								{
-									auto &m {*vidsel_item.m};
-									for(int n {0}; n < m.size(); n++)
 									{
-										m.enabled(n, true);
-										if(m.text(n) == "Select formats" && !bottom.btnfmt_visible())
-											m.erase(n--);
-									}
+										auto &m {*vidsel_item.m};
+										for(int n {0}; n < m.size(); n++)
+											m.enabled(n, true);
+										if(!bottom.btnfmt_visible() && vidsel_item.formats_pos < static_cast<std::size_t>(m.size()))
+											m.erase(vidsel_item.formats_pos);
 									SendMessage(hwnd, WM_REFRESH, reinterpret_cast<WPARAM>(m.handle()), 0);
 									vidsel_item.m = nullptr;
 								}
@@ -1517,7 +1645,7 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 									const auto &jpl {bottom.playlist_info["entries"]};
 									if(jpl.size() == 0)
 									{
-										lbq.set_line_text(url, {"---", "error: playlist with zero entries!", "---", "---", "---", "---"});
+								lbq.set_line_text(url, {"---", zero_playlist_label, "---", "---", "---", "---"});
 										bottom.vidinfo.clear();
 										bottom.playlist_info.clear();
 										lbq.set_item_bg(url, ::widgets::theme::lbbg);
@@ -1573,13 +1701,13 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 										media_website = "bandcamp.com";
 									else media_website = bottom.playlist_info["webpage_url_domain"];
 									if(bottom.is_yttab)
-										media_title = "[channel tab] " + bottom.playlist_info["title"].get<std::string>();
+										media_title = bottom.playlist_info["title"].get<std::string>();
 									else 
 									{
 										if(bottom.playlist_info.contains("title"))
-											media_title = "[playlist] " + bottom.playlist_info["title"].get<std::string>();
+											media_title = playlist_title(bottom.playlist_info["title"].get<std::string>());
 										else if(bottom.playlist_info.contains("id"))
-											media_title = "[playlist] " + bottom.playlist_info["id"].get<std::string>();
+											media_title = playlist_title(bottom.playlist_info["id"].get<std::string>());
 										else media_title = to_utf8(url);
 									}
 									if(vidsel_item.m && lbq.item_from_value(url).selected())
@@ -1587,9 +1715,11 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 										auto &m {*vidsel_item.m};
 										auto pos {vidsel_item.pos};
 										auto str {std::to_string(playlist_size)};
-										if(bottom.playsel_string.empty())
-											m.text(pos, (bottom.is_ytplaylist ? "Select videos (" : "Select songs (") + str + '/' + str + ")");
-										else m.text(pos, (bottom.is_ytplaylist ? "Select videos (" : "Select songs (") + std::to_string(bottom.playlist_selected()) + '/' + str + ")");
+										auto selected {bottom.playsel_string.empty() ? str : std::to_string(bottom.playlist_selected())};
+										auto menu_text {bottom.is_ytplaylist ? i18n::tr("main.menu.select_videos_count", "Select videos ({selected}/{total})") : i18n::tr("main.menu.select_songs_count", "Select songs ({selected}/{total})")};
+										replace_placeholder(menu_text, "{selected}", selected);
+										replace_placeholder(menu_text, "{total}", str);
+										m.text(pos, menu_text);
 										m.enabled(pos, true);
 										m.enabled(pos + 1, true);
 										m.enabled(pos + 2, true);
@@ -1614,7 +1744,11 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 									media_title = bottom.vidinfo["title"];
 								if(bottom.vidinfo_contains("is_live") && bottom.vidinfo["is_live"] ||
 									bottom.vidinfo_contains("live_status") && bottom.vidinfo["live_status"] == "is_live")
-									media_title = "[live] " + media_title;
+									{
+										auto title {i18n::tr("main.media.live", "[live] {title}")};
+										replace_placeholder(title, "{title}", media_title);
+										media_title = std::move(title);
+									}
 								if(bottom.vidinfo_contains("format_id"))
 									format_id = bottom.vidinfo["format_id"];
 								if(bottom.vidinfo_contains("resolution"))
@@ -1671,10 +1805,12 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 						}
 						else
 						{
-							lbq.set_line_text(url, {" ", "yt-dlp failed to get info (see output)", " ", " ", " ", " ", " "});
+							lbq.set_line_text(url, {" ", i18n::tr("queue.info_failed", "yt-dlp failed to get info (see output)"), " ", " ", " ", " ", " "});
 
 							auto cmdline {bottom.playlist_vid_cmdinfo.empty() ? to_utf8(bottom.cmdinfo) : to_utf8(bottom.playlist_vid_cmdinfo)};
-							outbox.caption("[GUI] got error executing command line: " + cmdline + "\n\n" + media_info + "\n", url);
+							auto error_text {i18n::tr("main.output.info_command_error", "[GUI] Error while inspecting command line:\n{command}")};
+							replace_placeholder(error_text, "{command}", cmdline);
+							outbox.caption(error_text + "\n\n" + media_info + "\n", url);
 							if(outbox.current() == url)
 							{
 								auto ca {outbox.colored_area_access()};
@@ -1712,8 +1848,8 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 					else if(bottom.working_info && bottom.info_thread.joinable())
 					{
 						if(conf.ytdlp_path.empty() || !fs::exists(conf.ytdlp_path))
-							lbq.set_line_text(url, {"", "can't get data for URL, yt-dlp.exe missing!", "", "", "", "", ""});
-						else lbq.set_line_text(url, {"", "yt-dlp did not provide any data for this URL!", "", "", "", "", ""});
+							lbq.set_line_text(url, {"", i18n::tr("queue.ytdlp_missing", "can't get data for URL, yt-dlp.exe missing!"), "", "", "", "", ""});
+						else lbq.set_line_text(url, {"", i18n::tr("queue.no_data", "yt-dlp did not provide any data for this URL!"), "", "", "", "", ""});
 					}
 				}
 				if(!g_exiting)
@@ -1724,27 +1860,28 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 						const auto &vidinfo {bottom.vidinfo};
 						auto &m {*vidsel_item.m};
 						for(int n {0}; n < m.size(); n++)
-						{
 							m.enabled(n, true);
-							if(m.text(n) == "Select formats" && !bottom.btnfmt_visible())
-								m.erase(n--);
-							if(m.text(n) == "Select subtitles")
+						if(!bottom.btnfmt_visible() && vidsel_item.formats_pos < static_cast<std::size_t>(m.size()))
+						{
+							if(vidsel_item.subtitles_pos > vidsel_item.formats_pos)
+								--vidsel_item.subtitles_pos;
+							m.erase(vidsel_item.formats_pos);
+						}
+						if(vidsel_item.subtitles_pos < static_cast<std::size_t>(m.size()))
+						{
+							int subcount {0};
+							if(!vidinfo.empty() && vidinfo.contains("subtitles") && vidinfo.at("subtitles").is_object())
 							{
-								if(!vidinfo.empty() && vidinfo.contains("subtitles") && vidinfo.at("subtitles").is_object())
+								try
 								{
-									try
-									{
-										const auto &jsubs {vidinfo.at("subtitles")};
-										int subcount {0};
-										for(auto it {jsubs.begin()}; it != jsubs.end(); it++)
-											if(it.key() != "live_chat" && it->is_array() && it->size() && it->front().contains("name"))
-												subcount++;
-										m.text(n, "Select subtitles (0/" + std::to_string(subcount) + ')');
-									}
-									catch(...) {};
+									const auto &jsubs {vidinfo.at("subtitles")};
+									for(auto it {jsubs.begin()}; it != jsubs.end(); it++)
+										if(it.key() != "live_chat" && it->is_array() && it->size() && it->front().contains("name"))
+											++subcount;
 								}
-								else (m.text(n, "Select subtitles (0/0)"));
+								catch(...) {}
 							}
+							m.text(vidsel_item.subtitles_pos, main_select_subtitles_count("0", std::to_string(subcount)));
 						}
 						SendMessage(hwnd, WM_REFRESH, reinterpret_cast<WPARAM>(m.handle()), 0);
 						vidsel_item.m = nullptr;
@@ -1855,7 +1992,7 @@ void GUI::show_queue(bool freeze_redraw)
 	const auto px {nana::API::screen_dpi(true) >= 144};
 	change_field_attr("Bottom", "weight", 298 - 240 * expcol.collapsed() - px);
 	auto &plc {get_place()};
-	btnq.caption("Show output");
+		btnq.caption(show_output_label);
 	plc.field_display("prog", false);
 	plc.field_display("separator", true);
 	plc.collocate();
@@ -1873,7 +2010,7 @@ void GUI::show_output()
 {
 	SendMessage(hwnd, WM_SETREDRAW, FALSE, 0);
 	change_field_attr("Bottom", "weight", 325 - 240 * expcol.collapsed());
-	btnq.caption("Show queue");
+		btnq.caption(i18n::tr("main.show_queue", "Show queue"));
 	auto &curbot {bottoms.current()};
 	auto &plc {get_place()};
 	plc.field_display("prog", true);
@@ -1900,12 +2037,11 @@ void GUI::get_releases(nana::window parent_for_msgbox)
 			{
 				releases.clear();
 				tmsg_parent = parent_for_msgbox;
-				tmsg_title = "ytdlp-interface JSON error";
+				tmsg_title = localized_json_error_title();
 				std::string str;
 				if(jtext.size() > 600)
-					str = " (showing the first 600 characters)";
-				tmsg_text = "Got an unexpected response when checking GitHub for a new version" + str + ":\n\n" + jtext.substr(0, 600) +
-					"\n\nError from the JSON parser:\n\n" + e.what();
+					str = update_truncation();
+				tmsg_text = update_response("a new version", str, update_parser_error(jtext.substr(0, 600), e.what()));
 				if(thr_releases.joinable())
 					thr_releases.detach();
 				return;
@@ -1919,42 +2055,43 @@ void GUI::get_releases(nana::window parent_for_msgbox)
 					{
 						releases.clear();
 						tmsg_parent = parent_for_msgbox;
-						tmsg_title = "ytdlp-interface error";
-						tmsg_text = std::string {"Got an unexpected response when checking GitHub for a new version. "} +
-							"The response is valid JSON and is properly formatted, but the value of the key \"tag_name\" " +
-							"for the latest release is less that 4 characters in length: \"" + tag_name + "\"";						
+						tmsg_title = main_error_title();
+						tmsg_text = update_missing_tag("the latest release");
 					}
 					else if(is_tag_a_new_version(tag_name) && conf.get_releases_at_startup)
-						caption(title + "   (" + tag_name + " is available)");
+					{
+						auto caption_text {i18n::tr("main.update_available_title", "{title}   ({version} is available)")};
+						replace_placeholder(caption_text, "{title}", title);
+						replace_placeholder(caption_text, "{version}", tag_name);
+						caption(caption_text);
+					}
 				}
 				else
 				{
 					tmsg_parent = parent_for_msgbox;
-					tmsg_title = "ytdlp-interface error";
+					tmsg_title = main_error_title();
 					std::string str;
 					if(jtext.size() > 600)
 					{
 						jtext.erase(600);
-						str = " (showing the first 600 characters)";
+						str = update_truncation();
 					}
-					tmsg_text = "Got an unexpected response when checking GitHub for a new version" + str + ":\n\n" + jtext +
-						"\n\nThe response is valid JSON and is formatted as an array (as expected), but the first element " +
-						"does not contain the key \"tag_name\".";
+					tmsg_text = update_response("a new version", str, update_missing_tag("the latest release"));
 					releases.clear();
 				}
 			}
 			else
 			{
 				tmsg_parent = parent_for_msgbox;
-				tmsg_title = "ytdlp-interface error";
+				tmsg_title = main_error_title();
 				std::string str;
 				if(jtext.size() > 600)
 				{
 					jtext.erase(600);
-					str = " (showing the first 600 characters)";
+					str = update_truncation();
 				}
-				tmsg_text = "Got an unexpected response when checking GitHub for a new version" + str + ":\n\n" + jtext +
-					"\n\nThe response is valid JSON, but is not formatted as an array.";
+				tmsg_text = update_response("a new version", str, i18n::tr("main.update_check.invalid_array", "{response}\n\nThe response is valid JSON, but it is not an array of releases."));
+				replace_placeholder(tmsg_text, "{response}", jtext);
 				releases.clear();
 			}
 		}
@@ -1981,15 +2118,14 @@ void GUI::get_latest_ffmpeg(nana::window parent_for_msgbox)
 			catch(nlohmann::detail::exception e)
 			{
 				tmsg_parent = parent_for_msgbox;
-				tmsg_title = "ytdlp-interface error";
+				tmsg_title = main_error_title();
 				std::string str;
 				if(jtext.size() > 600)
 				{
 					jtext.erase(600);
-					str = " (showing the first 600 characters)";
+					str = update_truncation();
 				}
-				tmsg_text = "Got an unexpected response when checking GitHub for a new FFmpeg version" + str + ":\n\n" + jtext +
-					"\n\nError from the JSON parser:\n\n" + e.what();
+				tmsg_text = update_response("a new FFmpeg version", str, update_parser_error(jtext, e.what()));
 				if(thr_releases_ffmpeg.joinable())
 					thr_releases_ffmpeg.detach();
 				return;
@@ -2051,15 +2187,14 @@ void GUI::get_latest_ytdlp(nana::window parent_for_msgbox)
 			catch(nlohmann::detail::exception e)
 			{
 				tmsg_parent = parent_for_msgbox;
-				tmsg_title = "ytdlp-interface error";
+				tmsg_title = main_error_title();
 				std::string str;
 				if(jtext.size() > 600)
 				{
 					jtext.erase(600);
-					str = " (showing the first 600 characters)";
+					str = update_truncation();
 				}
-				tmsg_text = "Got an unexpected response when checking GitHub for a new yt-dlp version" + str + ":\n\n" + jtext +
-					"\n\nError from the JSON parser:\n\n" + e.what();
+				tmsg_text = update_response("a new yt-dlp version", str, update_parser_error(jtext, e.what()));
 				if(thr_releases_ytdlp.joinable())
 					thr_releases_ytdlp.detach();
 				return;
@@ -2102,12 +2237,11 @@ void GUI::get_latest_deno(nana::window parent_for_msgbox)
 			catch(nlohmann::detail::exception e)
 			{
 				tmsg_parent = parent_for_msgbox;
-				tmsg_title = "ytdlp-interface JSON error";
+				tmsg_title = localized_json_error_title();
 				std::string str;
 				if(jtext.size() > 600)
-					str = " (showing the first 600 characters)";
-				tmsg_text = "Got an unexpected response when checking GitHub for a new Deno version" + str + ":\n\n" + jtext.substr(0, 600) +
-					"\n\nError from the JSON parser:\n\n" + e.what();
+					str = update_truncation();
+				tmsg_text = update_response("a new Deno version", str, update_parser_error(jtext.substr(0, 600), e.what()));
 				if(thr_releases_deno.joinable())
 					thr_releases_deno.detach();
 				return;
@@ -2448,7 +2582,7 @@ void GUI::adjust_lbq_headers()
 		if(conf.col_site_icon || conf.col_site_text)
 		{
 			lbq.column_at(1).width(one);
-			lbq.column_at(1).text(conf.col_site_text ? "Website" : "");
+			lbq.column_at(1).text(conf.col_site_text ? localized_queue_website() : "");
 			if(!lbq.column_at(1).visible())
 				lbq.column_at(1).visible(true);
 		}

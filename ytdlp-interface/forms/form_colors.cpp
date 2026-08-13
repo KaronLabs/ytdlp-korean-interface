@@ -1,3 +1,4 @@
+#include "../i18n.hpp"
 #include "form_colors.hpp"
 #include <nana/gui/filebox.hpp>
 #include <iostream>
@@ -38,7 +39,10 @@ void GUI::fm_colors(themed_form &parent)
 
 	themed_form fm {nullptr, parent, {}, appear::decorate<appear::minimize>{}};
 	fm.center(1000, 696);
-	fm.caption(title + " - custom " + (theme::is_dark() ? "dark " : "light ") + "color theme");
+	auto form_caption {i18n::tr("colors.custom_theme", "{title} - custom {variant} color theme")};
+	form_caption.replace(form_caption.find("{title}"), 7, title);
+	form_caption.replace(form_caption.find("{variant}"), 9, theme::is_dark() ? i18n::tr("colors.variant_dark", "dark") : i18n::tr("colors.variant_light", "light"));
+	fm.caption(form_caption);
 	fm.bgcolor(t_custom.fmbg);
 	fm.snap(conf.cbsnap);
 
@@ -118,42 +122,45 @@ void GUI::fm_colors(themed_form &parent)
 		tb_lbselfg {c_lbselfg, picker, &t_custom.lbselfg}, tb_lbselbg {c_lbselbg, picker, &t_custom.lbselbg},
 		tb_lbhilite {c_lbhilite , picker, &t_custom.lbhilite}, tb_lbskip {c_lbskip , picker, &t_custom.list_check_highlight_fg};
 
-	my_label l_label {c_label, "Label"}, l_fmbg {c_fmbg, "Window background"}, l_nimbus {c_nimbus, "Focus rectangle"},
-		l_sep {c_sep, "Separator"}, l_btnbg {c_btnbg, "Button background"}, l_btnfg {c_btnfg, "Button foreground"},
-		l_tbfg {c_tbfg, "Textbox foreground"}, l_tbsel {c_tbsel, "Textbox selection"}, l_headerbg {c_headerbg, "Listbox header"},
-		l_tbsel_unfocused {c_tbsel_unfocused, "Textbox sel. unfocused"}, l_gp {c_gp, "Group title"},
-		l_tree_selbg {c_tree_selbg, "Tree selection bground"}, l_tree_selfg {c_tree_selfg, "Tree selection border"},
-		l_tree_hilitebg {c_tree_hilitebg, "Tree hovered bground"}, l_tree_hilitefg {c_tree_hilitefg, "Tree hovered border"},
-		l_tree_parent {c_tree_parent, "Tree parent node"}, l_json_key {c_json_key, "JSON key"}, l_json_val {c_json_val, "JSON value"},
-		l_lbselbg {c_lbselbg, "Listbox selection bg"}, l_lbselfg {c_lbselfg, "Listbox sel. border"},
-		l_lbhilite {c_lbhilite, "Listbox hovered item"}, l_lbskip {c_lbskip, "Listbox special item"};
+	my_label l_label {c_label, i18n::tr("colors.label", "Label")}, l_fmbg {c_fmbg, i18n::tr("colors.window_background", "Window background")}, l_nimbus {c_nimbus, i18n::tr("colors.focus_rectangle", "Focus rectangle")},
+		l_sep {c_sep, i18n::tr("colors.separator", "Separator")}, l_btnbg {c_btnbg, i18n::tr("colors.button_background", "Button background")}, l_btnfg {c_btnfg, i18n::tr("colors.button_foreground", "Button foreground")},
+		l_tbfg {c_tbfg, i18n::tr("colors.textbox_foreground", "Textbox foreground")}, l_tbsel {c_tbsel, i18n::tr("colors.textbox_selection", "Textbox selection")}, l_headerbg {c_headerbg, i18n::tr("colors.listbox_header", "Listbox header")},
+		l_tbsel_unfocused {c_tbsel_unfocused, i18n::tr("colors.textbox_selection_unfocused", "Textbox sel. unfocused")}, l_gp {c_gp, i18n::tr("colors.group_title", "Group title")},
+		l_tree_selbg {c_tree_selbg, i18n::tr("colors.tree_selection_background", "Tree selection bground")}, l_tree_selfg {c_tree_selfg, i18n::tr("colors.tree_selection_border", "Tree selection border")},
+		l_tree_hilitebg {c_tree_hilitebg, i18n::tr("colors.tree_hover_background", "Tree hovered bground")}, l_tree_hilitefg {c_tree_hilitefg, i18n::tr("colors.tree_hover_border", "Tree hovered border")},
+		l_tree_parent {c_tree_parent, i18n::tr("colors.tree_parent_node", "Tree parent node")}, l_json_key {c_json_key, i18n::tr("colors.json_key", "JSON key")}, l_json_val {c_json_val, i18n::tr("colors.json_value", "JSON value")},
+		l_lbselbg {c_lbselbg, i18n::tr("colors.listbox_selection_background", "Listbox selection bg")}, l_lbselfg {c_lbselfg, i18n::tr("colors.listbox_selection_border", "Listbox sel. border")},
+		l_lbhilite {c_lbhilite, i18n::tr("colors.listbox_hovered_item", "Listbox hovered item")}, l_lbskip {c_lbskip, i18n::tr("colors.listbox_special_item", "Listbox special item")};
 
-	::widgets::Text l_itext {c_itext, "Info text"}, l_itext_error {c_itext_error, "Info text (error mode)"}, 
-		text_info {fm, "Right-click a color description to reset the color to its default value."};
+	::widgets::Text l_itext {c_itext, i18n::tr("colors.info_text", "Info text")}, l_itext_error {c_itext_error, i18n::tr("colors.info_text_error", "Info text (error mode)")},
+		text_info {fm, i18n::tr("colors.reset_hint", "Right-click a color description to reset the color to its default value.")};
 	l_itext_error.error_mode(true);
 	::widgets::Separator sep {fm};
-	::widgets::cbox cbox {c_cbox, "Checkbox"};
-	::widgets::Button btnapply {fm, "Apply changes"}, btndef {fm, "Reset to default"}, btnsave {fm, "Save"}, btnload {fm, "Load"};
-	::widgets::Title title {c_title, "Large header"};
-	std::wstring url {L"URL box"};
+	::widgets::cbox cbox {c_cbox, i18n::tr("colors.checkbox", "Checkbox")};
+	::widgets::Button btnapply {fm, i18n::tr("colors.apply_changes", "Apply changes")}, btndef {fm, widgets::localized_reset_default()}, btnsave {fm, i18n::tr("common.save", "Save")}, btnload {fm, i18n::tr("common.load", "Load")};
+	::widgets::Title title {c_title, i18n::tr("colors.large_header", "Large header")};
+	std::wstring url {to_wstring(i18n::tr("colors.url_box", "URL box"))};
 	fs::path path {"c:\\path\\box"};
 	::widgets::path_label l_url {c_url, &url}, l_path {c_path, &path};
 	api::effects_edge_nimbus(l_url, effects::edge_nimbus::none);
 	api::effects_edge_nimbus(l_path, effects::edge_nimbus::none);
-	auto tip {"The custom color theme is automatically saved to\nthe settings file when you click the apply button,\n"
-		"but you can also save/load it to/from an arbitrary file."};
+	auto tip {i18n::tr("colors.save_load_tooltip", "The custom color theme is automatically saved to\nthe settings file when you click the apply button,\nbut you can also save/load it to/from an arbitrary file.")};
+	const auto dark_theme_filter {i18n::tr("colors.dark_theme_filter", "Dark theme file")};
+	const auto light_theme_filter {i18n::tr("colors.light_theme_filter", "Light theme file")};
+	const auto default_dark_filename {i18n::tr("colors.default_dark_filename", "custom dark theme")};
+	const auto default_light_filename {i18n::tr("colors.default_light_filename", "custom light theme")};
 	btnsave.tooltip(tip);
 	btnload.tooltip(tip);
 
-	::widgets::Group gp {fm, "JSON Viewer"};
+	::widgets::Group gp {fm, i18n::tr("colors.json_viewer", "JSON Viewer")};
 	gp.div("jtree margin=10");
 	gp.enable_format_caption(true);
 
 	nlohmann::json j
 	{
-		{"boolean", true},
-		{"number", 3.141592},
-		{"trio", {"one", "two", "three"}},
+		{i18n::tr("colors.sample.boolean", "boolean"), true},
+		{i18n::tr("colors.sample.number", "number"), 3.141592},
+		{i18n::tr("colors.sample.trio", "trio"), {i18n::tr("colors.sample.one", "one"), i18n::tr("colors.sample.two", "two"), i18n::tr("colors.sample.three", "three")}},
 	};
 	::widgets::JSON_Tree jtree {gp, j};
 	gp["jtree"] << jtree;
@@ -165,9 +172,9 @@ void GUI::fm_colors(themed_form &parent)
 	lb.typeface(paint::font_info {"Calibri", 12});
 	lb.append_header("Media title", util::scale(200));
 	lb.append_header("Status", util::scale(90));
-	lb.at(0).append({"Good Media (part 1)", "queued"});
-	lb.at(0).append({"Media I will download later", "skip"});
-	lb.at(0).append({"Good Media (part 2)", "queued"});
+	lb.at(0).append({i18n::tr("colors.demo_media_1", "Good Media (part 1)"), "queued"});
+	lb.at(0).append({i18n::tr("colors.demo_media_later", "Media I will download later"), "skip"});
+	lb.at(0).append({i18n::tr("colors.demo_media_2", "Good Media (part 2)"), "queued"});
 	lb.at(0).at(1).check(true);
 	lb.at(0).at(2).select(true);
 
@@ -499,17 +506,17 @@ void GUI::fm_colors(themed_form &parent)
 		nana::filebox fb {fm, false};
 		fb.allow_multi_select(false);
 		if(theme::is_dark())
-			fb.add_filter("Dark theme file", "*.dtheme");
-		else fb.add_filter("Light theme file", "*.ltheme");
-		fb.title("Choose which file to save to");
+			fb.add_filter(dark_theme_filter, "*.dtheme");
+		else fb.add_filter(light_theme_filter, "*.ltheme");
+		fb.title(i18n::tr("colors.choose_save_file", "Choose which file to save to"));
 		if(!theme_path.empty())
 			fb.init_file(theme_path);
 		else
 		{
 			theme_path = confpath;
 			if(theme::is_dark())
-				fb.init_file(theme_path.replace_filename("custom dark theme"));
-			else fb.init_file(theme_path.replace_filename("custom light theme"));
+				fb.init_file(theme_path.replace_filename(default_dark_filename));
+			else fb.init_file(theme_path.replace_filename(default_light_filename));
 		}
 		auto res {fb()};
 		if(res.size())
@@ -528,17 +535,17 @@ void GUI::fm_colors(themed_form &parent)
 		nana::filebox fb {fm, true};
 		fb.allow_multi_select(false);
 		if(theme::is_dark())
-			fb.add_filter("Dark theme file", "*.dtheme");
-		else fb.add_filter("Light theme file", "*.ltheme");
-		fb.title("Choose which file to load from");
+			fb.add_filter(dark_theme_filter, "*.dtheme");
+		else fb.add_filter(light_theme_filter, "*.ltheme");
+		fb.title(i18n::tr("colors.choose_load_file", "Choose which file to load from"));
 		if(!theme_path.empty())
 			fb.init_file(theme_path);
 		else
 		{
 			theme_path = confpath;
 			if(theme::is_dark())
-				fb.init_file(theme_path.replace_filename("custom dark theme"));
-			else fb.init_file(theme_path.replace_filename("custom light theme"));
+				fb.init_file(theme_path.replace_filename(default_dark_filename));
+			else fb.init_file(theme_path.replace_filename(default_light_filename));
 		}
 		auto res {fb()};
 		if(res.size())
@@ -630,7 +637,7 @@ void container::refresh_btn_state()
 	auto clrconf {reinterpret_cast<nana::color*>(reinterpret_cast<intptr_t>(t_conf) + off)};
 	btn.enable(*tb.clr != *clrconf);
 	if(btn.enabled())
-		btn.tooltip("Revert unapplied changes");
+		btn.tooltip(i18n::tr("colors.revert_unapplied", "Revert unapplied changes"));
 	else btn.tooltip("");
 }
 

@@ -1,8 +1,32 @@
+#include "../i18n.hpp"
 #include "../gui.hpp"
 #include <regex>
 #include <nana/gui/filebox.hpp>
 #include <nana/system/platform.hpp>
 #include <nana/paint/image_process_selector.hpp>
+
+namespace
+{
+	std::string updater_github_failed() { return i18n::tr("updater.github_failed", "unable to get from GitHub"); }
+	std::string updater_unavailable() { return i18n::tr("updater.not_present", "not present"); }
+	std::string updater_changelog() { return i18n::tr("updater.click_changelog", "  [click for changelog]"); }
+	std::string updater_no_ytdlp_destination_title() { return i18n::tr("settings.updater.no_ytdlp_destination.title", "No place to put yt-dlp.exe"); }
+	std::string updater_error_title() { return i18n::tr("settings.updater.error.title", "ytdlp-interface update error"); }
+	std::string common_update() { return i18n::tr("common.update", "Update"); }
+	std::string updater_current(std::string value)
+	{
+		auto text {i18n::tr("updater.current", "{version}  (current)")};
+		text.replace(text.find("{version}"), 9, value);
+		return text;
+	}
+	std::string updater_current_version(std::string latest, std::string current)
+	{
+		auto text {i18n::tr("updater.current_version", "{latest}  (current = {current})")};
+		text.replace(text.find("{latest}"), 8, latest);
+		text.replace(text.find("{current}"), 9, current);
+		return text;
+	}
+}
 
 
 class about_label : public widgets::Label
@@ -23,7 +47,9 @@ void GUI::fm_settings()
 
 	themed_form fm {nullptr, *this, {}, appear::decorate<appear::minimize, appear::sizable>{}};
 	fm.center(820, 656);
-	fm.caption(title + " - settings");
+	auto settings_caption {i18n::tr("settings.title", "{title} - settings")};
+	settings_caption.replace(settings_caption.find("{title}"), 7, title);
+	fm.caption(settings_caption);
 	fm.bgcolor(theme::fmbg);
 	fm.snap(conf.cbsnap);
 
@@ -72,13 +98,13 @@ void GUI::fm_settings()
 	};
 
 	widgets::conf_tree tree {fm, &fm.get_place(), page_callback};
-	tree.add("yt-dlp", "ytdlp");
-	tree.add("SponsorBlock", "sblock");
-	tree.add("Queuing", "queuing");
-	tree.add("Interface", "gui");
-	tree.add("Updater", "updater");
-	tree.add("Config presets", "presets");
-	tree.add("About", "about");
+	tree.add(i18n::tr("settings.category.ytdlp", "yt-dlp"), "ytdlp");
+	tree.add(i18n::tr("settings.category.sponsorblock", "SponsorBlock"), "sblock");
+	tree.add(i18n::tr("settings.category.queue", "Queuing"), "queuing");
+	tree.add(i18n::tr("settings.category.interface", "Interface"), "gui");
+	tree.add(i18n::tr("settings.category.updater", "Updater"), "updater");
+	tree.add(i18n::tr("settings.category.presets", "Config presets"), "presets");
+	tree.add(i18n::tr("settings.category.about", "About"), "about");
 
 	fm["tree"] << tree;
 	fm["ytdlp"] << ytdlp.actual_handle();
@@ -115,15 +141,15 @@ void GUI::fm_settings()
 	about_label l_about_ver {about, ""};
 	nana::panel<true> pnl_header {about.handle()};
 	widgets::Separator about_sep1 {about}, about_sep2 {about};
-	widgets::Title libtitle {about, nana::to_string(u8"\u2606  Libraries used  \u2606")}, 
-		kbtitle {about, nana::to_string(u8"\u2606  Keyboard shortcuts  \u2606")};
-	widgets::Label l_nana {about, "Nana C++ GUI library"}, l_jpeg {about, "libjpeg-turbo"}, l_bit7z {about, "bit7z"},
+	widgets::Title libtitle {about, to_wstring(i18n::tr("about.libraries", "*  Libraries used  *"))},
+		kbtitle {about, to_wstring(i18n::tr("about.shortcuts", "*  Keyboard shortcuts  *"))};
+	widgets::Label l_nana {about, i18n::tr("about.nana", "Nana C++ GUI library")}, l_jpeg {about, "libjpeg-turbo"}, l_bit7z {about, "bit7z"},
 		l_png {about, "libpng"}, l_json {about, "JSON for Modern C++"}, l_ctrls {about, "Ctrl+S"}, l_ctrlc {about, "Ctrl+C"}, l_ctrlf {about, "Ctrl+F"},
-		l_ctrltab {about, "Ctrl+Tab"}, l_f2 {about, "F2"}, l_del {about, "Delete"}, l_esc {about, "Esc"}, l_ctrlnum0 {about, "Ctrl+Num0"};
+		l_ctrltab {about, "Ctrl+Tab"}, l_f2 {about, "F2"}, l_del {about, i18n::tr("common.delete", "Delete")}, l_esc {about, "Esc"}, l_ctrlnum0 {about, "Ctrl+Num0"};
 	widgets::Text l_nana_ver {about, "v1.8 (custom)"}, l_jpeg_ver {about, "v3.1.2"}, l_bit7z_ver {about, "v3.1.3"},
-		l_png_ver {about, "v1.6.37"}, l_json_ver {about, "v3.12.0"}, l_settings {about, "Settings"}, l_formats {about, "Formats"},
-		l_view {about, "Switch view (queue/output)"}, l_fname {about, "Set file name of queue item"}, l_copy {about, "Copy selected URL(s)"}, 
-		l_delitem {about, "Delete queue item(s)"}, l_close {about, "Close window"}, l_winpos {about, "Reset window size and position"};
+		l_png_ver {about, "v1.6.37"}, l_json_ver {about, "v3.12.0"}, l_settings {about, i18n::tr("about.settings", "Settings")}, l_formats {about, i18n::tr("about.formats", "Formats")},
+		l_view {about, i18n::tr("about.switch_view", "Switch view (queue/output)")}, l_fname {about, i18n::tr("about.set_filename", "Set file name of queue item")}, l_copy {about, i18n::tr("about.copy_urls", "Copy selected URL(s)")},
+		l_delitem {about, i18n::tr("about.delete_items", "Delete queue item(s)")}, l_close {about, i18n::tr("about.close_window", "Close window")}, l_winpos {about, i18n::tr("about.reset_window", "Reset window size and position")};
 
 	//about["title"] << title;
 	about["pnl_header"] << pnl_header;
@@ -176,41 +202,42 @@ void GUI::fm_settings()
 		paint::image_process::selector().stretch("bilinear interpolation");
 	});
 
-	widgets::Label l_res {ytdlp, "Preferred resolution:"}, l_vcodec {ytdlp, "Preferred video codec:"}, l_acodec {ytdlp, "Preferred audio codec:"},
-		l_video {ytdlp, "Preferred video container:"}, l_audio {ytdlp, "Preferred audio container:"}, l_theme {gui, "Color theme:"}, l_contrast {gui, "Contrast:"}, 
-		l_template {ytdlp, "Output template:"}, l_maxdl {queuing, "Max concurrent downloads:"}, l_playlist {ytdlp, "Playlist indexing:"},
-		l_opendlg_origin {gui, "When browsing for the output folder, start in:"}, l_sblock {sblock, ""},
-		l_cookies {ytdlp, "Load cookies from browser:"}, l_cookie_options {ytdlp, "Additional options:"},
-		l_maxinfo {queuing, "Max number of concurrent yt-dlp instances used for getting data:"};
+	widgets::Label l_language {gui, i18n::tr("settings.language", "Language:")}, l_language_restart {gui, i18n::tr("settings.language_restart_required", "Restart to apply language.")};
+	widgets::Label l_res {ytdlp, i18n::tr("settings.preferred_resolution", "Preferred resolution:")}, l_vcodec {ytdlp, i18n::tr("settings.preferred_video_codec", "Preferred video codec:")}, l_acodec {ytdlp, i18n::tr("settings.preferred_audio_codec", "Preferred audio codec:")},
+		l_video {ytdlp, i18n::tr("settings.preferred_video_container", "Preferred video container:")}, l_audio {ytdlp, i18n::tr("settings.preferred_audio_container", "Preferred audio container:")}, l_theme {gui, i18n::tr("settings.color_theme", "Color theme:")}, l_contrast {gui, i18n::tr("settings.contrast", "Contrast:")},
+		l_template {ytdlp, i18n::tr("settings.output_template", "Output template:")}, l_maxdl {queuing, i18n::tr("settings.max_downloads", "Max concurrent downloads:")}, l_playlist {ytdlp, i18n::tr("settings.playlist_indexing", "Playlist indexing:")},
+		l_opendlg_origin {gui, i18n::tr("settings.folder_start", "When browsing for the output folder, start in:")}, l_sblock {sblock, ""},
+		l_cookies {ytdlp, i18n::tr("settings.load_cookies_browser", "Load cookies from browser:")}, l_cookie_options {ytdlp, i18n::tr("settings.additional_options", "Additional options:")},
+		l_maxinfo {queuing, i18n::tr("settings.max_info_instances", "Max number of concurrent yt-dlp instances used for getting data:")};
 
 	widgets::path_label l_cookies_path {ytdlp, &conf.cookies_path};
 	widgets::Textbox tb_template {ytdlp}, tb_playlist {ytdlp}, tb_proxy {ytdlp}, tb_cookies {ytdlp}, tb_aria {ytdlp};
-	widgets::Combox com_res {ytdlp}, com_video {ytdlp}, com_audio {ytdlp}, com_vcodec {ytdlp}, com_acodec {ytdlp}, com_cookies {ytdlp};
-	widgets::cbox cbfps {ytdlp, "Prefer a higher framerate"}, cbtheme_dark {gui, "Dark"}, cbtheme_light {gui, "Light"},
-		cbtheme_system {gui, "System preference"}, cb_lengthyproc {queuing, "Start next item on lengthy processing"},
-		cb_common {queuing, "Each queue item has its own download options"},
-		cb_autostart {queuing, "When stopping a queue item, automatically start the next one"},
-		cb_queue_autostart {queuing, "When the program starts, automatically start processing the queue"},
-		cb_zeropadding {ytdlp, "Pad the indexed filenames with zeroes"}, cb_playlist_folder {ytdlp, "Put playlists in their own folders"},
-		cb_origin_progdir {gui, "Program folder"}, cb_origin_curdir {gui, "Currently selected folder"},
-		cb_mark {sblock, "Mark these categories:"}, cb_remove {sblock, "Remove these categories:"}, cb_proxy {ytdlp, "Use this proxy:"},
-		cbsnap {gui, "Snap windows to screen edges"}, cbminw {gui, "No minimum width for the main window"},
-		cb_premium {ytdlp, "[YouTube] For 1080p, prefer the \"premium\" format with enhanced bitrate"},
-		cb_android {ytdlp, "[YouTube] Use the Android player client for video extraction"},
-		cb_save_errors {queuing, "Save queue items with \"error\" status to the settings file"},
-		cb_clear_done {queuing, "Automatically remove completed items (with \"done\" status)"},
-		cb_formats_fsize_bytes {gui, "Formats window: display file sizes with exact byte value"},
-		cb_add_on_focus {queuing, "When the main window is activated, automatically add the URL from clipboard"},
-		cb_display_custom_filenames {queuing, "Display any custom file names in the \"Media title\" column"},
-		cb_aria {ytdlp, "Tell yt-dlp to download with aria2c  (--downloader aria2c)"}, cb_cookies {ytdlp, "Load cookies from file:"};
-	widgets::Separator sep1 {ytdlp}, sep2 {ytdlp}, sep3 {gui}, sep_aria {ytdlp, "aria2c integration"};
-	widgets::Button btn_close {fm, " Close"}, btn_default {ytdlp, "Reset to default", true},
-		btn_playlist_default {ytdlp, "Reset to default", true}, btn_info {ytdlp};
+	widgets::Combox com_res {ytdlp}, com_video {ytdlp}, com_audio {ytdlp}, com_vcodec {ytdlp}, com_acodec {ytdlp}, com_cookies {ytdlp}, com_language {gui};
+	widgets::cbox cbfps {ytdlp, i18n::tr("settings.prefer_framerate", "Prefer a higher framerate")}, cbtheme_dark {gui, i18n::tr("settings.theme_dark", "Dark")}, cbtheme_light {gui, i18n::tr("settings.theme_light", "Light")},
+		cbtheme_system {gui, i18n::tr("settings.theme_system", "System preference")}, cb_lengthyproc {queuing, i18n::tr("settings.lengthy_processing", "Start next item on lengthy processing")},
+		cb_common {queuing, i18n::tr("settings.per_item_options", "Each queue item has its own download options")},
+		cb_autostart {queuing, i18n::tr("settings.autostart_next", "When stopping a queue item, automatically start the next one")},
+		cb_queue_autostart {queuing, i18n::tr("settings.autostart_queue", "When the program starts, automatically start processing the queue")},
+		cb_zeropadding {ytdlp, i18n::tr("settings.zero_padding", "Pad the indexed filenames with zeroes")}, cb_playlist_folder {ytdlp, i18n::tr("settings.playlist_folders", "Put playlists in their own folders")},
+		cb_origin_progdir {gui, i18n::tr("settings.program_folder", "Program folder")}, cb_origin_curdir {gui, i18n::tr("settings.current_folder", "Currently selected folder")},
+		cb_mark {sblock, i18n::tr("settings.sponsorblock_mark", "Mark these categories:")}, cb_remove {sblock, i18n::tr("settings.sponsorblock_remove", "Remove these categories:")}, cb_proxy {ytdlp, i18n::tr("settings.use_proxy", "Use this proxy:")},
+		cbsnap {gui, i18n::tr("settings.snap_windows", "Snap windows to screen edges")}, cbminw {gui, i18n::tr("settings.no_min_width", "No minimum width for the main window")},
+		cb_premium {ytdlp, i18n::tr("settings.premium_1080p", "[YouTube] For 1080p, prefer the \"premium\" format with enhanced bitrate")},
+		cb_android {ytdlp, i18n::tr("settings.android_client", "[YouTube] Use the Android player client for video extraction")},
+		cb_save_errors {queuing, i18n::tr("settings.save_errors", "Save queue items with \"error\" status to the settings file")},
+		cb_clear_done {queuing, i18n::tr("settings.clear_done", "Automatically remove completed items (with \"done\" status)")},
+		cb_formats_fsize_bytes {gui, i18n::tr("settings.exact_filesizes", "Formats window: display file sizes with exact byte value")},
+		cb_add_on_focus {queuing, i18n::tr("settings.add_clipboard_focus", "When the main window is activated, automatically add the URL from clipboard")},
+		cb_display_custom_filenames {queuing, i18n::tr("settings.show_custom_filenames", "Display any custom file names in the \"Media title\" column")},
+		cb_aria {ytdlp, i18n::tr("settings.aria_download", "Tell yt-dlp to download with aria2c  (--downloader aria2c)")}, cb_cookies {ytdlp, i18n::tr("settings.cookies_file", "Load cookies from file:")};
+	widgets::Separator sep1 {ytdlp}, sep2 {ytdlp}, sep3 {gui}, sep_aria {ytdlp, i18n::tr("settings.aria_section", "aria2c integration")};
+	widgets::Button btn_close {fm, " Close"}, btn_default {ytdlp, widgets::localized_reset_default(), true},
+		btn_playlist_default {ytdlp, widgets::localized_reset_default(), true}, btn_info {ytdlp};
 	widgets::Spinbox sb_maxdl {queuing}, sb_maxinfo {queuing};
 	widgets::Slider slider {gui};
 	widgets::sblock_listbox lbmark {sblock}, lbremove {sblock};
 	widgets::Infobox l_info {sblock};
-	widgets::Label l_aria_present {ytdlp, ""}, l_aria_options {ytdlp, "Options for aria2c (--downloader-args):"};
+	widgets::Label l_aria_present {ytdlp, ""}, l_aria_options {ytdlp, i18n::tr("settings.aria_options", "Options for aria2c (--downloader-args):")};
 	l_aria_present.text_align(nana::align::left, nana::align_v::center);
 	nana::picture pic_aria_present {ytdlp};
 	pic_aria_present.align(nana::align::center, nana::align_v::center);
@@ -304,8 +331,8 @@ void GUI::fm_settings()
 		}
 		else fb.init_path(appdir);
 		fb.allow_multi_select(false);
-		fb.add_filter("Cookies file", "*.txt;*.*");
-		fb.title("Locate and select a text file that contains cookies exported from a browser");
+		fb.add_filter(i18n::tr("settings.cookies_filter", "Cookies file"), "*.txt;*.*");
+		fb.title(i18n::tr("settings.cookies_choose", "Locate and select a text file that contains cookies exported from a browser"));
 		auto res {fb()};
 		if(res.size())
 		{
@@ -361,8 +388,8 @@ void GUI::fm_settings()
 			ytdlp.get_place().collocate();
 			pic_aria_present.load(img);
 			if(aria_in_ytdlp_dir)
-				l_aria_present.caption("aria2c.exe found in the yt-dlp folder");
-			else l_aria_present.caption("aria2c.exe found in the %path% system variable");
+				l_aria_present.caption(i18n::tr("settings.aria_found_ytdlp", "aria2c.exe found in the yt-dlp folder"));
+			else l_aria_present.caption(i18n::tr("settings.aria_found_path", "aria2c.exe found in the %path% system variable"));
 		}
 		else
 		{
@@ -381,7 +408,7 @@ void GUI::fm_settings()
 				img.open(arr_info32_png, sizeof arr_info32_png);
 			else img.open(arr_info22_ico, sizeof arr_info22_ico);
 			pic_aria_present.load(img);
-			l_aria_present.caption("aria2c.exe not found in the yt-dlp folder or the %path% system variable");
+			l_aria_present.caption(i18n::tr("settings.aria_not_found", "aria2c.exe not found in the yt-dlp folder or the %path% system variable"));
 			ytdlp.get_place().field_display("aria_spacer", true);
 			ytdlp.get_place().collocate();
 		}
@@ -419,7 +446,8 @@ void GUI::fm_settings()
 	tb_cookies.typeface(nana::paint::font_info {"Tahoma", 10});
 	tb_cookies.multi_lines(false);
 
-	std::string sblock_text {"<color=0x url=\"https://sponsor.ajay.app\">SponsorBlock</> lets users mark or remove segments in YouTube videos"};
+	std::string sblock_text {i18n::tr("settings.sponsorblock.description", "<color={link_color} url=\"https://sponsor.ajay.app\">SponsorBlock</> lets users mark or remove segments in YouTube videos")};
+	sblock_text.replace(sblock_text.find("{link_color}"), 12, "0x");
 	l_sblock.format(true);
 	l_sblock.tooltip("https://sponsor.ajay.app");
 	l_sblock.text_align(nana::align::center, nana::align_v::center);
@@ -435,8 +463,19 @@ void GUI::fm_settings()
 		lbremove.at(0).push_back(sblock_infos[key].first);
 		lbremove.at(0).back().value(key);
 	}
-	cb_mark.tooltip("yt-dlp will create chapters for the segments in these categories\n(this passes <bold>--sponsorblock-mark</> to yt-dlp)");
-	cb_remove.tooltip("yt-dlp will remove the segments in these categories\n(this passes <bold>--sponsorblock-remove</> to yt-dlp)");
+	cb_mark.tooltip(i18n::tr("settings.sponsorblock_mark_tooltip", "yt-dlp will create chapters for the segments in these categories\n(this passes <bold>--sponsorblock-mark</> to yt-dlp)"));
+	cb_remove.tooltip(i18n::tr("settings.sponsorblock_remove_tooltip", "yt-dlp will remove the segments in these categories\n(this passes <bold>--sponsorblock-remove</> to yt-dlp)"));
+	auto localized_sblock_description = [&](const std::string &key) -> std::string
+	{
+		if(key == "sponsor") return i18n::tr("settings.sponsorblock.category.sponsor.description", "Segments promoting a product or service not directly related to the creator.");
+		if(key == "intro") return i18n::tr("settings.sponsorblock.category.intro.description", "Segments typically found at the start of a video that include an animation, still frame or clip which are also seen in other videos by the same creator. This can include livestream pauses with no content\n(looping animations or chat windows) and Copyright / Fair Use disclaimers.");
+		if(key == "selfpromo") return i18n::tr("settings.sponsorblock.category.selfpromo.description", "Segments promoting a product or service that is directly related to the creator themselves.\nThis usually includes merchandise or promotion of monetized platforms.");
+		if(key == "preview") return i18n::tr("settings.sponsorblock.category.preview.description", "Collection of clips that show what is coming up in this video or other videos in a series.");
+		if(key == "filler") return i18n::tr("settings.sponsorblock.category.filler.description", "Tangential scenes added only for filler or humor, that are not required to understand the main content of the video. This can also include: Timelapses / B-Roll, Fake Sponsors and slow-motion clips that do not provide any context or are used as replays or B-roll.");
+		if(key == "interaction") return i18n::tr("settings.sponsorblock.category.interaction.description", "Explicit reminders to like, subscribe or interact with them on any paid or free platform(s)\n(e.g. click on a video).");
+		if(key == "chapter") return i18n::tr("settings.sponsorblock.category.chapter.description", "Chapters designated by SponsorBlock (presumably in a video that doesn't have chapters otherwise).");
+		return sblock_infos[key].second;
+	};
 
 	size_t hovitem_mark {nana::npos};
 	lbmark.events().mouse_move([&](const nana::arg_mouse &arg)
@@ -445,7 +484,7 @@ void GUI::fm_settings()
 		if(hovered.item != -1 && hovered.item != hovitem_mark)
 		{
 			hovitem_mark = hovered.item;
-			l_info.caption(sblock_infos[lbmark.at(hovered).value<std::string>()].second);
+			l_info.caption(localized_sblock_description(lbmark.at(hovered).value<std::string>()));
 		}
 	});
 	lbmark.events().mouse_leave([&](const nana::arg_mouse &arg)
@@ -459,7 +498,7 @@ void GUI::fm_settings()
 		if(hovered.item != -1 && hovered.item != hovitem_mark)
 		{
 			hovitem_mark = hovered.item;
-			l_info.caption(sblock_infos[lbremove.at(hovered).value<std::string>()].second);
+			l_info.caption(localized_sblock_description(lbremove.at(hovered).value<std::string>()));
 		}
 	});
 	lbremove.events().mouse_leave([&](const nana::arg_mouse &arg)
@@ -535,13 +574,14 @@ void GUI::fm_settings()
 		<weight=20> <sep3 weight=3> <weight=20>
 		<weight=25 <cbsnap> <>> <weight=20> <weight=25 <cbminw weight=75%> <>> <weight=20>
 		<weight=25 <cb_formats_fsize_bytes>> <weight=20>
+		<weight=25 <l_language weight=100> <weight=20> <com_language weight=120> <weight=20> <l_language_restart>> <weight=20>
 		<weight=25 <l_opendlg_origin weight=345> <cb_origin_curdir>> <weight=10>
 		<weight=25 <opendlg_spacer weight=345> <cb_origin_progdir>> <weight=20>
 	)");
 
-	widgets::cbox cb_custom_dark_theme {gui, "Use custom dark color theme"},
-		cb_custom_light_theme {gui, "Use custom light color theme"};
-	widgets::Button btn_edit_theme {gui, "Edit custom theme", true};
+	widgets::cbox cb_custom_dark_theme {gui, i18n::tr("settings.custom_dark_theme", "Use custom dark color theme")},
+		cb_custom_light_theme {gui, i18n::tr("settings.custom_light_theme", "Use custom light color theme")};
+	widgets::Button btn_edit_theme {gui, i18n::tr("settings.edit_custom_theme", "Edit custom theme"), true};
 	btn_edit_theme.events().click([&] { fm_colors(fm); });
 
 	gui["cb_custom_dark_theme"] << cb_custom_dark_theme;
@@ -561,6 +601,9 @@ void GUI::fm_settings()
 	gui["cb_origin_progdir"] << cb_origin_progdir;
 	gui["cb_origin_curdir"] << cb_origin_curdir;
 	gui["cb_formats_fsize_bytes"] << cb_formats_fsize_bytes;
+	gui["l_language"] << l_language;
+	gui["com_language"] << com_language;
+	gui["l_language_restart"] << l_language_restart;
 
 	presets.div(R"(vert
 		<l_pinfo weight=90> <weight=18> <sep weight=3> <weight=20>
@@ -569,15 +612,13 @@ void GUI::fm_settings()
 		<weight=35 <><btn_save weight=100> <weight=20> <btn_load weight=100> <weight=20> <btn_delete weight=110> <weight=20> <btn_rename weight=110> <>>
 	)");
 
-	widgets::Label l_pinfo {presets, "<bold>Configuration presets</> are snapshots of the settings found in the first three categories "
-		"(yt-dlp, SponsorBlock, Queuing), as well as the ones in the \"Download options\" group in the main window. The \"Save\" button saves the current "
-		"settings to the selected preset, and the \"Load\" button loads the selected preset into the current settings."}, 
-		l_add {presets, "Name for new preset:"};
+	widgets::Label l_pinfo {presets, i18n::tr("preset.info", "<bold>Configuration presets</> are snapshots of the settings found in the first three categories (yt-dlp, SponsorBlock, Queuing), as well as the ones in the \"Download options\" group in the main window. The \"Save\" button saves the current settings to the selected preset, and the \"Load\" button loads the selected preset into the current settings.")},
+		l_add {presets, i18n::tr("preset.new_name", "Name for new preset:")};
 	widgets::Separator sep_presets {presets};
 	widgets::Listbox lb_presets {presets};
 	widgets::Textbox tb_add {presets};
-	widgets::Button btn_add {presets, "Create", true}, btn_save {presets, "Save"}, btn_load {presets, "Load"}, btn_delete {presets, "Delete"}, 
-		btn_rename {presets, "Rename"};
+	widgets::Button btn_add {presets, i18n::tr("preset.create", "Create"), true}, btn_save {presets, "Save"}, btn_load {presets, "Load"}, btn_delete {presets, "Delete"},
+		btn_rename {presets, i18n::tr("common.rename", "Rename")};
 
 	l_pinfo.text_align(nana::align::left, nana::align_v::top);
 	l_pinfo.format(true);
@@ -616,7 +657,13 @@ void GUI::fm_settings()
 	btn_save.enable(false);
 	btn_load.enable(false);
 	btn_delete.enable(false);
-	btn_add.tooltip("Create a new preset and save the current settings to it.");
+	btn_add.tooltip(i18n::tr("preset.create_tooltip", "Create a new preset and save the current settings to it."));
+	auto duplicate_name_body = [&](const std::string &name) { auto message {i18n::tr("preset.duplicate_name_body", "A preset with the name \"{name}\" already exists.")}; message.replace(message.find("{name}"), 6, name); return message; };
+	auto duplicate_preset_body = [&](const std::string &name) { auto message {i18n::tr("preset.duplicate_body", "The preset \"{name}\" already contains the current settings.")}; message.replace(message.find("{name}"), 6, name); return message; };
+	const auto duplicate_name_title {i18n::tr("preset.duplicate_name", "Duplicate name")};
+	const auto blank_name_title {i18n::tr("preset.blank_name", "Blank name")};
+	const auto duplicate_preset_title {i18n::tr("preset.duplicate_preset", "Duplicate preset")};
+	const auto rename_prompt {i18n::tr("preset.rename_prompt", "New name for preset:")};
 
 	presets["l_pinfo"] << l_pinfo;
 	presets["lb_presets"] << lb_presets;
@@ -653,18 +700,18 @@ void GUI::fm_settings()
 		for(const auto &el : conf_presets)
 			if(el.first == newname)
 			{
-				(widgets::msgbox {fm, "Duplicate name"}.icon(MB_ICONERROR) << "A preset with the name \"" << newname << "\" already exists.")();
+				(widgets::msgbox {fm, duplicate_name_title}.icon(MB_ICONERROR) << duplicate_name_body(newname))();
 				return;
 			}
 		if(newname.empty())
 		{
-			if((widgets::msgbox {fm, "Blank name", MB_YESNO} << "Are you sure you want to create a preset with a blank name?")() == IDNO)
+			if((widgets::msgbox {fm, blank_name_title, MB_YESNO} << i18n::tr("preset.blank_name_body", "Are you sure you want to create a preset with a blank name?"))() == IDNO)
 				return;
 		}
 		for(const auto &el : conf_presets)
 			if(conf.equals_preset(el.second))
 			{
-				(widgets::msgbox {fm, "Duplicate preset"}.icon(MB_ICONERROR) << "The preset \"" << el.first << "\" already contains the current settings.")();
+				(widgets::msgbox {fm, duplicate_preset_title}.icon(MB_ICONERROR) << duplicate_preset_body(el.first))();
 				return;
 			}
 		conf_presets[newname] = conf;
@@ -682,7 +729,7 @@ void GUI::fm_settings()
 			for(const auto &el : conf_presets)
 				if(conf.equals_preset(el.second))
 				{
-					(widgets::msgbox {fm, "Duplicate preset"}.icon(MB_ICONERROR) << "The preset \"" << el.first << "\" already contains the current settings.")();
+					(widgets::msgbox {fm, duplicate_preset_title}.icon(MB_ICONERROR) << duplicate_preset_body(el.first))();
 					return;
 				}
 			conf_presets[name].from_preset(conf);
@@ -726,18 +773,18 @@ void GUI::fm_settings()
 		if(!sel.empty())
 		{
 			auto item {lb_presets.at(sel.front())};
-			const auto res {input_box(fm, "Rename preset", "New name for preset:")};
+			const auto res {input_box(fm, i18n::tr("preset.rename_title", "Rename preset"), rename_prompt)};
 			if(res.first)
 			{
 				const auto new_name {res.second}, old_name {item.text(0)};
 				for(const auto &el : conf_presets)
 					if(el.first == new_name)
 					{
-						(widgets::msgbox {fm, "Duplicate name"}.icon(MB_ICONERROR) << "A preset with the name \"" << new_name << "\" already exists.")();
+						(widgets::msgbox {fm, duplicate_name_title}.icon(MB_ICONERROR) << duplicate_name_body(new_name))();
 						return;
 					}
 				if(new_name.empty())
-					if((widgets::msgbox {fm, "Blank name", MB_YESNO} << "Are you sure you want to make the preset name blank?")() == IDNO)
+					if((widgets::msgbox {fm, blank_name_title, MB_YESNO} << i18n::tr("preset.blank_rename_body", "Are you sure you want to make the preset name blank?"))() == IDNO)
 						return;
 				item.text(0, new_name);
 				auto node {conf_presets.extract(old_name)};
@@ -862,6 +909,13 @@ void GUI::fm_settings()
 		conf.cbsnap = cbsnap.checked();
 		fm.snap(conf.cbsnap);
 		snap(conf.cbsnap);
+	});
+	com_language.push_back(i18n::tr("settings.language_english", "English"));
+	com_language.push_back(i18n::tr("settings.language_korean", "Korean"));
+	com_language.option(conf.language == "ko-KR" ? 1 : 0);
+	com_language.events().selected([&](const nana::arg_combox &arg)
+	{
+		conf.language = arg.widget->option() == 1 ? "ko-KR" : "en-US";
 	});
 
 	l_opendlg_origin.text_align(nana::align::left, nana::align_v::center);
@@ -1059,48 +1113,23 @@ void GUI::fm_settings()
 		lb_presets.auto_draw(true);
 	};
 
-	cb_save_errors.tooltip("When the settings are saved, any incomplete queue items are also saved,\nexcept for those with the "
-		"\"error\" status. This option lets you also save the\nitems with the \"error\" status, which can be useful when a "
-		"download fails\ndue to connection issues, but can be resumed later.");
+	cb_save_errors.tooltip(i18n::tr("settings.tooltip.save_error_items", "When the settings are saved, any incomplete queue items are also saved, except for those with the \"error\" status. This option also saves items with the \"error\" status, which can be useful when a download fails due to connection issues but can be resumed later."));
 
-	cb_premium.tooltip("This option lets you override your video codec preference, in the case when a video\n"
-		"has format 616 available (which has the \"premium\" bitrate). For example, if you're\ndownloading a 1080p video and "
-		"you prefer the H264 codec, this option will override\nthat codec preference by requesting format 616 from yt-dlp "
-		"(with the argument\n\"-f 616+ba\").");
+	cb_premium.tooltip(i18n::tr("settings.tooltip.premium_1080p", "Override the preferred video codec when format 616 with the premium bitrate is available. This requests \"-f 616+ba\" from yt-dlp."));
 
-	cb_android.tooltip("Forces yt-dlp to use the Android client for extracting the video by passing\n"
-		"\"<bold>--extractor-args youtube:player_client=android</>\". This can be useful\nbecause some formats are only available "
-		"to the Android client."
-		"\n\nHowever, be aware of the warning from yt-dlp:\n\"<bold>Android client formats are broken and may yield HTTP Error 403</>\"");
+	cb_android.tooltip(i18n::tr("settings.tooltip.android_client", "Force yt-dlp to use the Android client with <bold>--extractor-args youtube:player_client=android</>.\n\nWarning from yt-dlp: <bold>Android client formats are broken and may yield HTTP Error 403</>"));
 
-	cbfps.tooltip("If several different formats have the same resolution,\ndownload the one with the highest framerate.");
+	cbfps.tooltip(i18n::tr("settings.tooltip.prefer_higher_framerate", "If several formats have the same resolution, download the one with the highest framerate."));
 
-	cb_lengthyproc.tooltip("When yt-dlp finishes downloading all the files associated with a queue item,\n"
-		"it performs actions on the files referred to as \"post-processing\". These actions\ncan be a number of things, depending "
-		"on the context, and on the options used.\n\nSometimes this post-processing phase can take a long time, so this setting\n"
-		"makes the program automatically start the next queue item when processing\ntakes longer that 3 seconds.");
+	cb_lengthyproc.tooltip(i18n::tr("settings.tooltip.start_next_processing", "When post-processing takes longer than 3 seconds, automatically start the next queue item."));
 
-	cb_zeropadding.tooltip("This option pads the index numbers in the filenames of playlist videos\nwith zeroes, when the playlist "
-		"contains more than 9 videos. This allows\nthe filenames to be sorted properly when viewed in a file manager (for\nexample, "
-		"<bold>\"2 - name\"</> comes after <bold>\"14 - name\"</> in the sort order, but\n<bold>\"02 - name\"</> comes before <bold>\"14 - name\"</>).\n\n"
-		"This feature works by automatically editing the \"Playlist indexing\" string\ndefined above, as long as it contains "
-		"<bold>\"%(playlist_index)d\"</>.\n\nAn appropriate amount of zeroes is added, according to the size of the\nplaylist "
-		"(if it has tens of videos, up to one zero; if it has hundreds of\nvideos, up to two zeroes; etc).");
+	cb_zeropadding.tooltip(i18n::tr("settings.tooltip.pad_indexed_filenames", "Pad playlist index numbers in file names with zeroes so they sort correctly. This edits <bold>%(playlist_index)d</> in the playlist indexing template."));
 
-	cb_playlist_folder.tooltip("Put playlist videos in a subfolder of the output folder, using the\nplaylist title as the name of "
-		"the subfolder.\n\nThis works by automatically prepending <bold>\"%(playlist_title)s\\\"</> to the\noutput template defined above, "
-		"whenever a playlist is downloaded\n\nSince v1.9, this setting also applies to channels and channel tabs.\n\n"
-		"Since v2.1, this setting also applies to Bandcamp albums (prepends\n<bold>\"%(artist)s\\%(album)s\\\"</> to the output template).");
+	cb_playlist_folder.tooltip(i18n::tr("settings.tooltip.playlists_in_folders", "Put playlist videos in a subfolder named after the playlist by prepending <bold>%(playlist_title)s\\</> to the output template."));
 
-	cb_add_on_focus.tooltip("If this option is checked, whenever the main window receives the input focus,\nany URL in the clipboard will "
-		"be automatically added to the queue (if it's not\nalready there). This only works for a single URL (if you have a multi-line list "
-		"of\nURLs, you'll have to add it manually)."
-	);
+	cb_add_on_focus.tooltip(i18n::tr("settings.tooltip.add_clipboard_on_focus", "When the main window receives input focus, automatically add a single URL from the clipboard if it is not already in the queue."));
 
-	cb_display_custom_filenames.tooltip("You can provide a custom file name for a queue item by selecting\n<bold>Set file name for item #</> "
-		"from the queue menu, or by pressing <bold>F2</>.\nThis name is \"custom\" because it overrides the output template\ndefined in the settings.\n\n"
-		"If you check this option, then if a queue item has a custom file name,\nit will be shown in the \"Media title\" column instead of the media title."
-	);
+	cb_display_custom_filenames.tooltip(i18n::tr("settings.tooltip.show_custom_filename", "Show a queue item's custom file name in the \"Media title\" column instead of its media title."));
 
 	const auto res_tip {"Download the best video with the largest resolution available that is\n"
 		"not higher than the selected value. Resolution is determined using the\n"
@@ -1160,17 +1189,17 @@ void GUI::fm_settings()
 			"Use the drop-down list to select which browser to get cookies from,\nand type any additional options in the textbox.\n\n"
 			"WARNING: Due to recent changes to how Chrome handles cookies,\nthis will probably not work with Chrome."};
 
-	l_cookie_options.tooltip(cookie_options_tip);
+	l_cookie_options.tooltip(i18n::tr("settings.tooltip.cookie_options", "Additional options for <bold>--cookies-from-browser</>, in the format <bold>[:PROFILE][::CONTAINER]</>. The text is passed to yt-dlp without validation."));
 	tb_cookies.tooltip(cookie_options_tip);
-	l_cookies.tooltip(cookies_tip);
+	l_cookies.tooltip(i18n::tr("settings.tooltip.cookies_browser", "Use <bold>--cookies-from-browser</> for downloads and URL inspection. Select a browser and enter optional arguments. Chrome cookie changes may prevent this from working."));
 	com_cookies.tooltip(cookies_tip);
 
-	l_ffmpeg.tooltip(ffmpeg_tip);
+	l_ffmpeg.tooltip(i18n::tr("settings.tooltip.ffmpeg_folder", "Choose where updated FFmpeg files are stored. If this is not the yt-dlp folder, the program can configure yt-dlp to find FFmpeg there.\n<bold>.\\ </>means the program folder."));
 	l_ffmpeg_path.tooltip(ffmpeg_tip);
-	l_ytdlp.tooltip(ytdlp_tip);
+	l_ytdlp.tooltip(i18n::tr("settings.tooltip.ytdlp_path", "<bold>.\\ </>means the program folder where ytdlp-interface.exe is located."));
 	l_ytdlp_path.tooltip(ytdlp_tip);
 
-	cb_proxy.tooltip(proxy_tip);
+	cb_proxy.tooltip(i18n::tr("settings.tooltip.proxy", "Tell yt-dlp to use a proxy server with <bold>--proxy</>.\n\nHTTP: <bold>IP_ADDRESS:PORT</>\nSOCKS: <bold>socks5://IP_ADDRESS:PORT</>\nAuthenticated SOCKS: <bold>socks5://USER:PASS@IP_ADDRESS:PORT</>"));
 	tb_proxy.tooltip(proxy_tip);
 
 	auto premium_handler = [&]
@@ -1210,21 +1239,21 @@ void GUI::fm_settings()
 		com_cookies.push_back(" " + nana::to_utf8(opt));
 
 	com_res.events().selected(premium_handler);
-	com_res.tooltip(res_tip);
+	com_res.tooltip(i18n::tr("settings.tooltip.resolution", "Download the best video whose resolution is not higher than the selected value. The smallest dimension is used for vertical videos."));
 	l_res.tooltip(res_tip);
-	l_maxdl.tooltip(maxdl_tip);
+	l_maxdl.tooltip(i18n::tr("settings.tooltip.max_concurrent_downloads", "When one queue item finishes, automatically start the selected number of next items. Manually started items are not limited."));
 	sb_maxdl.tooltip(maxdl_tip);
-	l_maxinfo.tooltip(maxinfo_tip);
+	l_maxinfo.tooltip(i18n::tr("settings.tooltip.max_data_instances", "Maximum concurrent yt-dlp processes used to inspect queued URLs. Higher values use more CPU and may send requests too quickly."));
 	sb_maxinfo.tooltip(maxinfo_tip);
-	l_template.tooltip(template_tip);
+	l_template.tooltip(i18n::tr("settings.tooltip.output_template", "The output template tells yt-dlp how to name downloaded files. Documentation: <bold>https://github.com/yt-dlp/yt-dlp#output-template</>"));
 	tb_template.tooltip(template_tip);
-	l_playlist.tooltip(playlist_tip);
+	l_playlist.tooltip(i18n::tr("settings.tooltip.playlist_indexing", "Optional text prepended to the output template for YouTube playlists. Leave blank if playlist videos should not be numbered."));
 	tb_playlist.tooltip(playlist_tip);
-	l_video.tooltip(container_tip);
+	l_video.tooltip(i18n::tr("settings.tooltip.container", "A media container can hold video and audio streams. Select compatible video and audio containers so yt-dlp can merge them into the preferred file type."));
 	l_audio.tooltip(container_tip);
 	com_video.tooltip(container_tip);
 	com_audio.tooltip(container_tip);
-	l_vcodec.tooltip(codec_tip);
+	l_vcodec.tooltip(i18n::tr("settings.tooltip.codec", "A codec compresses video or audio data. Selecting a preferred codec prevents unwanted formats from being downloaded when a site offers multiple codecs."));
 	com_vcodec.tooltip(codec_tip);
 	l_acodec.tooltip(codec_tip);
 	com_acodec.tooltip(codec_tip);
@@ -1316,7 +1345,7 @@ void GUI::fm_settings()
 		if(!fn_write_conf() && errno)
 		{
 			std::string error {std::strerror(errno)};
-			widgets::msgbox mbox {fm, "ytdlp-interface - error writing settings file"};
+			widgets::msgbox mbox {fm, i18n::tr("error.settings_write_title", "ytdlp-interface - error writing settings file")};
 			mbox.icon(MB_ICONERROR);
 			(mbox << confpath.string() << "\n\nAn error occured when trying to save the settings file:\n\n" << error)();
 		}
@@ -1354,7 +1383,9 @@ void GUI::fm_settings_info(nana::window owner)
 	using ::widgets::theme;
 
 	themed_form fm {nullptr, owner, {}, appear::decorate{}};
-	fm.caption(title + " - format sorting info");
+	auto form_caption {i18n::tr("settings.format_sorting.title", "{title} - format sorting info")};
+	form_caption.replace(form_caption.find("{title}"), 7, title);
+	fm.caption(form_caption);
 	fm.bgcolor(theme::fmbg);
 	fm.snap(conf.cbsnap);
 	fm.center(621 + 40 * (nana::API::screen_dpi(true) >= 144), 680);
@@ -1375,18 +1406,7 @@ void GUI::fm_settings_info(nana::window owner)
 	p.text_align(align::left, align_v::top);
 	p.format(true);
 
-	std::string ptext {R"(By default (when you don't explicitly request a specific format), yt-dlp downloads the best audio/video
-formats, which it judges according to certain parameters. For example, the main criteria that determine the "best" YouTube video format are quality, resolution, and framerate (prioritized in that order).
-
-The four settings pictured above allow you to change what yt-dlp considers "the best" in each of those categories, at the same time reordering how the categories are prioritised. For example, if you
-select "1080" for the preferred resolution, then yt-dlp will consider 1080p to be the best resolution, instead of the highest available. With the preferences configured like in the above picture, yt-dlp will first identify all the video formats with 1080p resolution, then out of those, all with .mp4 extension, and out of those, all with the highest framerate, and so on until one format is chosen.
-
-Of course, this is all optional – you can select "none" for each of these settings to let yt-dlp use its default priorities. Also, the program only uses these settings when you don't request a specific format
-(like <bold color=0x>-f 303+251</>, or <bold color=0x>-f ba</>).
-
-The program lets you manually select formats from a list, but it should be clear that you don't have to
-do that. That feature can be useful in certain cases, but yt-dlp does a good job of automatically selecting the best formats for whatever you're downloading. The four preferences discussed here
-(which the program communicates to yt-dlp with the <bold color=0x>-S</> argument) should be enough to ensure that in most cases, you can just click the download button without worrying about formats.)"};
+	std::string ptext {i18n::tr("settings.format_sorting.body", "By default (when you don't explicitly request a specific format), yt-dlp downloads the best audio/video\nformats, which it judges according to certain parameters. For example, the main criteria that determine the \"best\" YouTube video format are quality, resolution, and framerate (prioritized in that order).\n\nThe four settings pictured above allow you to change what yt-dlp considers \"the best\" in each of those categories, at the same time reordering how the categories are prioritised. For example, if you\nselect \"1080\" for the preferred resolution, then yt-dlp will consider 1080p to be the best resolution, instead of the highest available. With the preferences configured like in the above picture, yt-dlp will first identify all the video formats with 1080p resolution, then out of those, all with .mp4 extension, and out of those, all with the highest framerate, and so on until one format is chosen.\n\nOf course, this is all optional - you can select \"none\" for each of these settings to let yt-dlp use its default priorities. Also, the program only uses these settings when you don't request a specific format\n(like <bold color={accent}>-f 303+251</>, or <bold color={accent}>-f ba</>).\n\nThe program lets you manually select formats from a list, but it should be clear that you don't have to\ndo that. That feature can be useful in certain cases, but yt-dlp does a good job of automatically selecting the best formats for whatever you're downloading. The four preferences discussed here\n(which the program communicates to yt-dlp with the <bold color={accent}>-S</> argument) should be enough to ensure that in most cases, you can just click the download button without worrying about formats.")};
 
 	fm["pic"] << pic;
 	fm["p"] << p;
@@ -1402,7 +1422,7 @@ do that. That feature can be useful in certain cases, but yt-dlp does a good job
 		apply_theme(dark);
 		fm.bgcolor(theme::fmbg);
 		pic.load(dark ? imgdark : imglight);
-		p.caption(std::regex_replace(ptext, std::regex {"\\b(0x)"}, theme::is_dark() ? "0xd0c0b0" : "0x708099"));
+		p.caption(std::regex_replace(std::regex_replace(ptext, std::regex {"\\{accent\\}"}, theme::is_dark() ? "0xd0c0b0" : "0x708099"), std::regex {"\\b(0x)"}, theme::is_dark() ? "0xd0c0b0" : "0x708099"));
 		return false;
 	});
 
@@ -1449,35 +1469,36 @@ void GUI::make_updater_page(themed_form &parent)
 	if(win7 || !X64)
 		updater.get_place().field_display("deno_section", false);
 
-	l_ytdlp.create(updater, "Path to yt-dlp:");
-	l_ffmpeg.create(updater, "FFmpeg folder:");
+	l_ytdlp.create(updater, i18n::tr("settings.updater.path_ytdlp", "Path to yt-dlp:"));
+	l_ffmpeg.create(updater, i18n::tr("settings.updater.ffmpeg_folder", "FFmpeg folder:"));
 	l_ytdlp_path.create(updater, &conf.ytdlp_path);
 	l_ffmpeg_path.create(updater, &conf.ffmpeg_path);
-	l_ver.create(updater, "Latest version:");
-	l_ver_ytdlp.create(updater, "Latest yt-dlp version:");
-	l_ver_ffmpeg.create(updater, "Latest FFmpeg version:");
-	l_ver_deno.create(updater, "Latest Deno version:");
-	l_channel.create(updater, "yt-dlp release channel:");
-	l_vertext.create(updater, "checking...");
+	l_ver.create(updater, i18n::tr("settings.updater.latest_version", "Latest version:"));
+	l_ver_ytdlp.create(updater, i18n::tr("settings.updater.latest_ytdlp_version", "Latest yt-dlp version:"));
+	l_ver_ffmpeg.create(updater, i18n::tr("settings.updater.latest_ffmpeg_version", "Latest FFmpeg version:"));
+	l_ver_deno.create(updater, i18n::tr("settings.updater.latest_deno_version", "Latest Deno version:"));
+	l_channel.create(updater, i18n::tr("settings.updater.release_channel", "yt-dlp release channel:"));
+	l_vertext.create(updater, i18n::tr("updater.checking", "checking..."));
 	l_ytdlp_text.create(updater, "checking...");
 	l_ffmpeg_text.create(updater, "checking...");
 	l_deno_text.create(updater, "checking...");
-	btn_changes.create(updater, "Release notes");
-	btn_update.create(updater, "Update");
-	btn_update_ytdlp.create(updater, "Update yt-dlp");
-	btn_update_ffmpeg.create(updater, "Update FFmpeg");
-	btn_update_deno.create(updater, "Update Deno");
-	cb_startup.create(updater, "Check at program startup and display any new version in the title bar");
-	cb_selfonly.create(updater, "Only extract ytdlp-interface.exe from the downloaded archive");
-	cb_chan_stable.create(updater, "Stable");
-	cb_chan_nightly.create(updater, "Nightly");
-	cb_ffplay.create(updater, "When updating ffmpeg, also extract \"ffplay.exe\"");
+	btn_changes.create(updater, i18n::tr("settings.updater.release_notes", "Release notes"));
+	btn_update.create(updater, i18n::tr("common.unavailable", "Unavailable"));
+	btn_update.tooltip(i18n::tr("updater.self_update_disabled", "Unavailable") + "\n" + i18n::tr("updater.self_update_disabled_reason", "Self-update is disabled in the Korean localized edition. Use the verified portable installer to update the app."));
+	btn_update_ytdlp.create(updater, i18n::tr("settings.updater.update_ytdlp", "Update yt-dlp"));
+	btn_update_ffmpeg.create(updater, i18n::tr("settings.updater.update_ffmpeg", "Update FFmpeg"));
+	btn_update_deno.create(updater, i18n::tr("settings.updater.update_deno", "Update Deno"));
+	cb_startup.create(updater, i18n::tr("settings.updater.check_at_startup", "Check at program startup and display any new version in the title bar"));
+	cb_selfonly.create(updater, i18n::tr("settings.updater.extract_self_only", "Only extract ytdlp-interface.exe from the downloaded archive"));
+	cb_chan_stable.create(updater, i18n::tr("settings.updater.stable", "Stable"));
+	cb_chan_nightly.create(updater, i18n::tr("settings.updater.nightly", "Nightly"));
+	cb_ffplay.create(updater, i18n::tr("settings.updater.extract_ffplay", "When updating ffmpeg, also extract \"ffplay.exe\""));
 	prog_updater.create(updater);
 	prog_updater_misc.create(updater);
 	prog_updater_deno.create(updater);
 	sep1.create(updater, "ytdlp-interface");
-	sep2.create(updater, "ffmpeg & yt-dlp");
-	sep3.create(updater, "JavaScript runtime");
+	sep2.create(updater, i18n::tr("settings.updater.section.dependencies", "ffmpeg & yt-dlp"));
+	sep3.create(updater, i18n::tr("settings.updater.section.runtime", "JavaScript runtime"));
 
 	updater["sep1"] << sep1;
 	updater["cb_startup"] << cb_startup;
@@ -1515,15 +1536,13 @@ void GUI::make_updater_page(themed_form &parent)
 	cb_chan_stable.radio(true);
 	cb_chan_nightly.radio(true);
 
-	cb_chan_stable.tooltip("\"Stable\" releases are well tested and have no major bugs,\n"
-		"but there's a relatively long time until one comes out.");
-	cb_chan_nightly.tooltip("\"Nightly\" releases come out every day around midnight\nUTC and contain the latest patches and changes. "
-		"This is\nthe recommended channel for regular users of yt-dlp.");
+	cb_chan_stable.tooltip(i18n::tr("settings.updater.tooltip.stable", "\"Stable\" releases are well tested and have no major bugs, but there is a relatively long time between releases."));
+	cb_chan_nightly.tooltip(i18n::tr("settings.updater.tooltip.nightly", "\"Nightly\" releases come out every day around midnight UTC and contain the latest patches and changes."));
 	std::string selfonly_tip {"To update the program, an archive is downloaded from GitHub,\nwhich contains the following files:\n\n<bold>7z.dll\n"};
 	selfonly_tip += win7 || !X64 ? "libwinpthread-1.dll\nqjs.exe\n" : "deno.exe\n";
 	selfonly_tip += "ffmpeg.exe\nffprobe.exe\nyt-dlp.exe\nytdlp-interface.exe</>\n\nCheck this option if you don't want your current "
 		"versions of\nyt-dlp and ffmpeg to be overwritten with those in the archive.";
-	cb_selfonly.tooltip(selfonly_tip);
+	cb_selfonly.tooltip(i18n::tr("settings.updater.tooltip.self_only", "The update archive contains:\n\n<bold>7z.dll\n{platform_runtime}ffmpeg.exe\nffprobe.exe\nyt-dlp.exe\nytdlp-interface.exe</>\n\nSelect this option to keep the currently installed yt-dlp and ffmpeg versions."));
 
 	if(!rgp_chan.size())
 	{
@@ -1558,8 +1577,11 @@ void GUI::make_updater_page(themed_form &parent)
 		}
 		else fb.init_path(appdir);
 		fb.allow_multi_select(false);
-		fb.add_filter("yt-dlp executable", ytdlp_fname + (win7 ? "" : ";ytdl-patched-red.exe"));
-		fb.title("Locate and select " + ytdlp_fname + (win7 ? "" : " or ytdl-patched-red.exe"));
+		fb.add_filter(i18n::tr("settings.updater.ytdlp_filter", "yt-dlp executable"), ytdlp_fname + (win7 ? "" : ";ytdl-patched-red.exe"));
+		auto ytdlp_select_title {win7 ? i18n::tr("settings.updater.select_ytdlp", "Locate and select {executables}") : i18n::tr("settings.updater.select_ytdlp_alternative", "Locate and select {primary} or {alternative}")};
+		if(win7) ytdlp_select_title.replace(ytdlp_select_title.find("{executables}"), 13, ytdlp_fname);
+		else { ytdlp_select_title.replace(ytdlp_select_title.find("{primary}"), 9, ytdlp_fname); ytdlp_select_title.replace(ytdlp_select_title.find("{alternative}"), 13, "ytdl-patched-red.exe"); }
+		fb.title(ytdlp_select_title);
 		auto res {fb()};
 		if(res.size())
 		{
@@ -1580,20 +1602,20 @@ void GUI::make_updater_page(themed_form &parent)
 	{
 		nana::folderbox fb {updater, conf.ffmpeg_path.empty() ? (conf.ytdlp_path.empty() ? appdir : conf.ytdlp_path.parent_path()) : conf.ffmpeg_path};
 		fb.allow_multi_select(false);
-		fb.title("Locate and select the FFmpeg folder");
+		fb.title(i18n::tr("settings.updater.select_ffmpeg_folder", "Locate and select the FFmpeg folder"));
 		auto res {fb()};
 		if(res.size())
 		{
+			const auto ffmpeg_custom_title {i18n::tr("settings.ffmpeg_custom.title", "Custom FFmpeg folder")};
 			const auto orig_path {conf.ffmpeg_path};
 			conf.ffmpeg_path = util::to_relative_path(res.front());
 			l_ffmpeg_path.update_caption();
 			if(!updater_check_paths(true))
 			{
-				widgets::msgbox mbox {parent, "Custom FFmpeg folder", nana::msgbox::yes_no};
-				mbox << conf.ffmpeg_path.string() << "\n\nThe selected folder doesn't seem to contain ffmpeg.exe. "
-					"Are you sure you want to use this folder for the FFmpeg files?\n\nPress \"Yes\" if you intend to "
-					"add the FFmpeg files to the folder (you can use the updater to download the latest version).\n\n"
-					"Press \"No\" to choose a different folder.";
+				widgets::msgbox mbox {parent, ffmpeg_custom_title, nana::msgbox::yes_no};
+				auto message {i18n::tr("settings.ffmpeg_custom.missing_confirm", "{ffmpeg_path}\n\nThe selected folder does not seem to contain ffmpeg.exe. Use this folder for FFmpeg files anyway?")};
+				message.replace(message.find("{ffmpeg_path}"), 13, conf.ffmpeg_path.string());
+				mbox << message;
 				if(mbox() == IDNO)
 				{
 					conf.ffmpeg_path = orig_path;
@@ -1615,15 +1637,9 @@ void GUI::make_updater_page(themed_form &parent)
 				{
 					if(!fs::exists(ytdlp_dir / "yt-dlp.conf"))
 					{
-						widgets::msgbox mbox {parent, "Custom FFmpeg folder", nana::msgbox::yes_no};
+						widgets::msgbox mbox {parent, ffmpeg_custom_title, nana::msgbox::yes_no};
 						mbox.icon(nana::msgbox::icon_question);
-						std::string msg {"When updating FFmpeg, the program will put the FFmpeg files in the "
-							"folder you selected. There's just one problem though, the folder you selected is not "
-							"the same as the folder that contains yt-dlp.exe, so yt-dlp will not know how to find "
-							"the FFmpeg files.\n\n[ Yes ] To fix that, a configuration file (yt-dlp.conf) containing the "
-							"argument \"--ffmpeg-location\" can be created in the yt-dlp folder.\n\n[ No ] Or, the program "
-							"can pass \"--ffmpeg-location\" to yt-dlp through the command line.\n\n"
-							"Should the program create yt-dlp.conf for you now?"};
+						std::string msg {i18n::tr("settings.ffmpeg_custom.create_config_confirm", "The selected FFmpeg folder is different from the yt-dlp folder. Create yt-dlp.conf with \"--ffmpeg-location\" so yt-dlp can find FFmpeg?")};
 						if((mbox << msg)() == IDYES)
 						{
 							auto conf_path {ytdlp_dir / "yt-dlp.conf"};
@@ -1631,19 +1647,19 @@ void GUI::make_updater_page(themed_form &parent)
 							if(of.good())
 							{
 								of << "--ffmpeg-location " << conf.ffmpeg_path;
-								widgets::msgbox mb {parent, "Custom FFmpeg folder"};
-								mb.icon(nana::msgbox::icon_information) << conf_path.string() <<
-									"\n\nThe file has been created, and yt-dlp should now know where to find the FFmpeg files.";
+								widgets::msgbox mb {parent, ffmpeg_custom_title};
+								auto message {i18n::tr("settings.ffmpeg_custom.config_created", "{conf_path}\n\nThe file was created. yt-dlp should now be able to find the FFmpeg files.")};
+								message.replace(message.find("{conf_path}"), 11, conf_path.string());
+								mb.icon(nana::msgbox::icon_information) << message;
 								mb.show();
 							}
 							else
 							{
-								widgets::msgbox err {parent, "Custom FFmpeg folder"};
+								widgets::msgbox err {parent, ffmpeg_custom_title};
 								err.icon(nana::msgbox::icon_error);
-								err << conf_path.string() << "\n\nCould not open the file for writing! "
-									"Make sure the yt-dlp folder isn't \"Program Files\" or any other "
-									"folder that requires elevated priviliges for write access. Otherwise, "
-									"you must use \"Run as administrator\" to launch ytdlp-interface.";
+								auto message {i18n::tr("settings.ffmpeg_custom.write_error_with_path", "{conf_path}\n\nCould not open the file for writing. Choose a writable folder or run ytdlp-interface as administrator.")};
+								message.replace(message.find("{conf_path}"), 11, conf_path.string());
+								err << message;
 								err.show();
 							}
 						}
@@ -1661,33 +1677,25 @@ void GUI::make_updater_page(themed_form &parent)
 							auto pos {str.find("--ffmpeg-location")};
 							if(pos == -1)
 							{
-								widgets::msgbox mbox {parent, "Custom FFmpeg folder", nana::msgbox::yes_no};
+								widgets::msgbox mbox {parent, ffmpeg_custom_title, nana::msgbox::yes_no};
 								mbox.icon(nana::msgbox::icon_question);
-								std::string msg {"The yt-dlp folder contains a configuration file (yt-dlp.conf), "
-									"but the file doesn't contain the argument \"--ffmpeg-location\". That argument "
-									"must be present to tell yt-dlp where to find the FFmpeg files. "
-									"Should the program add the argument to the config file?\n\n"
-									"If you select \"no\", the program will have to pass \"--ffmpeg-location\" "
-									"to yt-dlp through the command line."};
+								std::string msg {i18n::tr("settings.ffmpeg_custom.add_argument_confirm", "yt-dlp.conf does not contain \"--ffmpeg-location\". Add the argument to the configuration file?")};
 								if((mbox << msg)() == IDYES)
 								{
 									std::ofstream ofs {ytdlp_dir / "yt-dlp.conf", std::ios_base::app};
 									if(ofs.good())
 									{
 										ofs << "\n\n--ffmpeg-location " << conf.ffmpeg_path;
-										nana::msgbox mb {parent, "Custom FFmpeg folder"};
-										mb.icon(nana::msgbox::icon_information) << "The argument has been added.";
+										nana::msgbox mb {parent, ffmpeg_custom_title};
+										mb.icon(nana::msgbox::icon_information) << i18n::tr("settings.ffmpeg_custom.argument_added", "The argument was added.");
 										mb.show();
 									}
 									else
 									{
-										widgets::msgbox err {parent, "Custom FFmpeg folder"};
+										widgets::msgbox err {parent, ffmpeg_custom_title};
 										err.icon(nana::msgbox::icon_error);
-										err << "Could not open file for writing! "
-											"Make sure the yt-dlp folder isn't \"Program Files\" or any other "
-											"folder that requires elevated priviliges for write access. Otherwise, "
-											"you must use \"Run as administrator\" to launch ytdlp-interface.";
-										err.show();
+										err << i18n::tr("settings.ffmpeg_custom.write_error", "Could not open the file for writing. Choose a writable folder or run ytdlp-interface as administrator.");
+												err.show();
 									}
 								}
 							}
@@ -1750,10 +1758,9 @@ void GUI::make_updater_page(themed_form &parent)
 					updater_update_misc(false, appdir);
 				else
 				{
-					::widgets::msgbox mbox {parent, "No place to put the ffmpeg files"};
+					::widgets::msgbox mbox {parent, i18n::tr("settings.updater.no_ffmpeg_destination.title", "No place to put the ffmpeg files")};
 					mbox.icon(nana::msgbox::icon_error);
-					(mbox << "Neither the program folder, nor the specified yt-dlp folder can be written in. Run the program "
-						"as administrator to fix that.")();
+					(mbox << i18n::tr("settings.updater.no_ffmpeg_destination.message", "Neither the program folder nor the selected yt-dlp folder is writable. Run the program as administrator."))();
 				}
 				return;
 			}
@@ -1771,10 +1778,9 @@ void GUI::make_updater_page(themed_form &parent)
 			}
 			else
 			{
-				::widgets::msgbox mbox {parent, "No place to put yt-dlp.exe"};
+				::widgets::msgbox mbox {parent, updater_no_ytdlp_destination_title()};
 				mbox.icon(nana::msgbox::icon_error);
-				(mbox << "The path for yt-dlp is not defined, and the program can't write in the folder "
-					"it's currently in (running it as administrator should fix that).")();
+				(mbox << i18n::tr("settings.updater.no_ytdlp_path.message", "The yt-dlp path is not defined and the current program folder is not writable. Run the program as administrator."))();
 			}
 		}
 		else
@@ -1789,10 +1795,9 @@ void GUI::make_updater_page(themed_form &parent)
 					updater_update_misc(true, appdir);
 				else
 				{
-					::widgets::msgbox mbox {parent, "No place to put yt-dlp.exe"};
+					::widgets::msgbox mbox {parent, updater_no_ytdlp_destination_title()};
 					mbox.icon(nana::msgbox::icon_error);
-					(mbox << "Neither the program folder, nor the specified yt-dlp folder can be written in. Running the program "
-						"as administrator should fix that.")();
+					(mbox << i18n::tr("settings.updater.no_ytdlp_destination.message", "Neither the program folder nor the selected yt-dlp folder is writable. Run the program as administrator."))();
 				}
 			}
 		}
@@ -1902,7 +1907,7 @@ void GUI::updater_display_version()
 	if(releases.empty())
 	{
 		l_vertext.error_mode(true);
-		l_vertext.caption("failed to get from GitHub!");
+		l_vertext.caption(updater_github_failed());
 		if(!inet_error.empty())
 			l_vertext.tooltip(inet_error);
 	}
@@ -1923,7 +1928,7 @@ void GUI::updater_display_version()
 				l_vertext.caption(tag_name + " lacks a Win7 package!");
 				return;
 			}
-			vertext = tag_name + " (new version)";
+			{ auto text {i18n::tr("updater.new_version", "{version} (new version)")}; text.replace(text.find("{version}"), 9, tag_name); vertext = text; }
 			btn_update.enabled(true);
 
 			std::map<std::string, std::string> arc_urls;
@@ -1969,7 +1974,7 @@ void GUI::updater_display_version()
 			}
 			btn_update.tooltip(arc_url);
 		}
-		else vertext = tag_name + " (current)";
+		else vertext = updater_current(tag_name);
 		l_vertext.caption(vertext);
 		btn_changes.enabled(true);
 	}
@@ -1981,7 +1986,7 @@ void GUI::updater_display_version_ffmpeg()
 	if(url_latest_ffmpeg.empty())
 	{
 		l_ffmpeg_text.error_mode(true);
-		l_ffmpeg_text.caption("unable to get from GitHub");
+		l_ffmpeg_text.caption(updater_github_failed());
 		if(!inet_error.empty())
 			l_ffmpeg_text.tooltip(inet_error);
 	}
@@ -1992,11 +1997,11 @@ void GUI::updater_display_version_ffmpeg()
 		{
 			std::string errclr {widgets::theme::is_dark() ? "<color=0xe09999>" : "<color=0xbb5555>"};
 			l_ffmpeg_text.caption(ver_ffmpeg_latest.string() + "  (current = " +
-				(!fs::exists(conf.ffmpeg_path / "ffmpeg.exe") ? errclr + "not present</>)" : ver_ffmpeg.string() + ")"));
+				(!fs::exists(conf.ffmpeg_path / "ffmpeg.exe") ? errclr + updater_unavailable() + "</>)" : ver_ffmpeg.string() + ")"));
 			btn_update_ffmpeg.enabled(true);
 			btn_update_ffmpeg.tooltip(url_latest_ffmpeg);
 		}
-		else l_ffmpeg_text.caption(ver_ffmpeg_latest.string() + "  (current)");
+		else l_ffmpeg_text.caption(updater_current(ver_ffmpeg_latest.string()));
 	}
 };
 
@@ -2006,7 +2011,7 @@ void GUI::updater_display_version_ytdlp()
 	if(url_latest_ytdlp.empty())
 	{
 		l_ytdlp_text.error_mode(true);
-		l_ytdlp_text.caption("unable to get from GitHub");
+		l_ytdlp_text.caption(updater_github_failed());
 		if(!inet_error.empty())
 			l_ytdlp_text.tooltip(inet_error);
 	}
@@ -2017,8 +2022,8 @@ void GUI::updater_display_version_ytdlp()
 		if(ver_ytdlp_latest != ver_ytdlp)
 		{
 			std::string errclr {widgets::theme::is_dark() ? "<color=0xe09999>" : "<color=0xbb5555>"};
-			l_ytdlp_text.caption(ver_ytdlp_latest.string() + "  (current = " +
-				(not_present ? errclr + "not present</>)  [click for changelog]" : ver_ytdlp.string() + ")  [click for changelog]"));
+			const auto current {not_present ? errclr + updater_unavailable() + "</>" : ver_ytdlp.string()};
+			l_ytdlp_text.caption(updater_current_version(ver_ytdlp_latest.string(), current) + updater_changelog());
 			btn_update_ytdlp.enabled(true);
 			btn_update_ytdlp.tooltip(url_latest_ytdlp);
 		}
@@ -2032,7 +2037,7 @@ void GUI::updater_display_version_deno()
 	if(url_latest_deno.empty())
 	{
 		l_deno_text.error_mode(true);
-		l_deno_text.caption("unable to get from GitHub");
+		l_deno_text.caption(updater_github_failed());
 		if(!inet_error.empty())
 			l_deno_text.tooltip(inet_error);
 	}
@@ -2047,16 +2052,16 @@ void GUI::updater_display_version_deno()
 		else if(!fs::exists(conf.ytdlp_path.parent_path() / "deno.exe"))
 			not_present = true;
 		l_deno_text.error_mode(false);
-		std::string click_for_changelog {url_latest_deno_relnotes.empty() ? "" : "  [click for changelog]"};
+		std::string click_for_changelog {url_latest_deno_relnotes.empty() ? "" : updater_changelog()};
 		if(ver_deno_latest != ver_deno)
 		{
 			std::string errclr {widgets::theme::is_dark() ? "<color=0xe09999>" : "<color=0xbb5555>"};
-			l_deno_text.caption(ver_deno_latest.string() + "  (current = " +
-				(not_present ? errclr + "not present</>)" + click_for_changelog : ver_deno.string() + ")" + click_for_changelog));
+			const auto current {not_present ? errclr + updater_unavailable() + "</>" : ver_deno.string()};
+			l_deno_text.caption(updater_current_version(ver_deno_latest.string(), current) + click_for_changelog);
 			btn_update_deno.enabled(true);
 			btn_update_deno.tooltip(url_latest_deno);
 		}
-		else l_deno_text.caption(ver_deno_latest.string() + "  (current)" + click_for_changelog);
+		else l_deno_text.caption(updater_current(ver_deno_latest.string()) + click_for_changelog);
 	}
 }
 
@@ -2079,20 +2084,20 @@ void GUI::updater_update_self(themed_form &parent)
 		{
 			if(!X64 && releases[0]["assets"].size() < 2)
 			{
-				::widgets::msgbox mbox {parent, "ytdlp-interface update error"};
+				::widgets::msgbox mbox {parent, updater_error_title()};
 				mbox.icon(nana::msgbox::icon_error);
-				(mbox << "The latest release on GitHub doesn't seem to contain a 32-bit package!")();
-				btn_update.caption("Update");
+				(mbox << i18n::tr("settings.updater.error.no_32bit_package", "The latest release on GitHub does not contain a 32-bit package."))();
+				btn_update.caption(common_update());
 				updater_working = false;
 				thr_updater.detach();
 				return;
 			}
 			if(win7 && releases[0]["assets"].size() < 4)
 			{
-				::widgets::msgbox mbox {parent, "ytdlp-interface update error"};
+				::widgets::msgbox mbox {parent, updater_error_title()};
 				mbox.icon(nana::msgbox::icon_error);
-				(mbox << "The latest release on GitHub doesn't seem to contain a Windows 7 package!")();
-				btn_update.caption("Update");
+				(mbox << i18n::tr("settings.updater.error.no_win7_package", "The latest release on GitHub does not contain a Windows 7 package."))();
+				btn_update.caption(common_update());
 				updater_working = false;
 				thr_updater.detach();
 				return;
@@ -2163,7 +2168,7 @@ void GUI::updater_update_self(themed_form &parent)
 				progval += prog_chunk;
 				auto total {util::int_to_filesize(arc_size, false)},
 					pct {std::to_string(progval / (arc_size / 100)) + '%'};
-				prog_updater.caption(arc_name + " : " + pct + " of " + total);
+				auto progress {i18n::tr("settings.updater.progress.download", "{archive_name} : {pct} of {total}")}; progress.replace(progress.find("{archive_name}"), 14, arc_name); progress.replace(progress.find("{pct}"), 5, pct); progress.replace(progress.find("{total}"), 7, total); prog_updater.caption(progress);
 				prog_updater.value(progval);
 			};
 			auto dl_error {util::dl_inet_res(arc_url, arc_path, &updater_working, cb_progress)};
@@ -2177,7 +2182,7 @@ void GUI::updater_update_self(themed_form &parent)
 						fs::remove(tempself);
 					try
 					{
-						prog_updater.caption("Unpacking archive and restarting...");
+						prog_updater.caption(i18n::tr("settings.updater.progress.unpack_restart", "Unpacking archive and restarting..."));
 						fs::copy_file(self_path, tempself);
 						auto temp_7zlib {fs::temp_directory_path() / "7z.dll"};
 						std::error_code ec;
@@ -2193,13 +2198,13 @@ void GUI::updater_update_self(themed_form &parent)
 						return;
 					}
 					catch(fs::filesystem_error const &e) {
-						::widgets::msgbox mbox {parent, "File copy error"};
+						::widgets::msgbox mbox {parent, i18n::tr("settings.updater.file_copy_error.title", "File copy error")};
 						mbox.icon(nana::msgbox::icon_error);
 						(mbox << e.what())();
 					}
 				}
 				else prog_updater.caption(dl_error);
-				btn_update.caption("Update");
+				btn_update.caption(common_update());
 				btn_update_ffmpeg.enabled(btnffmpeg_state);
 				btn_update_ytdlp.enabled(btnytdlp_state);
 				updater_working = false;
@@ -2209,7 +2214,7 @@ void GUI::updater_update_self(themed_form &parent)
 	}
 	else
 	{
-		btn_update.caption("Update");
+		btn_update.caption(common_update());
 		prog_updater.caption("");
 		prog_updater.value(0);
 		btn_update_ffmpeg.enabled(btnffmpeg_state);
@@ -2249,13 +2254,13 @@ void GUI::updater_update_deno(themed_form &parent)
 				{
 					const fs::path tempdir {fs::temp_directory_path()};
 					std::error_code ec;
-					prog_updater_deno.caption("Unpacking archive to temporary folder...");
+					prog_updater_deno.caption(i18n::tr("updater.unpacking", "Unpacking archive to temporary folder..."));
 					if(fs::exists(tempdir / "deno.exe"))
 						fs::remove(tempdir / "deno.exe", ec);
 					auto error {util::extract_7z(arc_path, tempdir)};
 					if(error.empty())
 					{
-						prog_updater_deno.caption("Copying deno.exe to yt-dlp folder...");
+						prog_updater_deno.caption(i18n::tr("settings.updater.progress.copy_deno", "Copying deno.exe to the yt-dlp folder..."));
 						fs::path denopath;
 						if(conf.ytdlp_path.empty())
 							denopath = appdir / "deno.exe";
@@ -2267,13 +2272,13 @@ void GUI::updater_update_deno(themed_form &parent)
 						if(!ec)
 						{
 							ver_deno = ver_deno_latest;
-							prog_updater_deno.caption("Deno update complete");
+							prog_updater_deno.caption(i18n::tr("updater.deno_complete", "Deno update complete"));
 							l_deno_text.caption(ver_deno_latest.string() + "  (current)  [click to see changelog]");
 							l_deno_text.error_mode(false);
 							btn_update_deno.tooltip("");
 							btn_update_deno.enabled(false);
 						}
-						else prog_updater_deno.caption("File copy error: " + ec.message());
+						else { auto message {i18n::tr("updater.file_copy_error", "File copy error: {error}")}; message.replace(message.find("{error}"), 7, ec.message()); prog_updater_deno.caption(message); }
 						fs::remove(tempdir / "deno.exe", ec);
 					}
 					else prog_updater_deno.caption(error);
@@ -2353,12 +2358,13 @@ void GUI::updater_update_misc(bool ytdlp, fs::path target)
 						fs::create_directory(tempdir, ec);
 						if(fs::exists(tempdir))
 						{
-							prog_updater_misc.caption("Extracting files to temporary folder...");
+							prog_updater_misc.caption(i18n::tr("updater.extracting", "Extracting files to temporary folder..."));
 							auto error {util::extract_7z(arc_path, tempdir, cb_ffplay.checked() + 1)};
 							if(error.empty())
 							{
-								prog_updater_misc.caption(std::string {"Copying files to "} + (target == appdir ?
-																					   "program folder..." : "FFmpeg folder..."));
+								prog_updater_misc.caption(target == appdir ?
+														 i18n::tr("settings.updater.progress.copy_files_program", "Copying files to the program folder...") :
+														 i18n::tr("settings.updater.progress.copy_files_ffmpeg", "Copying files to the FFmpeg folder..."));
 								for(auto const &dir_entry : fs::recursive_directory_iterator {tempdir})
 								{
 									if(dir_entry.is_regular_file())
@@ -2369,7 +2375,7 @@ void GUI::updater_update_misc(bool ytdlp, fs::path target)
 										fs::copy_file(dir_entry, target_path, ec);
 										if(ec)
 										{
-											prog_updater_misc.caption("Copy error: " + ec.message());
+											{ auto message {i18n::tr("updater.copy_error", "Copy error: {error}")}; message.replace(message.find("{error}"), 7, ec.message()); prog_updater_misc.caption(message); }
 											break;
 										}
 									}
@@ -2379,15 +2385,15 @@ void GUI::updater_update_misc(bool ytdlp, fs::path target)
 									conf.ffmpeg_path = target;
 									ver_ffmpeg = ver_ffmpeg_latest;
 									btnffmpeg_state = false;
-									prog_updater_misc.caption("FFmpeg update complete");
-									l_ffmpeg_text.caption(ver_ffmpeg_latest.string() + "  (current)");
+									prog_updater_misc.caption(i18n::tr("updater.ffmpeg_complete", "FFmpeg update complete"));
+									l_ffmpeg_text.caption(updater_current(ver_ffmpeg_latest.string()));
 									btn_update_ffmpeg.tooltip("");
 									updater_check_paths(true);
 								}
 							}
-							else prog_updater_misc.caption("Error: " + error);
+							else { auto message {i18n::tr("settings.updater.progress.error", "Error: {error}")}; message.replace(message.find("{error}"), 7, error); prog_updater_misc.caption(message); }
 						}
-						else prog_updater_misc.caption("!!! FAILED TO CREATE TEMPORARY DIRECTORY !!!");
+						else prog_updater_misc.caption(i18n::tr("settings.updater.progress.temp_directory_failed", "!!! FAILED TO CREATE TEMPORARY DIRECTORY !!!"));
 
 						fs::remove(arc_path, ec);
 						fs::remove_all(tempdir, ec);
@@ -2401,13 +2407,13 @@ void GUI::updater_update_misc(bool ytdlp, fs::path target)
 							conf.ytdlp_path = target / fname;
 							ver_ytdlp = ver_ytdlp_latest;
 							btnytdlp_state = false;
-							prog_updater_misc.caption("yt-dlp update complete");
+							prog_updater_misc.caption(i18n::tr("updater.ytdlp_complete", "yt-dlp update complete"));
 							l_ytdlp_text.caption(ver_ytdlp_latest.string() + "  (current)  [click to see changelog]");
 							l_ytdlp_text.error_mode(false);
 							btn_update_ytdlp.tooltip("");
 							updater_check_paths(false);
 						}
-						else prog_updater_misc.caption("Failed to move " + fname + " to set folder: " + ec.message());
+						else { auto message {i18n::tr("settings.updater.progress.move_ytdlp_failed", "Failed to move {fname} to the selected folder: {error}")}; message.replace(message.find("{fname}"), 7, fname); message.replace(message.find("{error}"), 7, ec.message()); prog_updater_misc.caption(message); }
 					}
 				}
 				else prog_updater_misc.caption(download_result);
@@ -2518,8 +2524,8 @@ bool GUI::updater_check_paths(bool ffmpeg_only)
 	if(!fs::exists(conf.ffmpeg_path / "ffmpeg.exe"))
 	{
 		if(conf.ffmpeg_path == fs::current_path() || conf.ffmpeg_path.empty() && !fs::exists(appdir / "ffmpeg.exe"))
-			l_ffmpeg_path.caption("!!!  FFMPEG.EXE NOT FOUND IN THE PROGRAM FOLDER  !!!");
-		else l_ffmpeg_path.caption("!!!  FFMPEG.EXE NOT FOUND IN THE SELECTED FOLDER  !!!");
+			l_ffmpeg_path.caption(i18n::tr("updater.ffmpeg_missing_program", "!!!  FFMPEG.EXE NOT FOUND IN THE PROGRAM FOLDER  !!!"));
+		else l_ffmpeg_path.caption(i18n::tr("updater.ffmpeg_missing_selected", "!!!  FFMPEG.EXE NOT FOUND IN THE SELECTED FOLDER  !!!"));
 		ver_ffmpeg = {0, 0, 0};
 		l_ffmpeg_path.refresh_theme();
 		updater_t1.start();
@@ -2553,10 +2559,10 @@ bool GUI::updater_check_paths(bool ffmpeg_only)
 			else
 			{
 				if(path_empty)
-					l_ytdlp_path.caption("!!!  YT-DLP EXECUTABLE NOT FOUND IN PROGRAM FOLDER  !!!");
+					l_ytdlp_path.caption(i18n::tr("updater.ytdlp_missing_program", "!!!  YT-DLP EXECUTABLE NOT FOUND IN PROGRAM FOLDER  !!!"));
 				else
 				{
-					l_ytdlp_path.caption("!!!  YT-DLP EXECUTABLE NOT FOUND AT ITS SELECTED LOCATION  !!!");
+					l_ytdlp_path.caption(i18n::tr("updater.ytdlp_missing_selected", "!!!  YT-DLP EXECUTABLE NOT FOUND AT ITS SELECTED LOCATION  !!!"));
 					conf.ytdlp_path.clear();
 				}
 				ver_ytdlp = {0, 0, 0};

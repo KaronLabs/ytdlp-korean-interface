@@ -1,4 +1,5 @@
 #include "gui.hpp"
+#include "i18n.hpp"
 
 
 unsigned GUI::gui_bottoms::joinable_dl_threads() const
@@ -109,25 +110,30 @@ void GUI::gui_bottoms::show(std::wstring key)
 	gui->com_args.caption(bot.argset);
 	gui->bot_showing = false;
 	if(conf.common_dl_options)
-		gui->gpopt.caption("Download options");
+		gui->gpopt.caption(i18n::tr("main.download_options", "Download options"));
 	else
 	{
 		auto item {gui->lbq.item_from_value(key)};
 		if(item != gui->lbq.empty_item)
-			gui->gpopt.caption("Download options for queue item #" + item.text(0));
+		{
+			auto caption {i18n::tr("main.download_options_item", "Download options for queue item #{item_number}")};
+			caption.replace(caption.find("{item_number}"), 13, item.text(0));
+			gui->gpopt.caption(caption);
+		}
 	}
 	nana::api::refresh_window(gui->gpopt);
 	if(bot.outfile.empty())
 		gui->l_outpath.tooltip("");
 	else
 	{
-		gui->l_outpath.tooltip("Custom file name:\n<bold>" + bot.outfile.filename().string() +
-			"</>\n(this overrides the output template from the settings)");
+		auto tooltip {gui->custom_filename_template};
+		tooltip.replace(tooltip.find("{filename}"), 10, bot.outfile.filename().string());
+		gui->l_outpath.tooltip(tooltip);
 	}
 	gui->show_btnfmt(!bot.vidinfo.empty());
 	if(!conf.common_dl_options && gui->lbq.item_count() > 1)
 		gui->show_btncopy(true);
-	gui->btndl.caption(bot.started ? "Stop download" : "Start download");
+	gui->btndl.caption(bot.started ? gui->stop_download_label : gui->start_download_label);
 }
 
 

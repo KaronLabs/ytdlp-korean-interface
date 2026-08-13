@@ -1,4 +1,5 @@
 #include "gui.hpp"
+#include "i18n.hpp"
 #include <nana/gui/filebox.hpp>
 
 
@@ -192,7 +193,7 @@ bool GUI::gui_bottom::browse_for_filename()
 {
 	nana::filebox fb {*pgui, false};
 	fb.allow_multi_select(false);
-	fb.title("Specify the name to give the downloaded file");
+	fb.title(i18n::tr("main.filename_dialog_title", "Specify the name to give the downloaded file"));
 	if(outfile.empty())
 	{
 		if(!vidinfo.empty() && vidinfo_contains("_filename"))
@@ -206,7 +207,7 @@ bool GUI::gui_bottom::browse_for_filename()
 			}
 			fb.init_file(outpath / fname);
 		}
-		else fb.init_file(outpath / "type the file name here (this overrides the output template from settings)");
+		else fb.init_file(outpath / i18n::tr("main.filename_placeholder", "type the file name here (this overrides the output template from settings)"));
 	}
 	else fb.init_file(outpath / outfile.filename());
 	auto res {fb()};
@@ -215,8 +216,9 @@ bool GUI::gui_bottom::browse_for_filename()
 		outfile = res.front();
 		outpath = conf.outpath = outfile.parent_path();
 		pgui->l_outpath.caption(outpath.u8string());
-		pgui->l_outpath.tooltip("Custom file name:\n<bold>" + outfile.filename().string() +
-			"</>\n(this overrides the output template from the settings)");
+		auto tooltip {pgui->custom_filename_template};
+		tooltip.replace(tooltip.find("{filename}"), 10, outfile.filename().string());
+		pgui->l_outpath.tooltip(tooltip);
 		if(conf.common_dl_options)
 			pgui->bottoms.propagate_misc_options(*this);
 		if(conf.outpaths.size() >= 11 && conf.outpaths.find(outpath) == conf.outpaths.end())
@@ -347,8 +349,9 @@ void GUI::gui_bottom::from_json(const nlohmann::json &j)
 		outfile = fs::u8path(j["outfile"].get<std::string>());
 		outpath = conf.outpath = outfile.parent_path();
 		pgui->l_outpath.caption(outpath.u8string());
-		pgui->l_outpath.tooltip("Custom file name:\n<bold>" + outfile.filename().string() +
-			"</>\n(this overrides the output template from the settings)");
+		auto tooltip {pgui->custom_filename_template};
+		tooltip.replace(tooltip.find("{filename}"), 10, outfile.filename().string());
+		pgui->l_outpath.tooltip(tooltip);
 	}
 	if(j.contains("outpath"))
 	{
