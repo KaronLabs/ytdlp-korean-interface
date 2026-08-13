@@ -1,0 +1,21 @@
+.superpowers/
+__pycache__/
+
+# Extracted static dependencies
+bit7z/
+nana/
+libpng/
+libjpeg-turbo-3.1.2/
+dependencies/
+
+# Visual Studio build output
+.vs/
+x64/
+Debug/
+Release/
+
+# Local recovery evidence and disposable runtime files
+candidate-runtime/
+smoke-evidence/
+backups/
+provenance-staging/
