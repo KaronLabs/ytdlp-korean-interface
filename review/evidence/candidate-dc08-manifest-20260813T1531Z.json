@@ -1,0 +1,186 @@
+{
+    "createdAtUtc":  "2026-08-13T15:31:00.8185744Z",
+    "attestation":  {
+                        "source":  {
+                                       "commit":  "b28e0bc43e70e27cc5d50b89b08aa23b259cf26b",
+                                       "statusPorcelain":  " M docs/runtime-maintenance.md\r\n M docs/windows-smoke.md\r\n M locales/ko-KR.json\r\n M tests/powershell/runtime-maintenance.Tests.ps1\r\n M tests/powershell/smoke-localhost.Tests.ps1\r\n M tests/run_powershell_tests.ps1\r\n M tools/build-candidate.ps1\r\n M tools/runtime-maintenance.psm1\r\n M tools/smoke-localhost.ps1\r\n?? docs/superpowers/plans/2026-08-13-not-guilty-evidence-hardening.md\r\n?? docs/superpowers/specs/2026-08-13-not-guilty-evidence-hardening-design.md\r\n?? review/\r\n",
+                                       "dirty":  true
+                                   },
+                        "dependencyArchive":  {
+                                                  "name":  "ytdlp-interface dependencies.7z",
+                                                  "sha256":  "6D50D1F74978CFAB8E40439487D67EF21A4B43E31CFB00EE95D23AEDFC791BAE"
+                                              },
+                        "linkerInputs":  [
+                                             {
+                                                 "name":  "bit7z",
+                                                 "library":  "bit7z64.lib",
+                                                 "sha256":  "F07BE4692350A8BDE0D44F3E679E598A93D84E718BCF9E54F5AD91A84A4606E0",
+                                                 "length":  2775474
+                                             },
+                                             {
+                                                 "name":  "Nana",
+                                                 "library":  "nana_v143_Release_x64.lib",
+                                                 "sha256":  "4DF1B9AB1AB1062F06F09298F34E357C22A3E41C424D6A2EF9CF78DCB9DB086E",
+                                                 "length":  239285546
+                                             },
+                                             {
+                                                 "name":  "libpng",
+                                                 "library":  "libpng.lib",
+                                                 "sha256":  "A5EF8F19473C4400F30100DC54E150066CE85D3F562FEC29D51326C010945ED4",
+                                                 "length":  4379228
+                                             },
+                                             {
+                                                 "name":  "libjpeg-turbo",
+                                                 "library":  "turbojpeg-static.lib",
+                                                 "sha256":  "8760376CF2BE3C4893632984A179588D1E2BCC7A5EDD748E5504F6F782F6DFAF",
+                                                 "length":  1540028
+                                             }
+                                         ],
+                        "toolchain":  [
+                                          {
+                                              "name":  "msbuild",
+                                              "path":  "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\MSBuild\\Current\\Bin\\MSBuild.exe",
+                                              "sha256":  "BA9E8C83C25F4CA9AB1F66290BE2CE429D8563EFB99B9EB699487D0D5AEF8DB7",
+                                              "version":  "msbuild 踰꾩쟾 17.14.51+25f168cee(.NET Framework??\r\n17.14.51.32402"
+                                          },
+                                          {
+                                              "name":  "cmake",
+                                              "path":  "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin\\cmake.exe",
+                                              "sha256":  "6FE2E6431B45CF32B9B2F3E50A8EFAE046A2366EB34D0FB36DA027CF56102AEC",
+                                              "version":  "cmake version 3.31.6-msvc6\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake)."
+                                          }
+                                      ],
+                        "commands":  [
+                                         {
+                                             "name":  "bit7z Release x64 build",
+                                             "executable":  "MSBuild.exe",
+                                             "arguments":  [
+                                                               "\u003csource\u003e\\bit7z\\bit7z.sln",
+                                                               "/m",
+                                                               "/t:Build",
+                                                               "/p:Configuration=Release",
+                                                               "/p:Platform=x64",
+                                                               "/p:PlatformToolset=v143"
+                                                           ]
+                                         },
+                                         {
+                                             "name":  "Nana Release x64 build",
+                                             "executable":  "MSBuild.exe",
+                                             "arguments":  [
+                                                               "\u003csource\u003e\\nana\\build\\vc2022\\nana.sln",
+                                                               "/m",
+                                                               "/t:Build",
+                                                               "/p:Configuration=Release",
+                                                               "/p:Platform=x64",
+                                                               "/p:PlatformToolset=v143"
+                                                           ]
+                                         },
+                                         {
+                                             "name":  "libpng Release x64 build",
+                                             "executable":  "MSBuild.exe",
+                                             "arguments":  [
+                                                               "\u003csource\u003e\\libpng\\libpng.sln",
+                                                               "/m",
+                                                               "/t:Build",
+                                                               "/p:Configuration=Release",
+                                                               "/p:Platform=x64",
+                                                               "/p:PlatformToolset=v143",
+                                                               "/p:OutDir=\u003csource\u003e\\libpng\\x64\\Release\\\\"
+                                                           ]
+                                         },
+                                         {
+                                             "name":  "libjpeg-turbo Release x64 build",
+                                             "executable":  "cmake.exe",
+                                             "arguments":  [
+                                                               "-S",
+                                                               "\u003csource\u003e\\libjpeg-turbo-3.1.2",
+                                                               "-B",
+                                                               "\u003csource\u003e\\libjpeg-turbo-3.1.2\\out\\build\\x64-Release",
+                                                               "-G",
+                                                               "Visual Studio 17 2022",
+                                                               "-A",
+                                                               "x64",
+                                                               "-T",
+                                                               "v143",
+                                                               "-DENABLE_SHARED=OFF",
+                                                               "-DENABLE_STATIC=ON",
+                                                               "-DWITH_TURBOJPEG=ON",
+                                                               "-DWITH_CRT_DLL=OFF",
+                                                               "-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE=\u003csource\u003e\\libjpeg-turbo-3.1.2\\out\\build\\x64-Release"
+                                                           ]
+                                         },
+                                         {
+                                             "name":  "libjpeg-turbo Release x64 build",
+                                             "executable":  "cmake.exe",
+                                             "arguments":  [
+                                                               "--build",
+                                                               "\u003csource\u003e\\libjpeg-turbo-3.1.2\\out\\build\\x64-Release",
+                                                               "--config",
+                                                               "Release",
+                                                               "--target",
+                                                               "turbojpeg-static"
+                                                           ]
+                                         },
+                                         {
+                                             "name":  "Release x64 MSBuild",
+                                             "executable":  "MSBuild.exe",
+                                             "arguments":  [
+                                                               "\u003csource\u003e\\ytdlp-interface\\ytdlp-interface.sln",
+                                                               "/m",
+                                                               "/t:Build",
+                                                               "/p:Configuration=Release",
+                                                               "/p:Platform=x64"
+                                                           ]
+                                         }
+                                     ]
+                    },
+    "versions":  {
+                     "product":  "2.19.1.0",
+                     "ytdlp":  "2026.08.04.234419",
+                     "ffmpeg":  "ffmpeg version N-124528-g4444a75590-20260517 Copyright (c) 2000-2026 the FFmpeg developers\r\nbuilt with gcc 15.2.0 (crosstool-NG 1.28.0.23_185f348)\r\nconfiguration: --prefix=/ffbuild/prefix --pkg-config-flags=--static --pkg-config=pkg-config --cross-prefix=x86_64-w64-mingw32- --arch=x86_64 --target-os=mingw32 --enable-gpl --enable-version3 --disable-debug --disable-w32threads --enable-pthreads --enable-iconv --enable-zlib --enable-libxml2 --enable-libvmaf --enable-fontconfig --enable-libharfbuzz --enable-libfreetype --enable-libfribidi --enable-vulkan --enable-libshaderc --enable-libvorbis --disable-libxcb --disable-xlib --disable-libpulse --enable-opencl --enable-gmp --enable-lzma --enable-liblcevc-dec --enable-amf --enable-libaom --enable-libaribb24 --enable-avisynth --enable-chromaprint --enable-libdav1d --enable-libdavs2 --enable-libdvdread --enable-libdvdnav --disable-libfdk-aac --enable-ffnvcodec --enable-cuda-llvm --enable-frei0r --enable-libgme --enable-libkvazaar --enable-libaribcaption --enable-libass --enable-libbluray --enable-libjxl --enable-libmp3lame --enable-libopus --enable-libplacebo --enable-librist --enable-libssh --enable-libtheora --enable-libvpx --enable-libwebp --enable-libzmq --enable-lv2 --enable-libvpl --enable-openal --enable-liboapv --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libopenh264 --enable-libopenjpeg --enable-libopenmpt --enable-librav1e --enable-librubberband --enable-schannel --enable-sdl2 --enable-libsnappy --enable-libsoxr --enable-libsrt --enable-libsvtav1 --enable-libtwolame --enable-libuavs3d --disable-libdrm --enable-vaapi --enable-libvidstab --enable-libvvenc --enable-whisper --enable-libx264 --enable-libx265 --enable-libxavs2 --enable-libxvid --enable-libzimg --enable-libzvbi --extra-cflags=-DLIBTWOLAME_STATIC --extra-cxxflags= --extra-libs=-lgomp --extra-ldflags=-pthread --extra-ldexeflags= --cc=x86_64-w64-mingw32-gcc --cxx=x86_64-w64-mingw32-g++ --ar=x86_64-w64-mingw32-gcc-ar --ranlib=x86_64-w64-mingw32-gcc-ranlib --nm=x86_64-w64-mingw32-gcc-nm --extra-version=20260517\r\nlibavutil      60. 31.100 / 60. 31.100\r\nlibavcodec     62. 33.100 / 62. 33.100\r\nlibavformat    62. 17.100 / 62. 17.100\r\nlibavdevice    62.  4.100 / 62.  4.100\r\nlibavfilter    11. 17.100 / 11. 17.100\r\nlibswscale      9.  7.100 /  9.  7.100\r\nlibswresample   6.  4.100 /  6.  4.100\r\n\r\nExiting with exit code 0",
+                     "ffprobe":  "ffprobe version N-124528-g4444a75590-20260517 Copyright (c) 2007-2026 the FFmpeg developers\r\nbuilt with gcc 15.2.0 (crosstool-NG 1.28.0.23_185f348)\r\nconfiguration: --prefix=/ffbuild/prefix --pkg-config-flags=--static --pkg-config=pkg-config --cross-prefix=x86_64-w64-mingw32- --arch=x86_64 --target-os=mingw32 --enable-gpl --enable-version3 --disable-debug --disable-w32threads --enable-pthreads --enable-iconv --enable-zlib --enable-libxml2 --enable-libvmaf --enable-fontconfig --enable-libharfbuzz --enable-libfreetype --enable-libfribidi --enable-vulkan --enable-libshaderc --enable-libvorbis --disable-libxcb --disable-xlib --disable-libpulse --enable-opencl --enable-gmp --enable-lzma --enable-liblcevc-dec --enable-amf --enable-libaom --enable-libaribb24 --enable-avisynth --enable-chromaprint --enable-libdav1d --enable-libdavs2 --enable-libdvdread --enable-libdvdnav --disable-libfdk-aac --enable-ffnvcodec --enable-cuda-llvm --enable-frei0r --enable-libgme --enable-libkvazaar --enable-libaribcaption --enable-libass --enable-libbluray --enable-libjxl --enable-libmp3lame --enable-libopus --enable-libplacebo --enable-librist --enable-libssh --enable-libtheora --enable-libvpx --enable-libwebp --enable-libzmq --enable-lv2 --enable-libvpl --enable-openal --enable-liboapv --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libopenh264 --enable-libopenjpeg --enable-libopenmpt --enable-librav1e --enable-librubberband --enable-schannel --enable-sdl2 --enable-libsnappy --enable-libsoxr --enable-libsrt --enable-libsvtav1 --enable-libtwolame --enable-libuavs3d --disable-libdrm --enable-vaapi --enable-libvidstab --enable-libvvenc --enable-whisper --enable-libx264 --enable-libx265 --enable-libxavs2 --enable-libxvid --enable-libzimg --enable-libzvbi --extra-cflags=-DLIBTWOLAME_STATIC --extra-cxxflags= --extra-libs=-lgomp --extra-ldflags=-pthread --extra-ldexeflags= --cc=x86_64-w64-mingw32-gcc --cxx=x86_64-w64-mingw32-g++ --ar=x86_64-w64-mingw32-gcc-ar --ranlib=x86_64-w64-mingw32-gcc-ranlib --nm=x86_64-w64-mingw32-gcc-nm --extra-version=20260517\r\nlibavutil      60. 31.100 / 60. 31.100\r\nlibavcodec     62. 33.100 / 62. 33.100\r\nlibavformat    62. 17.100 / 62. 17.100\r\nlibavdevice    62.  4.100 / 62.  4.100\r\nlibavfilter    11. 17.100 / 11. 17.100\r\nlibswscale      9.  7.100 /  9.  7.100\r\nlibswresample   6.  4.100 /  6.  4.100",
+                     "deno":  "deno 2.7.14 (stable, release, x86_64-pc-windows-msvc)\nv8 14.7.173.20-rusty\ntypescript 5.9.2"
+                 },
+    "files":  [
+                  {
+                      "path":  "7z.dll",
+                      "sha256":  "405E9A77857753D21E060DCFFAB12F820FA7593AE152B45588703BF312B5FF44",
+                      "length":  1710080
+                  },
+                  {
+                      "path":  "deno.exe",
+                      "sha256":  "B6E83993F1F1AB97075A77043DE61118966D719B5450BC631251D47C3A34230B",
+                      "length":  127973152
+                  },
+                  {
+                      "path":  "ffmpeg.exe",
+                      "sha256":  "EDD8A62C69279CED0723DDD8041A3CAC4606CAC1291EE1C493B7E717C5148129",
+                      "length":  202468352
+                  },
+                  {
+                      "path":  "ffprobe.exe",
+                      "sha256":  "16D4B4B5FFB4494FD232BCE1BB62EE63E570DF20352B6C75E9F4D9FAC567D6B6",
+                      "length":  202263040
+                  },
+                  {
+                      "path":  "locales\\ko-KR.json",
+                      "sha256":  "C5D73B957CB0E151CDCBEC2DED9D74AB7061FC4C1F8F6B7913D1702C8B7FD4E6",
+                      "length":  45320
+                  },
+                  {
+                      "path":  "yt-dlp.exe",
+                      "sha256":  "E78500D301B5DE3A9280A418F6DD45604C4D85B718B0A2447C1B0AA9699E2689",
+                      "length":  17425487
+                  },
+                  {
+                      "path":  "ytdlp-interface.exe",
+                      "sha256":  "4196FF442D5E7F96F8080BF95A5EB169AD4A69FEBFD9DFBC1F84CF5DB6274A3A",
+                      "length":  3916288
+                  },
+                  {
+                      "path":  "ytdlp-interface.json",
+                      "sha256":  "9D52BD66A45FDA25E257A9D89184C27896A44484412F2B32CD37E99FE3DB9F05",
+                      "length":  12531
+                  }
+              ]
+}

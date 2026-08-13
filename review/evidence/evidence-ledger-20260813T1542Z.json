@@ -1,0 +1,218 @@
+{
+    "schemaVersion":  2,
+    "createdAtUtc":  "2026-08-13T15:40:29.9041959Z",
+    "root":  "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src",
+    "excludedSelf":  "review\\evidence\\evidence-ledger-20260813T1542Z.json",
+    "entries":  [
+                    {
+                        "path":  "review/evidence/artifact-smoke-20260813T1532Z.log",
+                        "length":  2072,
+                        "sha256":  "F48208957120424BB1E888D2D4367A10C3E6190D4C009AC18E9A799915ADAF2D",
+                        "lastWriteTimeUtc":  "2026-08-13T15:32:15.2411968Z"
+                    },
+                    {
+                        "path":  "review/evidence/artifact-smoke-20260813T1533Z.log",
+                        "length":  974,
+                        "sha256":  "63C0E9DF4CB9E36117C13876F2A4795C1CCC80387CA9FF29D1F615C50C5A5F76",
+                        "lastWriteTimeUtc":  "2026-08-13T15:32:57.4782602Z"
+                    },
+                    {
+                        "path":  "review/evidence/artifact-smoke-20260813T1540Z.log",
+                        "length":  2838,
+                        "sha256":  "624FC95DC47096927F4B2AC60ABBEA8F29D946B729707BD9C5C3E87413C628A4",
+                        "lastWriteTimeUtc":  "2026-08-13T15:39:38.4696571Z"
+                    },
+                    {
+                        "path":  "review/evidence/artifact-smoke-20260813T1540Z.mp3",
+                        "length":  9328,
+                        "sha256":  "188ACFB52B9592FB2EADEED48B4BFD07BE1FE698B1A9AC8B144974AB5AB7D9D5",
+                        "lastWriteTimeUtc":  "2026-08-13T15:39:34.6200594Z"
+                    },
+                    {
+                        "path":  "review/evidence/artifact-smoke-20260813T1540Z.status.json",
+                        "length":  492,
+                        "sha256":  "A2CA07F2C0A599E91D214443F0F94CBFE38C31A134B0C8AA0D448FE732EC0BF4",
+                        "lastWriteTimeUtc":  "2026-08-13T15:39:38.4256566Z"
+                    },
+                    {
+                        "path":  "review/evidence/build-candidate-20260813T1520Z.stderr.log",
+                        "length":  750,
+                        "sha256":  "49D1E5126D0E29E5E36E373CD460D11B3A3DB2937107C995E01FBDEF740D829D",
+                        "lastWriteTimeUtc":  "2026-08-13T15:26:04.2757160Z"
+                    },
+                    {
+                        "path":  "review/evidence/build-candidate-20260813T1520Z.stdout.log",
+                        "length":  369,
+                        "sha256":  "CF33B7023E1C21E010BDE891D43692D06CD95E17FCDBEF00276AA246396830D8",
+                        "lastWriteTimeUtc":  "2026-08-13T15:26:03.8903823Z"
+                    },
+                    {
+                        "path":  "review/evidence/build-candidate-20260813T1528Z.launch.json",
+                        "length":  532,
+                        "sha256":  "A192CF827D412E12D4EBF731B6F6779ACDC508EC99622A1339090EE02616FA97",
+                        "lastWriteTimeUtc":  "2026-08-13T15:27:51.9889162Z"
+                    },
+                    {
+                        "path":  "review/evidence/build-candidate-20260813T1528Z.status.json",
+                        "length":  1110,
+                        "sha256":  "991747AD04256D2B44A79257B1C92A9ECD935487DE8F3857305C3A9BFB832F63",
+                        "lastWriteTimeUtc":  "2026-08-13T15:31:03.9883248Z"
+                    },
+                    {
+                        "path":  "review/evidence/build-candidate-20260813T1528Z.stderr.log",
+                        "length":  0,
+                        "sha256":  "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+                        "lastWriteTimeUtc":  "2026-08-13T15:27:51.7628694Z"
+                    },
+                    {
+                        "path":  "review/evidence/build-candidate-20260813T1528Z.stdout.log",
+                        "length":  369,
+                        "sha256":  "47518719C0991964613EC815CFD1315BB3E8F153F013BBAE19586A3191C4428B",
+                        "lastWriteTimeUtc":  "2026-08-13T15:31:03.7769454Z"
+                    },
+                    {
+                        "path":  "review/evidence/build-wrapper-v2-negative-20260813T1528Z.status.json",
+                        "length":  931,
+                        "sha256":  "BAA0A97497EC5B0A19BFDF54AF3AB1C37DE0E702168476EE7C039D1DA040658F",
+                        "lastWriteTimeUtc":  "2026-08-13T15:27:37.1267831Z"
+                    },
+                    {
+                        "path":  "review/evidence/candidate-dc08-manifest-20260813T1531Z.json",
+                        "length":  17722,
+                        "sha256":  "1070737848C63B7477BE2C053D21E48865BEF6E0807297D5BB1A69457846535E",
+                        "lastWriteTimeUtc":  "2026-08-13T15:31:02.8749400Z"
+                    },
+                    {
+                        "path":  "review/evidence/candidate-dc08-smoke-79f316-20260813T1532Z.json",
+                        "length":  674,
+                        "sha256":  "AFBB52FB9B6E667DC55A4C1973A9923DBE425BD60064B36EF065268655DCAC34",
+                        "lastWriteTimeUtc":  "2026-08-13T15:32:57.3021757Z"
+                    },
+                    {
+                        "path":  "review/evidence/candidate-dc08-smoke-f7d88a-20260813T1540Z.json",
+                        "length":  674,
+                        "sha256":  "DD33CE7136DFB204E5A3D7BD7496F2B32EEA9E840318040B6F004E1C3E3DCFDC",
+                        "lastWriteTimeUtc":  "2026-08-13T15:39:38.2546056Z"
+                    },
+                    {
+                        "path":  "review/evidence/comparison-base-to-worktree-20260813T1535Z.patch",
+                        "length":  515794,
+                        "sha256":  "4640A5DBD9634F87C8624CDAF1DFD7A97A02BAE2CCBFEFCED567357626F7F2EA",
+                        "lastWriteTimeUtc":  "2026-08-13T15:34:14.1710200Z"
+                    },
+                    {
+                        "path":  "review/evidence/evidence-ledger-20260813T1537Z.json",
+                        "length":  10015,
+                        "sha256":  "49A14153C42E1FAE40F3CA82D7C62B9DA8300C8B902A6D8ACD719C40020B9E24",
+                        "lastWriteTimeUtc":  "2026-08-13T15:34:57.3524881Z"
+                    },
+                    {
+                        "path":  "review/evidence/git-diff-check-20260813T1514Z.log",
+                        "length":  2920,
+                        "sha256":  "4DF8582E32AB77BF677FA71D6604ABD5BAC166149F1A3D288C05E55CBDBF3115",
+                        "lastWriteTimeUtc":  "2026-08-13T15:14:03.8717525Z"
+                    },
+                    {
+                        "path":  "review/evidence/git-diff-check-20260813T1534Z.log",
+                        "length":  3334,
+                        "sha256":  "96A1DD01333185A714A3EFD7A3F8F8153EC25A85BDDD18D74422954422B4A2C9",
+                        "lastWriteTimeUtc":  "2026-08-13T15:33:43.7701076Z"
+                    },
+                    {
+                        "path":  "review/evidence/native-i18n-tests-20260813T1518Z.log",
+                        "length":  92,
+                        "sha256":  "A50B5D886EFA5367176968EBB2A701BF2431A0CA0F38EAF4D0C90C4EA3C32526",
+                        "lastWriteTimeUtc":  "2026-08-13T15:17:58.6519814Z"
+                    },
+                    {
+                        "path":  "review/evidence/native-i18n-tests-20260813T1534Z.log",
+                        "length":  306,
+                        "sha256":  "3587DA16F2785CAF3AE9E083BB35E0CBF7A1A986C9BBD2E0923F0444D0BE5CFB",
+                        "lastWriteTimeUtc":  "2026-08-13T15:33:43.5039315Z"
+                    },
+                    {
+                        "path":  "review/evidence/parent-backup-version-20260813T1541Z.log",
+                        "length":  1156,
+                        "sha256":  "17541BECFEF014D5577966518C2C34BEA9483C013FC11EB3AB36C5814869AF9B",
+                        "lastWriteTimeUtc":  "2026-08-13T15:40:08.8130367Z"
+                    },
+                    {
+                        "path":  "review/evidence/parent-provenance-migration-backup-20260813T1430Z.json",
+                        "length":  442,
+                        "sha256":  "5B242A27EC412468FACA9FE5A0975BBEB8488D835CB1EF1AEC9C3F8DE0336A6D",
+                        "lastWriteTimeUtc":  "2026-08-13T11:40:04.9230337Z"
+                    },
+                    {
+                        "path":  "review/evidence/parent-yt-dlp-provenance-20260813T1536Z.json",
+                        "length":  842,
+                        "sha256":  "686DC7D0C34F088BA9499EE1A6F553CCEB521C5D05DE7828DCA537DFB55E5440",
+                        "lastWriteTimeUtc":  "2026-08-13T14:30:03.3612881Z"
+                    },
+                    {
+                        "path":  "review/evidence/powershell-tests-20260813T1514Z.log",
+                        "length":  1890,
+                        "sha256":  "206EB703E4D8D55197652236A3B39B6FF2D14DC14B8713A564C76773E0862E16",
+                        "lastWriteTimeUtc":  "2026-08-13T15:13:53.5149842Z"
+                    },
+                    {
+                        "path":  "review/evidence/powershell-tests-20260813T1534Z.log",
+                        "length":  2292,
+                        "sha256":  "8CEFC08864B9973E3B48E41E850BFA75A8CA3734E760D3B0D65F8169DB5BE06D",
+                        "lastWriteTimeUtc":  "2026-08-13T15:33:54.1563411Z"
+                    },
+                    {
+                        "path":  "review/evidence/python-contract-tests-20260813T1514Z.log",
+                        "length":  7698,
+                        "sha256":  "8008D55C591E9A0E18371C6E2D2C02DA05B0478405B8B1ED2A6178CC3A35600F",
+                        "lastWriteTimeUtc":  "2026-08-13T15:14:11.6112299Z"
+                    },
+                    {
+                        "path":  "review/evidence/python-contract-tests-20260813T1534Z.log",
+                        "length":  8230,
+                        "sha256":  "49553E1884F70245976650ECEE44E10B035098C47607D0441D325F21EBFE2DEA",
+                        "lastWriteTimeUtc":  "2026-08-13T15:33:52.3804135Z"
+                    },
+                    {
+                        "path":  "review/evidence/run-artifact-smoke-20260813T1532Z.ps1",
+                        "length":  1442,
+                        "sha256":  "6A5E819B1425F4C23A2430D37C93CA33785407D734613C102B9BEEF35E882977",
+                        "lastWriteTimeUtc":  "2026-08-13T15:32:03.9582574Z"
+                    },
+                    {
+                        "path":  "review/evidence/run-artifact-smoke-20260813T1533Z.ps1",
+                        "length":  1505,
+                        "sha256":  "61265C072DA8C88F5BDCAD2C80C9BCD6456A2A146BAD9153D3A5864615404244",
+                        "lastWriteTimeUtc":  "2026-08-13T15:32:27.2597461Z"
+                    },
+                    {
+                        "path":  "review/evidence/run-artifact-smoke-20260813T1540Z.ps1",
+                        "length":  2622,
+                        "sha256":  "6D3C5C399F3011AAF64993D6FB1FA804E300B8ED19D9820B20ECFF55FFC00667",
+                        "lastWriteTimeUtc":  "2026-08-13T15:39:04.4302811Z"
+                    },
+                    {
+                        "path":  "review/evidence/run-build-candidate-20260813T1520Z.ps1",
+                        "length":  1219,
+                        "sha256":  "58FFDA8497EDFE6F0F9AD08DC53D73B5ACDBECC6915BC309E9D11E1DAE0B6824",
+                        "lastWriteTimeUtc":  "2026-08-13T15:22:36.4373843Z"
+                    },
+                    {
+                        "path":  "review/evidence/run-build-candidate-20260813T1528Z.ps1",
+                        "length":  1214,
+                        "sha256":  "E37BC4928C7E3CD8B480A2DD34B71FA2DADF083A8D3BDA278B0F4B9FDF509536",
+                        "lastWriteTimeUtc":  "2026-08-13T15:27:25.2078242Z"
+                    },
+                    {
+                        "path":  "review/evidence/untracked-files-inventory-20260813T1541Z.json",
+                        "length":  11966,
+                        "sha256":  "37C5972D8FB149189505791C8FB7BC348958A60FE256F078A11D8D6F8057008D",
+                        "lastWriteTimeUtc":  "2026-08-13T15:40:18.0094650Z"
+                    },
+                    {
+                        "path":  "review/evidence/worktree-status-20260813T1535Z.txt",
+                        "length":  551,
+                        "sha256":  "A1CCFDBFC09E8231F048C438A3C9CCA7B7EA2F40476EC6ACAACCA592F90C3A41",
+                        "lastWriteTimeUtc":  "2026-08-13T15:34:14.3220555Z"
+                    }
+                ]
+}

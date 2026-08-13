@@ -1,0 +1,24 @@
+﻿{
+    "schemaVersion":  1,
+    "startedAtUtc":  "2026-08-13T15:27:52.6418950Z",
+    "completedAtUtc":  "2026-08-13T15:31:03.8019462Z",
+    "executable":  "powershell.exe",
+    "arguments":  [
+                      "-NoProfile",
+                      "-ExecutionPolicy",
+                      "Bypass",
+                      "-File",
+                      "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\tools\\build-candidate.ps1",
+                      "-Run",
+                      "-SourceRoot",
+                      "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src",
+                      "-ParentRuntime",
+                      "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface",
+                      "-CandidateBase",
+                      "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-candidates",
+                      "-DependencyArchiveDirectory",
+                      "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src"
+                  ],
+    "exitCode":  0,
+    "exception":  null
+}

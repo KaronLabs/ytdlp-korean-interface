@@ -1,0 +1,8 @@
+C:\Users\ceo\OneDrive\Desktop\01_AllWork\ytdlp-interface\src\review\evidence\run-build-candidate-20260813T1520Z.ps1 : '
+Encoding' 매개 변수를 바인딩할 수 없습니다. 값 "utf8NoBOM"을(를) "Microsoft.PowerShell.Commands.FileSystemCmdletProvide
+rEncoding" 유형으로 변환할 수 없습니다. 오류: "식별자 이름 utf8NoBOM을(를) 유효한 열거자 이름과 일치시킬 수 없습니다. 
+다음 열거자 이름 중 하나를 지정한 후 다시 시도하십시오.
+Unknown, String, Unicode, Byte, BigEndianUnicode, UTF8, UTF7, UTF32, Ascii, Default, Oem, BigEndianUTF32"
+    + CategoryInfo          : InvalidArgument: (:) [run-build-candidate-20260813T1520Z.ps1], ParameterBindingException
+    + FullyQualifiedErrorId : CannotConvertArgumentNoMessage,run-build-candidate-20260813T1520Z.ps1
+ 

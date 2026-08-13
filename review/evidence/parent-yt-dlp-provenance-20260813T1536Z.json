@@ -1,0 +1,14 @@
+{
+    "repository":  "yt-dlp/yt-dlp-nightly-builds",
+    "channel":  "nightly",
+    "tag":  "2026.08.04.234419",
+    "asset":  "yt-dlp.exe",
+    "sha256":  "E78500D301B5DE3A9280A418F6DD45604C4D85B718B0A2447C1B0AA9699E2689",
+    "installedAtUtc":  "2026-08-13T11:40:04.9129907Z",
+    "backupPath":  "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\yt-dlp.exe.backup-20260813204000.553e835ca96847e3b2323bf89c7e005e",
+    "previousVersion":  "2026.05.16.233954",
+    "previousSha256":  "0B6BD5752A3C66F3FB781EF0601501F5FD3ECE2A4A57BD98FB19B08EE860786B",
+    "schemaVersion":  2,
+    "migratedAtUtc":  "2026-08-13T14:30:03.3362922Z",
+    "migrationBackupPath":  "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\yt-dlp-provenance.json.migration-backup-20260813143000.1f5b7d251caa490a9679c9cbeabececf"
+}

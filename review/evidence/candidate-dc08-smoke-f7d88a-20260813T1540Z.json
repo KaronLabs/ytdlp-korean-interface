@@ -1,0 +1,16 @@
+{
+    "schemaVersion":  1,
+    "runId":  "f7d88af94661415aa14604a696ce0e1a",
+    "succeeded":  true,
+    "reasonCode":  "ok",
+    "mode":  "artifact-only",
+    "completedAtUtc":  "2026-08-13T15:39:38.2416016Z",
+    "workspaceId":  "ytdlp-interface-smoke-f7d88af94661415aa14604a696ce0e1a",
+    "candidateManifestSha256":  "1070737848C63B7477BE2C053D21E48865BEF6E0807297D5BB1A69457846535E",
+    "output":  {
+                   "relativePath":  "output\\artifact.mp3",
+                   "sha256":  "188ACFB52B9592FB2EADEED48B4BFD07BE1FE698B1A9AC8B144974AB5AB7D9D5",
+                   "length":  9328,
+                   "duration":  2.020136
+               }
+}

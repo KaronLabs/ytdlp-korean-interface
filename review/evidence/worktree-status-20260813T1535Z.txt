@@ -1,0 +1,14 @@
+CAPTURED_AT_UTC=2026-08-13T15:34:14.2655391Z
+COMMAND=git status --porcelain=v1
+ M docs/runtime-maintenance.md
+ M docs/windows-smoke.md
+ M locales/ko-KR.json
+ M tests/powershell/runtime-maintenance.Tests.ps1
+ M tests/powershell/smoke-localhost.Tests.ps1
+ M tests/run_powershell_tests.ps1
+ M tools/build-candidate.ps1
+ M tools/runtime-maintenance.psm1
+ M tools/smoke-localhost.ps1
+?? docs/superpowers/plans/2026-08-13-not-guilty-evidence-hardening.md
+?? docs/superpowers/specs/2026-08-13-not-guilty-evidence-hardening-design.md
+?? review/

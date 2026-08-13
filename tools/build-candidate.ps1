@@ -9,6 +9,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+Import-Module -Name (Join-Path $PSScriptRoot 'candidate-manifest.psm1') -Force
 
 function Test-PathContained {
     param([Parameter(Mandatory = $true)] [string] $Root, [Parameter(Mandatory = $true)] [string] $Path)
@@ -46,24 +47,71 @@ function Quote-WindowsArgument {
     return $quoted + '"'
 }
 
+function Normalize-ProcessEnvironmentPath {
+    param([Parameter(Mandatory = $true)] [object] $Environment)
+    $keys = @($Environment.Keys | ForEach-Object { [string]$_ } | Where-Object { $_ -ieq 'Path' })
+    if ($keys.Count -le 1) { return }
+    $value = if ($keys -ccontains 'Path') { [string]$Environment['Path'] } else { [string]$Environment[$keys[0]] }
+    foreach ($key in $keys) { $Environment.Remove($key) | Out-Null }
+    $Environment['Path'] = $value
+}
+
+function Get-CanonicalProcessEnvironment {
+    $environment = New-Object Collections.Specialized.StringDictionary
+    $lines = & $env:ComSpec /d /c set
+    if ($LASTEXITCODE -ne 0) { throw 'cmd.exe could not read the Windows process environment.' }
+    foreach ($line in @($lines)) {
+        $separator = $line.IndexOf('=')
+        if ($separator -le 0) { continue }
+        $environment[$line.Substring(0, $separator)] = $line.Substring($separator + 1)
+    }
+    Normalize-ProcessEnvironmentPath -Environment $environment
+    return ,$environment
+}
+
 function Invoke-CheckedProcess {
-    param([Parameter(Mandatory = $true)] [string] $FilePath, [string[]] $Arguments = @(), [Parameter(Mandatory = $true)] [string] $Name)
-    $stdoutPath = Join-Path ([IO.Path]::GetTempPath()) ('ytdlp-interface-process-' + [Guid]::NewGuid().ToString('N') + '.out')
-    $stderrPath = Join-Path ([IO.Path]::GetTempPath()) ('ytdlp-interface-process-' + [Guid]::NewGuid().ToString('N') + '.err')
+    param(
+        [Parameter(Mandatory = $true)] [string] $FilePath,
+        [string[]] $Arguments = @(),
+        [Parameter(Mandatory = $true)] [string] $Name,
+        [switch] $NormalizeEnvironment,
+        [string] $WorkingDirectory,
+        [Collections.IDictionary] $EnvironmentOverrides
+    )
+    $startInfo = New-Object Diagnostics.ProcessStartInfo
+    $startInfo.FileName = $FilePath
+    $startInfo.Arguments = ConvertTo-ProcessArgumentLine -Arguments $Arguments
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    if (-not [string]::IsNullOrWhiteSpace($WorkingDirectory)) { $startInfo.WorkingDirectory = $WorkingDirectory }
+    if ($NormalizeEnvironment) {
+        $null = $startInfo.EnvironmentVariables
+        $processEnvironment = $startInfo.EnvironmentVariables
+        $processEnvironment.Clear()
+        $canonicalEnvironment = Get-CanonicalProcessEnvironment
+        foreach ($key in $canonicalEnvironment.Keys) { $processEnvironment[$key] = $canonicalEnvironment[$key] }
+    }
+    if ($null -ne $EnvironmentOverrides) {
+        $null = $startInfo.EnvironmentVariables
+        foreach ($key in $EnvironmentOverrides.Keys) { $startInfo.EnvironmentVariables[[string]$key] = [string]$EnvironmentOverrides[$key] }
+    }
+    $process = New-Object Diagnostics.Process
+    $process.StartInfo = $startInfo
+    if (-not $process.Start()) { throw "$Name could not be started." }
     try {
-        $process = Start-Process -FilePath $FilePath -ArgumentList (ConvertTo-ProcessArgumentLine -Arguments $Arguments) -PassThru -NoNewWindow -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
         $process.Handle | Out-Null
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
         $process.WaitForExit()
         $process.Refresh()
-        $stdout = if (Test-Path -LiteralPath $stdoutPath) { [IO.File]::ReadAllText($stdoutPath).Trim() } else { '' }
-        $stderr = if (Test-Path -LiteralPath $stderrPath) { [IO.File]::ReadAllText($stderrPath).Trim() } else { '' }
+        $stdout = $stdoutTask.Result.Trim()
+        $stderr = $stderrTask.Result.Trim()
         if ($process.ExitCode -ne 0) { throw "$Name exited with code $($process.ExitCode). stdout=$stdout stderr=$stderr" }
         return [pscustomobject]@{ ExitCode = $process.ExitCode; StandardOutput = $stdout; StandardError = $stderr }
     }
-    finally {
-        if (Test-Path -LiteralPath $stdoutPath) { Remove-Item -LiteralPath $stdoutPath -Force -ErrorAction SilentlyContinue }
-        if (Test-Path -LiteralPath $stderrPath) { Remove-Item -LiteralPath $stderrPath -Force -ErrorAction SilentlyContinue }
-    }
+    finally { $process.Dispose() }
 }
 
 function Get-VsBuildTools {
@@ -79,7 +127,25 @@ function Get-VsBuildTools {
     if (-not (Test-Path -LiteralPath $msbuild)) { throw 'The selected Visual Studio installation has no MSBuild.exe.' }
     $v143 = Join-Path $installationPath 'VC\Tools\MSVC'
     if (-not (Test-Path -LiteralPath $v143)) { throw 'The selected Visual Studio installation has no v143 C++ toolset directory.' }
-    return [pscustomobject]@{ InstallationPath = $installationPath; MsBuildPath = $msbuild; V143Path = $v143 }
+    $versionFile = Join-Path $installationPath 'VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt'
+    if (-not (Test-Path -LiteralPath $versionFile -PathType Leaf)) { throw 'The selected Visual Studio installation has no default C++ toolset identity.' }
+    $vcToolsVersion = (Get-Content -LiteralPath $versionFile -Raw).Trim()
+    $compiler = Join-Path $v143 ($vcToolsVersion + '\bin\Hostx64\x64\cl.exe')
+    $linker = Join-Path $v143 ($vcToolsVersion + '\bin\Hostx64\x64\link.exe')
+    foreach ($path in @($compiler, $linker)) { if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'The selected Visual Studio installation has an incomplete x64 C++ toolset.' } }
+    $sdkRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10'
+    $sdkVersions = @(Get-ChildItem -LiteralPath (Join-Path $sdkRoot 'bin') -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^10\.\d+\.\d+\.\d+$' } | Sort-Object { [version]$_.Name } -Descending)
+    $sdk = $sdkVersions | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'x64\rc.exe') -PathType Leaf } | Select-Object -First 1
+    if ($null -eq $sdk) { throw 'A Windows 10/11 SDK x64 resource compiler is required.' }
+    $sdkVersion = $sdk.Name
+    $resourceCompiler = Join-Path $sdk.FullName 'x64\rc.exe'
+    $sdkIdentity = Join-Path $sdkRoot ('Lib\' + $sdkVersion + '\um\x64\kernel32.lib')
+    if (-not (Test-Path -LiteralPath $sdkIdentity -PathType Leaf)) { throw 'The selected Windows SDK has no x64 kernel32 import library.' }
+    return [pscustomobject]@{
+        InstallationPath = $installationPath; MsBuildPath = $msbuild; V143Path = $v143
+        VCToolsVersion = $vcToolsVersion; CompilerPath = $compiler; LinkerPath = $linker
+        WindowsSdkVersion = $sdkVersion; ResourceCompilerPath = $resourceCompiler; WindowsSdkIdentityPath = $sdkIdentity
+    }
 }
 
 function Get-CmakeExecutable {
@@ -118,6 +184,59 @@ function Get-DependencyArchiveManifest {
     return $manifest.archives[0]
 }
 
+function Get-GitTrackedPaths {
+    param([Parameter(Mandatory = $true)] [string] $SourceRoot, [Parameter(Mandatory = $true)] [string] $GitPath)
+    $source = [IO.Path]::GetFullPath($SourceRoot)
+    $safeDirectory = 'safe.directory=' + $source
+    $paths = @(& $GitPath -c $safeDirectory -C $source ls-files --cached 2>&1 | ForEach-Object { [string]$_ })
+    if ($LASTEXITCODE -ne 0 -or $paths.Count -eq 0) { throw 'Git could not enumerate tracked candidate source inputs.' }
+    return @($paths)
+}
+
+function Get-SourceInputAttestation {
+    param(
+        [Parameter(Mandatory = $true)] [string] $SourceRoot,
+        [Parameter(Mandatory = $true)] [string] $Commit,
+        [AllowEmptyString()] [string] $StatusPorcelain,
+        [Parameter(Mandatory = $true)] [string[]] $TrackedPaths
+    )
+    if (-not [string]::IsNullOrWhiteSpace($StatusPorcelain)) { throw 'source_worktree_dirty' }
+    $source = [IO.Path]::GetFullPath($SourceRoot)
+    $records = @()
+    foreach ($relative in @($TrackedPaths | Sort-Object -Unique)) {
+        if ([string]::IsNullOrWhiteSpace($relative) -or [IO.Path]::IsPathRooted($relative) -or $relative -match '(^|[\\/])\.\.([\\/]|$)') { throw 'source_input_invalid' }
+        $path = Join-Path $source $relative
+        if (-not (Test-PathContained -Root $source -Path $path) -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'source_input_invalid' }
+        $item = Get-Item -LiteralPath $path
+        $records += (($relative.Replace('\', '/')) + "`0" + $item.Length + "`0" + (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToUpperInvariant())
+    }
+    if ($records.Count -eq 0) { throw 'source_input_invalid' }
+    $bytes = [Text.Encoding]::UTF8.GetBytes(($records -join "`n"))
+    $hasher = [Security.Cryptography.SHA256]::Create()
+    try { $digest = ([BitConverter]::ToString($hasher.ComputeHash($bytes))).Replace('-', '') }
+    finally { $hasher.Dispose() }
+    return [ordered]@{ commit = $Commit; dirty = $false; treeSha256 = $digest; trackedFileCount = $records.Count }
+}
+
+function Get-SourceAttestation {
+    param([Parameter(Mandatory = $true)] [string] $SourceRoot, [string] $GitPath, [string[]] $TrackedPaths)
+    $source = [IO.Path]::GetFullPath($SourceRoot)
+    if ([string]::IsNullOrWhiteSpace($GitPath)) {
+        $git = Get-Command git.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($null -eq $git) { throw 'Git is required to attest the candidate source revision.' }
+        $GitPath = $git.Source
+    }
+    if (-not (Test-Path -LiteralPath $GitPath -PathType Leaf)) { throw 'Git executable is missing for source attestation.' }
+    $safeDirectory = 'safe.directory=' + $source
+    $commit = (& $GitPath -c $safeDirectory -C $source rev-parse --verify HEAD 2>&1 | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0) { throw 'Git could not verify the candidate source revision.' }
+    $status = & $GitPath -c $safeDirectory -C $source status --porcelain=v1 2>&1 | Out-String
+    if ($LASTEXITCODE -ne 0) { throw 'Git could not inspect the candidate source status.' }
+    if ([string]::IsNullOrWhiteSpace($commit)) { throw 'Git source revision is empty.' }
+    if ($null -eq $TrackedPaths -or $TrackedPaths.Count -eq 0) { $TrackedPaths = Get-GitTrackedPaths -SourceRoot $source -GitPath $GitPath }
+    return Get-SourceInputAttestation -SourceRoot $source -Commit $commit -StatusPorcelain $status -TrackedPaths $TrackedPaths
+}
+
 function Test-ArchiveEntrySafe {
     param([string] $Entry, [string[]] $ExpectedRoots)
     if ([string]::IsNullOrWhiteSpace($Entry) -or $Entry -match '^[A-Za-z]:|^[/\\]|(^|[/\\])\.\.([/\\]|$)') { return $false }
@@ -137,8 +256,7 @@ function Initialize-OfficialDependencies {
     $manifest = Get-DependencyArchiveManifest -SourceRoot $SourceRoot
     $roots = @($manifest.roots)
     $missing = @($roots | Where-Object { -not (Test-Path -LiteralPath (Join-Path $SourceRoot $_) -PathType Container) })
-    if ($missing.Count -eq 0) { return }
-    if ([string]::IsNullOrWhiteSpace($DependencyArchiveDirectory)) { throw 'Reviewed dependency archive directory is required for missing dependencies.' }
+    if ([string]::IsNullOrWhiteSpace($DependencyArchiveDirectory)) { throw 'Reviewed dependency archive directory is required for candidate builds.' }
     $archive = Join-Path $DependencyArchiveDirectory $manifest.name
     if (-not (Test-Path -LiteralPath $archive -PathType Leaf)) { throw "Reviewed dependency archive is missing: $archive" }
     if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToUpperInvariant() -cne ([string]$manifest.sha256).ToUpperInvariant()) { throw 'Dependency archive SHA-256 does not match the source-controlled manifest.' }
@@ -147,6 +265,7 @@ function Initialize-OfficialDependencies {
     $entries = Get-ArchiveEntriesFromListing -Listing $listing
     if ($entries.Count -eq 0) { throw 'Dependency archive contains no inspectable entries.' }
     foreach ($entry in $entries) { if (-not (Test-ArchiveEntrySafe -Entry $entry -ExpectedRoots $roots)) { throw 'Dependency archive contains an unsafe or unexpected entry.' } }
+    if ($missing.Count -eq 0) { return }
     $staging = Join-Path (Join-Path $SourceRoot 'dependencies') ('staging-' + [Guid]::NewGuid().ToString('N'))
     [IO.Directory]::CreateDirectory($staging) | Out-Null
     try {
@@ -160,14 +279,92 @@ function Initialize-OfficialDependencies {
     finally { if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue } }
 }
 
+function New-IsolatedBuildSource {
+    param(
+        [Parameter(Mandatory = $true)] [string] $SourceRoot,
+        [Parameter(Mandatory = $true)] [string] $WorkspaceRoot,
+        [Parameter(Mandatory = $true)] [string[]] $DependencyRoots,
+        [string[]] $TrackedPaths
+    )
+    $source = [IO.Path]::GetFullPath($SourceRoot)
+    $isolated = Join-Path $WorkspaceRoot 'source'
+    [IO.Directory]::CreateDirectory($isolated) | Out-Null
+    if ($null -eq $TrackedPaths -or $TrackedPaths.Count -eq 0) {
+        $git = Get-Command git.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1
+        $TrackedPaths = Get-GitTrackedPaths -SourceRoot $source -GitPath $git.Source
+    }
+    foreach ($relative in @($TrackedPaths | Sort-Object -Unique)) {
+        $rootName = ($relative -split '[/\\]')[0]
+        if ($DependencyRoots -contains $rootName -or $rootName -eq '.git') { continue }
+        $from = Join-Path $source $relative; $to = Join-Path $isolated $relative
+        if (-not (Test-PathContained -Root $source -Path $from) -or -not (Test-Path -LiteralPath $from -PathType Leaf)) { throw 'source_input_invalid' }
+        [IO.Directory]::CreateDirectory((Split-Path -Parent $to)) | Out-Null
+        Copy-Item -LiteralPath $from -Destination $to -Force
+    }
+    return $isolated
+}
+
+function New-IsolatedBuildWorkspace {
+    param([Parameter(Mandatory = $true)] [string] $WorkspaceBase)
+    $base = [IO.Path]::GetFullPath($WorkspaceBase)
+    [IO.Directory]::CreateDirectory($base) | Out-Null
+    do { $workspace = Join-Path $base ('b-' + [Guid]::NewGuid().ToString('N')) } while (Test-Path -LiteralPath $workspace)
+    if (-not (Test-PathContained -Root $base -Path $workspace)) { throw 'Isolated build workspace escaped its configured base directory.' }
+    [IO.Directory]::CreateDirectory($workspace) | Out-Null
+    return $workspace
+}
+
+function New-HermeticBuildContext {
+    param(
+        [Parameter(Mandatory = $true)] [string] $SourceRoot,
+        [Parameter(Mandatory = $true)] [string] $WorkspaceRoot,
+        [string] $VCToolsVersion,
+        [string] $WindowsSdkVersion
+    )
+    $source = [IO.Path]::GetFullPath($SourceRoot)
+    $userRoot = Join-Path ([IO.Path]::GetFullPath($WorkspaceRoot)) 'empty-user-root'
+    [IO.Directory]::CreateDirectory($userRoot) | Out-Null
+    $properties = [ordered]@{
+        Configuration = 'Release'
+        Platform = 'x64'
+        PlatformToolset = 'v143'
+        ImportDirectoryBuildProps = 'false'
+        ImportDirectoryBuildTargets = 'false'
+        UserRootDir = '<hermetic-user-root>'
+    }
+    $arguments = @(
+        '/p:Configuration=Release', '/p:Platform=x64', '/p:PlatformToolset=v143',
+        '/p:ImportDirectoryBuildProps=false', '/p:ImportDirectoryBuildTargets=false', ('/p:UserRootDir=' + $userRoot + '\')
+    )
+    if (-not [string]::IsNullOrWhiteSpace($VCToolsVersion)) { $properties.VCToolsVersion = $VCToolsVersion; $arguments += '/p:VCToolsVersion=' + $VCToolsVersion }
+    if (-not [string]::IsNullOrWhiteSpace($WindowsSdkVersion)) { $properties.WindowsTargetPlatformVersion = $WindowsSdkVersion; $arguments += '/p:WindowsTargetPlatformVersion=' + $WindowsSdkVersion }
+    $vsGlobals = @(
+        'ImportDirectoryBuildProps=false', 'ImportDirectoryBuildTargets=false', ('UserRootDir=' + $userRoot + '\')
+    )
+    if (-not [string]::IsNullOrWhiteSpace($VCToolsVersion)) { $vsGlobals += 'VCToolsVersion=' + $VCToolsVersion }
+    if (-not [string]::IsNullOrWhiteSpace($WindowsSdkVersion)) { $vsGlobals += 'WindowsTargetPlatformVersion=' + $WindowsSdkVersion }
+    return [pscustomobject]@{
+        UserRootDirectory = $userRoot
+        MsBuildArguments = $arguments
+        CmakeVsGlobalsArgument = '-DCMAKE_VS_GLOBALS=' + ($vsGlobals -join ';')
+        EffectiveProperties = $properties
+        WorkingDirectory = $source
+        AttestedWorkingDirectory = '<source>'
+        EnvironmentOverrides = [ordered]@{ PreferredToolArchitecture = 'x64' }
+        AttestedEnvironment = [ordered]@{ PreferredToolArchitecture = 'x64' }
+    }
+}
+
 function Get-ReleaseX64DependencyPlan {
     param(
         [Parameter(Mandatory = $true)] [string] $SourceRoot,
         [string] $MsBuildPath = 'MSBuild.exe',
-        [string] $CmakePath = 'cmake.exe'
+        [string] $CmakePath = 'cmake.exe',
+        [string[]] $CommonMsBuildArguments = @('/p:Configuration=Release', '/p:Platform=x64', '/p:PlatformToolset=v143'),
+        [string] $CmakeVsGlobalsArgument
     )
     $source = [IO.Path]::GetFullPath($SourceRoot)
-    $release = @('/m', '/t:Build', '/p:Configuration=Release', '/p:Platform=x64', '/p:PlatformToolset=v143')
+    $release = @('/m', '/t:Build') + @($CommonMsBuildArguments)
     $libPngOutput = Join-Path $source 'libpng\x64\Release'
     $jpegOutput = Join-Path $source 'libjpeg-turbo-3.1.2\out\build\x64-Release'
     return @(
@@ -183,14 +380,14 @@ function Get-ReleaseX64DependencyPlan {
         },
         [pscustomobject]@{
             Name = 'libpng'; SourceDirectory = (Join-Path $source 'libpng'); FilePath = $MsBuildPath
-            Arguments = @((Join-Path $source 'libpng\libpng.sln')) + $release + ('/p:OutDir=' + $libPngOutput + '\\')
+            Arguments = @((Join-Path $source 'libpng\libpng.sln')) + $release + ('/p:OutDir=' + $libPngOutput + '\')
             LibraryPath = (Join-Path $libPngOutput 'libpng.lib'); BuildArguments = @()
         },
         [pscustomobject]@{
             Name = 'libjpeg-turbo'; SourceDirectory = (Join-Path $source 'libjpeg-turbo-3.1.2'); FilePath = $CmakePath
-            Arguments = @('-S', (Join-Path $source 'libjpeg-turbo-3.1.2'), '-B', $jpegOutput, '-G', 'Visual Studio 17 2022', '-A', 'x64', '-T', 'v143', '-DENABLE_SHARED=OFF', '-DENABLE_STATIC=ON', '-DWITH_TURBOJPEG=ON', '-DWITH_CRT_DLL=OFF', ('-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE=' + $jpegOutput))
+            Arguments = @('-S', (Join-Path $source 'libjpeg-turbo-3.1.2'), '-B', $jpegOutput, '-G', 'Visual Studio 17 2022', '-A', 'x64', '-T', 'v143') + @($(if (-not [string]::IsNullOrWhiteSpace($CmakeVsGlobalsArgument)) { $CmakeVsGlobalsArgument })) + @('-DENABLE_SHARED=OFF', '-DENABLE_STATIC=ON', '-DWITH_TURBOJPEG=ON', '-DWITH_CRT_DLL=OFF', ('-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE=' + $jpegOutput))
             LibraryPath = (Join-Path $jpegOutput 'turbojpeg-static.lib')
-            BuildArguments = @('--build', $jpegOutput, '--config', 'Release', '--target', 'turbojpeg-static')
+            BuildArguments = @('--build', $jpegOutput, '--config', 'Release', '--target', 'turbojpeg-static', '--') + @($CommonMsBuildArguments)
         }
     )
 }
@@ -200,18 +397,98 @@ function Test-ReleaseX64DependencyLibraries {
     return (@($Plan | Where-Object { -not (Test-Path -LiteralPath $_.LibraryPath -PathType Leaf) }).Count -eq 0)
 }
 
+function Get-DependencyLibraryAttestation {
+    param([Parameter(Mandatory = $true)] [object[]] $Plan)
+    return @($Plan | ForEach-Object {
+        if (-not (Test-Path -LiteralPath $_.LibraryPath -PathType Leaf)) { throw "Dependency linker input is missing: $($_.Name)" }
+        $file = Get-Item -LiteralPath $_.LibraryPath
+        [ordered]@{ name = $_.Name; library = $file.Name; sha256 = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToUpperInvariant(); length = $file.Length }
+    })
+}
+
+function Assert-DependencyLibraryAttestationUnchanged {
+    param([Parameter(Mandatory = $true)] [object[]] $Plan, [Parameter(Mandatory = $true)] [object[]] $Before)
+    $after = @(Get-DependencyLibraryAttestation -Plan $Plan)
+    if ($after.Count -ne $Before.Count) { throw 'dependency_linker_input_changed' }
+    for ($index = 0; $index -lt $after.Count; $index++) {
+        if ($after[$index].name -ne $Before[$index].name -or $after[$index].library -ne $Before[$index].library -or
+            $after[$index].sha256 -cne $Before[$index].sha256 -or $after[$index].length -ne $Before[$index].length) { throw 'dependency_linker_input_changed' }
+    }
+}
+
+function Get-BuildToolchainAttestation {
+    param(
+        [Parameter(Mandatory = $true)] [object] $Tools,
+        [Parameter(Mandatory = $true)] [string] $CmakePath,
+        [scriptblock] $IdentityReader
+    )
+    $entries = @(
+        [pscustomobject]@{ name = 'msbuild'; path = $Tools.MsBuildPath; arguments = @('/version') },
+        [pscustomobject]@{ name = 'cmake'; path = $CmakePath; arguments = @('--version') },
+        [pscustomobject]@{ name = 'cl'; path = $Tools.CompilerPath; version = $Tools.VCToolsVersion },
+        [pscustomobject]@{ name = 'link'; path = $Tools.LinkerPath; version = $Tools.VCToolsVersion },
+        [pscustomobject]@{ name = 'rc'; path = $Tools.ResourceCompilerPath; version = $Tools.WindowsSdkVersion },
+        [pscustomobject]@{ name = 'windows-sdk'; path = $Tools.WindowsSdkIdentityPath; version = $Tools.WindowsSdkVersion }
+    )
+    return @($entries | ForEach-Object {
+        if (-not (Test-Path -LiteralPath $_.path -PathType Leaf)) { throw "Build toolchain input is missing: $($_.name)" }
+        $version = if ($null -ne $IdentityReader) { [string](& $IdentityReader $_.name $_.path) }
+            elseif ($null -ne $_.PSObject.Properties['arguments']) { Invoke-CheckedExecutable -Path $_.path -Arguments $_.arguments -Name $_.name }
+            else { [string]$_.version }
+        [ordered]@{
+            name = $_.name
+            path = $_.path
+            sha256 = (Get-FileHash -LiteralPath $_.path -Algorithm SHA256).Hash.ToUpperInvariant()
+            version = $version.Trim()
+        }
+    })
+}
+
+function Get-NormalizedBuildArgument {
+    param([Parameter(Mandatory = $true)] [string] $Argument, [Parameter(Mandatory = $true)] [string] $SourceRoot, [string] $HermeticUserRoot)
+    $normalized = $Argument.Replace([IO.Path]::GetFullPath($SourceRoot), '<source>')
+    if (-not [string]::IsNullOrWhiteSpace($HermeticUserRoot)) { $normalized = $normalized.Replace([IO.Path]::GetFullPath($HermeticUserRoot), '<hermetic-user-root>') }
+    return $normalized
+}
+
+function Get-BuildCommandAttestation {
+    param(
+        [Parameter(Mandatory = $true)] [string] $SourceRoot,
+        [Parameter(Mandatory = $true)] [object[]] $DependencyPlan,
+        [Parameter(Mandatory = $true)] [string] $ProductExecutable,
+        [Parameter(Mandatory = $true)] [string[]] $ProductArguments,
+        [object] $BuildContext
+    )
+    $userRoot = if ($null -eq $BuildContext) { $null } else { $BuildContext.UserRootDirectory }
+    $workingDirectory = if ($null -eq $BuildContext) { '<source>' } else { $BuildContext.AttestedWorkingDirectory }
+    $properties = if ($null -eq $BuildContext) { [ordered]@{} } else { $BuildContext.EffectiveProperties }
+    $environment = if ($null -eq $BuildContext) { [ordered]@{} } else { $BuildContext.AttestedEnvironment }
+    $commands = @()
+    foreach ($dependency in $DependencyPlan) {
+        $phase = if ($dependency.Name -eq 'libjpeg-turbo') { 'configure' } else { 'build' }
+        $commands += [ordered]@{ name = "$($dependency.Name) Release x64 $phase"; executable = (Split-Path -Leaf $dependency.FilePath); arguments = @($dependency.Arguments | ForEach-Object { Get-NormalizedBuildArgument -Argument ([string]$_) -SourceRoot $SourceRoot -HermeticUserRoot $userRoot }); workingDirectory = $workingDirectory; effectiveProperties = $properties; environment = $environment }
+        if ($dependency.BuildArguments.Count -ne 0) {
+            $commands += [ordered]@{ name = "$($dependency.Name) Release x64 build"; executable = (Split-Path -Leaf $dependency.FilePath); arguments = @($dependency.BuildArguments | ForEach-Object { Get-NormalizedBuildArgument -Argument ([string]$_) -SourceRoot $SourceRoot -HermeticUserRoot $userRoot }); workingDirectory = $workingDirectory; effectiveProperties = $properties; environment = $environment }
+        }
+    }
+    $commands += [ordered]@{ name = 'Release x64 MSBuild'; executable = (Split-Path -Leaf $ProductExecutable); arguments = @($ProductArguments | ForEach-Object { Get-NormalizedBuildArgument -Argument ([string]$_) -SourceRoot $SourceRoot -HermeticUserRoot $userRoot }); workingDirectory = $workingDirectory; effectiveProperties = $properties; environment = $environment }
+    return @($commands)
+}
+
 function Invoke-ReleaseX64Dependencies {
     param(
         [Parameter(Mandatory = $true)] [string] $SourceRoot,
         [Parameter(Mandatory = $true)] [string] $MsBuildPath,
-        [Parameter(Mandatory = $true)] [string] $CmakePath
+        [Parameter(Mandatory = $true)] [string] $CmakePath,
+        [object] $BuildContext
     )
-    $plan = Get-ReleaseX64DependencyPlan -SourceRoot $SourceRoot -MsBuildPath $MsBuildPath -CmakePath $CmakePath
+    $commonArguments = if ($null -eq $BuildContext) { @('/p:Configuration=Release', '/p:Platform=x64', '/p:PlatformToolset=v143') } else { @($BuildContext.MsBuildArguments) }
+    $plan = Get-ReleaseX64DependencyPlan -SourceRoot $SourceRoot -MsBuildPath $MsBuildPath -CmakePath $CmakePath -CommonMsBuildArguments $commonArguments -CmakeVsGlobalsArgument $(if ($null -eq $BuildContext) { $null } else { $BuildContext.CmakeVsGlobalsArgument })
     foreach ($dependency in $plan) {
         if (-not (Test-Path -LiteralPath $dependency.SourceDirectory -PathType Container)) { throw "Dependency source is missing: $($dependency.Name)" }
-        Invoke-CheckedProcess -FilePath $dependency.FilePath -Arguments $dependency.Arguments -Name "$($dependency.Name) Release x64 build" | Out-Null
+        Invoke-CheckedProcess -FilePath $dependency.FilePath -Arguments $dependency.Arguments -Name "$($dependency.Name) Release x64 build" -NormalizeEnvironment -WorkingDirectory $(if ($null -eq $BuildContext) { $SourceRoot } else { $BuildContext.WorkingDirectory }) -EnvironmentOverrides $(if ($null -eq $BuildContext) { $null } else { $BuildContext.EnvironmentOverrides }) | Out-Null
         if ($dependency.BuildArguments.Count -ne 0) {
-            Invoke-CheckedProcess -FilePath $dependency.FilePath -Arguments $dependency.BuildArguments -Name "$($dependency.Name) Release x64 build" | Out-Null
+            Invoke-CheckedProcess -FilePath $dependency.FilePath -Arguments $dependency.BuildArguments -Name "$($dependency.Name) Release x64 build" -NormalizeEnvironment -WorkingDirectory $(if ($null -eq $BuildContext) { $SourceRoot } else { $BuildContext.WorkingDirectory }) -EnvironmentOverrides $(if ($null -eq $BuildContext) { $null } else { $BuildContext.EnvironmentOverrides }) | Out-Null
         }
     }
     $missing = @($plan | Where-Object { -not (Test-Path -LiteralPath $_.LibraryPath -PathType Leaf) })
@@ -232,17 +509,40 @@ function Invoke-CheckedExecutable {
     return $result.StandardOutput
 }
 
+function Assert-ParentProvenanceShape {
+    param([Parameter(Mandatory = $true)] [object] $Provenance)
+    if ($Provenance.repository -ne 'yt-dlp/yt-dlp-nightly-builds' -or $Provenance.channel -ne 'nightly' -or [string]::IsNullOrWhiteSpace([string]$Provenance.tag)) { throw 'Parent runtime provenance is not the official nightly channel.' }
+    $previousVersion = $Provenance.PSObject.Properties['previousVersion']
+    $previousSha256 = $Provenance.PSObject.Properties['previousSha256']
+    $backupPath = $Provenance.PSObject.Properties['backupPath']
+    if ($null -eq $previousVersion -or $null -eq $previousSha256 -or $null -eq $backupPath -or [string]::IsNullOrWhiteSpace([string]$previousVersion.Value) -or ([string]$previousSha256.Value).ToUpperInvariant() -notmatch '^[A-F0-9]{64}$' -or [string]::IsNullOrWhiteSpace([string]$backupPath.Value)) { throw 'Parent runtime provenance rollback identity is missing.' }
+}
+
+function Get-BackupYtDlpVersion {
+    param([Parameter(Mandatory = $true)] [string] $BackupPath, [scriptblock] $VersionReader)
+    $temporaryExecutable = Join-Path ([IO.Path]::GetTempPath()) ('ytdlp-backup-version-' + [Guid]::NewGuid().ToString('N') + '.exe')
+    try {
+        Copy-Item -LiteralPath $BackupPath -Destination $temporaryExecutable
+        if ($null -ne $VersionReader) { return [string](& $VersionReader $temporaryExecutable) }
+        return (Invoke-CheckedExecutable -Path $temporaryExecutable -Arguments @('--version') -Name 'yt-dlp backup').Trim()
+    }
+    finally { if (Test-Path -LiteralPath $temporaryExecutable) { Remove-Item -LiteralPath $temporaryExecutable -Force -ErrorAction SilentlyContinue } }
+}
+
 function Get-VerifiedParentRuntime {
     param([Parameter(Mandatory = $true)] [string] $ParentRuntime)
     $parent = [IO.Path]::GetFullPath($ParentRuntime)
     $provenancePath = Join-Path $parent 'yt-dlp-provenance.json'
     if (-not (Test-Path -LiteralPath $provenancePath -PathType Leaf)) { throw 'Parent runtime yt-dlp provenance is missing.' }
     $provenance = Get-Content -LiteralPath $provenancePath -Raw | ConvertFrom-Json
-    if ($provenance.repository -ne 'yt-dlp/yt-dlp-nightly-builds' -or $provenance.channel -ne 'nightly' -or [string]::IsNullOrWhiteSpace($provenance.tag)) { throw 'Parent runtime provenance is not the official nightly channel.' }
+    Assert-ParentProvenanceShape -Provenance $provenance
     $ytDlp = Join-Path $parent 'yt-dlp.exe'
     if (-not (Test-Path -LiteralPath $ytDlp -PathType Leaf)) { throw 'Parent runtime yt-dlp.exe is missing.' }
     $hash = (Get-FileHash -LiteralPath $ytDlp -Algorithm SHA256).Hash.ToUpperInvariant()
     if ($hash -cne ([string]$provenance.sha256).ToUpperInvariant()) { throw 'Parent runtime yt-dlp hash does not match provenance.' }
+    $backupPath = [IO.Path]::GetFullPath([string]$provenance.backupPath)
+    if (-not (Test-Path -LiteralPath $backupPath -PathType Leaf) -or (Get-FileHash -LiteralPath $backupPath -Algorithm SHA256).Hash.ToUpperInvariant() -cne ([string]$provenance.previousSha256).ToUpperInvariant()) { throw 'Parent runtime yt-dlp backup does not match provenance rollback identity.' }
+    if ((Get-BackupYtDlpVersion -BackupPath $backupPath) -ne [string]$provenance.previousVersion) { throw 'Parent runtime yt-dlp backup version does not match provenance rollback identity.' }
     $version = Invoke-CheckedExecutable -Path $ytDlp -Arguments @('--version') -Name 'yt-dlp'
     if ($version.Trim() -ne ([string]$provenance.tag).Trim()) { throw 'Parent runtime yt-dlp version does not match provenance tag.' }
     foreach ($check in @(@('ffmpeg.exe', '-version', 'ffmpeg'), @('ffprobe.exe', '-version', 'ffprobe'), @('deno.exe', '--version', 'deno'))) {
@@ -252,7 +552,7 @@ function Get-VerifiedParentRuntime {
 }
 
 function Get-CandidateManifest {
-    param([Parameter(Mandatory = $true)] [string] $CandidateRoot)
+    param([Parameter(Mandatory = $true)] [string] $CandidateRoot, [object] $Attestation)
     $files = Get-ChildItem -LiteralPath $CandidateRoot -File -Recurse | Sort-Object FullName
     $versions = [ordered]@{
         product = (Get-Item -LiteralPath (Join-Path $CandidateRoot 'ytdlp-interface.exe')).VersionInfo.ProductVersion
@@ -263,7 +563,9 @@ function Get-CandidateManifest {
     }
     foreach ($name in $versions.Keys) { if ([string]::IsNullOrWhiteSpace($versions[$name])) { throw "Candidate $name version verification produced no output." } }
     return [ordered]@{
+        schemaVersion = 1
         createdAtUtc = [DateTime]::UtcNow.ToString('o')
+        attestation = $Attestation
         versions = $versions
         files = @($files | ForEach-Object {
             [ordered]@{ path = $_.FullName.Substring($CandidateRoot.Length).TrimStart('\', '/'); sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash; length = $_.Length }
@@ -295,30 +597,61 @@ function Invoke-BuildCandidate {
     $settings = Join-Path $ParentRuntime 'ytdlp-interface.json'
     foreach ($path in @($solution, $project, $catalog, $settings)) { if (-not (Test-Path -LiteralPath $path)) { throw "Required build input is missing: $path" } }
     if (-not (Select-String -LiteralPath $project -Pattern '<PlatformToolset>v143</PlatformToolset>' -Quiet)) { throw 'The project does not declare v143.' }
+    $git = Get-Command git.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1
+    $trackedPaths = Get-GitTrackedPaths -SourceRoot $source -GitPath $git.Source
+    $sourceAttestation = Get-SourceAttestation -SourceRoot $source -GitPath $git.Source -TrackedPaths $trackedPaths
+    $dependencyManifest = Get-DependencyArchiveManifest -SourceRoot $source
     $verifiedParent = Get-VerifiedParentRuntime -ParentRuntime $parent
-    Initialize-OfficialDependencies -SourceRoot $source -DependencyArchiveDirectory $DependencyArchiveDirectory
-    $tools = Get-VsBuildTools
-    $cmake = Get-CmakeExecutable -VisualStudioInstallation $tools.InstallationPath
-    Invoke-ReleaseX64Dependencies -SourceRoot $source -MsBuildPath $tools.MsBuildPath -CmakePath $cmake | Out-Null
-    Invoke-CheckedProcess -FilePath $tools.MsBuildPath -Arguments @($solution, '/m', '/t:Build', '/p:Configuration=Release', '/p:Platform=x64') -Name 'Release x64 MSBuild' | Out-Null
-    $product = Join-Path $source 'ytdlp-interface\x64\Release\ytdlp-interface.exe'
-    if (-not (Test-Path -LiteralPath $product -PathType Leaf)) { throw "Release x64 product is missing: $product" }
-    $candidate = New-CandidateRoot -BaseDirectory $candidateBase
+    $buildWorkspace = $null
     try {
+        $buildWorkspace = New-IsolatedBuildWorkspace -WorkspaceBase (Join-Path $env:SystemDrive 'oai-ytdlp-build')
+        $buildSource = New-IsolatedBuildSource -SourceRoot $source -WorkspaceRoot $buildWorkspace -DependencyRoots @($dependencyManifest.roots) -TrackedPaths $trackedPaths
+        $copiedSourceAttestation = Get-SourceInputAttestation -SourceRoot $buildSource -Commit $sourceAttestation.commit -StatusPorcelain '' -TrackedPaths $trackedPaths
+        if ($copiedSourceAttestation.treeSha256 -cne $sourceAttestation.treeSha256 -or $copiedSourceAttestation.trackedFileCount -ne $sourceAttestation.trackedFileCount) { throw 'source_input_changed' }
+        $dependencyArchiveSourcePath = Join-Path $DependencyArchiveDirectory $dependencyManifest.name
+        if (-not (Test-Path -LiteralPath $dependencyArchiveSourcePath -PathType Leaf)) { throw "Reviewed dependency archive is missing: $dependencyArchiveSourcePath" }
+        $dependencyArchivePath = Join-Path $buildWorkspace $dependencyManifest.name
+        Copy-Item -LiteralPath $dependencyArchiveSourcePath -Destination $dependencyArchivePath
+        Initialize-OfficialDependencies -SourceRoot $buildSource -DependencyArchiveDirectory $buildWorkspace
+        $tools = Get-VsBuildTools
+        $cmake = Get-CmakeExecutable -VisualStudioInstallation $tools.InstallationPath
+        $buildContext = New-HermeticBuildContext -SourceRoot $buildSource -WorkspaceRoot $buildWorkspace -VCToolsVersion $tools.VCToolsVersion -WindowsSdkVersion $tools.WindowsSdkVersion
+        $dependencyPlan = Invoke-ReleaseX64Dependencies -SourceRoot $buildSource -MsBuildPath $tools.MsBuildPath -CmakePath $cmake -BuildContext $buildContext
+        $linkerInputs = Get-DependencyLibraryAttestation -Plan $dependencyPlan
+        $buildSolution = Join-Path $buildSource 'ytdlp-interface\ytdlp-interface.sln'
+        $productBuildArguments = @($buildSolution, '/m', '/t:Build') + @($buildContext.MsBuildArguments)
+        Invoke-CheckedProcess -FilePath $tools.MsBuildPath -Arguments $productBuildArguments -Name 'Release x64 MSBuild' -NormalizeEnvironment -WorkingDirectory $buildContext.WorkingDirectory -EnvironmentOverrides $buildContext.EnvironmentOverrides | Out-Null
+        Assert-DependencyLibraryAttestationUnchanged -Plan $dependencyPlan -Before $linkerInputs | Out-Null
+        $attestation = [ordered]@{
+            source = $sourceAttestation
+            dependencyArchive = [ordered]@{ name = $dependencyManifest.name; sha256 = (Get-FileHash -LiteralPath $dependencyArchivePath -Algorithm SHA256).Hash.ToUpperInvariant() }
+            linkerInputs = $linkerInputs
+            toolchain = Get-BuildToolchainAttestation -Tools $tools -CmakePath $cmake
+            commands = Get-BuildCommandAttestation -SourceRoot $buildSource -DependencyPlan $dependencyPlan -ProductExecutable $tools.MsBuildPath -ProductArguments $productBuildArguments -BuildContext $buildContext
+        }
+        $product = Join-Path $buildSource 'ytdlp-interface\x64\Release\ytdlp-interface.exe'
+        if (-not (Test-Path -LiteralPath $product -PathType Leaf)) { throw "Release x64 product is missing: $product" }
+        $candidate = New-CandidateRoot -BaseDirectory $candidateBase
+        try {
         Copy-CandidateFile -Source $product -DestinationDirectory $candidate
         foreach ($name in Get-RequiredRuntimeFiles) { Copy-CandidateFile -Source (Join-Path $parent $name) -DestinationDirectory $candidate }
         if ((Get-FileHash -LiteralPath (Join-Path $candidate 'yt-dlp.exe') -Algorithm SHA256).Hash.ToUpperInvariant() -cne $verifiedParent.YtDlpHash) { throw 'Candidate yt-dlp copy hash does not match verified parent runtime.' }
         Copy-CandidateFile -Source $settings -DestinationDirectory $candidate
-        Import-Module -Name (Join-Path $source 'tools\runtime-maintenance.psm1') -Force
+        Import-Module -Name (Join-Path $buildSource 'tools\runtime-maintenance.psm1') -Force
         RepairSettings -SettingsPath (Join-Path $candidate 'ytdlp-interface.json') -Confirm:$false | Out-Null
         $localeDirectory = Join-Path $candidate 'locales'; [IO.Directory]::CreateDirectory($localeDirectory) | Out-Null
-        Copy-CandidateFile -Source $catalog -DestinationDirectory $localeDirectory
+        Copy-CandidateFile -Source (Join-Path $buildSource 'locales\ko-KR.json') -DestinationDirectory $localeDirectory
         Test-CandidateAssembly -CandidateRoot $candidate
-        $manifest = Get-CandidateManifest -CandidateRoot $candidate
-        [IO.File]::WriteAllText((Join-Path $candidate 'candidate-manifest.json'), ($manifest | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
-        return [pscustomobject]@{ CandidateRoot = $candidate; ManifestPath = (Join-Path $candidate 'candidate-manifest.json') }
+        $manifest = Get-CandidateManifest -CandidateRoot $candidate -Attestation $attestation
+        $manifestPath = Join-Path $candidate 'candidate-manifest.json'
+        [IO.File]::WriteAllText($manifestPath, ($manifest | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
+        $writtenManifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+        Assert-CandidateManifestSeal -CandidateRoot $candidate -Manifest $writtenManifest | Out-Null
+        return [pscustomobject]@{ CandidateRoot = $candidate; ManifestPath = $manifestPath }
+        }
+        catch { if (Test-Path -LiteralPath $candidate) { Remove-Item -LiteralPath $candidate -Recurse -Force -ErrorAction SilentlyContinue }; throw }
     }
-    catch { if (Test-Path -LiteralPath $candidate) { Remove-Item -LiteralPath $candidate -Recurse -Force -ErrorAction SilentlyContinue }; throw }
+    finally { if (Test-Path -LiteralPath $buildWorkspace) { Remove-Item -LiteralPath $buildWorkspace -Recurse -Force -ErrorAction SilentlyContinue } }
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
