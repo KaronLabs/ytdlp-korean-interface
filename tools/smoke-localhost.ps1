@@ -387,6 +387,31 @@ function Assert-GuiOverlayStringArray {
     }
 }
 
+function Assert-GuiOverlayQueueItems {
+    param([object] $Actual, [AllowEmptyCollection()] [object[]] $Expected)
+    if ($null -eq $Actual -or -not ($Actual -is [Array])) { throw 'gui_settings_overlay_invalid' }
+    $actualEntries = @($Actual)
+    if ($actualEntries.Count -ne $Expected.Count) { throw 'gui_settings_overlay_invalid' }
+    for ($index = 0; $index -lt $Expected.Count; $index++) {
+        $actualEntry = $actualEntries[$index]
+        $expectedEntry = $Expected[$index]
+        if ($actualEntry -is [string] -or $expectedEntry -is [string]) {
+            if ($actualEntry -isnot [string] -or $expectedEntry -isnot [string] -or [string]::IsNullOrWhiteSpace($actualEntry) -or $actualEntry -cne $expectedEntry) { throw 'gui_settings_overlay_invalid' }
+            continue
+        }
+        if ($null -eq $actualEntry -or $null -eq $expectedEntry) { throw 'gui_settings_overlay_invalid' }
+        $expectedNames = @('items', 'name')
+        $actualNames = @($actualEntry.PSObject.Properties.Name | Sort-Object)
+        $plannedNames = @($expectedEntry.PSObject.Properties.Name | Sort-Object)
+        if (($actualNames -join ',') -cne ($expectedNames -join ',') -or ($plannedNames -join ',') -cne ($expectedNames -join ',')) { throw 'gui_settings_overlay_invalid' }
+        if ($actualEntry.name -isnot [string] -or $expectedEntry.name -isnot [string] -or [string]::IsNullOrWhiteSpace($actualEntry.name) -or $actualEntry.name -cne $expectedEntry.name -or
+            $actualEntry.items -isnot [Array] -or $expectedEntry.items -isnot [Array] -or @($actualEntry.items).Count -eq 0 -or @($actualEntry.items).Count -ne @($expectedEntry.items).Count) { throw 'gui_settings_overlay_invalid' }
+        for ($itemIndex = 0; $itemIndex -lt @($expectedEntry.items).Count; $itemIndex++) {
+            if ($actualEntry.items[$itemIndex] -isnot [string] -or $expectedEntry.items[$itemIndex] -isnot [string] -or [string]::IsNullOrWhiteSpace($actualEntry.items[$itemIndex]) -or $actualEntry.items[$itemIndex] -cne $expectedEntry.items[$itemIndex]) { throw 'gui_settings_overlay_invalid' }
+        }
+    }
+}
+
 function Normalize-GuiOverlayPresetOutpaths {
     param([Parameter(Mandatory = $true)] [object] $Settings)
     $presetsProperty = $Settings.PSObject.Properties['presets']
@@ -438,7 +463,7 @@ function Assert-GuiExecutionOverlay {
         [Parameter(Mandatory = $true)] [string] $BaseCandidateManifestSha256,
         [Parameter(Mandatory = $true)] [string] $ExpectedOutputDirectory,
         [Parameter(Mandatory = $true)] [int] $ExpectedWindowDpi,
-        [Parameter(Mandatory = $true)] [AllowEmptyCollection()] [string[]] $ExpectedQueueItems,
+        [Parameter(Mandatory = $true)] [AllowEmptyCollection()] [object[]] $ExpectedQueueItems,
         [Parameter(Mandatory = $true)] [AllowEmptyCollection()] [string[]] $ExpectedQueueStates,
         [ValidateSet('pre-run', 'post-run')] [string] $Phase = 'pre-run'
     )
@@ -461,13 +486,13 @@ function Assert-GuiExecutionOverlay {
     Assert-CandidateManifestSeal -CandidateRoot $base -Manifest $baseManifest | Out-Null
     $baseEntries = @{}
     foreach ($entry in @($baseManifest.files)) {
-        $key = ([string]$entry.path).Replace('/', '\\')
+        $key = ([string]$entry.path).Replace('/', '\')
         if ([string]::IsNullOrWhiteSpace($key) -or $baseEntries.ContainsKey($key)) { throw 'candidate_execution_base_manifest_mismatch' }
         $baseEntries[$key] = $entry
     }
     $executionEntries = @{}
     foreach ($entry in @($executionManifest.files)) {
-        $key = ([string]$entry.path).Replace('/', '\\')
+        $key = ([string]$entry.path).Replace('/', '\')
         if ([string]::IsNullOrWhiteSpace($key) -or $executionEntries.ContainsKey($key)) { throw 'candidate_execution_base_manifest_mismatch' }
         $executionEntries[$key] = $entry
     }
@@ -476,7 +501,7 @@ function Assert-GuiExecutionOverlay {
     $actualEntries = @{}
     $executionManifestFull = [IO.Path]::GetFullPath($executionManifestPath)
     foreach ($item in @(Get-ChildItem -LiteralPath $execution -File -Recurse | Where-Object { $_.FullName -ine $executionManifestFull })) {
-        $key = $item.FullName.Substring($execution.Length).TrimStart([char[]]@('\', '/')).Replace('/', '\\')
+        $key = $item.FullName.Substring($execution.Length).TrimStart([char[]]@('\', '/')).Replace('/', '\')
         if ($actualEntries.ContainsKey($key)) { throw 'candidate_execution_payload_changed' }
         $actualEntries[$key] = $item
     }
@@ -495,7 +520,7 @@ function Assert-GuiExecutionOverlay {
     try {
         $baseSettings = Get-Content -LiteralPath $baseSettingsPath -Raw | ConvertFrom-Json
         $executionSettings = Get-Content -LiteralPath $executionSettingsPath -Raw | ConvertFrom-Json
-        Assert-GuiOverlayStringArray -Actual $executionSettings.unfinished_queue_items -Expected $ExpectedQueueItems
+        Assert-GuiOverlayQueueItems -Actual $executionSettings.unfinished_queue_items -Expected $ExpectedQueueItems
         Assert-GuiOverlayStringArray -Actual $executionSettings.unfinished_queue_states -Expected $ExpectedQueueStates
         if (-not (Test-GuiOverlayWindow -Window $executionSettings.window -ExpectedDpi $ExpectedWindowDpi)) { throw 'gui_settings_overlay_invalid' }
         $expectedOutput = [IO.Path]::GetFullPath($ExpectedOutputDirectory).TrimEnd([char[]]@('\', '/'))
@@ -523,6 +548,95 @@ function Assert-GuiExecutionOverlay {
         payloadsUnchanged = $true
         checkedAtUtc = [DateTime]::UtcNow.ToString('o')
     }
+}
+
+function Write-GuiEvidenceJson {
+    param([Parameter(Mandatory = $true)] [string] $Path, [Parameter(Mandatory = $true)] [object] $Value)
+    [IO.Directory]::CreateDirectory((Split-Path -Parent $Path)) | Out-Null
+    $bytes = [Text.UTF8Encoding]::new($false).GetBytes(($Value | ConvertTo-Json -Depth 100))
+    $stream = New-Object IO.FileStream($Path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    try { $stream.Write($bytes, 0, $bytes.Length); $stream.Flush($true) }
+    finally { $stream.Dispose() }
+}
+
+function New-GuiEvidencePlan {
+    param(
+        [Parameter(Mandatory = $true)] [string] $CandidateRoot,
+        [Parameter(Mandatory = $true)] [string] $Workspace,
+        [Parameter(Mandatory = $true)] [string] $EvidenceDirectory,
+        [Parameter(Mandatory = $true)] [string] $ExpectedCandidateManifestSha256,
+        [Parameter(Mandatory = $true)] [string] $ExpectedOutputDirectory,
+        [Parameter(Mandatory = $true)] [int] $ExpectedWindowDpi,
+        [Parameter(Mandatory = $true)] [AllowEmptyCollection()] [object[]] $ExpectedQueueItems,
+        [Parameter(Mandatory = $true)] [AllowEmptyCollection()] [string[]] $ExpectedQueueStates,
+        [Parameter(Mandatory = $true)] [ValidatePattern('^[a-fA-F0-9]{32}$')] [string] $RunId
+    )
+    $candidate = [IO.Path]::GetFullPath($CandidateRoot)
+    $workspaceFull = [IO.Path]::GetFullPath($Workspace)
+    $evidence = [IO.Path]::GetFullPath($EvidenceDirectory)
+    $output = [IO.Path]::GetFullPath($ExpectedOutputDirectory)
+    $pathsOverlap = (Test-PathOverlap -First $candidate -Second $workspaceFull) -or (Test-PathOverlap -First $candidate -Second $evidence) -or (Test-PathOverlap -First $workspaceFull -Second $evidence)
+    if ($pathsOverlap -or -not (Test-PathContained -Root $workspaceFull -Path $output) -or $ExpectedWindowDpi -le 0) { throw 'gui_evidence_plan_invalid' }
+    Assert-GuiOverlayQueueItems -Actual ([object[]]$ExpectedQueueItems) -Expected $ExpectedQueueItems
+    Assert-GuiOverlayStringArray -Actual ([string[]]$ExpectedQueueStates) -Expected $ExpectedQueueStates
+    $execution = Copy-SealedCandidateForSmoke -CandidateRoot $candidate -Workspace $workspaceFull -ExpectedCandidateManifestSha256 $ExpectedCandidateManifestSha256
+    Set-SmokeCandidateOutputPath -CandidateRoot $execution -OutputDirectory $output
+    $preRun = Assert-SmokeExecutionOverlay -ExecutionCandidate $execution -BaseCandidateRoot $candidate -BaseCandidateManifestSha256 $ExpectedCandidateManifestSha256 -ExpectedOutputDirectory $output -Phase 'pre-run'
+    $planPath = Join-Path $evidence (Join-Path 'gui-plans' ($RunId.ToLowerInvariant() + '.plan.json'))
+    $plan = [ordered]@{
+        schemaVersion = 1
+        kind = 'gui-evidence-plan'
+        runId = $RunId.ToLowerInvariant()
+        createdAtUtc = [DateTime]::UtcNow.ToString('o')
+        baseCandidateRoot = $candidate
+        baseCandidateManifestSha256 = $ExpectedCandidateManifestSha256.ToUpperInvariant()
+        executionCandidate = $execution
+        outputDirectory = $output
+        expectedWindowDpi = $ExpectedWindowDpi
+        expectedQueueItems = $ExpectedQueueItems
+        expectedQueueStates = $ExpectedQueueStates
+        expectedProcessPath = (Join-Path $execution 'ytdlp-interface.exe')
+        preRunAttestation = $preRun
+    }
+    Write-GuiEvidenceJson -Path $planPath -Value $plan
+    return [ordered]@{
+        runId = $plan.runId
+        planPath = $planPath
+        planSha256 = (Get-FileHash -LiteralPath $planPath -Algorithm SHA256).Hash.ToUpperInvariant()
+        executionCandidate = $execution
+        expectedProcessPath = $plan.expectedProcessPath
+    }
+}
+
+function Complete-GuiEvidencePlan {
+    param(
+        [Parameter(Mandatory = $true)] [string] $PlanPath,
+        [Parameter(Mandatory = $true)] [ValidatePattern('^[a-fA-F0-9]{64}$')] [string] $ExpectedPlanSha256,
+        [int] $GuiProcessId
+    )
+    if (-not (Test-Path -LiteralPath $PlanPath -PathType Leaf)) { throw 'gui_evidence_plan_invalid' }
+    $planSha256 = (Get-FileHash -LiteralPath $PlanPath -Algorithm SHA256).Hash.ToUpperInvariant()
+    if ($planSha256 -cne $ExpectedPlanSha256.ToUpperInvariant()) { throw 'gui_evidence_plan_mismatch' }
+    try { $plan = Get-Content -LiteralPath $PlanPath -Raw | ConvertFrom-Json }
+    catch { throw 'gui_evidence_plan_invalid' }
+    if ($plan.kind -cne 'gui-evidence-plan' -or $plan.schemaVersion -ne 1 -or $plan.runId -notmatch '^[a-fA-F0-9]{32}$' -or $plan.baseCandidateManifestSha256 -notmatch '^[a-fA-F0-9]{64}$') { throw 'gui_evidence_plan_invalid' }
+    if ($GuiProcessId -gt 0 -and $null -ne (Get-Process -Id $GuiProcessId -ErrorAction SilentlyContinue)) { throw 'gui_process_still_running' }
+    $postRun = Assert-GuiExecutionOverlay -ExecutionCandidate ([string]$plan.executionCandidate) -BaseCandidateRoot ([string]$plan.baseCandidateRoot) -BaseCandidateManifestSha256 ([string]$plan.baseCandidateManifestSha256) -ExpectedOutputDirectory ([string]$plan.outputDirectory) -ExpectedWindowDpi ([int]$plan.expectedWindowDpi) -ExpectedQueueItems @($plan.expectedQueueItems) -ExpectedQueueStates @($plan.expectedQueueStates) -Phase 'post-run'
+    $evidence = Split-Path -Parent (Split-Path -Parent $PlanPath)
+    $attestationPath = Join-Path $evidence (Join-Path 'gui-plans' ($plan.runId.ToLowerInvariant() + '.post.json'))
+    $attestation = [ordered]@{
+        schemaVersion = 1
+        kind = 'gui-evidence-attestation'
+        runId = $plan.runId.ToLowerInvariant()
+        completedAtUtc = [DateTime]::UtcNow.ToString('o')
+        planPath = [IO.Path]::GetFullPath($PlanPath)
+        planSha256 = $planSha256
+        guiProcessId = if ($GuiProcessId -gt 0) { $GuiProcessId } else { $null }
+        expectedProcessPath = $plan.expectedProcessPath
+        postRunAttestation = $postRun
+    }
+    Write-GuiEvidenceJson -Path $attestationPath -Value $attestation
+    return [ordered]@{ planSha256 = $planSha256; attestationPath = $attestationPath; postRunAttestation = $postRun }
 }
 
 function Get-SmokeDownloadsKnownFolderPath {

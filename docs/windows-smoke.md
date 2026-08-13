@@ -105,6 +105,13 @@ non-settings payload, then permits only the declared output path, exact queue
 items/states, exact window schema and DPI, and order-only changes to existing
 `presets[*].data.outpaths`. Every other settings difference, including proxy
 configuration or a changed preset-path set, invalidates the execution copy.
+Before any GUI action, `New-GuiEvidencePlan` writes an append-only plan that
+pins the base candidate SHA-256, execution copy, process path, output path,
+expected queue shape/states, and expected DPI. After the GUI exits normally,
+`Complete-GuiEvidencePlan` accepts only the caller-pinned plan SHA-256,
+rechecks the GUI overlay against that predeclared state, and writes a separate
+append-only post-run attestation. The expected GUI state is therefore fixed
+before interaction rather than inferred from the resulting settings file.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/smoke-localhost.ps1 -Run -CandidateRoot <candidate> -ParentRuntime <preserved-runtime> -ExpectedCandidateManifestSha256 <reviewed-sha256> -OperatorGuided

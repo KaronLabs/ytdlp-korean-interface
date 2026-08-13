@@ -666,6 +666,16 @@ function Set-GuiOverlayFixtureSettings {
     [IO.File]::WriteAllText($Fixture.ManifestPath, ($Fixture.Manifest | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
 }
 
+function Add-ManifestedFixtureFile {
+    param([Parameter(Mandatory = $true)] $Fixture, [Parameter(Mandatory = $true)] [string] $RelativePath, [Parameter(Mandatory = $true)] [string] $Content)
+    $path = Join-Path $Fixture.Root ($RelativePath.Replace('/', '\'))
+    [IO.Directory]::CreateDirectory((Split-Path -Parent $path)) | Out-Null
+    [IO.File]::WriteAllText($path, $Content, [Text.UTF8Encoding]::new($false))
+    $item = Get-Item -LiteralPath $path
+    $Fixture.Manifest.files += [ordered]@{ path = $RelativePath; sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash; length = $item.Length }
+    [IO.File]::WriteAllText($Fixture.ManifestPath, ($Fixture.Manifest | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
+}
+
 function Test-GuiExecutionOverlayAllowsOnlyDeclaredRuntimeState {
     $root = New-FixtureRoot
     try {
@@ -788,6 +798,111 @@ function Test-GuiExecutionOverlayRejectsUnexpectedWindowShape {
         try { Assert-GuiExecutionOverlay -ExecutionCandidate $execution -BaseCandidateRoot $fixture.Root -BaseCandidateManifestSha256 $baseHash -ExpectedOutputDirectory $output -ExpectedWindowDpi 96 -ExpectedQueueItems @() -ExpectedQueueStates @() -Phase 'post-run'; $actual = 'no_failure' }
         catch { $actual = $_.Exception.Message }
         Assert-Equal 'gui_settings_overlay_invalid' $actual 'GUI overlay validation must reject unexpected window fields.'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+function Test-GuiExecutionOverlaySupportsNativePlaylistCategoryQueue {
+    $root = New-FixtureRoot
+    try {
+        $fixture = New-MinimalSealedCandidate -Root $root
+        Set-GuiOverlayFixtureSettings -Fixture $fixture
+        $workspace = Join-Path $root 'workspace'; [IO.Directory]::CreateDirectory($workspace) | Out-Null
+        $output = Join-Path $workspace 'output'; [IO.Directory]::CreateDirectory($output) | Out-Null
+        $execution = Copy-SealedCandidateForSmoke -CandidateRoot $fixture.Root -Workspace $workspace
+        $baseHash = (Get-FileHash -LiteralPath $fixture.ManifestPath -Algorithm SHA256).Hash
+        $settingsPath = Join-Path $execution 'ytdlp-interface.json'
+        $settings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+        $settings.outpath = $output
+        $settings.unfinished_queue_items = @(
+            'http://127.0.0.1:60324/direct.m3u8',
+            [pscustomobject]@{ name = 'Local Korean Playlist'; items = @('http://127.0.0.1:60321/input-a.mp4', 'http://127.0.0.1:60321/input-b.mp4') }
+        )
+        $settings.unfinished_queue_states = @('queued', 'complete', 'queued')
+        [IO.File]::WriteAllText($settingsPath, ($settings | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
+        $expectedItems = @(
+            'http://127.0.0.1:60324/direct.m3u8',
+            [pscustomobject]@{ name = 'Local Korean Playlist'; items = @('http://127.0.0.1:60321/input-a.mp4', 'http://127.0.0.1:60321/input-b.mp4') }
+        )
+        $attestation = Assert-GuiExecutionOverlay -ExecutionCandidate $execution -BaseCandidateRoot $fixture.Root -BaseCandidateManifestSha256 $baseHash -ExpectedOutputDirectory $output -ExpectedWindowDpi 96 -ExpectedQueueItems $expectedItems -ExpectedQueueStates @('queued', 'complete', 'queued') -Phase 'post-run'
+        Assert-Equal 'gui-settings-overlay' $attestation.kind 'GUI overlay validation must support the native playlist-category queue shape.'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+function Test-GuiExecutionOverlayAcceptsForwardSlashManifestPaths {
+    $root = New-FixtureRoot
+    try {
+        $fixture = New-MinimalSealedCandidate -Root $root
+        Set-GuiOverlayFixtureSettings -Fixture $fixture
+        Add-ManifestedFixtureFile -Fixture $fixture -RelativePath 'locales/ko-KR.json' -Content '{"language":"ko-KR"}'
+        $workspace = Join-Path $root 'workspace'; [IO.Directory]::CreateDirectory($workspace) | Out-Null
+        $execution = Copy-SealedCandidateForSmoke -CandidateRoot $fixture.Root -Workspace $workspace
+        $baseHash = (Get-FileHash -LiteralPath $fixture.ManifestPath -Algorithm SHA256).Hash
+        $attestation = Assert-GuiExecutionOverlay -ExecutionCandidate $execution -BaseCandidateRoot $fixture.Root -BaseCandidateManifestSha256 $baseHash -ExpectedOutputDirectory 'C:\old' -ExpectedWindowDpi 96 -ExpectedQueueItems @() -ExpectedQueueStates @() -Phase 'pre-run'
+        Assert-True ([bool]$attestation.payloadsUnchanged) 'Forward-slash manifest paths must validate against the copied nested payload.'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+function Test-GuiExecutionOverlayRejectsChangedNonSettingsPayload {
+    $root = New-FixtureRoot
+    try {
+        $fixture = New-MinimalSealedCandidate -Root $root
+        Set-GuiOverlayFixtureSettings -Fixture $fixture
+        Add-ManifestedFixtureFile -Fixture $fixture -RelativePath 'bin/fixture.bin' -Content 'original'
+        $workspace = Join-Path $root 'workspace'; [IO.Directory]::CreateDirectory($workspace) | Out-Null
+        $execution = Copy-SealedCandidateForSmoke -CandidateRoot $fixture.Root -Workspace $workspace
+        $baseHash = (Get-FileHash -LiteralPath $fixture.ManifestPath -Algorithm SHA256).Hash
+        [IO.File]::WriteAllText((Join-Path $execution 'bin\fixture.bin'), 'mutated', [Text.UTF8Encoding]::new($false))
+        try { Assert-GuiExecutionOverlay -ExecutionCandidate $execution -BaseCandidateRoot $fixture.Root -BaseCandidateManifestSha256 $baseHash -ExpectedOutputDirectory 'C:\old' -ExpectedWindowDpi 96 -ExpectedQueueItems @() -ExpectedQueueStates @() -Phase 'post-run'; $actual = 'no_failure' }
+        catch { $actual = $_.Exception.Message }
+        Assert-Equal 'candidate_execution_payload_changed' $actual 'GUI overlay validation must reject changed non-settings payload bytes.'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+function Test-GuiEvidencePlanBindsPredeclaredStateToPostRunAttestation {
+    $root = New-FixtureRoot
+    try {
+        $command = Get-Command -Name New-GuiEvidencePlan -ErrorAction SilentlyContinue
+        Assert-True ($null -ne $command) 'GUI evidence must create an append-only predeclared execution plan.'
+        if ($null -eq $command) { return }
+        $fixture = New-MinimalSealedCandidate -Root $root
+        Set-GuiOverlayFixtureSettings -Fixture $fixture
+        $workspace = Join-Path $root 'workspace'; [IO.Directory]::CreateDirectory($workspace) | Out-Null
+        $output = Join-Path $workspace 'output'; [IO.Directory]::CreateDirectory($output) | Out-Null
+        $evidence = Join-Path $root 'evidence'
+        $baseHash = (Get-FileHash -LiteralPath $fixture.ManifestPath -Algorithm SHA256).Hash
+        $expectedItems = @('http://127.0.0.1:60324/master.m3u8')
+        $plan = New-GuiEvidencePlan -CandidateRoot $fixture.Root -Workspace $workspace -EvidenceDirectory $evidence -ExpectedCandidateManifestSha256 $baseHash -ExpectedOutputDirectory $output -ExpectedWindowDpi 120 -ExpectedQueueItems $expectedItems -ExpectedQueueStates @('queued') -RunId 'a2bdf113c5e74bfbb57fa14c0ab5bbac'
+        Assert-True (Test-Path -LiteralPath $plan.planPath) 'GUI evidence plan must be persisted before GUI interaction.'
+        $settingsPath = Join-Path $plan.executionCandidate 'ytdlp-interface.json'
+        $settings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+        $settings.unfinished_queue_items = $expectedItems
+        $settings.unfinished_queue_states = @('queued')
+        $settings.window = [pscustomobject]@{ dpi = 120; h = 879; w = 1429; x = 366; y = 198; zoomed = $false }
+        [IO.File]::WriteAllText($settingsPath, ($settings | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
+        $post = Complete-GuiEvidencePlan -PlanPath $plan.planPath -ExpectedPlanSha256 $plan.planSha256
+        Assert-Equal $plan.planSha256 $post.planSha256 'Post-run attestation must bind the immutable predeclared plan hash.'
+        Assert-True (Test-Path -LiteralPath $post.attestationPath) 'Post-run attestation must be append-only evidence outside the execution copy.'
+        $postJson = Get-Content -LiteralPath $post.attestationPath -Raw | ConvertFrom-Json
+        Assert-Equal 'gui-evidence-attestation' $postJson.kind 'Persisted evidence must identify the GUI evidence attestation schema.'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+function Test-GuiEvidencePlanSupportsAnExplicitEmptyQueue {
+    $root = New-FixtureRoot
+    try {
+        $fixture = New-MinimalSealedCandidate -Root $root
+        Set-GuiOverlayFixtureSettings -Fixture $fixture
+        $workspace = Join-Path $root 'workspace'; [IO.Directory]::CreateDirectory($workspace) | Out-Null
+        $output = Join-Path $workspace 'output'; [IO.Directory]::CreateDirectory($output) | Out-Null
+        $evidence = Join-Path $root 'evidence'
+        $baseHash = (Get-FileHash -LiteralPath $fixture.ManifestPath -Algorithm SHA256).Hash
+        $plan = New-GuiEvidencePlan -CandidateRoot $fixture.Root -Workspace $workspace -EvidenceDirectory $evidence -ExpectedCandidateManifestSha256 $baseHash -ExpectedOutputDirectory $output -ExpectedWindowDpi 96 -ExpectedQueueItems @() -ExpectedQueueStates @() -RunId 'd14de75b1d924496ac1e156173b7f2fb'
+        Assert-True (Test-Path -LiteralPath $plan.planPath) 'A GUI evidence plan must admit an explicitly declared empty queue.'
     }
     finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
 }
@@ -1212,6 +1327,11 @@ $sealRedTests = @(
     'Test-GuiExecutionOverlayRejectsChangedPresetPathSet',
     'Test-GuiExecutionOverlayRejectsUnexpectedQueueEntry',
     'Test-GuiExecutionOverlayRejectsUnexpectedWindowShape',
+    'Test-GuiExecutionOverlaySupportsNativePlaylistCategoryQueue',
+    'Test-GuiExecutionOverlayAcceptsForwardSlashManifestPaths',
+    'Test-GuiExecutionOverlayRejectsChangedNonSettingsPayload',
+    'Test-GuiEvidencePlanBindsPredeclaredStateToPostRunAttestation',
+    'Test-GuiEvidencePlanSupportsAnExplicitEmptyQueue',
     'Test-SmokeExecutionOverlayRejectsBaseRootOverlap',
     'Test-SmokeEvidenceLivesOutsideCandidateAndPreservesWholeTree',
     'Test-CleanupFailureOnFailedRunIsRecordedAndThrown',
