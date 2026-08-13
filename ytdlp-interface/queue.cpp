@@ -329,11 +329,11 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 			completed.clear();
 			for(auto &item : lbq.at(item.pos().cat))
 			{
-				const auto text {item.text(3)};
-				if(text == "done")
+				const auto state {item.value<lbqval_t>().state};
+				if(state == queue_item_state::done)
 					//completed.push_back(item.value<lbqval_t>().url);
 					completed.push_back(item.pos());
-				else if(text.find("stopped") == -1 && text.find("queued") == -1 && text.find("error") == -1 && text.find("skip") == -1)
+				else if(state == queue_item_state::active)
 					stoppable.push_back(item);
 				else startable.push_back(item);
 			}
@@ -344,7 +344,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 			auto verb {btndl.caption().substr(0, 5)};
 			if(verb.back() == ' ')
 				verb.pop_back();
-			if(item.text(3).find("stopped") != -1)
+			if(item.value<lbqval_t>().state == queue_item_state::stopped)
 				verb = "Resume";
 			m.append(verb + " " + item_name, [&, url, this](menu::item_proxy)
 			{
@@ -413,7 +413,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 				});
 			}
 
-			if(item.text(3) != "error" || !bottom.vidinfo.empty())
+			if(item.value<lbqval_t>().state != queue_item_state::error || !bottom.vidinfo.empty())
 			{
 				m.append_splitter();
 				if(bottom.is_ytplaylist || bottom.is_bcplaylist || bottom.is_scplaylist || bottom.is_gen_playlist)
@@ -522,8 +522,15 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 				{
 					item.check(!item.checked());
 					if(item.checked())
+					{
 						item.text(3, "skip");
-					else item.text(3, "queued");
+						item.value<lbqval_t>().state = queue_item_state::skipped;
+					}
+					else
+					{
+						item.text(3, "queued");
+						item.value<lbqval_t>().state = queue_item_state::queued;
+					}
 					lbq.refresh_theme();
 					taskbar_overall_progress();
 				}).checked(item.checked());
@@ -609,7 +616,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 				else 
 				{
 					startables.push_back(url);
-					if(item.text(3) != "done")
+					if(item.value<lbqval_t>().state != queue_item_state::done)
 						startables_not_done.push_back(item);
 				}
 			}
@@ -679,6 +686,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 					for(auto item : src)
 					{
 						item.text(3, check ? "skip" : "queued");
+						item.value<lbqval_t>().state = check ? queue_item_state::skipped : queue_item_state::queued;
 						item.check(check);
 					}
 					lbq.refresh_theme();
@@ -695,6 +703,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 						for(auto item : startables_not_done)
 						{
 							item.text(3, "skip");
+							item.value<lbqval_t>().state = queue_item_state::skipped;
 							item.check(true);
 						}
 						lbq.refresh_theme();
@@ -709,6 +718,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 						for(auto item : skippers)
 						{
 							item.text(3, "queued");
+							item.value<lbqval_t>().state = queue_item_state::queued;
 							item.check(false);
 						}
 						lbq.refresh_theme();
@@ -723,11 +733,13 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 						for(auto item : startables_not_done)
 						{
 							item.text(3, "skip");
+							item.value<lbqval_t>().state = queue_item_state::skipped;
 							item.check(true);
 						}
 						for(auto item : skippers)
 						{
 							item.text(3, "queued");
+							item.value<lbqval_t>().state = queue_item_state::queued;
 							item.check(false);
 						}
 						lbq.refresh_theme();
@@ -1053,8 +1065,8 @@ bool GUI::queue_save()
 				auto &qitems {conf.unfinished_queue_items.emplace_back(icat.text(), std::vector<std::string>{}).second};
 				for(auto item : icat)
 				{
-					auto text {item.text(3)};
-					if(text != "done" && (text != "error" || text == "error" && conf.cb_save_errors))
+					const auto state {item.value<lbqval_t>().state};
+					if(state != queue_item_state::done && (state != queue_item_state::error || conf.cb_save_errors))
 						qitems.push_back(nana::to_utf8(item.value<lbqval_t>().url));
 				}
 			}
@@ -1077,8 +1089,8 @@ void GUI::queue_save_data(size_t max_qitems_to_process)
 		{
 			for(auto item : icat)
 			{
-				auto text {item.text(3)};
-				if(text != "done" && (text != "error" || text == "error" && conf.cb_save_errors))
+				const auto state {item.value<lbqval_t>().state};
+				if(state != queue_item_state::done && (state != queue_item_state::error || conf.cb_save_errors))
 				{
 					auto &bot {bottoms.at(item.value<lbqval_t>())};
 					if(!bot.vidinfo.empty() || !bot.playlist_info.empty())
@@ -1099,8 +1111,8 @@ void GUI::queue_save_data(size_t max_qitems_to_process)
 				auto &qitems {conf.unfinished_queue_items.emplace_back(icat.text(), std::vector<std::string>{}).second};
 				for(auto item : icat)
 				{
-					auto text {item.text(3)};
-					if(text != "done" && (text != "error" || text == "error" && conf.cb_save_errors))
+					const auto state {item.value<lbqval_t>().state};
+					if(state != queue_item_state::done && (state != queue_item_state::error || conf.cb_save_errors))
 					{
 						const auto wurl {item.value<lbqval_t>().url};
 						const auto url {nana::to_utf8(wurl)};

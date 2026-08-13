@@ -1300,8 +1300,8 @@ void GUI::fm_settings()
 						}
 					}
 
-					const auto text {item.text(3)};
-					if(text != "done" && (text != "error" || text == "error" && conf.cb_save_errors))
+					const auto state {item.value<lbqval_t>().state};
+					if(state != queue_item_state::done && (state != queue_item_state::error || conf.cb_save_errors))
 						qitems.push_back(nana::to_utf8(item.value<lbqval_t>().url));
 				}
 			}
@@ -2062,22 +2062,23 @@ void GUI::updater_update_self(themed_form &parent)
 	static fs::path arc_path;
 	static bool btnffmpeg_state, btnytdlp_state;
 	arc_path = fs::temp_directory_path() / (X64 ? (win7 ? "ytdlp-interface_win7.7z" : "ytdlp-interface.7z") : (win7 ? "ytdlp-interface_x86_win7.7z" : "ytdlp-interface_x86.7z"));
-	if(btn_update.caption() == "Update")
+	if(!updater_working)
 	{
 		btn_update.caption("Cancel");
 		btnffmpeg_state = btn_update_ffmpeg.enabled();
 		btnytdlp_state = btn_update_ytdlp.enabled();
 		btn_update_ffmpeg.enabled(false);
 		btn_update_ytdlp.enabled(false);
+		updater_working = true;
 		thr_updater = std::thread {[&parent, this]
 		{
-			updater_working = true;
 			if(!X64 && releases[0]["assets"].size() < 2)
 			{
 				::widgets::msgbox mbox {parent, "ytdlp-interface update error"};
 				mbox.icon(nana::msgbox::icon_error);
 				(mbox << "The latest release on GitHub doesn't seem to contain a 32-bit package!")();
 				btn_update.caption("Update");
+				updater_working = false;
 				thr_updater.detach();
 				return;
 			}
@@ -2087,6 +2088,7 @@ void GUI::updater_update_self(themed_form &parent)
 				mbox.icon(nana::msgbox::icon_error);
 				(mbox << "The latest release on GitHub doesn't seem to contain a Windows 7 package!")();
 				btn_update.caption("Update");
+				updater_working = false;
 				thr_updater.detach();
 				return;
 			}
@@ -2215,12 +2217,12 @@ void GUI::updater_update_self(themed_form &parent)
 
 void GUI::updater_update_deno(themed_form &parent)
 {
-	if(btn_update_deno.caption() != "Cancel")
+	if(!updater_working_deno)
 	{
 		btn_update_deno.caption("Cancel");
+		updater_working_deno = true;
 		thr_updater_deno = std::thread {[this]
 		{
-			updater_working_deno = true;
 			auto arc_path {fs::temp_directory_path() / url_latest_deno.substr(url_latest_deno.rfind('/') + 1)};
 			unsigned progval {0};
 			prog_updater_deno.amount(size_latest_deno);
@@ -2294,15 +2296,15 @@ void GUI::updater_update_misc(bool ytdlp, fs::path target)
 
 	static auto btntext_ffmpeg {btn_update_ffmpeg.caption()}, btntext_ytdlp {btn_update_ytdlp.caption()};
 
-	if(btn->caption() != "Cancel")
+	if(!updater_working)
 	{
 		btnffmpeg_state = btn_update_ffmpeg.enabled();
 		btnytdlp_state = btn_update_ytdlp.enabled();
 		btnupdate_state = btn_update.enabled();
 		btn->caption("Cancel");
+		updater_working = true;
 		thr_updater = std::thread {[ytdlp, target, this]
 		{
-			updater_working = true;
 			unsigned progval {0};
 			const auto arc_size {ytdlp ? size_latest_ytdlp : size_latest_ffmpeg};
 			const auto arc_url {ytdlp ? url_latest_ytdlp : url_latest_ffmpeg};

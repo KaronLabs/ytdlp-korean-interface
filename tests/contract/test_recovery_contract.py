@@ -210,6 +210,45 @@ def is_tracked_runtime_artifact(path):
 
 
 class RecoveryContractTests(unittest.TestCase):
+    def test_task_3_settings_language_defaults_persists_and_falls_back(self):
+        header = (SOURCE_ROOT / "types.hpp").read_text(encoding="utf-8-sig")
+        source = (SOURCE_ROOT / "types.cpp").read_text(encoding="utf-8-sig")
+        self.assertRegex(header, r'std::string\s+language\s*\{\s*"en-US"\s*\}')
+        self.assertIn('j["language"] = language;', source)
+        self.assertRegex(source, r'language\s*=\s*"en-US";')
+        self.assertRegex(source, r'value\s*==\s*"ko-KR"\s*\|\|\s*value\s*==\s*"en-US"')
+
+    def test_task_3_loads_selected_catalog_before_gui_construction(self):
+        source = (SOURCE_ROOT / "main.cpp").read_text(encoding="utf-8-sig", errors="replace")
+        self.assertIn('i18n::load_catalog', source)
+        load = source.index('i18n::load_catalog')
+        construct = source.index('GUI gui;')
+        self.assertLess(load, construct)
+        self.assertIn('appdir / "locales" / "ko-KR.json"', source)
+        self.assertIn('localization.log', source)
+        self.assertIn('i18n::reset_for_tests()', source)
+
+    def test_task_3_behavior_never_compares_visible_control_captions(self):
+        sources = {
+            path.name: path.read_text(encoding="utf-8-sig", errors="replace")
+            for path in (
+                SOURCE_ROOT / "gui.cpp",
+                SOURCE_ROOT / "gui_make.cpp",
+                SOURCE_ROOT / "outbox.cpp",
+                SOURCE_ROOT / "queue.cpp",
+                SOURCE_ROOT / "forms" / "form_formats.cpp",
+                SOURCE_ROOT / "forms" / "form_settings.cpp",
+            )
+        }
+        forbidden = ("done", "queue", "Audio only", "Video only", "Update", "Cancel")
+        for name, source in sources.items():
+            for caption in forbidden:
+                with self.subTest(source=name, caption=caption):
+                    self.assertNotRegex(
+                        source,
+                        rf'(?:caption\s*\(\s*\)|text\s*\(\s*3\s*\)).{{0,80}}(?:==|!=|\.find\s*\()\s*"{re.escape(caption)}"',
+                    )
+
     def test_i18n_source_and_header_exist(self):
         self.assertTrue(I18N_SOURCE.is_file(), f"missing i18n source: {I18N_SOURCE}")
         self.assertTrue(I18N_HEADER.is_file(), f"missing i18n header: {I18N_HEADER}")

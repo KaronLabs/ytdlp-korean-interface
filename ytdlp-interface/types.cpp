@@ -674,6 +674,7 @@ void settings_t::to_json(nlohmann::json &j) const
 	}
 
 	j["com_cookies"] = com_cookies;
+	j["language"] = language;
 	j["ytdlp_path"] = ytdlp_path;
 	j["outpath"] = outpath;
 	j["fmt1"] = to_utf8(fmt1);
@@ -766,6 +767,13 @@ void settings_t::to_json(nlohmann::json &j) const
 void settings_t::from_json(const nlohmann::json &j)
 {
 	using nana::to_wstring;
+	language = "en-US";
+	if(j.contains("language") && j["language"].is_string())
+	{
+		const auto value {j["language"].get<std::string>()};
+		if(value == "ko-KR" || value == "en-US")
+			language = value;
+	}
 
 	ytdlp_path = j["ytdlp_path"].get<std::string>();
 	if(!ytdlp_path.empty())

@@ -1,5 +1,16 @@
 ﻿#include "gui.hpp"
+#include "i18n.hpp"
 #pragma warning (disable: 4244)
+
+namespace
+{
+	void append_localization_diagnostics(const fs::path &settings_path, const std::vector<i18n::diagnostic> &diagnostics)
+	{
+		std::ofstream output {fs::path {settings_path}.replace_filename("localization.log"), std::ios::app};
+		for(const auto &diagnostic : diagnostics)
+			output << diagnostic.key << ": " << diagnostic.reason << '\n';
+	}
+}
 
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
@@ -141,6 +152,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 		fs::copy_file(appdir_confpath, confpath, ec);
 
 	nlohmann::json jconf;
+	bool invalid_language_setting {false};
 	if(fs::exists(confpath))
 	{
 		std::ifstream f {confpath};
@@ -153,6 +165,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 		}
 		if(!jconf.empty())
 		{
+			invalid_language_setting = jconf.contains("language") &&
+				(!jconf["language"].is_string() || (jconf["language"] != "en-US" && jconf["language"] != "ko-KR"));
 			GUI::conf.from_json(jconf);
 			std::error_code ec;
 			if(!fs::exists(GUI::conf.ffmpeg_path, ec))
@@ -169,6 +183,18 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 		}
 	}
 	else GUI::conf.outpath = util::get_sys_folder(FOLDERID_Downloads);
+
+	std::vector<i18n::diagnostic> localization_diagnostics;
+	if(GUI::conf.language == "ko-KR")
+	{
+		auto result {i18n::load_catalog(appdir / "locales" / "ko-KR.json")};
+		localization_diagnostics = std::move(result.diagnostics);
+	}
+	else i18n::reset_for_tests();
+	if(invalid_language_setting)
+		localization_diagnostics.push_back({"language", "unsupported setting"});
+	if(!localization_diagnostics.empty())
+		append_localization_diagnostics(confpath, localization_diagnostics);
 
 	jconf.clear();
 

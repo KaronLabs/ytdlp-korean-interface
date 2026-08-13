@@ -43,6 +43,8 @@ void GUI::fm_formats()
 		"(this passes --audio-multistreams to yt-dlp)"};
 	::widgets::Listbox list {fm, nullptr, true};
 	::widgets::Button btnok {fm, "Use the selected format(s)"}, btncancel {fm, "Let yt-dlp choose the best formats (default)"};
+	const auto no_category {static_cast<size_t>(-1)};
+	size_t audio_category {1}, video_category {2};
 
 	fm["l_title"] << l_title;
 	fm["l_dur"] << l_dur;
@@ -92,7 +94,7 @@ void GUI::fm_formats()
 		if(conf.audio_multistreams)
 		{
 			auto pos {list.cast({arg.pos.x, arg.pos.y})};
-			if(pos.is_category() && list.at(pos.cat).text() == "Audio only")
+			if(pos.is_category() && pos.cat == audio_category)
 			{
 				list.auto_draw(false);
 				for(auto ip : list.at(pos.cat))
@@ -115,32 +117,29 @@ void GUI::fm_formats()
 				for(auto ip : list.at(0))
 					if(ip != item)
 						ip.check(false);
-				if(list.size_categ() == 3)
-					for(auto ip : list.at(2))
+				if(video_category != no_category)
+					for(auto ip : list.at(video_category))
 						ip.check(false);
-				if(list.size_categ() > 1 && (!conf.audio_multistreams || list.at(1).text() == "Video only"))
-					for(auto ip : list.at(1))
+				if(!conf.audio_multistreams && audio_category != no_category)
+					for(auto ip : list.at(audio_category))
 						ip.check(false);
 			}
-			else if(list.size_categ() > 1)
+			else if(pos.cat == video_category)
 			{
-				if(list.at(pos.cat).text() == "Video only")
-				{
-					for(auto ip : list.at(0))
+				for(auto ip : list.at(0))
+					ip.check(false);
+				for(auto ip : list.at(video_category))
+					if(ip != item)
 						ip.check(false);
-					for(auto ip : list.at(2))
-						if(ip != item)
-							ip.check(false);
-				}
-				else if(!conf.audio_multistreams)
-				{
-					for(auto ip : list.at(1))
-						if(ip != item)
-							ip.check(false);
-					for(auto ip : list.at(0))
-						if(ip != item)
-							ip.check(false);
-				}
+			}
+			else if(pos.cat == audio_category && !conf.audio_multistreams)
+			{
+				for(auto ip : list.at(audio_category))
+					if(ip != item)
+						ip.check(false);
+				for(auto ip : list.at(0))
+					if(ip != item)
+						ip.check(false);
 			}
 			list.auto_draw(true);
 		}
@@ -150,7 +149,7 @@ void GUI::fm_formats()
 	cb_streams.events().checked([&]
 	{
 		conf.audio_multistreams = cb_streams.checked();
-		if(!conf.audio_multistreams && list.size_categ() > 1 && list.at(1).text() == "Audio only")
+		if(!conf.audio_multistreams && audio_category != no_category)
 		{
 			list.auto_draw(false);
 			int count {0};
@@ -160,7 +159,7 @@ void GUI::fm_formats()
 					count++;
 					break;
 				}
-			for(auto ip : list.at(1))
+			for(auto ip : list.at(audio_category))
 				if(ip.checked())
 				{
 					if(!count)
@@ -234,11 +233,7 @@ void GUI::fm_formats()
 		fmt1.clear();
 		fmt2.clear();
 
-		size_t vidcat {0};
-		if(list.size_categ() == 3)
-			vidcat = 2;
-		else if(list.size_categ() == 2 && list.at(1).text() == "Video only")
-			vidcat = 1;
+		const size_t vidcat {video_category == no_category ? 0 : video_category};
 
 		bool mergeall {false};
 		if(vidcat == 2)
@@ -296,7 +291,7 @@ void GUI::fm_formats()
 					fsize = util::int_to_filesize(fmt["filesize"].get<std::uint64_t>(), false);
 				else if(fmt.contains("filesize_approx") && fmt["filesize_approx"] != nullptr)
 					fsize = util::int_to_filesize(fmt["filesize_approx"].get<std::uint64_t>(), false);
-				if(list.at(sel.front().cat).text() == "Audio only")
+				if(sel.front().cat == audio_category)
 					fmt_note = get_string(fmt, "format_note");
 				else fmt_note = get_string(fmt, "resolution");
 				ext = get_string(fmt, "ext");
@@ -569,9 +564,17 @@ void GUI::fm_formats()
 	if(list.size_categ() == 3)
 	{
 		if(list.at(2).size() == 0)
+		{
 			list.erase(2);
+			video_category = no_category;
+		}
 		if(list.at(1).size() == 0)
+		{
 			list.erase(1);
+			audio_category = no_category;
+			if(video_category != no_category)
+				video_category = 1;
+		}
 	}
 
 	list.refresh_theme();

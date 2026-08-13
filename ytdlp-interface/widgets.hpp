@@ -36,10 +36,21 @@
 
 namespace fs = std::filesystem;
 
+enum class queue_item_state
+{
+	queued,
+	active,
+	stopped,
+	done,
+	error,
+	skipped,
+};
+
 struct lbqval_t
 {
 	std::wstring url;
 	nana::paint::image *pimg {nullptr};
+	queue_item_state state {queue_item_state::queued};
 	operator const nana::paint::image *() const { return pimg; }
 	operator const nana::paint::image *() { return pimg; }
 	operator const std::wstring &() const { return url; }

@@ -474,7 +474,7 @@ void GUI::make_form_bottom()
 
 	btnq.events().click([&]
 	{
-		if(btnq.caption().find("queue") != -1)
+		if(!queue_panel.visible())
 			show_queue();
 		else show_output();
 	});
@@ -858,7 +858,10 @@ void GUI::make_message_handlers()
 			{
 			case YTDLP_POSTPROCESS:
 				if(bottoms.at(url).started)
+				{
 					item.text(3, "processing");
+					item.value<lbqval_t>().state = queue_item_state::active;
+				}
 				else return true;
 				if(conf.cb_lengthyproc && bottoms.contains(url) && !bottoms.at(url).is_playlist())
 				{
@@ -883,6 +886,7 @@ void GUI::make_message_handlers()
 
 			case YTDLP_DOWNLOAD:
 				item.text(3, "downloading");
+				item.value<lbqval_t>().state = queue_item_state::active;
 				break;
 			}
 		}
@@ -1245,7 +1249,7 @@ void GUI::make_message_handlers()
 			lbq.auto_draw(false);
 		for(int cat {0}; cat < lbq.size_categ(); cat++)
 			for(auto item : lbq.at(cat))
-				if(item.text(3) == "skip")
+				if(item.value<lbqval_t>().state == queue_item_state::skipped)
 					item.check(true);
 		lbq.refresh_theme();
 		if(!items_initialized)
@@ -1258,7 +1262,7 @@ void GUI::make_message_handlers()
 	{
 		auto stridx {std::to_string(lbq.at(cat).size() + 1)};
 		lbq.at(cat).append({stridx, "...", "...", "queued", "...", "...", "...", "..."});
-		lbq.at(cat).back().value(lbqval_t {*reinterpret_cast<std::wstring*>(url), nullptr});
+		lbq.at(cat).back().value(lbqval_t {*reinterpret_cast<std::wstring*>(url), nullptr, queue_item_state::queued});
 		//adjust_lbq_headers();
 		return false;
 	});

@@ -10,7 +10,6 @@
 
 settings_t GUI::conf;
 std::unordered_map<std::string, settings_t> GUI::conf_presets;
-nana::internationalization GUI::lang;
 
 
 GUI::GUI() : themed_form {std::bind(&GUI::apply_theme, this, std::placeholders::_1)}
@@ -70,8 +69,7 @@ GUI::GUI() : themed_form {std::bind(&GUI::apply_theme, this, std::placeholders::
 			for(size_t cat {0}; cat < lbq.size_categ(); cat++)
 				for(auto item : lbq.at(cat))
 				{
-					const auto text {item.text(3)};
-					if(text == "done")
+					if(item.value<lbqval_t>().state == queue_item_state::done)
 						completed.push_back(item.value<lbqval_t>().url);
 				}
 
@@ -265,7 +263,7 @@ bool GUI::process_queue_item(std::wstring url)
 		if(tbpipe.current() == url)
 		{
 			tbpipe.clear();
-			if(tbpipe_overlay.visible() && btnq.caption().find("queue") != -1)
+			if(tbpipe_overlay.visible() && !queue_panel.visible())
 				tbpipe.show(url);
 		}
 		else tbpipe.clear(url);
@@ -861,6 +859,7 @@ bool GUI::process_queue_item(std::wstring url)
 			if(i_taskbar && lbq.item_count() == 1)
 				i_taskbar->SetProgressState(hwnd, TBPF_NORMAL);
 			lbq.set_line_text(url, {"", "", "started", "", "", "", ""});
+			lbq.item_from_value(url).value<lbqval_t>().state = queue_item_state::active;
 
 			auto cb_append = [url, this](std::string text, bool keyword)
 			{
@@ -907,6 +906,7 @@ bool GUI::process_queue_item(std::wstring url)
 				if(res == "failed")
 				{
 					lbq.set_line_text(url, {"", "", "error", "", "", "", ""});
+					lbq.item_from_value(url).value<lbqval_t>().state = queue_item_state::error;
 					auto progtext {prog.nana::progress::caption()};
 					auto pos1 {progtext.find('[')};
 					if(pos1 != -1)
@@ -924,7 +924,11 @@ bool GUI::process_queue_item(std::wstring url)
 						}
 					}
 				}
-				else lbq.set_line_text(url, {"", "", "done", "", "", "", ""});
+				else
+				{
+					lbq.set_line_text(url, {"", "", "done", "", "", "", ""});
+					lbq.item_from_value(url).value<lbqval_t>().state = queue_item_state::done;
+				}
 
 				taskbar_overall_progress();
 				if(i_taskbar && lbq.item_count() == 1)
@@ -985,6 +989,7 @@ bool GUI::process_queue_item(std::wstring url)
 		else if(text.find('%') != -1)
 			lbq.set_line_text(url, {"", "", "stopped (" + text + ")", "", "", "", ""});
 		else lbq.set_line_text(url, {"", "", "stopped", "", "", "", ""});
+		item.value<lbqval_t>().state = queue_item_state::stopped;
 		if(tbpipe.current() == url)
 		{
 			auto ca {tbpipe.colored_area_access()};
@@ -1015,9 +1020,12 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 
 	if(item == lbq.empty_item || refresh)
 	{
-		if(refresh)
-			lbq.set_line_text(url, {"...", "...", "", "...", "...", "...", "..."});
-		else SendMessage(hwnd, WM_LBQ_NEWITEM, cat, reinterpret_cast<LPARAM>(&url));
+	if(refresh)
+	{
+		lbq.set_line_text(url, {"...", "...", "", "...", "...", "...", "..."});
+		lbq.item_from_value(url).value<lbqval_t>().state = queue_item_state::queued;
+	}
+	else SendMessage(hwnd, WM_LBQ_NEWITEM, cat, reinterpret_cast<LPARAM>(&url));
 
 		auto &bottom {bottoms.add(url)};
 		if(!refresh)
@@ -1163,6 +1171,7 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 				{
 					media_title = "Can't parse the JSON data produced by yt-dlp! See output for details.";
 					lbq.set_line_text(url, {"", "", "error", "", "", "", ""});
+					lbq.item_from_value(url).value<lbqval_t>().state = queue_item_state::error;
 					outbox.caption(e.what() + std::string {"\n\n"} + media_info, url);
 					if(outbox.current() == url)
 					{
@@ -2291,9 +2300,9 @@ void GUI::taskbar_overall_progress()
 		{
 			for(auto &item : lbq.at(cat))
 			{
-				if(item.text(3) == "done")
+				if(item.value<lbqval_t>().state == queue_item_state::done)
 					completed++;
-				else if(item.text(3) == "skip")
+				else if(item.value<lbqval_t>().state == queue_item_state::skipped)
 					skip++;
 				else startable++;
 			}
@@ -2348,8 +2357,9 @@ unsigned GUI::start_next_urls(std::wstring current_url)
 				{
 					if(item == current_item)
 						continue;
-					auto status_text {item.text(3)};
-					if(status_text == "queued" || status_text.find("stopped") == 0 || !bottoms.at(item.value<lbqval_t>().url).started && status_text.find("%") != -1)
+					const auto state {item.value<lbqval_t>().state};
+					if(state == queue_item_state::queued || state == queue_item_state::stopped ||
+						!bottoms.at(item.value<lbqval_t>().url).started && state == queue_item_state::active)
 					{
 						auto pos {item.pos()};
 						if(pos.cat <= current_pos.cat && pos.item < current_pos.item)

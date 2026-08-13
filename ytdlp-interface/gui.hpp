@@ -32,7 +32,6 @@ public:
 
 	static settings_t conf;
 	static std::unordered_map<std::string, settings_t> conf_presets;
-	static nana::internationalization lang;
 	fs::path confpath, infopath;
 	std::function<bool()> fn_write_conf;
 	nlohmann::json unfinished_qitems_data;
