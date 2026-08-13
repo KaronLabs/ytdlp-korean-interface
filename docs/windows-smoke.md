@@ -99,6 +99,13 @@ paths require a newly-created contained final `.mp3`, no `.part` files,
 `ffprobe` codec `mp3`, and positive duration. The server is polled at its exact
 `127.0.0.1` URL before the GUI starts.
 
+GUI evidence uses a separate `gui-settings-overlay` attestation; it does not
+relax the smoke contract. It rechecks the same base manifest and every
+non-settings payload, then permits only the declared output path, exact queue
+items/states, exact window schema and DPI, and order-only changes to existing
+`presets[*].data.outpaths`. Every other settings difference, including proxy
+configuration or a changed preset-path set, invalidates the execution copy.
+
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/smoke-localhost.ps1 -Run -CandidateRoot <candidate> -ParentRuntime <preserved-runtime> -ExpectedCandidateManifestSha256 <reviewed-sha256> -OperatorGuided
 ```

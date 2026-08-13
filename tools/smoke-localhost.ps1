@@ -377,6 +377,154 @@ function Assert-SmokeExecutionOverlay {
     }
 }
 
+function Assert-GuiOverlayStringArray {
+    param([object] $Actual, [string[]] $Expected)
+    if ($null -eq $Actual -or -not ($Actual -is [Array])) { throw 'gui_settings_overlay_invalid' }
+    $values = @($Actual)
+    if ($values.Count -ne $Expected.Count) { throw 'gui_settings_overlay_invalid' }
+    for ($index = 0; $index -lt $Expected.Count; $index++) {
+        if ($values[$index] -isnot [string] -or $values[$index] -cne $Expected[$index]) { throw 'gui_settings_overlay_invalid' }
+    }
+}
+
+function Normalize-GuiOverlayPresetOutpaths {
+    param([Parameter(Mandatory = $true)] [object] $Settings)
+    $presetsProperty = $Settings.PSObject.Properties['presets']
+    if ($null -eq $presetsProperty -or $null -eq $presetsProperty.Value -or -not ($presetsProperty.Value -is [Array])) { throw 'gui_settings_overlay_invalid' }
+    foreach ($preset in @($presetsProperty.Value)) {
+        if ($null -eq $preset -or $null -eq $preset.PSObject.Properties['data']) { throw 'gui_settings_overlay_invalid' }
+        $data = $preset.data
+        if ($null -eq $data -or $null -eq $data.PSObject.Properties['outpaths']) { throw 'gui_settings_overlay_invalid' }
+        $outpaths = $data.outpaths
+        if ($null -eq $outpaths -or -not ($outpaths -is [Array])) { throw 'gui_settings_overlay_invalid' }
+        $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+        $normalized = New-Object Collections.Generic.List[string]
+        foreach ($outpath in @($outpaths)) {
+            if ($outpath -isnot [string] -or -not $seen.Add($outpath)) { throw 'gui_settings_overlay_invalid' }
+            $normalized.Add($outpath)
+        }
+        $data.outpaths = @($normalized | Sort-Object)
+    }
+}
+
+function Test-GuiOverlayWindow {
+    param([object] $Window, [int] $ExpectedDpi)
+    if ($null -eq $Window) { return $false }
+    $expectedNames = @('dpi', 'h', 'w', 'x', 'y', 'zoomed') | Sort-Object
+    $actualNames = @($Window.PSObject.Properties.Name | Sort-Object)
+    if ($actualNames.Count -ne $expectedNames.Count) { return $false }
+    for ($index = 0; $index -lt $expectedNames.Count; $index++) { if ($actualNames[$index] -cne $expectedNames[$index]) { return $false } }
+    foreach ($name in @('dpi', 'h', 'w', 'x', 'y')) {
+        if ($Window.$name -isnot [int] -and $Window.$name -isnot [long]) { return $false }
+    }
+    if ($Window.zoomed -isnot [bool] -or [int]$Window.dpi -ne $ExpectedDpi -or [int]$Window.dpi -le 0 -or [int]$Window.w -le 0 -or [int]$Window.h -le 0) { return $false }
+    return $true
+}
+
+function Convert-GuiSettingsForOverlayComparison {
+    param([Parameter(Mandatory = $true)] [object] $Settings)
+    $copy = ($Settings | ConvertTo-Json -Depth 100 | ConvertFrom-Json)
+    Normalize-GuiOverlayPresetOutpaths -Settings $copy
+    foreach ($name in @('outpath', 'unfinished_queue_items', 'unfinished_queue_states', 'window')) {
+        if ($null -ne $copy.PSObject.Properties[$name]) { $copy.PSObject.Properties.Remove($name) }
+    }
+    return ($copy | ConvertTo-Json -Depth 100 -Compress)
+}
+
+function Assert-GuiExecutionOverlay {
+    param(
+        [Parameter(Mandatory = $true)] [string] $ExecutionCandidate,
+        [Parameter(Mandatory = $true)] [string] $BaseCandidateRoot,
+        [Parameter(Mandatory = $true)] [string] $BaseCandidateManifestSha256,
+        [Parameter(Mandatory = $true)] [string] $ExpectedOutputDirectory,
+        [Parameter(Mandatory = $true)] [int] $ExpectedWindowDpi,
+        [Parameter(Mandatory = $true)] [AllowEmptyCollection()] [string[]] $ExpectedQueueItems,
+        [Parameter(Mandatory = $true)] [AllowEmptyCollection()] [string[]] $ExpectedQueueStates,
+        [ValidateSet('pre-run', 'post-run')] [string] $Phase = 'pre-run'
+    )
+    if ($BaseCandidateManifestSha256 -notmatch '^[A-Fa-f0-9]{64}$') { throw 'candidate_execution_base_manifest_mismatch' }
+    $base = [IO.Path]::GetFullPath($BaseCandidateRoot)
+    $execution = [IO.Path]::GetFullPath($ExecutionCandidate)
+    if (Test-PathOverlap -First $base -Second $execution) { throw 'candidate_execution_base_overlap' }
+    $baseManifestPath = Join-Path $base 'candidate-manifest.json'
+    $executionManifestPath = Join-Path $execution 'candidate-manifest.json'
+    if (-not (Test-Path -LiteralPath $baseManifestPath -PathType Leaf) -or -not (Test-Path -LiteralPath $executionManifestPath -PathType Leaf)) { throw 'candidate_execution_base_manifest_mismatch' }
+    $expectedHash = $BaseCandidateManifestSha256.ToUpperInvariant()
+    $baseHash = (Get-FileHash -LiteralPath $baseManifestPath -Algorithm SHA256).Hash.ToUpperInvariant()
+    $executionHash = (Get-FileHash -LiteralPath $executionManifestPath -Algorithm SHA256).Hash.ToUpperInvariant()
+    if ($baseHash -cne $expectedHash -or $executionHash -cne $expectedHash) { throw 'candidate_execution_base_manifest_mismatch' }
+    try {
+        $baseManifest = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($baseManifestPath)) | ConvertFrom-Json
+        $executionManifest = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($executionManifestPath)) | ConvertFrom-Json
+    }
+    catch { throw 'candidate_execution_base_manifest_mismatch' }
+    Assert-CandidateManifestSeal -CandidateRoot $base -Manifest $baseManifest | Out-Null
+    $baseEntries = @{}
+    foreach ($entry in @($baseManifest.files)) {
+        $key = ([string]$entry.path).Replace('/', '\\')
+        if ([string]::IsNullOrWhiteSpace($key) -or $baseEntries.ContainsKey($key)) { throw 'candidate_execution_base_manifest_mismatch' }
+        $baseEntries[$key] = $entry
+    }
+    $executionEntries = @{}
+    foreach ($entry in @($executionManifest.files)) {
+        $key = ([string]$entry.path).Replace('/', '\\')
+        if ([string]::IsNullOrWhiteSpace($key) -or $executionEntries.ContainsKey($key)) { throw 'candidate_execution_base_manifest_mismatch' }
+        $executionEntries[$key] = $entry
+    }
+    if ($baseEntries.Count -ne $executionEntries.Count) { throw 'candidate_execution_base_manifest_mismatch' }
+    foreach ($key in $baseEntries.Keys) { if (-not $executionEntries.ContainsKey($key)) { throw 'candidate_execution_base_manifest_mismatch' } }
+    $actualEntries = @{}
+    $executionManifestFull = [IO.Path]::GetFullPath($executionManifestPath)
+    foreach ($item in @(Get-ChildItem -LiteralPath $execution -File -Recurse | Where-Object { $_.FullName -ine $executionManifestFull })) {
+        $key = $item.FullName.Substring($execution.Length).TrimStart([char[]]@('\', '/')).Replace('/', '\\')
+        if ($actualEntries.ContainsKey($key)) { throw 'candidate_execution_payload_changed' }
+        $actualEntries[$key] = $item
+    }
+    if ($actualEntries.Count -ne $baseEntries.Count) { throw 'candidate_execution_payload_changed' }
+    foreach ($key in $baseEntries.Keys) {
+        if (-not $actualEntries.ContainsKey($key)) { throw 'candidate_execution_payload_changed' }
+        if ($key -ine 'ytdlp-interface.json') {
+            $actual = $actualEntries[$key]
+            $expected = $baseEntries[$key]
+            if ($actual.Length -ne [long]$expected.length -or (Get-FileHash -LiteralPath $actual.FullName -Algorithm SHA256).Hash.ToUpperInvariant() -cne ([string]$expected.sha256).ToUpperInvariant()) { throw 'candidate_execution_payload_changed' }
+        }
+    }
+    $baseSettingsPath = Join-Path $base 'ytdlp-interface.json'
+    $executionSettingsPath = Join-Path $execution 'ytdlp-interface.json'
+    if (-not (Test-Path -LiteralPath $baseSettingsPath -PathType Leaf) -or -not (Test-Path -LiteralPath $executionSettingsPath -PathType Leaf)) { throw 'gui_settings_overlay_invalid' }
+    try {
+        $baseSettings = Get-Content -LiteralPath $baseSettingsPath -Raw | ConvertFrom-Json
+        $executionSettings = Get-Content -LiteralPath $executionSettingsPath -Raw | ConvertFrom-Json
+        Assert-GuiOverlayStringArray -Actual $executionSettings.unfinished_queue_items -Expected $ExpectedQueueItems
+        Assert-GuiOverlayStringArray -Actual $executionSettings.unfinished_queue_states -Expected $ExpectedQueueStates
+        if (-not (Test-GuiOverlayWindow -Window $executionSettings.window -ExpectedDpi $ExpectedWindowDpi)) { throw 'gui_settings_overlay_invalid' }
+        $expectedOutput = [IO.Path]::GetFullPath($ExpectedOutputDirectory).TrimEnd([char[]]@('\', '/'))
+        $actualOutput = [string]$executionSettings.outpath
+        if ($executionSettings.outpath -isnot [string] -or [string]::IsNullOrWhiteSpace($actualOutput) -or [IO.Path]::GetFullPath($actualOutput).TrimEnd([char[]]@('\', '/')) -cne $expectedOutput) { throw 'gui_settings_overlay_invalid' }
+        if ((Convert-GuiSettingsForOverlayComparison -Settings $baseSettings) -cne (Convert-GuiSettingsForOverlayComparison -Settings $executionSettings)) { throw 'gui_settings_overlay_invalid' }
+    }
+    catch {
+        if ($_.Exception.Message -eq 'gui_settings_overlay_invalid') { throw }
+        throw 'gui_settings_overlay_invalid'
+    }
+    return [ordered]@{
+        kind = 'gui-settings-overlay'
+        phase = $Phase
+        baseCandidateManifestSha256 = $expectedHash
+        executionCandidateManifestSha256 = $executionHash
+        overlayPath = 'ytdlp-interface.json'
+        allowedSettingsFields = @('outpath', 'presets.data.outpaths(order)', 'unfinished_queue_items', 'unfinished_queue_states', 'window')
+        expectedWindowDpi = $ExpectedWindowDpi
+        expectedQueueItems = $ExpectedQueueItems
+        expectedQueueStates = $ExpectedQueueStates
+        baseSettingsSha256 = (Get-FileHash -LiteralPath $baseSettingsPath -Algorithm SHA256).Hash.ToUpperInvariant()
+        settingsSha256 = (Get-FileHash -LiteralPath $executionSettingsPath -Algorithm SHA256).Hash.ToUpperInvariant()
+        outpath = $actualOutput
+        payloadsUnchanged = $true
+        checkedAtUtc = [DateTime]::UtcNow.ToString('o')
+    }
+}
+
 function Get-SmokeDownloadsKnownFolderPath {
     $module = Import-Module -Name (Join-Path $PSScriptRoot 'runtime-maintenance.psm1') -Force -PassThru
     return & $module { Get-DownloadsKnownFolderPath }

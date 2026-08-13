@@ -645,6 +645,153 @@ function Test-SmokeExecutionOverlayAllowsOnlyOutpathSettingsChange {
     finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
+function Set-GuiOverlayFixtureSettings {
+    param([Parameter(Mandatory = $true)] $Fixture)
+    $settings = [ordered]@{
+        outpath = 'C:\old'
+        proxy = [ordered]@{ URL = ''; enabled = $false }
+        presets = @(
+            [ordered]@{ name = 'one'; data = [ordered]@{ outpaths = @('C:\Users\Administrator\Downloads', 'D:\Luna-Youtube-Downloader'); proxy = [ordered]@{ URL = ''; enabled = $false } } },
+            [ordered]@{ name = 'two'; data = [ordered]@{ outpaths = @('C:\Users\Administrator\Videos', 'C:\Users\Administrator\Downloads'); proxy = [ordered]@{ URL = ''; enabled = $false } } }
+        )
+        unfinished_queue_items = @()
+        unfinished_queue_states = @()
+        window = [ordered]@{ dpi = 96; h = 703; w = 1000; x = 366; y = 198; zoomed = $false }
+        protected = 'unchanged'
+    }
+    [IO.File]::WriteAllText($Fixture.SettingsPath, ($settings | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
+    $item = Get-Item -LiteralPath $Fixture.SettingsPath
+    $Fixture.Manifest.files[0].sha256 = (Get-FileHash -LiteralPath $Fixture.SettingsPath -Algorithm SHA256).Hash
+    $Fixture.Manifest.files[0].length = $item.Length
+    [IO.File]::WriteAllText($Fixture.ManifestPath, ($Fixture.Manifest | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
+}
+
+function Test-GuiExecutionOverlayAllowsOnlyDeclaredRuntimeState {
+    $root = New-FixtureRoot
+    try {
+        $command = Get-Command -Name Assert-GuiExecutionOverlay -ErrorAction SilentlyContinue
+        Assert-True ($null -ne $command) 'GUI evidence must expose a dedicated execution-overlay validator.'
+        if ($null -eq $command) { return }
+        $fixture = New-MinimalSealedCandidate -Root $root
+        Set-GuiOverlayFixtureSettings -Fixture $fixture
+        $workspace = Join-Path $root 'workspace'; [IO.Directory]::CreateDirectory($workspace) | Out-Null
+        $output = Join-Path $workspace 'output'; [IO.Directory]::CreateDirectory($output) | Out-Null
+        $execution = Copy-SealedCandidateForSmoke -CandidateRoot $fixture.Root -Workspace $workspace
+        $baseHash = (Get-FileHash -LiteralPath $fixture.ManifestPath -Algorithm SHA256).Hash
+        $settingsPath = Join-Path $execution 'ytdlp-interface.json'
+        $settings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+        $settings.outpath = $output
+        $settings.presets[0].data.outpaths = @('D:\Luna-Youtube-Downloader', 'C:\Users\Administrator\Downloads')
+        $settings.presets[1].data.outpaths = @('C:\Users\Administrator\Downloads', 'C:\Users\Administrator\Videos')
+        $settings.unfinished_queue_items = @('http://127.0.0.1:60324/master.m3u8')
+        $settings.unfinished_queue_states = @('queued')
+        $settings.window = [pscustomobject]@{ dpi = 120; h = 879; w = 1429; x = 366; y = 198; zoomed = $false }
+        [IO.File]::WriteAllText($settingsPath, ($settings | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
+        $attestation = Assert-GuiExecutionOverlay -ExecutionCandidate $execution -BaseCandidateRoot $fixture.Root -BaseCandidateManifestSha256 $baseHash -ExpectedOutputDirectory $output -ExpectedWindowDpi 120 -ExpectedQueueItems @('http://127.0.0.1:60324/master.m3u8') -ExpectedQueueStates @('queued') -Phase 'post-run'
+        Assert-Equal 'gui-settings-overlay' $attestation.kind 'GUI runtime state must have a separate, explicit overlay classification.'
+        Assert-True ([bool]$attestation.payloadsUnchanged) 'GUI overlay attestation must preserve every non-settings payload.'
+        Assert-Equal 'outpath,presets.data.outpaths(order),unfinished_queue_items,unfinished_queue_states,window' ($attestation.allowedSettingsFields -join ',') 'GUI allowlist must be explicit and narrowly bounded.'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+function Test-GuiExecutionOverlayRejectsProtectedSettingsMutation {
+    $root = New-FixtureRoot
+    try {
+        $command = Get-Command -Name Assert-GuiExecutionOverlay -ErrorAction SilentlyContinue
+        Assert-True ($null -ne $command) 'GUI evidence must reject settings outside the declared runtime state.'
+        if ($null -eq $command) { return }
+        $fixture = New-MinimalSealedCandidate -Root $root
+        Set-GuiOverlayFixtureSettings -Fixture $fixture
+        $workspace = Join-Path $root 'workspace'; [IO.Directory]::CreateDirectory($workspace) | Out-Null
+        $output = Join-Path $workspace 'output'; [IO.Directory]::CreateDirectory($output) | Out-Null
+        $execution = Copy-SealedCandidateForSmoke -CandidateRoot $fixture.Root -Workspace $workspace
+        $baseHash = (Get-FileHash -LiteralPath $fixture.ManifestPath -Algorithm SHA256).Hash
+        $settingsPath = Join-Path $execution 'ytdlp-interface.json'
+        $settings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+        $settings.outpath = $output
+        $settings.proxy.enabled = $true
+        [IO.File]::WriteAllText($settingsPath, ($settings | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
+        try { Assert-GuiExecutionOverlay -ExecutionCandidate $execution -BaseCandidateRoot $fixture.Root -BaseCandidateManifestSha256 $baseHash -ExpectedOutputDirectory $output -ExpectedWindowDpi 96 -ExpectedQueueItems @() -ExpectedQueueStates @() -Phase 'post-run'; $actual = 'no_failure' }
+        catch { $actual = $_.Exception.Message }
+        Assert-Equal 'gui_settings_overlay_invalid' $actual 'GUI overlay validation must reject proxy mutation.'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+function Test-GuiExecutionOverlayRejectsChangedPresetPathSet {
+    $root = New-FixtureRoot
+    try {
+        $command = Get-Command -Name Assert-GuiExecutionOverlay -ErrorAction SilentlyContinue
+        Assert-True ($null -ne $command) 'GUI evidence must restrict preset changes to ordering only.'
+        if ($null -eq $command) { return }
+        $fixture = New-MinimalSealedCandidate -Root $root
+        Set-GuiOverlayFixtureSettings -Fixture $fixture
+        $workspace = Join-Path $root 'workspace'; [IO.Directory]::CreateDirectory($workspace) | Out-Null
+        $output = Join-Path $workspace 'output'; [IO.Directory]::CreateDirectory($output) | Out-Null
+        $execution = Copy-SealedCandidateForSmoke -CandidateRoot $fixture.Root -Workspace $workspace
+        $baseHash = (Get-FileHash -LiteralPath $fixture.ManifestPath -Algorithm SHA256).Hash
+        $settingsPath = Join-Path $execution 'ytdlp-interface.json'
+        $settings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+        $settings.outpath = $output
+        $settings.presets[0].data.outpaths = @('C:\Users\Administrator\Downloads', 'C:\untrusted')
+        [IO.File]::WriteAllText($settingsPath, ($settings | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
+        try { Assert-GuiExecutionOverlay -ExecutionCandidate $execution -BaseCandidateRoot $fixture.Root -BaseCandidateManifestSha256 $baseHash -ExpectedOutputDirectory $output -ExpectedWindowDpi 96 -ExpectedQueueItems @() -ExpectedQueueStates @() -Phase 'post-run'; $actual = 'no_failure' }
+        catch { $actual = $_.Exception.Message }
+        Assert-Equal 'gui_settings_overlay_invalid' $actual 'GUI overlay validation must reject a changed preset path set.'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+function Test-GuiExecutionOverlayRejectsUnexpectedQueueEntry {
+    $root = New-FixtureRoot
+    try {
+        $command = Get-Command -Name Assert-GuiExecutionOverlay -ErrorAction SilentlyContinue
+        Assert-True ($null -ne $command) 'GUI evidence must bind the exact persisted queue entries.'
+        if ($null -eq $command) { return }
+        $fixture = New-MinimalSealedCandidate -Root $root
+        Set-GuiOverlayFixtureSettings -Fixture $fixture
+        $workspace = Join-Path $root 'workspace'; [IO.Directory]::CreateDirectory($workspace) | Out-Null
+        $output = Join-Path $workspace 'output'; [IO.Directory]::CreateDirectory($output) | Out-Null
+        $execution = Copy-SealedCandidateForSmoke -CandidateRoot $fixture.Root -Workspace $workspace
+        $baseHash = (Get-FileHash -LiteralPath $fixture.ManifestPath -Algorithm SHA256).Hash
+        $settingsPath = Join-Path $execution 'ytdlp-interface.json'
+        $settings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+        $settings.outpath = $output
+        $settings.unfinished_queue_items = @('http://127.0.0.1:60324/master.m3u8', 'http://127.0.0.1:60324/unexpected.m3u8')
+        $settings.unfinished_queue_states = @('queued', 'queued')
+        [IO.File]::WriteAllText($settingsPath, ($settings | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
+        try { Assert-GuiExecutionOverlay -ExecutionCandidate $execution -BaseCandidateRoot $fixture.Root -BaseCandidateManifestSha256 $baseHash -ExpectedOutputDirectory $output -ExpectedWindowDpi 96 -ExpectedQueueItems @('http://127.0.0.1:60324/master.m3u8') -ExpectedQueueStates @('queued') -Phase 'post-run'; $actual = 'no_failure' }
+        catch { $actual = $_.Exception.Message }
+        Assert-Equal 'gui_settings_overlay_invalid' $actual 'GUI overlay validation must reject unexpected persisted queue entries.'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+function Test-GuiExecutionOverlayRejectsUnexpectedWindowShape {
+    $root = New-FixtureRoot
+    try {
+        $command = Get-Command -Name Assert-GuiExecutionOverlay -ErrorAction SilentlyContinue
+        Assert-True ($null -ne $command) 'GUI evidence must bind the exact persisted window schema.'
+        if ($null -eq $command) { return }
+        $fixture = New-MinimalSealedCandidate -Root $root
+        Set-GuiOverlayFixtureSettings -Fixture $fixture
+        $workspace = Join-Path $root 'workspace'; [IO.Directory]::CreateDirectory($workspace) | Out-Null
+        $output = Join-Path $workspace 'output'; [IO.Directory]::CreateDirectory($output) | Out-Null
+        $execution = Copy-SealedCandidateForSmoke -CandidateRoot $fixture.Root -Workspace $workspace
+        $baseHash = (Get-FileHash -LiteralPath $fixture.ManifestPath -Algorithm SHA256).Hash
+        $settingsPath = Join-Path $execution 'ytdlp-interface.json'
+        $settings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+        $settings.outpath = $output
+        $settings.window | Add-Member -NotePropertyName unexpected -NotePropertyValue 1
+        [IO.File]::WriteAllText($settingsPath, ($settings | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
+        try { Assert-GuiExecutionOverlay -ExecutionCandidate $execution -BaseCandidateRoot $fixture.Root -BaseCandidateManifestSha256 $baseHash -ExpectedOutputDirectory $output -ExpectedWindowDpi 96 -ExpectedQueueItems @() -ExpectedQueueStates @() -Phase 'post-run'; $actual = 'no_failure' }
+        catch { $actual = $_.Exception.Message }
+        Assert-Equal 'gui_settings_overlay_invalid' $actual 'GUI overlay validation must reject unexpected window fields.'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
 function Test-SmokeExecutionOverlayRejectsBaseRootOverlap {
     $root = New-FixtureRoot
     try {
@@ -1060,6 +1207,11 @@ $sealRedTests = @(
     'Test-SmokeSettingsOverrideProducesExplicitDerivativeAttestation',
     'Test-SmokeExecutionOverlayRejectsBaseMismatchAndNonSettingsMutation',
     'Test-SmokeExecutionOverlayAllowsOnlyOutpathSettingsChange',
+    'Test-GuiExecutionOverlayAllowsOnlyDeclaredRuntimeState',
+    'Test-GuiExecutionOverlayRejectsProtectedSettingsMutation',
+    'Test-GuiExecutionOverlayRejectsChangedPresetPathSet',
+    'Test-GuiExecutionOverlayRejectsUnexpectedQueueEntry',
+    'Test-GuiExecutionOverlayRejectsUnexpectedWindowShape',
     'Test-SmokeExecutionOverlayRejectsBaseRootOverlap',
     'Test-SmokeEvidenceLivesOutsideCandidateAndPreservesWholeTree',
     'Test-CleanupFailureOnFailedRunIsRecordedAndThrown',
