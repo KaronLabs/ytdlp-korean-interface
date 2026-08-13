@@ -280,6 +280,102 @@ function Get-SmokeExecutionAttestation {
     }
 }
 
+function Convert-SmokeSettingsForOverlayComparison {
+    param([Parameter(Mandatory = $true)] [object] $Settings)
+    $copy = ($Settings | ConvertTo-Json -Depth 100 | ConvertFrom-Json)
+    if ($null -ne $copy.PSObject.Properties['outpath']) { $copy.PSObject.Properties.Remove('outpath') }
+    return ($copy | ConvertTo-Json -Depth 100 -Compress)
+}
+
+function Assert-SmokeExecutionOverlay {
+    param(
+        [Parameter(Mandatory = $true)] [string] $ExecutionCandidate,
+        [Parameter(Mandatory = $true)] [string] $BaseCandidateRoot,
+        [Parameter(Mandatory = $true)] [string] $BaseCandidateManifestSha256,
+        [Parameter(Mandatory = $true)] [string] $ExpectedOutputDirectory,
+        [ValidateSet('pre-run', 'post-run')] [string] $Phase = 'pre-run'
+    )
+    if ($BaseCandidateManifestSha256 -notmatch '^[A-Fa-f0-9]{64}$') { throw 'candidate_execution_base_manifest_mismatch' }
+    $base = [IO.Path]::GetFullPath($BaseCandidateRoot)
+    $execution = [IO.Path]::GetFullPath($ExecutionCandidate)
+    $baseManifestPath = Join-Path $base 'candidate-manifest.json'
+    $executionManifestPath = Join-Path $execution 'candidate-manifest.json'
+    if (-not (Test-Path -LiteralPath $baseManifestPath -PathType Leaf) -or -not (Test-Path -LiteralPath $executionManifestPath -PathType Leaf)) { throw 'candidate_execution_base_manifest_mismatch' }
+    $baseHash = (Get-FileHash -LiteralPath $baseManifestPath -Algorithm SHA256).Hash.ToUpperInvariant()
+    $expectedHash = $BaseCandidateManifestSha256.ToUpperInvariant()
+    if ($baseHash -cne $expectedHash) { throw 'candidate_execution_base_manifest_mismatch' }
+    try {
+        $baseManifest = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($baseManifestPath)) | ConvertFrom-Json
+        $executionManifest = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($executionManifestPath)) | ConvertFrom-Json
+    }
+    catch { throw 'candidate_execution_base_manifest_mismatch' }
+    Assert-CandidateManifestSeal -CandidateRoot $base -Manifest $baseManifest | Out-Null
+    $executionHash = (Get-FileHash -LiteralPath $executionManifestPath -Algorithm SHA256).Hash.ToUpperInvariant()
+    if ($executionHash -cne $expectedHash) { throw 'candidate_execution_base_manifest_mismatch' }
+
+    $baseEntries = @{}
+    foreach ($entry in @($baseManifest.files)) {
+        $key = ([string]$entry.path).Replace('/', '\')
+        if ([string]::IsNullOrWhiteSpace($key) -or $baseEntries.ContainsKey($key)) { throw 'candidate_execution_base_manifest_mismatch' }
+        $baseEntries[$key] = $entry
+    }
+    $executionEntries = @{}
+    foreach ($entry in @($executionManifest.files)) {
+        $key = ([string]$entry.path).Replace('/', '\')
+        if ([string]::IsNullOrWhiteSpace($key) -or $executionEntries.ContainsKey($key)) { throw 'candidate_execution_base_manifest_mismatch' }
+        $executionEntries[$key] = $entry
+    }
+    if ($baseEntries.Count -ne $executionEntries.Count) { throw 'candidate_execution_base_manifest_mismatch' }
+    foreach ($key in $baseEntries.Keys) { if (-not $executionEntries.ContainsKey($key)) { throw 'candidate_execution_base_manifest_mismatch' } }
+
+    $actualEntries = @{}
+    $executionManifestFull = [IO.Path]::GetFullPath($executionManifestPath)
+    foreach ($item in @(Get-ChildItem -LiteralPath $execution -File -Recurse | Where-Object { $_.FullName -ine $executionManifestFull })) {
+        $key = $item.FullName.Substring($execution.Length).TrimStart([char[]]@('\', '/')).Replace('/', '\')
+        if ($actualEntries.ContainsKey($key)) { throw 'candidate_execution_payload_changed' }
+        $actualEntries[$key] = $item
+    }
+    if ($actualEntries.Count -ne $baseEntries.Count) { throw 'candidate_execution_payload_changed' }
+    foreach ($key in $baseEntries.Keys) { if (-not $actualEntries.ContainsKey($key)) { throw 'candidate_execution_payload_changed' } }
+
+    $settingsKey = 'ytdlp-interface.json'
+    if (-not $baseEntries.ContainsKey($settingsKey)) { throw 'settings_overlay_invalid' }
+    foreach ($key in $baseEntries.Keys) {
+        $expected = $baseEntries[$key]
+        $actual = $actualEntries[$key]
+        $actualHash = (Get-FileHash -LiteralPath $actual.FullName -Algorithm SHA256).Hash.ToUpperInvariant()
+        $expectedHashForFile = ([string]$expected.sha256).ToUpperInvariant()
+        if ($key -ine $settingsKey -and ($actual.Length -ne [long]$expected.length -or $actualHash -cne $expectedHashForFile)) { throw 'candidate_execution_payload_changed' }
+    }
+
+    $baseSettingsPath = Join-Path $base $settingsKey
+    $executionSettingsPath = Join-Path $execution $settingsKey
+    if (-not (Test-Path -LiteralPath $baseSettingsPath -PathType Leaf) -or -not (Test-Path -LiteralPath $executionSettingsPath -PathType Leaf)) { throw 'settings_overlay_invalid' }
+    try {
+        $baseSettings = Get-Content -LiteralPath $baseSettingsPath -Raw | ConvertFrom-Json
+        $executionSettings = Get-Content -LiteralPath $executionSettingsPath -Raw | ConvertFrom-Json
+    }
+    catch { throw 'settings_overlay_invalid' }
+    if ((Convert-SmokeSettingsForOverlayComparison -Settings $baseSettings) -cne (Convert-SmokeSettingsForOverlayComparison -Settings $executionSettings)) { throw 'settings_overlay_invalid' }
+    $expectedOutput = [IO.Path]::GetFullPath($ExpectedOutputDirectory).TrimEnd([char[]]@('\', '/'))
+    $actualOutput = [string]$executionSettings.outpath
+    if ([string]::IsNullOrWhiteSpace($actualOutput) -or [IO.Path]::GetFullPath($actualOutput).TrimEnd([char[]]@('\', '/')) -cne $expectedOutput) { throw 'settings_overlay_invalid' }
+
+    return [ordered]@{
+        kind = 'settings-overlay'
+        phase = $Phase
+        baseCandidateManifestSha256 = $expectedHash
+        executionCandidateManifestSha256 = $executionHash
+        overlayPath = $settingsKey
+        allowedSettingsFields = @('outpath')
+        baseSettingsSha256 = (Get-FileHash -LiteralPath $baseSettingsPath -Algorithm SHA256).Hash.ToUpperInvariant()
+        settingsSha256 = (Get-FileHash -LiteralPath $executionSettingsPath -Algorithm SHA256).Hash.ToUpperInvariant()
+        outpath = $actualOutput
+        payloadsUnchanged = $true
+        checkedAtUtc = [DateTime]::UtcNow.ToString('o')
+    }
+}
+
 function Get-SmokeDownloadsKnownFolderPath {
     $module = Import-Module -Name (Join-Path $PSScriptRoot 'runtime-maintenance.psm1') -Force -PassThru
     return & $module { Get-DownloadsKnownFolderPath }
@@ -354,7 +450,7 @@ function Invoke-LocalhostSmoke {
         $media = Join-Path $workspace 'input.mp4'
         $executionCandidate = Copy-SealedCandidateForSmoke -CandidateRoot $candidate -Workspace $workspace -ExpectedCandidateManifestSha256 $manifestBindingSha256
         Set-SmokeCandidateOutputPath -CandidateRoot $executionCandidate -OutputDirectory $output
-        $executionAttestation = Get-SmokeExecutionAttestation -ExecutionCandidate $executionCandidate -BaseCandidateManifestSha256 $manifestBindingSha256
+        $executionAttestation = Assert-SmokeExecutionOverlay -ExecutionCandidate $executionCandidate -BaseCandidateRoot $candidate -BaseCandidateManifestSha256 $manifestBindingSha256 -ExpectedOutputDirectory $output -Phase 'pre-run'
         Invoke-SmokeProcess -ReasonCode 'fixture_generation_failed' -Action { Invoke-CheckedProcess -FilePath (Join-Path $executionCandidate 'ffmpeg.exe') -Arguments @('-y', '-f', 'lavfi', '-i', 'color=c=black:s=320x240:r=25:d=2', '-f', 'lavfi', '-i', 'sine=frequency=1000:duration=2', '-shortest', '-t', '2', $media) -Name 'smoke fixture generation' } | Out-Null
         $port = Get-LoopbackPort
         $url = "http://127.0.0.1:$port/input.mp4"
@@ -386,6 +482,7 @@ function Invoke-LocalhostSmoke {
         $probeCapture = [pscustomobject]@{ Text = $null }
         $result = Test-SmokeOutput -OutputDirectory $output -StartedAtUtc $startedAtUtc -FfprobeAction { param($path) $probeCapture.Text = (Invoke-SmokeProcess -ReasonCode 'ffprobe_failed' -Action { (Invoke-CheckedProcess -FilePath (Join-Path $executionCandidate 'ffprobe.exe') -Arguments @('-v', 'error', '-show_entries', 'format=duration:stream=codec_name', '-of', 'default=noprint_wrappers=1', $path) -Name 'smoke ffprobe').StandardOutput }); $probeCapture.Text }
         if (-not $result.Valid) { throw $result.ReasonCode }
+        $executionAttestation.postRun = Assert-SmokeExecutionOverlay -ExecutionCandidate $executionCandidate -BaseCandidateRoot $candidate -BaseCandidateManifestSha256 $manifestBindingSha256 -ExpectedOutputDirectory $output -Phase 'post-run'
         $successEvidenceAction = {
             $finalProbe = (Invoke-SmokeProcess -ReasonCode 'ffprobe_failed' -Action { (Invoke-CheckedProcess -FilePath (Join-Path $executionCandidate 'ffprobe.exe') -Arguments @('-v', 'error', '-show_entries', 'format=duration:stream=codec_name', '-of', 'default=noprint_wrappers=1', $result.Mp3Path) -Name 'final smoke ffprobe').StandardOutput })
             New-SmokeSuccessEvidence -Workspace $workspace -OutputDirectory $output -Mp3Path $result.Mp3Path -SettingsPath (Join-Path $executionCandidate 'ytdlp-interface.json') -FfprobeOutput ([string]$finalProbe) -EvidenceDirectory $evidence -RunId $runId
@@ -394,7 +491,7 @@ function Invoke-LocalhostSmoke {
         $succeeded = $true; $reasonCode = 'ok'; return $result
     }
     catch {
-        $known = @('candidate_parent_overlap', 'candidate_missing', 'candidate_manifest_missing', 'candidate_manifest_invalid', 'candidate_manifest_digest_mismatch', 'candidate_manifest_mismatch', 'candidate_copy_mismatch', 'smoke_execution_attestation_invalid', 'smoke_success_evidence_invalid', 'workspace_containment', 'output_not_empty', 'fixture_generation_failed', 'url_rejected', 'python_missing', 'server_not_ready', 'gui_start_failed', 'automation_marker_invalid', 'operator_not_confirmed', 'automation_required', 'output_missing', 'part_file', 'mp3_missing', 'stale_output', 'ffprobe_failed', 'codec_not_mp3', 'duration_invalid')
+        $known = @('candidate_parent_overlap', 'candidate_missing', 'candidate_manifest_missing', 'candidate_manifest_invalid', 'candidate_manifest_digest_mismatch', 'candidate_manifest_mismatch', 'candidate_copy_mismatch', 'candidate_execution_base_manifest_mismatch', 'candidate_execution_payload_changed', 'settings_overlay_invalid', 'smoke_execution_attestation_invalid', 'smoke_success_evidence_invalid', 'workspace_containment', 'output_not_empty', 'fixture_generation_failed', 'url_rejected', 'python_missing', 'server_not_ready', 'gui_start_failed', 'automation_marker_invalid', 'operator_not_confirmed', 'automation_required', 'output_missing', 'part_file', 'mp3_missing', 'stale_output', 'ffprobe_failed', 'codec_not_mp3', 'duration_invalid')
         if ($known -contains $_.Exception.Message) { $reasonCode = $_.Exception.Message } else { $reasonCode = 'unexpected_failure' }
         throw
     }

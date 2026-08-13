@@ -591,6 +591,60 @@ function Test-SmokeSettingsOverrideProducesExplicitDerivativeAttestation {
     finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
+function Test-SmokeExecutionOverlayRejectsBaseMismatchAndNonSettingsMutation {
+    $root = New-FixtureRoot
+    try {
+        $command = Get-Command -Name Assert-SmokeExecutionOverlay -ErrorAction SilentlyContinue
+        Assert-True ($null -ne $command) 'Smoke must expose a strict execution-overlay validator.'
+        if ($null -eq $command) { return }
+        $fixture = New-MinimalSealedCandidate -Root $root
+        $payloadPath = Join-Path $fixture.Root 'ffmpeg.exe'
+        [IO.File]::WriteAllText($payloadPath, 'fixture-ffmpeg', [Text.Encoding]::ASCII)
+        $payload = Get-Item -LiteralPath $payloadPath
+        $fixture.Manifest.files += [ordered]@{ path = 'ffmpeg.exe'; sha256 = (Get-FileHash -LiteralPath $payloadPath -Algorithm SHA256).Hash; length = $payload.Length }
+        [IO.File]::WriteAllText($fixture.ManifestPath, ($fixture.Manifest | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
+        $workspace = Join-Path $root 'workspace'; [IO.Directory]::CreateDirectory($workspace) | Out-Null
+        $output = Join-Path $workspace 'output'; [IO.Directory]::CreateDirectory($output) | Out-Null
+        $execution = Copy-SealedCandidateForSmoke -CandidateRoot $fixture.Root -Workspace $workspace
+        Set-SmokeCandidateOutputPath -CandidateRoot $execution -OutputDirectory $output
+        $baseHash = (Get-FileHash -LiteralPath $fixture.ManifestPath -Algorithm SHA256).Hash
+        try { Assert-SmokeExecutionOverlay -ExecutionCandidate $execution -BaseCandidateRoot $fixture.Root -BaseCandidateManifestSha256 ('F' * 64) -ExpectedOutputDirectory $output -Phase 'pre-run'; $baseResult = 'no_failure' }
+        catch { $baseResult = $_.Exception.Message }
+        Assert-Equal 'candidate_execution_base_manifest_mismatch' $baseResult 'Overlay validation must reject a wrong base manifest binding.'
+        $attestation = Assert-SmokeExecutionOverlay -ExecutionCandidate $execution -BaseCandidateRoot $fixture.Root -BaseCandidateManifestSha256 $baseHash -ExpectedOutputDirectory $output -Phase 'pre-run'
+        Assert-Equal 'settings-overlay' $attestation.kind 'A valid execution copy must be explicitly classified as a settings overlay.'
+        Assert-True ([bool]$attestation.payloadsUnchanged) 'A pre-run overlay attestation must prove non-settings payloads are unchanged.'
+        [IO.File]::WriteAllText((Join-Path $execution 'ffmpeg.exe'), 'mutated-after-copy', [Text.Encoding]::ASCII)
+        try { Assert-SmokeExecutionOverlay -ExecutionCandidate $execution -BaseCandidateRoot $fixture.Root -BaseCandidateManifestSha256 $baseHash -ExpectedOutputDirectory $output -Phase 'post-run'; $payloadResult = 'no_failure' }
+        catch { $payloadResult = $_.Exception.Message }
+        Assert-Equal 'candidate_execution_payload_changed' $payloadResult 'A post-run mutation of a non-settings payload must invalidate the execution copy.'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+function Test-SmokeExecutionOverlayAllowsOnlyOutpathSettingsChange {
+    $root = New-FixtureRoot
+    try {
+        $command = Get-Command -Name Assert-SmokeExecutionOverlay -ErrorAction SilentlyContinue
+        Assert-True ($null -ne $command) 'Smoke must expose a strict settings-overlay validator.'
+        if ($null -eq $command) { return }
+        $fixture = New-MinimalSealedCandidate -Root $root
+        $workspace = Join-Path $root 'workspace'; [IO.Directory]::CreateDirectory($workspace) | Out-Null
+        $output = Join-Path $workspace 'output'; [IO.Directory]::CreateDirectory($output) | Out-Null
+        $execution = Copy-SealedCandidateForSmoke -CandidateRoot $fixture.Root -Workspace $workspace
+        Set-SmokeCandidateOutputPath -CandidateRoot $execution -OutputDirectory $output
+        $baseHash = (Get-FileHash -LiteralPath $fixture.ManifestPath -Algorithm SHA256).Hash
+        $settingsPath = Join-Path $execution 'ytdlp-interface.json'
+        $settings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+        $settings.proxy = 'mutated-proxy'
+        [IO.File]::WriteAllText($settingsPath, ($settings | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
+        try { Assert-SmokeExecutionOverlay -ExecutionCandidate $execution -BaseCandidateRoot $fixture.Root -BaseCandidateManifestSha256 $baseHash -ExpectedOutputDirectory $output -Phase 'post-run'; $actual = 'no_failure' }
+        catch { $actual = $_.Exception.Message }
+        Assert-Equal 'settings_overlay_invalid' $actual 'The explicit overlay validator must reject settings changes outside the outpath override.'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
 function Test-SmokeEvidenceLivesOutsideCandidateAndPreservesWholeTree {
     $root = New-FixtureRoot
     try {
@@ -989,6 +1043,8 @@ $sealRedTests = @(
     'Test-SmokeRejectsCallerExpectedManifestDigestMismatch',
     'Test-SmokeRejectsDuplicatePathsAndMalformedManifestMetadata',
     'Test-SmokeSettingsOverrideProducesExplicitDerivativeAttestation',
+    'Test-SmokeExecutionOverlayRejectsBaseMismatchAndNonSettingsMutation',
+    'Test-SmokeExecutionOverlayAllowsOnlyOutpathSettingsChange',
     'Test-SmokeEvidenceLivesOutsideCandidateAndPreservesWholeTree',
     'Test-CleanupFailureOnFailedRunIsRecordedAndThrown',
     'Test-SmokeSuccessEvidenceSeparatesProofClaims',
