@@ -1,4 +1,4 @@
-# ytdlp-interface
+# ytdlp-korean-interface
 
 이 프로젝트는 [yt-dlp](https://github.com/yt-dlp/yt-dlp)를 위한 Windows GUI 인터페이스로, 기본적으로는 유튜브 다운로드용으로 설계되었습니다.  
 v1.2부터는 유튜브 URL 외의 주소도 입력할 수 있어, `yt-dlp`가 지원하는 거의 모든 사이트를 이론적으로 다운로드할 수 있습니다.  
