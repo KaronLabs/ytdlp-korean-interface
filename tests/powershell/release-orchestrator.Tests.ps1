@@ -50,6 +50,19 @@ Invoke-Test 'CI nightly initialization refuses a missing disposable parent runti
     finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
+Invoke-Test 'release path overlap helper distinguishes siblings from containment' {
+    $root = New-TempDirectory
+    try {
+        $parent = Join-Path $root 'parent'; New-Item -ItemType Directory -Force -Path $parent | Out-Null
+        $sibling = Join-Path $root 'candidate-base'; New-Item -ItemType Directory -Force -Path $sibling | Out-Null
+        $child = Join-Path $parent 'child'; New-Item -ItemType Directory -Force -Path $child | Out-Null
+        Assert-True (-not (Test-ReleasePathsOverlap -First $parent -Second $sibling)) 'sibling directories must not overlap'
+        Assert-True (Test-ReleasePathsOverlap -First $parent -Second $child) 'parent/child directories must overlap'
+        Assert-True (Test-ReleasePathsOverlap -First $parent -Second $parent) 'same directory must overlap'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
 Invoke-Test 'candidate build refuses missing source or parent inputs' {
     $root = New-TempDirectory
     try {
