@@ -247,7 +247,7 @@ function Invoke-ReleaseArtifactSmoke {
         param($url, $executionCandidate, $outputDirectory, $guiPid)
         $ytDlp = Join-Path $executionCandidate 'yt-dlp.exe'
         $template = Join-Path $outputDirectory 'smoke.%(ext)s'
-        & $ytDlp --ignore-config --no-playlist --ffmpeg-location $executionCandidate -x --audio-format mp3 -o $template $url
+        $downloadOutput = @(& $ytDlp --ignore-config --no-playlist --ffmpeg-location $executionCandidate -x --audio-format mp3 -o $template $url 2>&1)
         if ($LASTEXITCODE -ne 0) { throw 'release_smoke_download_failed' }
         return [pscustomobject]@{ Completed = $true; GuiProcessId = $guiPid; Url = $url; OutputDirectory = $outputDirectory }
     }
