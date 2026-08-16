@@ -83,6 +83,12 @@ Invoke-Test 'artifact smoke refuses malformed candidate manifest identity before
     finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
+Invoke-Test 'release smoke automation suppresses yt-dlp stdout before returning marker' {
+    $orchestratorText = Get-Content -LiteralPath $Orchestrator -Raw
+    Assert-True ($orchestratorText -match '\$downloadOutput\s*=\s*@\(&\s*\$ytDlp') 'yt-dlp output must be captured instead of leaking into the automation marker pipeline'
+    Assert-True ($orchestratorText -match 'return \[pscustomobject\]@\{\s*Completed = \$true; GuiProcessId = \$guiPid; Url = \$url; OutputDirectory = \$outputDirectory \}') 'automation must return exactly the marker object after capture'
+}
+
 Invoke-Test 'release CI does not weaken the public unelevated updater policy' {
     $runtimeModule = Get-Content -LiteralPath (Join-Path $RepositoryRoot 'tools\runtime-maintenance.psm1') -Raw
     $orchestratorText = Get-Content -LiteralPath $Orchestrator -Raw
