@@ -17,7 +17,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-      - name: Compare tracked and isolated source paths
+      - name: Run same pre-release tests first
+        shell: powershell
+        env:
+          RECOVERED_CATALOG: locales/ko-KR.json
+        run: |
+          python tests/run_contract_tests.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/run_ci_powershell_tests.ps1
+          exit $LASTEXITCODE
+      - name: Compare tracked and isolated source paths after tests
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
@@ -29,7 +38,10 @@ jobs:
           $tracked = @(Get-GitTrackedPaths -SourceRoot $source -GitPath $git.Source)
           $manifest = Get-DependencyArchiveManifest -SourceRoot $source
           $dependencyRoots = @($manifest.roots | ForEach-Object { [string]$_ })
+          $status = (& $git.Source -C $source status --porcelain=v1 2>&1 | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'git status failed' }
 
+          Write-Host ('STATUS_AFTER_TESTS=' + $(if ([string]::IsNullOrWhiteSpace($status)) { '<clean>' } else { $status.Replace("`r`n", ' | ').Replace("`n", ' | ') }))
           Write-Host ('TRACKED_COUNT=' + $tracked.Count)
           Write-Host ('DEPENDENCY_ROOTS=' + ($dependencyRoots -join ','))
 
@@ -62,8 +74,11 @@ jobs:
           foreach ($item in $missing) { Write-Host ('MISSING_ISOLATED ' + ($item | ConvertTo-Json -Compress)) }
 
           try {
-            $copyAttestation = Get-SourceInputAttestation -SourceRoot $isolated -Commit ('${{ github.sha }}') -StatusPorcelain '' -TrackedPaths $tracked
-            Write-Host ('ATTESTATION_OK trackedFileCount=' + $copyAttestation.trackedFileCount + ' treeSha256=' + $copyAttestation.treeSha256)
+            $sourceAttestation = Get-SourceAttestation -SourceRoot $source -GitPath $git.Source -TrackedPaths $tracked
+            Write-Host ('SOURCE_ATTESTATION_OK trackedFileCount=' + $sourceAttestation.trackedFileCount + ' treeSha256=' + $sourceAttestation.treeSha256)
+            $copyAttestation = Get-SourceInputAttestation -SourceRoot $isolated -Commit $sourceAttestation.commit -StatusPorcelain '' -TrackedPaths $tracked
+            Write-Host ('COPY_ATTESTATION_OK trackedFileCount=' + $copyAttestation.trackedFileCount + ' treeSha256=' + $copyAttestation.treeSha256)
+            if ($sourceAttestation.treeSha256 -cne $copyAttestation.treeSha256) { throw 'diagnostic_tree_digest_mismatch' }
           }
           catch {
             Write-Host ('ATTESTATION_ERROR=' + $_.Exception.Message)
