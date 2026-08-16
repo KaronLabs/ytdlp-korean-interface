@@ -58,6 +58,16 @@ function New-TestCandidate {
     return $candidate
 }
 
+function New-TestUpstreamRuntime {
+    param([string] $Root, [string] $Name)
+    $runtime = Join-Path $Root $Name
+    New-Item -ItemType Directory -Force -Path $runtime | Out-Null
+    foreach ($file in @('ytdlp-interface.exe','yt-dlp.exe','ffmpeg.exe','ffprobe.exe','deno.exe','7z.dll','ytdlp-interface.json')) {
+        [IO.File]::WriteAllText((Join-Path $runtime $file), "fixture-$file", [Text.UTF8Encoding]::new($false))
+    }
+    return $runtime
+}
+
 if (-not (Test-Path -LiteralPath $ReleaseFactory -PathType Leaf)) {
     throw "release factory implementation is missing: $ReleaseFactory"
 }
@@ -144,6 +154,37 @@ Invoke-Test 'release checksum binds exact ZIP bytes and name' {
         Test-ReleaseChecksum -ZipPath $zip -ChecksumPath $sum | Out-Null
         [IO.File]::WriteAllText($sum, (('0' * 64) + '  ' + $config.ZipName + "`n"), [Text.UTF8Encoding]::new($false))
         Assert-Throws { Test-ReleaseChecksum -ZipPath $zip -ChecksumPath $sum } 'release_checksum_mismatch'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+Invoke-Test 'upstream archive hash mismatch is terminal' {
+    $root = New-TempDirectory
+    try {
+        $archive = Join-Path $root 'ytdlp-interface.7z'
+        [IO.File]::WriteAllText($archive, 'tampered-upstream')
+        Assert-Throws { Assert-UpstreamArchiveHash -ArchivePath $archive } 'upstream_archive_hash_mismatch'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+Invoke-Test 'upstream runtime resolution rejects ambiguous payload roots' {
+    $root = New-TempDirectory
+    try {
+        New-TestUpstreamRuntime -Root $root -Name 'runtime-a' | Out-Null
+        New-TestUpstreamRuntime -Root $root -Name 'runtime-b' | Out-Null
+        Assert-Throws { Resolve-UpstreamRuntimeRoot -ExtractedRoot $root } 'upstream_runtime_ambiguous'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+Invoke-Test 'upstream runtime resolution rejects incomplete payload' {
+    $root = New-TempDirectory
+    try {
+        $runtime = Join-Path $root 'runtime'
+        New-Item -ItemType Directory -Force -Path $runtime | Out-Null
+        [IO.File]::WriteAllText((Join-Path $runtime 'ytdlp-interface.exe'), 'only-product')
+        Assert-Throws { Resolve-UpstreamRuntimeRoot -ExtractedRoot $root } 'upstream_runtime_incomplete'
     }
     finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
 }
