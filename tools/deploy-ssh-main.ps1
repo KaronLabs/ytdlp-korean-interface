@@ -194,7 +194,7 @@ Write-Output "LOCAL_SHA=$sha"
 if (-not $bootstrapMode) {
     $remoteNow = Invoke-StrictShaCheck
     if ($remoteNow -ne $remoteBefore) {
-        throw "원격 브랜치가 푸시 시작 전에 변경되었습니다: $remoteBefore -> $remoteNow"
+        throw "Remote branch changed before push: $remoteBefore -> $remoteNow"
     }
 }
 
@@ -207,10 +207,10 @@ $null = Invoke-GitStrict -Arguments @('push', $CanonicalRemoteUrl, "${sha}:refs/
 
 $remoteAfter = Invoke-StrictShaCheck
 if ([string]::IsNullOrWhiteSpace($remoteAfter)) {
-    throw "원격 SHA 조회 실패: origin/main."
+    throw 'Remote SHA lookup failed for origin/main.'
 }
 if ($remoteAfter -ne $sha) {
-    throw "원격 SHA 불일치: expected=$sha actual=$remoteAfter"
+    throw "Remote SHA mismatch: expected=$sha actual=$remoteAfter"
 }
 
 Write-Output "REMOTE_AFTER=$remoteAfter"
