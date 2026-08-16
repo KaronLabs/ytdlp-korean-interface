@@ -47,6 +47,37 @@ function Test-ReleasePathContained {
     return $pathFull.StartsWith($rootFull + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
 }
 
+function Initialize-ReleaseParentSettings {
+    param([Parameter(Mandatory = $true)] [string] $ParentRuntime)
+    if (-not (Test-Path -LiteralPath $ParentRuntime -PathType Container)) { throw 'release_parent_runtime_missing' }
+    $parent = [IO.Path]::GetFullPath($ParentRuntime)
+    if (-not (Test-UpstreamRuntimeComplete -RuntimeRoot $parent)) { throw 'release_parent_runtime_incomplete' }
+    $settingsPath = Join-Path $parent 'ytdlp-interface.json'
+    if (Test-Path -LiteralPath $settingsPath) { throw 'release_parent_settings_unexpected' }
+
+    $settings = [ordered]@{
+        language = 'ko-KR'
+        ytdlp_path = '.\yt-dlp.exe'
+        outpath = '.'
+        fmt1 = ''
+        fmt2 = ''
+        ratelim = 0
+        ratelim_unit = 1
+        unfinished_queue_items = @()
+        unfinished_queue_states = @()
+    }
+    $json = $settings | ConvertTo-Json -Depth 5
+    [IO.File]::WriteAllText($settingsPath, $json, [Text.UTF8Encoding]::new($false))
+    try { $written = Get-Content -LiteralPath $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop }
+    catch { throw 'release_parent_settings_invalid' }
+    if ([string]$written.language -cne 'ko-KR' -or [string]$written.ytdlp_path -cne '.\yt-dlp.exe' -or
+        [string]$written.outpath -cne '.' -or [int]$written.ratelim -ne 0 -or [int]$written.ratelim_unit -ne 1 -or
+        @($written.unfinished_queue_items).Count -ne 0 -or @($written.unfinished_queue_states).Count -ne 0) {
+        throw 'release_parent_settings_invalid'
+    }
+    return $settingsPath
+}
+
 function Initialize-CiNightlyParentRuntime {
     param(
         [Parameter(Mandatory = $true)] [string] $SourceRoot,
@@ -128,11 +159,13 @@ function New-VerifiedUpstreamParentRuntime {
         $sevenZip = Get-TrustedReleaseSevenZip
         Invoke-ReleaseNative -FilePath $sevenZip -Arguments @('x', $archive, ('-o' + $extractRoot), '-y') -FailureCode 'upstream_extract_failed' | Out-Null
         $parent = Resolve-UpstreamRuntimeRoot -ExtractedRoot $extractRoot
+        $settingsPath = Initialize-ReleaseParentSettings -ParentRuntime $parent
         $verified = Initialize-CiNightlyParentRuntime -SourceRoot $SourceRoot -ParentRuntime $parent
         return [pscustomobject]@{
             ParentRuntime = $parent
             UpstreamArchivePath = $archive
             UpstreamArchiveSha256 = $config.UpstreamArchiveSha256.ToLowerInvariant()
+            SettingsPath = $settingsPath
             YtDlpTag = [string]$verified.YtDlpVersion
             YtDlpSha256 = ([string]$verified.YtDlpHash).ToLowerInvariant()
             YtDlpProvenancePath = Join-Path $parent 'yt-dlp-provenance.json'
