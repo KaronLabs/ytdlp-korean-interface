@@ -32,7 +32,7 @@ jobs:
         run: |
           python tests/run_contract_tests.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/run_powershell_tests.ps1
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/run_ci_powershell_tests.ps1
           exit $LASTEXITCODE
 
       - name: Preflight fixed release request
