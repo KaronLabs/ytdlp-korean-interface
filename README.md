@@ -1,3 +1,9 @@
+# 아래 (README.md)는 나도 뭔말인지 모름. codex-spark가 쓴거에요. 
+# 짐 급한게 있어서 그거 끝나고, 나중에 제대로 고칠께여. 그때까진 고칠거 있으면 알아서 고쳐쓰세요
+
+
+---
+
 # ytdlp-korean-interface
 
 이 프로젝트는 [yt-dlp](https://github.com/yt-dlp/yt-dlp)를 위한 Windows GUI 인터페이스로, 기본적으로는 유튜브 다운로드용으로 설계되었습니다.  
