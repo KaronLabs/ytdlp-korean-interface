@@ -204,15 +204,35 @@ provenance 기록
 
 # 다운로드
 
-## ⚠️ KaronLabs 한국어 빌드 상태
+## ✅ KaronLabs Windows x64 Release
 
-**현재 이 저장소에는 KaronLabs가 별도로 배포하는 공개 Release 바이너리가 없습니다.**
+첫 KaronLabs 공개 바이너리 릴리스가 나왔습니다.
 
-따라서 현재 이 프로젝트의 한국어 변경사항을 사용하려면 **소스에서 직접 빌드해야 합니다.**
+### [v2.19.1-karon.1 — GitHub Release](https://github.com/KaronLabs/ytdlp-korean-interface/releases/tag/v2.19.1-karon.1)
 
-예전 README에는 ErrorFlynn upstream의 실행 파일 링크가 이 프로젝트의 다운로드처럼 붙어 있었는데, 그 파일은 **KaronLabs 한국어 빌드가 아니라 upstream 원본 바이너리**입니다.
+Windows x64 사용자는 Release의 아래 ZIP을 받아 압축을 풀고 `ytdlp-interface.exe`를 실행하면 됩니다.
 
-README에서 한국어판이라고 해놓고 다운로드 버튼을 누르면 영어 원본이 떨어지는 작은 함정이 있었습니다. 이제 치웠습니다.
+```text
+ytdlp-korean-interface-v2.19.1-karon.1-win-x64.zip
+```
+
+이 릴리스는 정확히 다음 KaronLabs source commit에서 빌드되었습니다.
+
+```text
+c053c1edf5508b05beac1da27ddfcdbefd1bc2bd
+```
+
+공개 ZIP SHA-256:
+
+```text
+271664db6378be9ffe513b62f91cf90b849ab13bb9532a45096cee72bdaf9cc2
+```
+
+Release에는 `SHA256SUMS.txt`도 함께 제공됩니다. ZIP 내부의 `release-manifest.json`은 최종 배포 파일 전체의 SHA-256/크기, source/upstream 정보, 빌드 시점의 정확한 `yt-dlp` nightly identity를 기록합니다. 그보다 앞 단계의 sealed build provenance는 `candidate-manifest.json`에 남습니다.
+
+릴리스 파이프라인은 Windows x64 build, candidate seal, `127.0.0.1` 기반 MP3 artifact/runtime smoke, release package inventory, ZIP 구조, SHA-256을 모두 검증한 뒤에만 GitHub Release를 발행하도록 구성되어 있습니다. 발행 뒤에는 공개된 ZIP과 checksum 파일을 다시 내려받아 바이트 단위 checksum도 재확인합니다.
+
+예전 README에는 ErrorFlynn upstream의 실행 파일 링크가 이 프로젝트의 다운로드처럼 붙어 있었는데, 그 파일은 **KaronLabs 한국어 빌드가 아니라 upstream 원본 바이너리**였습니다. 이제 KaronLabs 바이너리는 위 canonical Release에서 별도로 배포합니다.
 
 ### 원본 ytdlp-interface가 필요한 경우
 
@@ -220,8 +240,7 @@ README에서 한국어판이라고 해놓고 다운로드 버튼을 누르면 �
 - [Upstream v2.19.1 Release](https://github.com/ErrorFlynn/ytdlp-interface/releases/tag/v2.19.1)
 
 > **주의**  
-> 위 Release의 실행 파일은 ErrorFlynn의 공식 upstream 빌드입니다.  
-> 이 저장소의 한국어 소스 변경사항이 포함된 KaronLabs 빌드가 아닙니다.
+> ErrorFlynn의 Release는 공식 upstream 빌드이고, 위 KaronLabs `v2.19.1-karon.1`은 그 upstream을 기반으로 한국어 복구·하드닝 작업을 포함해 별도로 빌드한 KaronLabs Release입니다.
 
 ---
 
