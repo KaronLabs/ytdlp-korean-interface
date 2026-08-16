@@ -75,11 +75,12 @@ Invoke-Test 'publication workflow is fixed, minimal-permission, and verification
     Assert-True ($text -match 'gh release download') 'fresh public asset download verification missing'
 }
 
-Invoke-Test 'GitHub absence probes inspect native exit status under PowerShell 5.1' {
+Invoke-Test 'GitHub absence probes inspect and clear native status under PowerShell 5.1' {
     $text=Get-Content -LiteralPath $Workflow -Raw
     Assert-True ($text -match '\$probeErrorActionPreference\s*=\s*\$ErrorActionPreference') 'workflow does not save ErrorActionPreference around gh status probes'
     Assert-True ($text -match '\$ErrorActionPreference\s*=\s*''Continue''') 'workflow does not allow expected gh 404 stderr to be inspected'
     Assert-True ($text -match '\$ErrorActionPreference\s*=\s*\$probeErrorActionPreference') 'workflow does not restore ErrorActionPreference after gh status probes'
+    Assert-True ($text -match '\$global:LASTEXITCODE\s*=\s*0') 'workflow does not clear the expected gh 404 native exit status'
 }
 
 Invoke-Test 'release notes preserve upstream lineage and verification instructions' {
