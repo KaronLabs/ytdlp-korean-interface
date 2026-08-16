@@ -1,10 +1,10 @@
 {
-  "schemaVersion": 1,
-  "tag": "v2.19.1-karon.1",
-  "platform": "win-x64",
-  "upstreamRepository": "ErrorFlynn/ytdlp-interface",
-  "upstreamTag": "v2.19.1",
-  "upstreamCommit": "2173316ebb5e50af49a2a4e939693fa8c3a3459c",
-  "upstreamAsset": "ytdlp-interface.7z",
-  "upstreamArchiveSha256": "53b54e3c5c753e8cb2a8b9638c69c95c1449c8185c3145a9f0b06a2000b3702e"
+    "schemaVersion": 1,
+    "tag": "v2.19.1-karon.1",
+    "platform": "win-x64",
+    "upstreamRepository": "ErrorFlynn/ytdlp-interface",
+    "upstreamTag": "v2.19.1",
+    "upstreamCommit": "2173316ebb5e50af49a2a4e939693fa8c3a3459c",
+    "upstreamAsset": "ytdlp-interface.7z",
+    "upstreamArchiveSha256": "53b54e3c5c753e8cb2a8b9638c69c95c1449c8185c3145a9f0b06a2000b3702e"
 }
