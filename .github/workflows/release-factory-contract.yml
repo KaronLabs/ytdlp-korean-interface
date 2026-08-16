@@ -16,6 +16,7 @@ on:
       - 'tests/powershell/deploy-ssh-main-security.Tests.ps1'
       - 'tests/powershell/release-factory.Tests.ps1'
       - 'tests/powershell/release-orchestrator.Tests.ps1'
+      - 'tests/powershell/release-upstream-layout.Tests.ps1'
       - 'tests/powershell/release-publication-contract.Tests.ps1'
       - '.github/workflows/release-factory-contract.yml'
   pull_request:
@@ -32,6 +33,7 @@ on:
       - 'tests/powershell/deploy-ssh-main-security.Tests.ps1'
       - 'tests/powershell/release-factory.Tests.ps1'
       - 'tests/powershell/release-orchestrator.Tests.ps1'
+      - 'tests/powershell/release-upstream-layout.Tests.ps1'
       - 'tests/powershell/release-publication-contract.Tests.ps1'
       - '.github/workflows/release-factory-contract.yml'
 
@@ -50,6 +52,8 @@ jobs:
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/powershell/release-factory.Tests.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/powershell/release-orchestrator.Tests.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/powershell/release-upstream-layout.Tests.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/powershell/release-publication-contract.Tests.ps1
           exit $LASTEXITCODE
