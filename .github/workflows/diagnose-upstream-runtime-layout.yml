@@ -17,6 +17,7 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
           $url = 'https://github.com/ErrorFlynn/ytdlp-interface/releases/download/v2.19.1/ytdlp-interface.7z'
           $expected = '53b54e3c5c753e8cb2a8b9638c69c95c1449c8185c3145a9f0b06a2000b3702e'
           $root = Join-Path $env:RUNNER_TEMP 'upstream-layout'
