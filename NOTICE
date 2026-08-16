@@ -1,0 +1,30 @@
+KaronLabs/ytdlp-korean-interface — Provenance Notice
+
+Canonical repository:
+https://github.com/KaronLabs/ytdlp-korean-interface
+
+Direct upstream:
+https://github.com/ErrorFlynn/ytdlp-interface
+Baseline: v2.19.1
+Baseline commit: 2173316ebb5e50af49a2a4e939693fa8c3a3459c
+
+Upstream copyright notice retained in LICENSE:
+Copyright (c) 2021 ErrorFlynn
+
+This repository records KaronLabs-specific Korean recovery, localization,
+hardening, testing, runtime-maintenance, and verification history from 2026
+onward. It does not claim KaronLabs sole authorship of unchanged upstream code.
+
+The software remains distributed under the MIT License in LICENSE. This NOTICE
+documents lineage and repository provenance; it does not add a new
+software-license restriction.
+
+For the detailed chain of origin and verification procedure, see:
+- PROVENANCE.md
+- ATTRIBUTION.md
+- docs/provenance-dispute-response.md
+
+Code reuse, modification, redistribution, commercial use, and teaching remain
+governed by the MIT License. Provenance documentation exists so lawful reuse
+can remain open without rewriting the recorded history of where the code and
+repository-specific changes came from.
