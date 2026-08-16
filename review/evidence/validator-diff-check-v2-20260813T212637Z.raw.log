@@ -1,0 +1,6 @@
+START_UTC=2026-08-13T21:26:37.1787532Z
+COMMAND=git -C C:\Users\ceo\OneDrive\Desktop\01_AllWork\ytdlp-interface\src diff --check -- tools/smoke-localhost.ps1 tests/powershell/smoke-localhost.Tests.ps1
+warning: in the working copy of 'tests/powershell/smoke-localhost.Tests.ps1', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/smoke-localhost.ps1', LF will be replaced by CRLF the next time Git touches it
+END_UTC=2026-08-13T21:26:37.2510271Z
+EXIT_CODE=0

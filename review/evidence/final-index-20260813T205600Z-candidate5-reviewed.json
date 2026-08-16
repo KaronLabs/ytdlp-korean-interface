@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 3,
+  "capturedAtUtc": "2026-08-13T20:56:00Z",
+  "status": "partial_success",
+  "review_target": "candidate-5 Korean i18n recovery and evidence hardening",
+  "candidateManifestSha256": "0DBB42E55AC3E400A758D38CE996321775FA2E3215E2B1AACFA6C1592062F68E",
+  "candidateRoot": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-final-candidates-5\\candidate-55e66fa7d6004a0c84bce001c97d2c4d",
+  "sourceCommit": "6fe72b7f2b5240c272f4e4e6244a07c76695645b",
+  "sourceDirty": false,
+  "manifestRecheck": {"entryCount":8,"allMatched":true,"postSmokeRecheckRawSha256":"9525E97D9BEDB4DDDE17C1E4E8771627CD4C07C20BA29659754B32C46C7D37E5","exitCode":0},
+  "smoke": {"runId":"add8b0130fdd43f2bd020e924ea1e59f","manifestSha256":"F362C55FB7D2B68C8C2749058FF5BC38CB893ED0C467ADAEE4DD5B961D89BE57","candidateBinding":"0DBB42E55AC3E400A758D38CE996321775FA2E3215E2B1AACFA6C1592062F68E","succeeded":true,"mode":"artifact-only","guiInteractionProven":false,"mp3Sha256":"188ACFB52B9592FB2EADEED48B4BFD07BE1FE698B1A9AC8B144974AB5AB7D9D5","duration":2.020136,"ffprobeSha256":"312A974BFE98206258E69671AE8F50CDAA44C2C1BD1D55BB944A4F5C0ECCC41","noPartFiles":true},
+  "independentReviewer": {"path":"C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\independent-review-candidate5-20260813T204854Z.md","sha256":"B286C166BD8D2D423B1C909277666B3444A54440733BA9030775A12C4ECAA692","model":"gpt-5.6-terra","verdict":"GUILTY","notGuiltyEligible":false},
+  "openGates":["candidate5-bound GUI causal ledger/screenshots absent","manual DPI 100/150/200 observations absent","post-capture untracked inventory absent"],
+  "historicalInvalidation": {"path":"C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\f526-invalidated-20260813T205500Z.md","sha256":"23418DA63AD383BAB54F7E17A260163D863DCFC2ADBA24A11185AAC72135D40D"},
+  "finalVerdict":"GUILTY; candidate seal is sound, but strict acceptance evidence is incomplete."
+}

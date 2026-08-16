@@ -1,0 +1,15 @@
+START_UTC=2026-08-13T21:24:04.2259048Z
+COMMAND=powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\Users\ceo\OneDrive\Desktop\01_AllWork\ytdlp-interface\src\tests\run_powershell_tests.ps1
+START runtime-maintenance.Tests.ps1
+What if: Performing the operation "replace repaired settings" on target "C:\Users\ceo\AppData\Local\Temp\runtime-maintenance-tests-b6f03c9a094e4a528bf5d9832e792c17\settings.json".
+What if: Performing the operation "replace verified yt-dlp nightly" on target "C:\Users\ceo\AppData\Local\Temp\runtime-maintenance-tests-cf22c071cbbc4004963a9c82dbba0e00\yt-dlp.exe".
+What if: Performing the operation "replace verified yt-dlp nightly" on target "C:\Users\ceo\AppData\Local\Temp\runtime-maintenance-tests-cf22c071cbbc4004963a9c82dbba0e00\yt-dlp.exe".
+What if: Performing the operation "replace verified yt-dlp nightly" on target "C:\Users\ceo\AppData\Local\Temp\runtime-maintenance-tests-7fe64b1c67a94389bfb68b05ba2c9a21\yt-dlp.exe".
+What if: Performing the operation "replace verified yt-dlp nightly" on target "C:\Users\ceo\AppData\Local\Temp\runtime-maintenance-tests-395d85d17dc54cfb8a86817bf6e66dda\yt-dlp.exe".
+runtime-maintenance tests passed
+PASS runtime-maintenance.Tests.ps1
+START smoke-localhost.Tests.ps1
+smoke-localhost fixture tests passed.
+PASS smoke-localhost.Tests.ps1
+END_UTC=2026-08-13T21:24:15.1611331Z
+EXIT_CODE=0

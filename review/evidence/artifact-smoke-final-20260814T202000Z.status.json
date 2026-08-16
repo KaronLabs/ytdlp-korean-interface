@@ -1,0 +1,11 @@
+﻿{
+    "schemaVersion":  1,
+    "startedAtUtc":  "2026-08-13T20:05:07.8978836Z",
+    "completedAtUtc":  "2026-08-13T20:05:11.5091422Z",
+    "command":  "",
+    "candidateRoot":  "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-final-candidates-3\\candidate-be82d99ef153424ca1bb9890c8c5380e",
+    "expectedCandidateManifestSha256":  "22A481CD04F3C90D5FD7717C8085B49D7667F0245906F1B58E9EB330AFA36F6C",
+    "artifactPath":  "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\artifact-smoke-final-20260814T202000Z.artifact.mp3",
+    "exitCode":  1,
+    "exception":  "System.Management.Automation.RuntimeException: candidate_manifest_mismatch"
+}

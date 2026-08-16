@@ -1,0 +1,11 @@
+﻿{
+    "schemaVersion":  1,
+    "startedAtUtc":  "2026-08-13T21:48:19.5286600Z",
+    "pid":  20124,
+    "url":  "http://127.0.0.1:60324/master.m3u8",
+    "pythonPath":  "C:\\Users\\ceo\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe",
+    "serverScript":  "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\hls-subtitle-server-candidate7.py",
+    "stdoutPath":  "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\hls-subtitle-server-candidate7.out.log",
+    "stderrPath":  "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\hls-subtitle-server-candidate7.err.log",
+    "aliveAfterStart":  true
+}

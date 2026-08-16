@@ -1,0 +1,75 @@
+﻿{
+    "checkedAtUtc":  "2026-08-13T19:36:08.5142934Z",
+    "candidateRoot":  "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-final-candidates-3\\candidate-be82d99ef153424ca1bb9890c8c5380e",
+    "manifestSha256":  "22A481CD04F3C90D5FD7717C8085B49D7667F0245906F1B58E9EB330AFA36F6C",
+    "sourceCommit":  "6fe72b7f2b5240c272f4e4e6244a07c76695645b",
+    "sourceDirty":  false,
+    "treeSha256":  "53AD3690BEACCF9A3C4C9F9CE2D27DA199EAD42849F686FFFEF14F5DA28F4B15",
+    "entries":  [
+                    {
+                        "path":  "7z.dll",
+                        "expectedSha256":  "405E9A77857753D21E060DCFFAB12F820FA7593AE152B45588703BF312B5FF44",
+                        "actualSha256":  "405E9A77857753D21E060DCFFAB12F820FA7593AE152B45588703BF312B5FF44",
+                        "expectedLength":  1710080,
+                        "actualLength":  1710080,
+                        "match":  true
+                    },
+                    {
+                        "path":  "deno.exe",
+                        "expectedSha256":  "B6E83993F1F1AB97075A77043DE61118966D719B5450BC631251D47C3A34230B",
+                        "actualSha256":  "B6E83993F1F1AB97075A77043DE61118966D719B5450BC631251D47C3A34230B",
+                        "expectedLength":  127973152,
+                        "actualLength":  127973152,
+                        "match":  true
+                    },
+                    {
+                        "path":  "ffmpeg.exe",
+                        "expectedSha256":  "EDD8A62C69279CED0723DDD8041A3CAC4606CAC1291EE1C493B7E717C5148129",
+                        "actualSha256":  "EDD8A62C69279CED0723DDD8041A3CAC4606CAC1291EE1C493B7E717C5148129",
+                        "expectedLength":  202468352,
+                        "actualLength":  202468352,
+                        "match":  true
+                    },
+                    {
+                        "path":  "ffprobe.exe",
+                        "expectedSha256":  "16D4B4B5FFB4494FD232BCE1BB62EE63E570DF20352B6C75E9F4D9FAC567D6B6",
+                        "actualSha256":  "16D4B4B5FFB4494FD232BCE1BB62EE63E570DF20352B6C75E9F4D9FAC567D6B6",
+                        "expectedLength":  202263040,
+                        "actualLength":  202263040,
+                        "match":  true
+                    },
+                    {
+                        "path":  "locales\\ko-KR.json",
+                        "expectedSha256":  "C5D73B957CB0E151CDCBEC2DED9D74AB7061FC4C1F8F6B7913D1702C8B7FD4E6",
+                        "actualSha256":  "C5D73B957CB0E151CDCBEC2DED9D74AB7061FC4C1F8F6B7913D1702C8B7FD4E6",
+                        "expectedLength":  45320,
+                        "actualLength":  45320,
+                        "match":  true
+                    },
+                    {
+                        "path":  "yt-dlp.exe",
+                        "expectedSha256":  "E78500D301B5DE3A9280A418F6DD45604C4D85B718B0A2447C1B0AA9699E2689",
+                        "actualSha256":  "E78500D301B5DE3A9280A418F6DD45604C4D85B718B0A2447C1B0AA9699E2689",
+                        "expectedLength":  17425487,
+                        "actualLength":  17425487,
+                        "match":  true
+                    },
+                    {
+                        "path":  "ytdlp-interface.exe",
+                        "expectedSha256":  "CFEAE1A9867ADC543F1A178162B91D477DA83DF17ADD84B0FE80D72785845943",
+                        "actualSha256":  "CFEAE1A9867ADC543F1A178162B91D477DA83DF17ADD84B0FE80D72785845943",
+                        "expectedLength":  3917312,
+                        "actualLength":  3917312,
+                        "match":  true
+                    },
+                    {
+                        "path":  "ytdlp-interface.json",
+                        "expectedSha256":  "9D52BD66A45FDA25E257A9D89184C27896A44484412F2B32CD37E99FE3DB9F05",
+                        "actualSha256":  "9D52BD66A45FDA25E257A9D89184C27896A44484412F2B32CD37E99FE3DB9F05",
+                        "expectedLength":  12531,
+                        "actualLength":  12531,
+                        "match":  true
+                    }
+                ],
+    "allMatched":  true
+}

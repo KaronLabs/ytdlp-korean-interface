@@ -1,0 +1,11 @@
+﻿{
+    "schemaVersion":  1,
+    "startedAtUtc":  "2026-08-13T20:04:26.7124734Z",
+    "completedAtUtc":  "2026-08-13T20:04:27.5712827Z",
+    "command":  "",
+    "candidateRoot":  "",
+    "expectedCandidateManifestSha256":  "22A481CD04F3C90D5FD7717C8085B49D7667F0245906F1B58E9EB330AFA36F6C",
+    "artifactPath":  "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\artifact-smoke-final-20260814T201500Z.artifact.mp3",
+    "exitCode":  1,
+    "exception":  "System.Management.Automation.RuntimeException: parent_runtime_required"
+}

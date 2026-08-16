@@ -1,0 +1,11 @@
+﻿{
+    "schemaVersion":  1,
+    "startedAtUtc":  "2026-08-13T20:13:52.6840922Z",
+    "completedAtUtc":  "2026-08-13T20:14:24.8365519Z",
+    "command":  "",
+    "candidateRoot":  "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-final-candidates-4\\candidate-2ccc31fd803f47179fe7487f5f084b93",
+    "expectedCandidateManifestSha256":  "F5263136E613A81A58B998D00A46732ED793234D6CE127E6FD5C2934DD428057",
+    "artifactPath":  "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\artifact-smoke-final-20260814T202500Z.artifact.mp3",
+    "exitCode":  0,
+    "exception":  null
+}

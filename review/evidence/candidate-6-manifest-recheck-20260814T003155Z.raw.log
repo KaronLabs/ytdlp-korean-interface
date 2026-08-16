@@ -1,0 +1,5 @@
+START_UTC=2026-08-13T21:31:55.6724217Z
+COMMAND=powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Import-Module C:\Users\ceo\AppData\Local\Temp\ytdlp-interface-clean-68769de\tools\candidate-manifest.psm1; Assert-CandidateManifestSeal -CandidateRoot C:\Users\ceo\AppData\Local\Temp\ytdlp-interface-final-candidates-6\candidate-d2f04c7e10ba44f1951c47f1e45f41c0 -Manifest (Get-Content -Raw C:\Users\ceo\AppData\Local\Temp\ytdlp-interface-final-candidates-6\candidate-d2f04c7e10ba44f1951c47f1e45f41c0\candidate-manifest.json | ConvertFrom-Json)"
+OUTPUT={"candidateRoot":"C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-final-candidates-6\\candidate-d2f04c7e10ba44f1951c47f1e45f41c0","manifestSha256":"27AC7980F78675E0169F92B4710EF60C60F8948F4606776291EEBC182F9CC4D1","entryCount":8,"result":"PASS","sourceCommit":"68769dec911bd297820dad58266fc2c33bfc8126","sourceDirty":false,"sourceTreeSha256":"FFB416667F5FFA177C2B1EDE6C79763868737037B4DF6BD2A38AFC996F17A4F6","exitCode":0}
+END_UTC=2026-08-13T21:31:58.9106720Z
+EXIT_CODE=0

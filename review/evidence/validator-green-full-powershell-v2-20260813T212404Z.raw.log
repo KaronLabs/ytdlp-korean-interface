@@ -1,0 +1,10 @@
+START_UTC=2026-08-13T21:24:04.2259048Z
+COMMAND=powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\Users\ceo\OneDrive\Desktop\01_AllWork\ytdlp-interface\src\tests\run_powershell_tests.ps1
+START runtime-maintenance.Tests.ps1
+runtime-maintenance tests passed
+PASS runtime-maintenance.Tests.ps1
+START smoke-localhost.Tests.ps1
+smoke-localhost fixture tests passed.
+PASS smoke-localhost.Tests.ps1
+END_UTC=2026-08-13T21:24:15.1611331Z
+EXIT_CODE=0

@@ -1,0 +1,8 @@
+START_UTC=2026-08-13T21:18:00Z
+COMMAND=C:\Users\ceo\AppData\Local\OpenAI\Codex\runtimes\codex-primary-runtime\dependencies\python\python.exe C:\Users\ceo\OneDrive\Desktop\01_AllWork\ytdlp-interface\src\review\evidence\hls-subtitle-probe-candidate5.py
+YTDLP_COMMAND=C:\Users\ceo\AppData\Local\Temp\ytdlp-interface-final-candidates-5\candidate-55e66fa7d6004a0c84bce001c97d2c4d\yt-dlp.exe --no-warnings -J http://127.0.0.1:60323/master.m3u8
+STDOUT_EXCERPT={"id":"master","formats":[{"protocol":"m3u8_native","url":"http://127.0.0.1:60323/video.m3u8"}],"subtitles":{"ko":[{"url":"http://127.0.0.1:60323/subs.m3u8","ext":"vtt","protocol":"m3u8_native"}]},"duration":2}
+SUBTITLE_ASSERTION=language=ko; nonempty_url=true; ext=vtt; protocol=m3u8_native
+STDERR_EXCERPT=
+END_UTC=2026-08-13T21:18:04Z
+EXIT_CODE=0

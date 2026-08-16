@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 2,
+  "createdAtUtc": "2026-08-13T19:57:21.9374706Z",
+  "reviewTarget": {
+    "commit": "6fe72b7f2b5240c272f4e4e6244a07c76695645b",
+    "branch": "codex/korean-i18n-recovery",
+    "sourceDirty": false,
+    "treeSha256": "53AD3690BEACCF9A3C4C9F9CE2D27DA199EAD42849F686FFFEF14F5DA28F4B15"
+  },
+  "comparisonBase": "2173316ebb5e50af49a2a4e939693fa8c3a3459c",
+  "review_target": {
+    "commit": "6fe72b7f2b5240c272f4e4e6244a07c76695645b",
+    "branch": "codex/korean-i18n-recovery",
+    "source_dirty": false,
+    "tree_sha256": "53AD3690BEACCF9A3C4C9F9CE2D27DA199EAD42849F686FFFEF14F5DA28F4B15"
+  },
+  "comparison_base": "2173316ebb5e50af49a2a4e939693fa8c3a3459c",
+  "reviewerAccessAssumption": "A different session or model can read the repository, Git history, both applicable AGENTS.md files, and the absolute evidence paths below. No prior chat state is required. The GUI ledger is append-only; any later ledger hash requires a new index.",
+  "meta": {
+    "changed_files_or_diff": {
+      "command": "git diff --name-status 2173316ebb5e50af49a2a4e939693fa8c3a3459c..6fe72b7f2b5240c272f4e4e6244a07c76695645b",
+      "counts": { "total": 104, "added": 75, "modified": 29, "deleted": 0, "renamed": 0 },
+      "patch": {
+        "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\comparison-base-to-final-20260814T193500Z.patch",
+        "bytes": 2750358,
+        "sha256": "0A683E31236CF28513B90C65F278ADDDF4AFC2324506B91E929EC77025B3E2AF"
+      }
+    },
+    "reviewer_access_assumption": "Different session/model has read access to the exact paths and can recompute every hash; summaries are not accepted as output evidence.",
+    "evidence_package": {
+      "constitution": [
+        { "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\AGENTS.md", "bytes": 10453, "sha256": "4E22E0747C79B2AD9F17F08FE7F083035F3F37C6765DD02E9AAD029DAE2BA322", "applicable": true },
+        { "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\AGENTS.md", "bytes": 9613, "sha256": "50407D74E8897E2D4F7413ED089AAFDAD2C7658365804755164141C40A63A66C", "applicable": true },
+        { "path": "GEMINI.md/CLAUDE.md", "state": "not found in repository or stated parent; no path inferred" }
+      ],
+      "candidate": {
+        "root": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-final-candidates-3\\candidate-be82d99ef153424ca1bb9890c8c5380e",
+        "manifestPath": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-final-candidates-3\\candidate-be82d99ef153424ca1bb9890c8c5380e\\candidate-manifest.json",
+        "manifestSha256": "22A481CD04F3C90D5FD7717C8085B49D7667F0245906F1B58E9EB330AFA36F6C",
+        "manifestBytes": 31011,
+        "manifestMtimeUtc": "2026-08-13T19:33:32.4414432Z",
+        "recheck": { "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\candidate-recheck-final-20260814T193500Z.json", "bytes": 4260, "sha256": "A42CE7F675921CA44F7A383AF0324A3142B409EA46FDC61ED5A910B21A01EFCF", "entries": 8, "mismatches": 0, "allMatched": true }
+      },
+      "diff": {
+        "sourceOnlyCheck": { "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\diff-check-source-final-20260814T194000Z.log", "bytes": 225, "sha256": "826A225B81E70E3DD792CD8D4983AC735B453DF6DA16ECA4505E42AEBA225F82", "exitCode": 0 },
+        "fullCheck": { "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\diff-check-final-20260814T194000Z.log", "bytes": 563741, "sha256": "6A470CFA4ECAB42D69ACF4EE441FC517EDE6564BCA1DC0CBE1AA9C31667C2793", "exitCode": 2, "reason": "old review patch whitespace diagnostics" },
+        "untrackedInventory": { "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\untracked-inventory-final-20260814T193500Z.json", "bytes": 3117, "sha256": "022409B6CF3D2E4617D0EA85CE2C088F5762D44625F0AA56E880C009AF3DB7D3", "capturedAtUtc": "2026-08-13T19:35:53.3047685Z", "note": "snapshot predates this audit artifact and later GUI append-only entries" }
+      },
+      "rawLogs": [
+        { "name": "build", "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\build-candidate-final-20260814T193500Z.log", "bytes": 1084, "sha256": "07E2023621F0CC63DA4A43CDBEC82BB70C88F3F9C7927D754C2CD905BC345D05", "exitCode": 0, "endUtc": "2026-08-13T19:33:35.3862005Z" },
+        { "name": "native", "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\native-final-20260814T194000Z.log", "bytes": 529, "sha256": "DB10640B6DA697AD57A0AC4D7BDE9ACC2264632A01620F94AD00726AE021E742", "buildExit": 0, "testExit": 0, "startUtc": "2026-08-13T19:36:30.9858729Z", "endUtc": "2026-08-13T19:36:31.9982868Z" },
+        { "name": "contract", "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\contract-final-20260814T194000Z.log", "bytes": 7964, "sha256": "7D7C1762CA8B9F2B5419CD89B92144FE0F463451C200F36D7E7A9DC120403950", "quote": "Ran 20 tests in 8.161s; OK; EXIT_CODE=0", "exitCode": 0, "endUtc": "2026-08-13T19:36:47.4796649Z" },
+        { "name": "powershell", "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\powershell-final-20260814T194000Z.log", "bytes": 2507, "sha256": "711CFFF45BBED6A07BA6C00EE23B1C2E1E0697121523E43055A9493A49FCEA01", "quote": "runtime-maintenance tests passed; smoke-localhost fixture tests passed; EXIT_CODE=0", "exitCode": 0, "endUtc": "2026-08-13T19:37:09.7837257Z" }
+      ],
+      "gui": {
+        "ledgerPath": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-final-gui-evidence-22A481CD\\gui-ledger.jsonl",
+        "ledgerBytes": 3605,
+        "ledgerSha256": "F062DA3E039DAB48BC45FDFA27E1596CCE79AC4CE89C88C1431F5B03D741370D",
+        "candidateBoundRecordsAtCapture": 3,
+        "screenshots": [
+          { "name": "startup.jpg", "bytes": 75197, "sha256": "E81A5D9E48F31ADB59FBCFB1F324D8AE765AD3A79C1713CEFEE4217703866EA7" },
+          { "name": "startup-after-overlay.jpg", "bytes": 74060, "sha256": "FEAD76ED17D11B256FAA2FBC9EB8D41DAF04E3EE6E10B7E39670EE368034E57E" },
+          { "name": "startup-sealed.jpg", "bytes": 71295, "sha256": "8D37DF0018A229E0BABCC8318B51E4536571BAAA746B05A79274EBEF66ADD117" }
+        ],
+        "passedSlots": ["Korean startup visible"],
+        "missingSlots": ["metadata/format causal chain", "settings/playlist/subtitle/sections/queue/output/message-box matrix", "fresh candidate-bound GUI MP3 completion", "overlay-free visual evidence", "DPI 100/150/200"]
+      }
+    }
+  },
+  "threatModel": {
+    "trustBoundary": ["network", "proxy", "file_io", "process_exec", "deserialization", "environment/tool discovery", "local runtime replacement"],
+    "trusted": ["comparison-base Git object", "reviewed dependency archive hash", "candidate executables only after manifest/hash/version recheck", "validated locale catalog"],
+    "untrusted": ["network release metadata before hash/version verification", "archive entries before traversal checks", "stale settings paths", "translated captions as program state", "arbitrary fixture output", "child-process success before direct exit code"],
+    "securityScope": "No auth, secret, token, proxy credential, or permission boundary was expanded by the subtitle fallback change; localhost fixtures are isolated."
+  },
+  "tests": [
+    { "command": "MSBuild.exe tests\\native\\i18n_tests.vcxproj /t:Build /p:Configuration=Debug /p:Platform=x64 /m /nologo /v:minimal ; tests\\native\\x64\\Debug\\i18n_tests.exe", "result": "build/test exit 0", "rawLog": "native-final-20260814T194000Z.log" },
+    { "command": "RECOVERED_CATALOG=locales/ko-KR.json python3 tests/run_contract_tests.py", "result": "20 tests OK; exit 0", "rawLog": "contract-final-20260814T194000Z.log" },
+    { "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/run_powershell_tests.ps1", "result": "runtime-maintenance and smoke-localhost suites passed; exit 0", "rawLog": "powershell-final-20260814T194000Z.log" },
+    { "command": "git diff --check 2173316ebb5e50af49a2a4e939693fa8c3a3459c..6fe72b7f2b5240c272f4e4e6244a07c76695645b -- . :(exclude)review", "result": "exit 0", "rawLog": "diff-check-source-final-20260814T194000Z.log" }
+  ],
+  "evidenceQuotes": [
+    { "source": "contract-final-20260814T194000Z.log", "quote": "Ran 20 tests in 8.161s; OK; EXIT_CODE=0", "timestampUtc": "2026-08-13T19:36:47.4796649Z" },
+    { "source": "powershell-final-20260814T194000Z.log", "quote": "runtime-maintenance tests passed; smoke-localhost fixture tests passed; EXIT_CODE=0", "timestampUtc": "2026-08-13T19:37:09.7837257Z" },
+    { "source": "candidate-recheck-final-20260814T193500Z.json", "quote": "allMatched=true; 8 entries; mismatches=0", "timestampUtc": "2026-08-13T19:36:08.5142934Z" },
+    { "source": "gui-ledger.jsonl", "quote": "startup visible; later URL click has pre/post screenshots but visibleResult=inspect screenshot and externalOverlayPresent=true", "timestampUtc": "2026-08-13T19:56:26.336Z" }
+  ],
+  "evidence_quotes": [
+    { "source": "contract-final-20260814T194000Z.log", "quote": "Ran 20 tests in 8.161s; OK; EXIT_CODE=0", "timestamp_utc": "2026-08-13T19:36:47.4796649Z" },
+    { "source": "powershell-final-20260814T194000Z.log", "quote": "runtime-maintenance tests passed; smoke-localhost fixture tests passed; EXIT_CODE=0", "timestamp_utc": "2026-08-13T19:37:09.7837257Z" },
+    { "source": "candidate-recheck-final-20260814T193500Z.json", "quote": "allMatched=true; 8 entries; mismatches=0", "timestamp_utc": "2026-08-13T19:36:08.5142934Z" },
+    { "source": "gui-ledger.jsonl", "quote": "startup visible; later URL click has pre/post screenshots but visibleResult=inspect screenshot and externalOverlayPresent=true", "timestamp_utc": "2026-08-13T19:56:26.336Z" }
+  ],
+  "risks": [
+    { "severity": "high", "description": "Complete candidate-bound GUI state matrix and causal URL-to-MP3 flow are absent.", "handling": "accepted_unresolved" },
+    { "severity": "high", "description": "Current-candidate 100%, 150%, and 200% DPI measurements are absent.", "handling": "accepted_unresolved" },
+    { "severity": "high", "description": "Fresh operator-guided smoke artifacts (MP3/settings/FFprobe/no-part) bound to 22A481 are absent; old 78E1 artifacts are excluded.", "handling": "plan" },
+    { "severity": "high", "description": "Different-session-or-model final verdict over this exact candidate/package is pending.", "handling": "plan" },
+    { "severity": "medium", "description": "Full diff check exits 2 because old review patch evidence contains whitespace diagnostics; source-only scope exits 0.", "handling": "safeguard" },
+    { "severity": "medium", "description": "GUI ledger is live append-only and includes an initial overlay=false record followed by overlay=true records.", "handling": "safeguard" }
+  ],
+  "reviewPackage": {
+    "state": "partial",
+    "requiredSlots": ["spec_file_content", "changed_files_or_diff", "test_logs_or_evidence_quotes", "relevant_runtime_outputs"],
+    "present": ["candidate manifest", "candidate recheck", "binary comparison patch", "source-only diff check", "native/contract/PowerShell raw logs", "constitution hashes", "threat model", "GUI startup ledger"],
+    "missing": ["final spec after GUI ledger freeze", "fresh 22A481 smoke artifacts", "complete GUI state matrix", "DPI 100/150/200", "different-session-or-model verdict", "post-audit untracked inventory"],
+    "reviewerRequired": "different_session_or_model"
+  },
+  "review_package": {
+    "state": "partial",
+    "required_slots": ["spec_file_content", "changed_files_or_diff", "test_logs_or_evidence_quotes", "relevant_runtime_outputs"],
+    "present": ["candidate manifest", "candidate recheck", "binary comparison patch", "source-only diff check", "native/contract/PowerShell raw logs", "constitution hashes", "threat model", "GUI startup ledger"],
+    "missing": ["final spec after GUI ledger freeze", "fresh 22A481 smoke artifacts", "complete GUI state matrix", "DPI 100/150/200", "different-session-or-model verdict", "post-audit untracked inventory"],
+    "reviewer_required": "different_session_or_model"
+  },
+  "reviewer_required": "different_session_or_model",
+  "status": "partial_success",
+  "reviewerVerdict": "pending",
+  "notGuiltyEligible": false,
+  "auditArtifact": {
+    "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\package-audit-20260813T195721Z.md",
+    "purpose": "read-only exact-hash audit; no source changes; missing gates are explicit"
+  }
+}

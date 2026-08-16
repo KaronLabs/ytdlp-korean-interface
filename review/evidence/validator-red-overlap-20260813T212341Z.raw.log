@@ -1,0 +1,5 @@
+START_UTC=2026-08-13T21:23:41.6936524Z
+COMMAND=powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\Users\ceo\OneDrive\Desktop\01_AllWork\ytdlp-interface\src\tests\powershell\smoke-localhost.Tests.ps1 with SMOKE_TEST_FILTER=seal-red
+RED=Test-SmokeExecutionOverlayRejectsBaseRootOverlap expected candidate_execution_base_overlap, observed no_failure; test runner reported the assertion failure and exited 1.
+END_UTC=2026-08-13T21:23:43.7502020Z
+EXIT_CODE=1

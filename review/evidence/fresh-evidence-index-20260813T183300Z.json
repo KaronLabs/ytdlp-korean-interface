@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "createdAtUtc": "2026-08-13T18:33:00Z",
+  "reviewTargetCommit": "366dc65539bec11edf8159d05b470e0beeddee6b",
+  "comparisonBase": "2173316ebb5e50af49a2a4e939693fa8c3a3459c",
+  "candidateRoot": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-final-candidates-2\\candidate-3fae2c2b8fb342e4a0a6f44dff35c185",
+  "candidateManifestSha256": "78E1AF2D6FBB5BC2300A7C0FE307A28AA6CA4A04160A8D8ECEAABF371205474D",
+  "candidateSourceDirty": false,
+  "candidateFileRecheck": { "entries": 8, "mismatches": 0 },
+  "diff": {
+    "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\comparison-base-to-head-20260814T182700Z.patch",
+    "length": 1392781,
+    "sha256": "1560E47995C287A3452DF204AC7D8E4BABFB9B689C932360A765665A22D83F70"
+  },
+  "tests": [
+    { "path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-evidence\\tests-final-20260813T182300Z.log", "exit": 0, "sha256": "7BE840CDEEA5627968DF93B8D05BFBB34CC75AF5D859FA1CE175B6B871C84208" },
+    { "path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-evidence\\contract-tests-final-20260813T182400Z.log", "exit": 0, "sha256": "76DECA782CA9C26A7B8E9F2A41CC81AB01F36FEF63721D4C870E77FB58F6E396" },
+    { "path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-evidence\\native-tests-final-20260813T182500Z.log", "exit": 0, "sha256": "511D3897D4209EDD3EC6841126C3C570301F7941CC699E7F8C0077CCADD897FB" },
+    { "path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-evidence\\diff-check-final-20260813T182600Z.log", "exit": 0, "sha256": "076746F5946F387061035843369979D46DB83E4F4A9D45667196BBBFE93F0D43" }
+  ],
+  "guiLedger": {
+    "path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-evidence\\gui-run-20260813T174200Z-ledger.jsonl",
+    "sha256": "365A33D5DF40340921E4F2A8D8F400D2863F5E602C24C87885D1F1C2B63D3746",
+    "freshCandidateShaBoundEvents": 20,
+    "excludedOldCandidateEvents": true
+  },
+  "operatorSmoke": {
+    "runId": "d4c5e9cf46dd4199927ba8ebff86aa69",
+    "manifestPath": "C:\\Users\\ceo\\Downloads\\ytdlp-interface-smoke-evidence\\runs\\d4c5e9cf46dd4199927ba8ebff86aa69.json",
+    "manifestSha256": "2A527006DA3DDCA5681022CD0A7956EE14B30554436737C9060D05D1026203D5",
+    "succeeded": true,
+    "mode": "operator-guided",
+    "artifactValidated": true,
+    "operatorAttested": true,
+    "guiInteractionProven": false,
+    "cleanupSucceeded": true,
+    "mp3Sha256": "188ACFB52B9592FB2EADEED48B4BFD07BE1FE698B1A9AC8B144974AB5AB7D9D5",
+    "mp3Length": 9328,
+    "duration": 2.020136,
+    "ffprobeSha256": "312A974BFE98206258E69671AE8F50CDAA44C2C1BD1D55BB944A4F5C0ECCC41A",
+    "noPartFiles": true
+  },
+  "dpi": { "observedLogicalDpi": 120, "observedScales": ["current desktop only"], "missingScales": [150, 200] },
+  "status": "partial_success",
+  "reviewerRequired": "different_session_or_model",
+  "reviewerVerdict": "pending"
+}

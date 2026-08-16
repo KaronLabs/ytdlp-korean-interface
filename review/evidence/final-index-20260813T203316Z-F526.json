@@ -1,0 +1,200 @@
+{
+  "schemaVersion": 3,
+  "createdAtUtc": "2026-08-13T20:33:16.2966026Z",
+  "review_target": {
+    "commit": "6fe72b7f2b5240c272f4e4e6244a07c76695645b",
+    "branch": "codex/korean-i18n-recovery",
+    "source_dirty": false,
+    "tree_sha256": "07D5889D48E55B866698777D5EBD22DDFF7DE8F4E8CABB7C4451B5CFA53D7A27",
+    "candidate_root": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-final-candidates-4\\candidate-2ccc31fd803f47179fe7487f5f084b93",
+    "candidate_manifest_sha256": "F5263136E613A81A58B998D00A46732ED793234D6CE127E6FD5C2934DD428057"
+  },
+  "comparison_base": "2173316ebb5e50af49a2a4e939693fa8c3a3459c",
+  "reviewer_required": "different_session_or_model",
+  "reviewer_access_assumption": "A different session or model can read this spec, this index, the repository Git history, both applicable AGENTS.md files, the sealed F526 candidate, the Downloads smoke run, and all absolute evidence paths. No prior chat state is required.",
+  "meta": {
+    "changed_files_or_diff": {
+      "command": "git diff --name-status 2173316ebb5e50af49a2a4e939693fa8c3a3459c..6fe72b7f2b5240c272f4e4e6244a07c76695645b",
+      "counts": { "total": 104, "added": 75, "modified": 29, "deleted": 0, "renamed": 0 },
+      "patch": {
+        "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\comparison-base-to-final-20260814T193500Z.patch",
+        "bytes": 2750358,
+        "sha256": "0A683E31236CF28513B90C65F278ADDDF4AFC2324506B91E929EC77025B3E2AF"
+      },
+      "source_only_diff_check": {
+        "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\diff-check-source-final-20260814T194000Z.log",
+        "bytes": 225,
+        "sha256": "826A225B81E70E3DD792CD8D4983AC735B453DF6DA16ECA4505E42AEBA225F82",
+        "exit_code": 0
+      },
+      "full_diff_check": {
+        "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\diff-check-final-20260814T194000Z.log",
+        "bytes": 563741,
+        "sha256": "6A470CFA4ECAB42D69ACF4EE441FC517EDE6564BCA1DC0CBE1AA9C31667C2793",
+        "exit_code": 2,
+        "reason": "whitespace diagnostics in older review evidence patch; not hidden"
+      },
+      "untracked_inventory": {
+        "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\untracked-inventory-final-20260814T193500Z.json",
+        "bytes": 3117,
+        "sha256": "022409B6CF3D2E4617D0EA85CE2C088F5762D44625F0AA56E880C009AF3DB7D3",
+        "captured_at_utc": "2026-08-13T19:35:53.3047685Z",
+        "note": "This inventory predates F526 v2 evidence. New v2 files are listed explicitly below; a later package may issue a fresh inventory after evidence freeze."
+      }
+    },
+    "reviewer_access_assumption": "Exact absolute paths and hashes are supplied; author summaries are not used as substitute output.",
+    "evidence_package": {
+      "constitution": [
+        { "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\AGENTS.md", "bytes": 10453, "sha256": "4E22E0747C79B2AD9F17F08FE7F083035F3F37C6765DD02E9AAD029DAE2BA322", "applicable": true },
+        { "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\AGENTS.md", "bytes": 9613, "sha256": "50407D74E8897E2D4F7413ED089AAFDAD2C7658365804755164141C40A63A66C", "applicable": true },
+        { "path": "GEMINI.md/CLAUDE.md", "state": "not found in repository or stated parent; no path inferred" }
+      ],
+      "candidate": {
+        "manifest_path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-final-candidates-4\\candidate-2ccc31fd803f47179fe7487f5f084b93\\candidate-manifest.json",
+        "manifest_bytes": 31011,
+        "manifest_mtime_utc": "2026-08-13T20:12:59.2630996Z",
+        "manifest_sha256": "F5263136E613A81A58B998D00A46732ED793234D6CE127E6FD5C2934DD428057",
+        "source_commit": "6fe72b7f2b5240c272f4e4e6244a07c76695645b",
+        "source_dirty": false,
+        "tree_sha256": "07D5889D48E55B866698777D5EBD22DDFF7DE8F4E8CABB7C4451B5CFA53D7A27",
+        "tracked_file_count": 125,
+        "recheck": {
+          "json_path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-evidence\\candidate-recheck-20260814T-new.json",
+          "json_bytes": 4507,
+          "json_sha256": "BC1FB92F25FF2353982242920365C8CA26026EA83F31F64A7EFAC1721B92CC55",
+          "raw_log_path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-evidence\\candidate-recheck-20260814T-new.raw.log",
+          "raw_log_bytes": 569,
+          "raw_log_sha256": "DA956565CFC9A661B58164E08E0A72F69C28D354D2D1C4A567479C9E907CD6EF",
+          "checked_at_utc": "2026-08-13T20:14:26.5482343Z",
+          "entry_count": 8,
+          "all_matched": true,
+          "raw_quote": "Assert-CandidateManifestSeal passed; ENTRY_COUNT=8; ALL_MATCHED=True; EXIT_CODE=0"
+        }
+      },
+      "build": {
+        "raw_log_path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-evidence\\build-candidate-final-20260814T-new.raw.log",
+        "raw_log_bytes": 1222,
+        "raw_log_sha256": "BA841CE24F5578CEC61537DA1CD7C9D6616F68D9C34AB0669C57E145106A790A",
+        "status_path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-evidence\\build-candidate-final-20260814T-new.raw.status.json",
+        "status_bytes": 1354,
+        "status_sha256": "5B1E895A4433D5C7F6CAFCF345101D9C5DBD70A900E0A32C5AF5A5CD025D983C",
+        "start_utc": "2026-08-13T20:08:47.0368914Z",
+        "end_utc": "2026-08-13T20:13:03.7359634Z",
+        "exit_code": 0,
+        "raw_quote": "SOURCE_HEAD=6fe72b7f2b5240c272f4e4e6244a07c76695645b; SOURCE_STATUS=; EXIT_CODE=0"
+      },
+      "tests": [
+        { "name": "native", "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\native-final-20260814T194000Z.log", "sha256": "DB10640B6DA697AD57A0AC4D7BDE9ACC2264632A01620F94AD00726AE021E742", "quote": "BUILD_EXIT=0; TEST_EXIT=0" },
+        { "name": "contract", "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\contract-final-20260814T194000Z.log", "sha256": "7D7C1762CA8B9F2B5419CD89B92144FE0F463451C200F36D7E7A9DC120403950", "quote": "Ran 20 tests in 8.161s; OK; EXIT_CODE=0" },
+        { "name": "powershell", "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\powershell-final-20260814T194000Z.log", "sha256": "711CFFF45BBED6A07BA6C00EE23B1C2E1E0697121523E43055A9493A49FCEA01", "quote": "runtime-maintenance tests passed; smoke-localhost fixture tests passed; EXIT_CODE=0" }
+      ],
+      "smoke": {
+        "run_id": "6808a14bf971476c875e8f4caadc6cb8",
+        "manifest_path": "C:\\Users\\ceo\\Downloads\\ytdlp-interface-smoke-evidence\\runs\\6808a14bf971476c875e8f4caadc6cb8.json",
+        "manifest_bytes": 1766,
+        "manifest_sha256": "82B8AF68DA37426B213890255783B639E915EAC96C6154A3DE58305EF0FC540D",
+        "completed_at_utc": "2026-08-13T20:14:24.6956721Z",
+        "mode": "artifact-only",
+        "succeeded": true,
+        "candidate_manifest_sha256": "F5263136E613A81A58B998D00A46732ED793234D6CE127E6FD5C2934DD428057",
+        "base_candidate_manifest_sha256": "F5263136E613A81A58B998D00A46732ED793234D6CE127E6FD5C2934DD428057",
+        "settings_sha256": "C34C81927D5E2E91D81AAD40D7B616D4EBD0199EEFFC0C39B450C1C6511D24ED",
+        "artifact_mp3": { "path": "C:\\Users\\ceo\\Downloads\\ytdlp-interface-smoke-evidence\\artifacts\\6808a14bf971476c875e8f4caadc6cb8\\output.mp3", "bytes": 9328, "sha256": "188ACFB52B9592FB2EADEED48B4BFD07BE1FE698B1A9AC8B144974AB5AB7D9D5" },
+        "settings": { "path": "C:\\Users\\ceo\\Downloads\\ytdlp-interface-smoke-evidence\\artifacts\\6808a14bf971476c875e8f4caadc6cb8\\ytdlp-interface.json", "bytes": 12595, "sha256": "C34C81927D5E2E91D81AAD40D7B616D4EBD0199EEFFC0C39B450C1C6511D24ED" },
+        "ffprobe": { "path": "C:\\Users\\ceo\\Downloads\\ytdlp-interface-smoke-evidence\\artifacts\\6808a14bf971476c875e8f4caadc6cb8\\ffprobe.txt", "bytes": 33, "sha256": "312A974BFE98206258E69671AE8F50CDAA44C2C1BD1D55BB944A4F5C0ECCC41A", "quote": "codec_name=mp3; duration=2.020136" },
+        "duration": 2.020136,
+        "no_part_files": true,
+        "cleanup_succeeded": true,
+        "gui_interaction_proven": false,
+        "operator_attested": false,
+        "raw_log": { "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\artifact-smoke-final-20260814T202500Z.log", "bytes": 1360, "sha256": "80B7B897975E116E5E648E91B7A9ECDAC3FC1BB07794825CB68E7CB3E97A1151", "exit_code": 0, "quote": "Valid=true; ReasonCode=ok; Duration=2.020136; EXIT_CODE=0" },
+        "status": { "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\artifact-smoke-final-20260814T202500Z.status.json", "bytes": 626, "sha256": "BD81E240F623B0B13F9C57752FA85AC68A97A60F4D753AB6C68D60DE7843F6D5", "exit_code": 0 }
+      },
+      "failed_smoke_attempts": [
+        { "attempt": "20260814T201500Z", "status_path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\artifact-smoke-final-20260814T201500Z.status.json", "status_sha256": "32CE4FB53FDA3CB7ED2681EEFAE66A6CC71AE5AA4194697A690D4632C24DE8C6", "log_sha256": "CA366C42BCBFAF2ABAEF85A1FF294CEC076D1B6BE8090599AF050E3EE3857B76", "reason": "parent_runtime_required; expected old 22A candidate" },
+        { "attempt": "20260814T202000Z", "status_path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\artifact-smoke-final-20260814T202000Z.status.json", "status_sha256": "42096218F86B69CC9CECECA7309CDE8FA4A06C1EA60E22AA74E78D606FAE90D2", "log_sha256": "09032656B1755CE0A7EB58F84D1AF1B9BC4054480AAD1B8034EE0CE9FFFDE3E2", "reason": "candidate_manifest_mismatch; expected old 22A candidate" }
+      ],
+      "gui": {
+        "ledger_path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\gui-ledger-F5263136-v2.jsonl",
+        "ledger_bytes": 12264,
+        "ledger_sha256": "C34BD3F03128268CDA5E3653F7DA173F7E64748C0A9E252940E80553DF399FE7",
+        "event_count": 14,
+        "candidate_manifest_sha256": "F5263136E613A81A58B998D00A46732ED793234D6CE127E6FD5C2934DD428057",
+        "window_id": 33161530,
+        "screenshot_hashes": {
+          "startup": "D9F1FE22AECDDFBEA78B9D9EFA0F511F988C32A27112D4BA3D9B7448EC7E3A18",
+          "settings": "4B886902B0FCAD5168A5866FFE1E851B3C4260C1E5E302D93C261958C9E03932",
+          "settings_sponsorblock": "4A4C78A81D8185B558AFEACEB19B5A2CDB1950B695C901C93A5BDCE963204A34",
+          "settings_interface": "78EECFF063DC0F8FADB0F40CF9C0BBBF96AF3EAB2136DAD722977BAA5B33CE70",
+          "url_added": "27865250E66A1DF8D61C31A884D7C35DE1F8B3569C80D99D58376886D0AFEA74",
+          "metadata_playlist": "558961044CEF74F037EE42AA04F7363D7D277E010FA8EF8206A2FA6BCAF1FDDC",
+          "playlist_context": "10C456ADDB9AA133141453CC6EEA848C1CDF5FFA181EF1DE4C1518E6FDFDCA62",
+          "playlist_selection": "39F879A62088567CB5CB0208EA79F52383B607D9C4359BF86E4B548D29490ECF",
+          "direct_queued": "59C70B23817F2CEDA1199E94D4932ECE7AA6B3B4F6567C303E3BA1446B444412",
+          "direct_after_wait": "B7F03ABF8B4162127C36351463FD5434D2503BE5842447036B027D7E556C677A",
+          "direct_context": "FA225EC3E40F71F3E81EB0975839A535427264090F6AA9DE7BBB7F00829B5E5D",
+          "sections": "7E0290EE919A780AAC3F250E512539EA7FE9B80AF65BC428D0328CC4F4E85556",
+          "validation": "D5CA93A14D52111AF18C4A89D77781EED57F54C216C8245CD4427A0230D08322",
+          "format": "6A91C22062FEFB9E8F48164075BA540EA7C273259D70D3DF4380A01D392A6ED7"
+        },
+        "passed_slots": ["Korean startup", "Korean settings", "SponsorBlock settings", "interface settings", "URL row", "metadata playlist row", "playlist context/selection", "direct media row", "sections dialog", "localized validation message", "format dialog"],
+        "missing_slots": ["manual DPI 100%", "manual DPI 150%", "manual DPI 200%", "independent different-session/model review", "GUI-causal MP3 completion in the smoke manifest"],
+        "external_overlay_present": true,
+        "overlay_caveat": "Every captured screenshot was recorded with the Codex evidence overlay present; overlay-free visual proof is not claimed."
+      },
+      "config_audit": {
+        "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\codex-config-audit-20260814T200000Z.json",
+        "bytes": 561,
+        "sha256": "50A2F29D05CF4B896FAC180ECE904008CD8A397B87EC64EFB0DA517336E6E52C",
+        "config_path": "C:\\Users\\ceo\\.codex\\config.toml",
+        "config_sha256": "EE4D7ED863CCDDE4890B450B12095C997416D553F7453EB6C7624D819B8565A1",
+        "keys": { "approval_policy": "never", "default_permissions": ":danger-full-access", "windows.sandbox": "elevated", "web_search": "live", "sandbox_mode": "absent" },
+        "edit_performed": false
+      },
+      "post_v2_files": [
+        "review/evidence/gui-ledger-F5263136-v2.jsonl",
+        "review/evidence/final-index-20260813T203316Z-F526.json",
+        "review/evidence/package-audit-20260813T203316Z-F526.md",
+        "review/spec_20260813_203316_korean_i18n_candidate_f526_v2.md"
+      ]
+    }
+  },
+  "threat_model": {
+    "trust_boundary": ["network", "proxy", "file_io", "process_exec", "deserialize", "environment/tool discovery", "local runtime replacement"],
+    "trusted": ["comparison-base Git object", "reviewed dependency archive SHA", "validated catalog", "candidate only after manifest/hash/version recheck", "smoke output only after direct artifact/hash/ffprobe checks"],
+    "untrusted": ["network metadata before hash/version verification", "archive entries before traversal checks", "stale settings paths", "translated captions as program state", "arbitrary fixture output", "GUI screenshot claims with external overlay", "child success before direct exit code"],
+    "security_scope": "The subtitle fallback change does not expand auth, secret, token, proxy-credential, permission, eval, deserialize, SQL, or environment-secret access. Localhost smoke is isolated."
+  },
+  "tests": [
+    { "command": "MSBuild.exe tests\\native\\i18n_tests.vcxproj /t:Build /p:Configuration=Debug /p:Platform=x64 /m /nologo /v:minimal ; tests\\native\\x64\\Debug\\i18n_tests.exe", "result": "BUILD_EXIT=0; TEST_EXIT=0", "raw_log": "native-final-20260814T194000Z.log" },
+    { "command": "RECOVERED_CATALOG=locales/ko-KR.json python3 tests/run_contract_tests.py", "result": "Ran 20 tests in 8.161s; OK; EXIT_CODE=0", "raw_log": "contract-final-20260814T194000Z.log" },
+    { "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/run_powershell_tests.ps1", "result": "runtime-maintenance tests passed; smoke-localhost fixture tests passed; EXIT_CODE=0", "raw_log": "powershell-final-20260814T194000Z.log" },
+    { "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File review/evidence/run-artifact-smoke-final-20260814.ps1 -StatusPath ...202500Z.status.json -ArtifactPath ...202500Z.artifact.mp3", "result": "Valid=true; ReasonCode=ok; EXIT_CODE=0", "raw_log": "artifact-smoke-final-20260814T202500Z.log" }
+  ],
+  "evidence_quotes": [
+    { "source": "candidate-recheck-20260814T-new.raw.log", "quote": "Assert-CandidateManifestSeal passed; ENTRY_COUNT=8; ALL_MATCHED=True; EXIT_CODE=0", "timestamp_utc": "2026-08-13T20:14:52.7643362Z" },
+    { "source": "artifact-smoke-final-20260814T202500Z.log", "quote": "Valid=true; ReasonCode=ok; Duration=2.020136; EXIT_CODE=0", "timestamp_utc": "2026-08-13T20:14:24.8869358Z" },
+    { "source": "ffprobe.txt", "quote": "codec_name=mp3; duration=2.020136", "timestamp_utc": "2026-08-13T20:14:24Z" },
+    { "source": "gui-ledger-F5263136-v2.jsonl", "quote": "direct context menu visibly contains 구간 다운로드 and 자막 선택(0/0); Korean localized validation message box rendered", "timestamp_utc": "2026-08-13T20:29:05.0982576Z" },
+    { "source": "gui-ledger-F5263136-v2.jsonl", "quote": "Every event has preObservation/postObservation fields; externalOverlayPresent=true", "timestamp_utc": "2026-08-13T20:31:22.4710943Z" }
+  ],
+  "risks": [
+    { "severity": "high", "description": "Manual Windows DPI observations at 100%, 150%, and 200% are absent for this candidate.", "handling": "accepted_unresolved" },
+    { "severity": "high", "description": "Independent different-session-or-model verdict over the F526 package is absent.", "handling": "plan" },
+    { "severity": "high", "description": "The successful smoke is artifact-only and explicitly records guiInteractionProven=false and operatorAttested=false; GUI screenshots are a separate evidence chain.", "handling": "safeguard" },
+    { "severity": "medium", "description": "All GUI screenshots contain an external Codex evidence overlay, so unobstructed visual claims are not made.", "handling": "safeguard" },
+    { "severity": "medium", "description": "Two earlier 22A smoke attempts failed with parent_runtime_required and candidate_manifest_mismatch; both logs are retained and not hidden.", "handling": "safeguard" },
+    { "severity": "medium", "description": "Untracked inventory predates F526 v2 files; paths added after its capture are explicitly listed and require a fresh inventory for a future frozen package.", "handling": "plan" },
+    { "severity": "medium", "description": "Full diff-check exit 2 due whitespace in older review evidence; source-only diff-check exit 0.", "handling": "safeguard" }
+  ],
+  "review_package": {
+    "state": "partial",
+    "required_slots": ["spec_file_content", "changed_files_or_diff", "test_logs_or_evidence_quotes", "relevant_runtime_outputs"],
+    "present": ["F526 candidate manifest", "8/8 seal recheck", "raw build/seal logs", "successful F526 artifact smoke and MP3/settings/ffprobe", "14-event pre/post GUI ledger", "constitution hashes", "threat model", "config audit", "failed smoke logs retained"],
+    "missing": ["manual DPI 100/150/200", "different-session-or-model verdict", "GUI-causal binding of artifact-only smoke", "fresh post-v2 untracked inventory"],
+    "reviewer_required": "different_session_or_model"
+  },
+  "status": "partial_success",
+  "reviewer_verdict": "pending",
+  "not_guilty_eligible": false
+}

@@ -1,0 +1,24 @@
+﻿{
+    "schemaVersion":  1,
+    "startedAtUtc":  "2026-08-13T21:38:30.2045030Z",
+    "capturedAtUtc":  "2026-08-13T21:38:42.3018903Z",
+    "baseCandidateRoot":  "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-final-candidates-7\\candidate-40b53764d6d244858b9e5b4ead6dbad1",
+    "executionRoot":  "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-gui-candidate7-76102d9bd98a4638aa1863898ddb5d92\\candidate",
+    "outputDirectory":  "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-gui-candidate7-76102d9bd98a4638aa1863898ddb5d92\\output",
+    "baseManifestSha256":  "81D760273EBF9FFD7E03D8712A4942CDF82AD00A89C45D11BAE402817BC6EF4D",
+    "attestation":  {
+                        "kind":  "settings-overlay",
+                        "phase":  "pre-run",
+                        "baseCandidateManifestSha256":  "81D760273EBF9FFD7E03D8712A4942CDF82AD00A89C45D11BAE402817BC6EF4D",
+                        "executionCandidateManifestSha256":  "81D760273EBF9FFD7E03D8712A4942CDF82AD00A89C45D11BAE402817BC6EF4D",
+                        "overlayPath":  "ytdlp-interface.json",
+                        "allowedSettingsFields":  [
+                                                      "outpath"
+                                                  ],
+                        "baseSettingsSha256":  "9D52BD66A45FDA25E257A9D89184C27896A44484412F2B32CD37E99FE3DB9F05",
+                        "settingsSha256":  "878874F6FD28E39F335715A14462FB58C4F9EF574805B2FA8359856C891AD92D",
+                        "outpath":  "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-gui-candidate7-76102d9bd98a4638aa1863898ddb5d92\\output",
+                        "payloadsUnchanged":  true,
+                        "checkedAtUtc":  "2026-08-13T21:38:42.3018903Z"
+                    }
+}

@@ -1,0 +1,4 @@
+START_UTC=2026-08-13T21:23:05.8024126Z
+COMMAND=git -C C:\Users\ceo\OneDrive\Desktop\01_AllWork\ytdlp-interface\src diff --check -- tools/smoke-localhost.ps1 tests/powershell/smoke-localhost.Tests.ps1
+END_UTC=2026-08-13T21:23:05.8564220Z
+EXIT_CODE=0

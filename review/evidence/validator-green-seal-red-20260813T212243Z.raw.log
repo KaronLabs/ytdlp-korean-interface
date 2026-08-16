@@ -1,0 +1,5 @@
+START_UTC=2026-08-13T21:22:43.6363670Z
+COMMAND=powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\Users\ceo\OneDrive\Desktop\01_AllWork\ytdlp-interface\src\tests\powershell\smoke-localhost.Tests.ps1 with SMOKE_TEST_FILTER=seal-red
+smoke-localhost fixture tests passed.
+END_UTC=2026-08-13T21:22:45.5999576Z
+EXIT_CODE=0

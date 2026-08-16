@@ -1,0 +1,10 @@
+﻿{
+    "schemaVersion":  1,
+    "startedAtUtc":  "2026-08-13T20:45:23.5869054Z",
+    "completedAtUtc":  "2026-08-13T20:45:53.4140149Z",
+    "candidateRoot":  "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-final-candidates-5\\candidate-55e66fa7d6004a0c84bce001c97d2c4d",
+    "expectedManifestSha256":  "0DBB42E55AC3E400A758D38CE996321775FA2E3215E2B1AACFA6C1592062F68E",
+    "artifactPath":  "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\artifact-smoke-candidate5-20260813T205000Z.mp3",
+    "exitCode":  1,
+    "exception":  "System.Management.Automation.ItemNotFoundException: Cannot find path \u0027C:\\Users\\ceo\\Downloads\\ytdlp-interface-smoke-e9374c05110e4b90af99c41f569188ba\\output\\artifact.mp3\u0027 because it does not exist.\r\n   at System.Management.Automation.LocationGlobber.ResolveDriveQualifiedPath(String path, CmdletProviderContext context, Boolean allowNonexistingPaths, CmdletProvider\u0026 providerInstance)\r\n   at System.Management.Automation.LocationGlobber.GetGlobbedMonadPathsFromMonadPath(String path, Boolean allowNonexistingPaths, CmdletProviderContext context, CmdletProvider\u0026 providerInstance)\r\n   at System.Management.Automation.LocationGlobber.GetGlobbedProviderPathsFromMonadPath(String path, Boolean allowNonexistingPaths, CmdletProviderContext context, ProviderInfo\u0026 provider, CmdletProvider\u0026 providerInstance)\r\n   at System.Management.Automation.SessionStateInternal.CopyItem(String[] paths, String copyPath, Boolean recurse, CopyContainers copyContainers, CmdletProviderContext context)\r\n   at Microsoft.PowerShell.Commands.CopyItemCommand.ProcessRecord()"
+}

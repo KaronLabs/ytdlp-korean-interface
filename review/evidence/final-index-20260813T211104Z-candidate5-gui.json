@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 5,
+  "createdAtUtc": "2026-08-13T21:11:04.7753341Z",
+  "status": "partial_success",
+  "reviewer_required": "different_session_or_model",
+  "reviewer_verdict": "pending",
+  "not_guilty_eligible": false,
+  "review_target": {
+    "candidate_root": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-final-candidates-5\\candidate-55e66fa7d6004a0c84bce001c97d2c4d",
+    "manifest_path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-final-candidates-5\\candidate-55e66fa7d6004a0c84bce001c97d2c4d\\candidate-manifest.json",
+    "candidate_manifest_sha256": "0DBB42E55AC3E400A758D38CE996321775FA2E3215E2B1AACFA6C1592062F68E",
+    "source_commit": "6fe72b7f2b5240c272f4e4e6244a07c76695645b",
+    "source_dirty": false,
+    "tree_sha256": "07D5889D48E55B866698777D5EBD22DDFF7DE8F4E8CABB7C4451B5CFA53D7A27",
+    "tracked_file_count": 125,
+    "branch": "codex/korean-i18n-recovery"
+  },
+  "comparison_base": {
+    "commit": "2173316ebb5e50af49a2a4e939693fa8c3a3459c",
+    "head": "6fe72b7f2b5240c272f4e4e6244a07c76695645b",
+    "changed_files_command": "git diff --name-status 2173316ebb5e50af49a2a4e939693fa8c3a3459c..6fe72b7f2b5240c272f4e4e6244a07c76695645b",
+    "counts": { "total": 104, "added": 75, "modified": 29, "deleted": 0, "renamed": 0 },
+    "patch": {
+      "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\comparison-base-to-final-20260814T193500Z.patch",
+      "bytes": 2750358,
+      "sha256": "0A683E31236CF28513B90C65F278ADDDF4AFC2324506B91E929EC77025B3E2AF"
+    },
+    "source_only_diff_check": {
+      "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\diff-check-source-final-20260814T194000Z.log",
+      "sha256": "826A225B81E70E3DD792CD8D4983AC735B453DF6DA16ECA4505E42AEBA225F82",
+      "exit_code": 0
+    },
+    "full_diff_check": {
+      "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\diff-check-final-20260814T194000Z.log",
+      "sha256": "6A470CFA4ECAB42D69ACF4EE441FC517EDE6564BCA1DC0CBE1AA9C31667C2793",
+      "exit_code": 2,
+      "reason": "older review evidence patch whitespace diagnostics"
+    }
+  },
+  "reviewer_access_assumption": "A different session or model can read this index, its bound spec/audit, Git history, applicable constitution files, candidate-5 root, raw logs, smoke artifacts and every absolute GUI path without prior chat state.",
+  "meta": {
+    "changed_files_or_diff": {
+      "command": "git diff --name-status 2173316ebb5e50af49a2a4e939693fa8c3a3459c..6fe72b7f2b5240c272f4e4e6244a07c76695645b",
+      "counts": { "total": 104, "added": 75, "modified": 29, "deleted": 0, "renamed": 0 },
+      "patch_path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\comparison-base-to-final-20260814T193500Z.patch",
+      "patch_sha256": "0A683E31236CF28513B90C65F278ADDDF4AFC2324506B91E929EC77025B3E2AF"
+    },
+    "reviewer_access_assumption": "Hashes and raw paths below are the review evidence; author summaries are not substituted for command output.",
+    "evidence_package": {
+      "spec_file_content": {
+        "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\spec_20260813_210934_korean_i18n_candidate5_gui.md",
+        "bytes": 12569,
+        "sha256": "0021D6D4A04D8FF1A748776C6B16ADA98A3FC28E47E61CD0F6A738F19663094A"
+      },
+      "constitution": [
+        { "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\AGENTS.md", "bytes": 10453, "sha256": "4E22E0747C79B2AD9F17F08FE7F083035F3F37C6765DD02E9AAD029DAE2BA322", "applicable": true },
+        { "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\AGENTS.md", "bytes": 9613, "sha256": "50407D74E8897E2D4F7413ED089AAFDAD2C7658365804755164141C40A63A66C", "applicable": true },
+        { "path": "GEMINI.md/CLAUDE.md", "state": "not found in repository or stated parent; no path inferred" }
+      ],
+      "candidate_manifest": {
+        "path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-final-candidates-5\\candidate-55e66fa7d6004a0c84bce001c97d2c4d\\candidate-manifest.json",
+        "bytes": 31011,
+        "mtime_utc": "2026-08-13T20:41:32.9598094Z",
+        "sha256": "0DBB42E55AC3E400A758D38CE996321775FA2E3215E2B1AACFA6C1592062F68E",
+        "source_commit": "6fe72b7f2b5240c272f4e4e6244a07c76695645b",
+        "source_dirty": false,
+        "tree_sha256": "07D5889D48E55B866698777D5EBD22DDFF7DE8F4E8CABB7C4451B5CFA53D7A27"
+      },
+      "build": {
+        "raw_log_path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-evidence\\build-candidate-5-20260813T203735Z.raw.log",
+        "raw_log_sha256": "455AD0C6F2F65BFB8D4F794188738D75F240F31D5CC2DA449175552A7887A3CF",
+        "status_path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-evidence\\build-candidate-5-20260813T203735Z.status.json",
+        "status_sha256": "AE865F82D6C08E1883AF5510DDE4EB98C575468F9647896BA4F142677E61CB27",
+        "exit_code": 0,
+        "quote": "SOURCE_HEAD=6fe72b7f2b5240c272f4e4e6244a07c76695645b; SOURCE_STATUS=; EXIT_CODE=0"
+      },
+      "rechecks": {
+        "pre": {
+          "path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-evidence\\candidate-5-recheck-20260813T2042Z.json",
+          "bytes": 4507,
+          "sha256": "E504021F7ADFE10636481DBE9AC947BE2AE31B96073DBE160825BFF6B69FA3E5",
+          "entry_count": 8,
+          "all_matched": true,
+          "checked_at_utc": "2026-08-13T20:41:53.3031413Z"
+        },
+        "post": {
+          "script_path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-evidence\\candidate-5-recheck-20260813T2047Z.ps1",
+          "script_sha256": "08F5CCDACEDA5D5AFA32BC17D7CB83A4DD2AD90ADB1CF6B2E11DA65BDD73E302",
+          "raw_log_path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-evidence\\candidate-5-recheck-20260813T2047Z.raw.log",
+          "raw_log_sha256": "9525E97D9BEDB4DDDE17C1E4E8771627CD4C07C20BA29659754B32C46C7D37",
+          "exit_code": 0,
+          "entry_count": 8,
+          "all_matched": true,
+          "checked_at_utc": "2026-08-13T20:46:49.0916544Z",
+          "quote": "Assert-CandidateManifestSeal PASS; all declared payload hashes and lengths matched; EXIT_CODE=0"
+        }
+      },
+      "tests": [
+        { "name": "native", "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\native-final-20260814T194000Z.log", "sha256": "DB10640B6DA697AD57A0AC4D7BDE9ACC2264632A01620F94AD00726AE021E742", "quote": "BUILD_EXIT=0; TEST_EXIT=0" },
+        { "name": "contract", "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\contract-final-20260814T194000Z.log", "sha256": "7D7C1762CA8B9F2B5419CD89B92144FE0F463451C200F36D7E7A9DC120403950", "quote": "Ran 20 tests in 8.161s; OK; EXIT_CODE=0" },
+        { "name": "powershell", "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\powershell-final-20260814T194000Z.log", "sha256": "711CFFF45BBED6A07BA6C00EE23B1C2E1E0697121523E43055A9493A49FCEA01", "quote": "runtime-maintenance tests passed; smoke-localhost fixture tests passed; EXIT_CODE=0" }
+      ],
+      "smoke": {
+        "run_id": "add8b0130fdd43f2bd020e924ea1e59f",
+        "manifest_path": "C:\\Users\\ceo\\Downloads\\ytdlp-interface-smoke-evidence\\runs\\add8b0130fdd43f2bd020e924ea1e59f.json",
+        "manifest_bytes": 1766,
+        "manifest_sha256": "F362C55FB7D2B68C8C2749058FF5BC38CB893ED0C467ADAEE4DD5B961D89BE57",
+        "completed_at_utc": "2026-08-13T20:46:32.3907330Z",
+        "mode": "artifact-only",
+        "succeeded": true,
+        "candidate_manifest_sha256": "0DBB42E55AC3E400A758D38CE996321775FA2E3215E2B1AACFA6C1592062F68E",
+        "settings_sha256": "817FE80902CAFA58EE802E568D249094C6FA40D6FC99F11F915933E201B7292D",
+        "artifact_mp3": { "path": "C:\\Users\\ceo\\Downloads\\ytdlp-interface-smoke-evidence\\artifacts\\add8b0130fdd43f2bd020e924ea1e59f\\output.mp3", "bytes": 9328, "sha256": "188ACFB52B9592FB2EADEED48B4BFD07BE1FE698B1A9AC8B144974AB5AB7D9D5" },
+        "ffprobe": { "path": "C:\\Users\\ceo\\Downloads\\ytdlp-interface-smoke-evidence\\artifacts\\add8b0130fdd43f2bd020e924ea1e59f\\ffprobe.txt", "bytes": 33, "sha256": "312A974BFE98206258E69671AE8F50CDAA44C2C1BD1D55BB944A4F5C0ECCC41", "quote": "codec_name=mp3; duration=2.020136" },
+        "no_part_files": true,
+        "cleanup_succeeded": true,
+        "gui_interaction_proven": false,
+        "operator_attested": false,
+        "raw_log": { "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\artifact-smoke-candidate5-20260813T205500Z.log", "sha256": "FAD277F43EB76698DCE4994E5EF73561C0DF907FC99F599F3549FC99B245FAB1", "exit_code": 0, "quote": "Valid=true; ReasonCode=ok; Duration=2.020136" }
+      },
+      "gui": {
+        "ledger_path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\gui-candidate5-20260814T205700Z-ledger.jsonl",
+        "ledger_bytes": 16462,
+        "ledger_mtime_utc": "2026-08-13T21:07:28.4063639Z",
+        "ledger_sha256": "819DEC76114254273F2252E8DF1D02F6F4EF4D81D271723E7BB86643929371EA",
+        "line_count": 12,
+        "valid_json_lines": 9,
+        "invalid_json_lines": [3, 7, 10],
+        "invalid_reason": "unescaped internal quotes in visibleResult.menuItems, visibleResult.sections, and visibleResult.logContains",
+        "all_candidate_manifest_sha256": "0DBB42E55AC3E400A758D38CE996321775FA2E3215E2B1AACFA6C1592062F68E",
+        "external_overlay_present": true,
+        "events": [
+          { "line": 1, "event": "startup", "timestamp_utc": "2026-08-13T20:55:58.662Z", "post": "gui-candidate5-20260814T205700Z-startup.jpg", "sha256": "EBEA2C96F6C147DE412868E36E80C76DAED960BF1E7A7DFB2E6E797DFFC91E57", "claim": "Korean main visible; preObservation null" },
+          { "line": 2, "event": "url-entry", "timestamp_utc": "2026-08-13T20:57:59.255Z", "post": "gui-candidate5-20260814T205700Z-url-entry.jpg", "sha256": "02AC02FFA87A394E46687E9DAF625A7BF43EC6318C097E80420F1166AAEE70CA", "claim": "127.0.0.1:60321/input.mp4 entered and queued" },
+          { "line": 3, "event": "queue-context-menu", "timestamp_utc": "2026-08-13T20:58:46.698Z", "post": "gui-candidate5-20260814T205700Z-queue-context.jpg", "sha256": "9573E5F98DC7A811A326DC9333FA2CF0D6A19A48D3136007F6BDE766AD5CEE25", "claim": "Korean menu; 구간 다운로드, 형식 선택, 자막 선택(0/0); JSON invalid" },
+          { "line": 4, "event": "queue-action-result", "timestamp_utc": "2026-08-13T20:59:02.613Z", "post": "gui-candidate5-20260814T205700Z-queue-action-result.jpg", "sha256": "68023F5BC624F54667CF7FE0B0BB05FC78AE60FC8890FDC97AD95DE3DFC25F6E", "claim": "queue cleared; no metadata success claim" },
+          { "line": 5, "event": "metadata-outcome", "timestamp_utc": "2026-08-13T20:59:38.248Z", "post": "gui-candidate5-20260814T205700Z-metadata-outcome.jpg", "sha256": "8B0DCC26479B5B997334DEBB1E7D14585350B4A791E56C899420A480CC4A8ACE", "claim": "completed row but info ---" },
+          { "line": 6, "event": "format-dialog", "timestamp_utc": "2026-08-13T21:00:04.850Z", "post": "gui-candidate5-20260814T205700Z-format-dialog.jpg", "sha256": "D9F1B164A4A585A41ED04D39EF49DB5AB26708C397AB7723B739CFC761593BCB", "claim": "localized format child and mp4 row" },
+          { "line": 7, "event": "settings-ytdlp", "timestamp_utc": "2026-08-13T21:00:41.982Z", "post": "gui-candidate5-20260814T205700Z-settings-ytdlp.jpg", "sha256": "AD04525DC51DA4F89E6EC46693359124016AB7A7870851B39BB93061E1D6319C", "claim": "Korean settings child; JSON invalid" },
+          { "line": 8, "event": "sections-dialog", "timestamp_utc": "2026-08-13T21:02:47.020Z", "post": "gui-candidate5-20260814T205700Z-sections-dialog.jpg", "sha256": "2D9C14ECEB53A6EEC0AF2E470AB1CF610FDCB007CD2847B7978F882D04161D4F", "claim": "sections dialog visible" },
+          { "line": 9, "event": "localized-message-box", "timestamp_utc": "2026-08-13T21:04:43.425Z", "post": "gui-candidate5-20260814T205700Z-message-box.jpg", "sha256": "75AF4535E0C21E0C82ADF280BD2F4DC2E26C4171626AE96F8A5FB786D02A0FD9", "claim": "equal start/end validation message visible" },
+          { "line": 10, "event": "output-view", "timestamp_utc": "2026-08-13T21:05:33.308Z", "post": "gui-candidate5-20260814T205700Z-output-view.jpg", "sha256": "5A166B1D1C537DB5850B14FAD6BDBEC9DDD0F8740A03F7CBC3080C2DAA2557A6", "claim": "Korean output log and MP3 mention; JSON invalid" },
+          { "line": 11, "event": "playlist-availability-result", "timestamp_utc": "2026-08-13T21:06:56.547Z", "post": "gui-candidate5-20260814T205700Z-playlist-input-result.jpg", "sha256": "B04586CCFD091B1D23BF3CC47306C17CF227695C50EAAE28D61EC9C2BBB1BF3B", "claim": "feed.rss blocked by existing queue; no playlist success" },
+          { "line": 12, "event": "metadata-outcome-corrected-binding", "timestamp_utc": "2026-08-13T21:07:28.415Z", "post": "gui-candidate5-20260814T205700Z-metadata-outcome.jpg", "sha256": "8B0DCC26479B5B997334DEBB1E7D14585350B4A791E56C899420A480CC4A8ACE", "claim": "corrected binding; no new metadata content" }
+        ],
+        "screenshots": [
+          { "name": "gui-candidate5-20260814T205700Z-startup.jpg", "bytes": 71320, "mtime_utc": "2026-08-13T20:55:58.6605658Z", "sha256": "EBEA2C96F6C147DE412868E36E80C76DAED960BF1E7A7DFB2E6E797DFFC91E57" },
+          { "name": "gui-candidate5-20260814T205700Z-url-entry.jpg", "bytes": 73204, "mtime_utc": "2026-08-13T20:57:59.2541694Z", "sha256": "02AC02FFA87A394E46687E9DAF625A7BF43EC6318C097E80420F1166AAEE70CA" },
+          { "name": "gui-candidate5-20260814T205700Z-queue-context.jpg", "bytes": 77119, "mtime_utc": "2026-08-13T20:58:46.6979653Z", "sha256": "9573E5F98DC7A811A326DC9333FA2CF0D6A19A48D3136007F6BDE766AD5CEE25" },
+          { "name": "gui-candidate5-20260814T205700Z-queue-action-result.jpg", "bytes": 69107, "mtime_utc": "2026-08-13T20:59:02.6125280Z", "sha256": "68023F5BC624F54667CF7FE0B0BB05FC78AE60FC8890FDC97AD95DE3DFC25F6E" },
+          { "name": "gui-candidate5-20260814T205700Z-queue-action-started.jpg", "bytes": 72064, "mtime_utc": "2026-08-13T21:07:28.4063639Z", "sha256": "876CEF678A21F01129B6E8970AA2565997E53E66EB9C0DE89C036803754437AE" },
+          { "name": "gui-candidate5-20260814T205700Z-metadata-outcome.jpg", "bytes": 71764, "mtime_utc": "2026-08-13T20:59:38.2476842Z", "sha256": "8B0DCC26479B5B997334DEBB1E7D14585350B4A791E56C899420A480CC4A8ACE" },
+          { "name": "gui-candidate5-20260814T205700Z-format-dialog.jpg", "bytes": 66921, "mtime_utc": "2026-08-13T21:00:04.8496808Z", "sha256": "D9F1B164A4A585A41ED04D39EF49DB5AB26708C397AB7723B739CFC761593BCB" },
+          { "name": "gui-candidate5-20260814T205700Z-settings-ytdlp.jpg", "bytes": 98828, "mtime_utc": "2026-08-13T21:00:41.9810024Z", "sha256": "AD04525DC51DA4F89E6EC46693359124016AB7A7870851B39BB93061E1D6319C" },
+          { "name": "gui-candidate5-20260814T205700Z-queue-context-sections.jpg", "bytes": 72318, "mtime_utc": "2026-08-13T21:02:47.0189486Z", "sha256": "D0164186AF8A1572279B1949889288EA9E677C86F546DD7532C8ED9BFD5F1EC1" },
+          { "name": "gui-candidate5-20260814T205700Z-sections-dialog.jpg", "bytes": 68839, "mtime_utc": "2026-08-13T21:02:47.0202478Z", "sha256": "2D9C14ECEB53A6EEC0AF2E470AB1CF610FDCB007CD2847B7978F882D04161D4F" },
+          { "name": "gui-candidate5-20260814T205700Z-sections-invalid-input.jpg", "bytes": 68539, "mtime_utc": "2026-08-13T21:04:43.4235046Z", "sha256": "5C5FF87D9C553EEB58CE3B14E8F5D545191DE2194E6F1C47ACFB22E9E407ADB2" },
+          { "name": "gui-candidate5-20260814T205700Z-message-box.jpg", "bytes": 74832, "mtime_utc": "2026-08-13T21:04:43.4245659Z", "sha256": "75AF4535E0C21E0C82ADF280BD2F4DC2E26C4171626AE96F8A5FB786D02A0FD9" },
+          { "name": "gui-candidate5-20260814T205700Z-main-before-output.jpg", "bytes": 72423, "mtime_utc": "2026-08-13T21:05:33.3065510Z", "sha256": "B0CEFCC4B5D42CF89934DA2E26B9D0DF9ADCBF7B10A512050C8787503F8C7214" },
+          { "name": "gui-candidate5-20260814T205700Z-output-view.jpg", "bytes": 85963, "mtime_utc": "2026-08-13T21:05:33.3074388Z", "sha256": "5A166B1D1C537DB5850B14FAD6BDBEC9DDD0F8740A03F7CBC3080C2DAA2557A6" },
+          { "name": "gui-candidate5-20260814T205700Z-playlist-input-before.jpg", "bytes": 73391, "mtime_utc": "2026-08-13T21:06:56.5457752Z", "sha256": "D7D6B9E185B4A7570944F25A67C84D27A39699F5DCA00EED48F74604C097AA4A" },
+          { "name": "gui-candidate5-20260814T205700Z-playlist-input-result.jpg", "bytes": 73356, "mtime_utc": "2026-08-13T21:06:56.5478803Z", "sha256": "B04586CCFD091B1D23BF3CC47306C17CF227695C50EAAE28D61EC9C2BBB1BF3B" }
+        ],
+        "screenshot_root": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence"
+      },
+      "inventory": {
+        "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\untracked-inventory-final-20260814T193500Z.json",
+        "sha256": "022409B6CF3D2E4617D0EA85CE2C088F5762D44625F0AA56E880C009AF3DB7D3",
+        "state": "stale_pre_capture",
+        "post_capture_inventory": "missing"
+      }
+    }
+  },
+  "threat_model": {
+    "trust_boundaries": ["network", "proxy", "file_io", "process_exec", "deserialize", "environment/tool discovery", "local runtime replacement"],
+    "trusted_after_direct_checks": ["comparison-base Git object", "dependency archive SHA", "validated catalog", "candidate after pre/post seal recheck", "smoke artifacts after direct SHA and FFprobe checks"],
+    "untrusted": ["network metadata before verification", "archive entries before traversal checks", "stale settings paths", "translated captions as state", "arbitrary fixture output", "GUI evidence from another candidate", "child success before direct exit code"],
+    "security_scope": "No auth, secret, token, proxy credential, permission, eval, SQL, or environment-secret boundary is expanded; localhost smoke is isolated. GUI overlay and DPI are operational evidence limits."
+  },
+  "evidence_quotes": [
+    { "source": "candidate-5-recheck-20260813T2047Z.raw.log", "timestamp_utc": "2026-08-13T20:46:49.0916544Z", "command_or_context": "post-smoke candidate seal recheck", "quote": "MANIFEST_SHA256=0DBB42...; ENTRY_COUNT=8; ALL_MATCHED=True; Assert-CandidateManifestSeal PASS; EXIT_CODE=0" },
+    { "source": "artifact-smoke-candidate5-20260813T205500Z.log", "timestamp_utc": "2026-08-13T20:46:32.5435154Z", "command_or_context": "candidate-5 artifact smoke", "quote": "CANDIDATE_MANIFEST_SHA256=0DBB42...; Valid=true; ReasonCode=ok; Duration=2.020136" },
+    { "source": "ffprobe.txt", "timestamp_utc": "2026-08-13T20:46:32Z", "command_or_context": "ffprobe output", "quote": "codec_name=mp3; duration=2.020136" },
+    { "source": "gui-candidate5-20260814T205700Z-ledger.jsonl", "timestamp_utc": "2026-08-13T21:04:43.425Z", "command_or_context": "localized-message-box event line 9", "quote": "post screenshot SHA 75AF4535E0C21E0C82ADF280BD2F4DC2E26C4171626AE96F8A5FB786D02A0FD9; Korean equal start/end validation message visible; externalOverlayPresent=true" }
+  ],
+  "risks": [
+    { "id": "GUI_CAUSAL", "severity": "high", "handling": "accepted_unresolved", "detail": "GUI evidence is candidate-bound but smoke is artifact-only and guiInteractionProven=false; output-view cannot causally prove the smoke artifact." },
+    { "id": "GUI_LEDGER_JSON", "severity": "high", "handling": "accepted_unresolved", "detail": "Ledger has 12 lines but lines 3, 7 and 10 are not valid JSON because of unescaped internal quotes; raw file hash is preserved." },
+    { "id": "DPI", "severity": "high", "handling": "plan", "detail": "Manual 100%, 150% and 200% display-scale captures are absent." },
+    { "id": "PLAYLIST_SUBTITLE", "severity": "high", "handling": "accepted_unresolved", "detail": "Playlist attempt is negative and subtitle selector visibly reports 0/0; causal success is not claimed." },
+    { "id": "INVENTORY", "severity": "medium", "handling": "plan", "detail": "Existing inventory predates candidate-5 GUI capture; post-capture inventory is missing." },
+    { "id": "REVIEWER", "severity": "high", "handling": "plan", "detail": "Independent different-session-or-model final verdict is pending." },
+    { "id": "OVERLAY", "severity": "medium", "handling": "accepted_unresolved", "detail": "All GUI screenshots report externalOverlayPresent=true." },
+    { "id": "DIFF", "severity": "medium", "handling": "safeguard", "detail": "Source-only diff check exits 0; full review-evidence diff check exits 2 for older whitespace diagnostics." }
+  ],
+  "review_package": {
+    "state": "partial",
+    "required_slots": ["spec_file_content", "changed_files_or_diff", "test_logs_or_evidence_quotes", "relevant_runtime_outputs"],
+    "present": ["this index and bound spec", "candidate manifest and source/tree hashes", "build raw/status", "pre/post 8-entry seal rechecks", "successful artifact-only smoke with MP3/settings/ffprobe/no-part evidence", "constitution hashes", "comparison patch and source-only diff result", "candidate-bound GUI ledger and screenshot hash inventory", "threat model"],
+    "missing_or_open": ["manual DPI 100/150/200", "playlist causal success", "subtitle causal success beyond 0/0", "GUI-to-artifact causal binding", "post-capture untracked inventory", "independent final verdict", "machine-parseable JSON for ledger lines 3, 7 and 10"],
+    "reviewer_required": "different_session_or_model",
+    "prior_artifacts_preserved": ["final-index-20260813T204749Z-0DBB.json", "spec_20260813_204749_korean_i18n_candidate5.md", "package-audit-20260813T204749Z-0DBB.md", "F526 evidence and invalidation record"]
+  }
+}

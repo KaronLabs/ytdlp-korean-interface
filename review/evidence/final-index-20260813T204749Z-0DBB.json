@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 4,
+  "createdAtUtc": "2026-08-13T20:47:49.6434635Z",
+  "status": "partial_success",
+  "reviewer_required": "different_session_or_model",
+  "reviewer_verdict": "pending",
+  "not_guilty_eligible": false,
+  "review_target": {
+    "commit": "6fe72b7f2b5240c272f4e4e6244a07c76695645b",
+    "branch": "codex/korean-i18n-recovery",
+    "source_dirty": false,
+    "tree_sha256": "07D5889D48E55B866698777D5EBD22DDFF7DE8F4E8CABB7C4451B5CFA53D7A27",
+    "candidate_root": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-final-candidates-5\\candidate-55e66fa7d6004a0c84bce001c97d2c4d",
+    "candidate_manifest_sha256": "0DBB42E55AC3E400A758D38CE996321775FA2E3215E2B1AACFA6C1592062F68E"
+  },
+  "comparison_base": {
+    "commit": "2173316ebb5e50af49a2a4e939693fa8c3a3459c",
+    "head": "6fe72b7f2b5240c272f4e4e6244a07c76695645b",
+    "changed_files_command": "git diff --name-status 2173316ebb5e50af49a2a4e939693fa8c3a3459c..6fe72b7f2b5240c272f4e4e6244a07c76695645b",
+    "counts": { "total": 104, "added": 75, "modified": 29, "deleted": 0, "renamed": 0 },
+    "patch_path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\comparison-base-to-final-20260814T193500Z.patch",
+    "patch_bytes": 2750358,
+    "patch_sha256": "0A683E31236CF28513B90C65F278ADDDF4AFC2324506B91E929EC77025B3E2AF",
+    "source_only_diff_check": { "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\diff-check-source-final-20260814T194000Z.log", "sha256": "826A225B81E70E3DD792CD8D4983AC735B453DF6DA16ECA4505E42AEBA225F82", "exit_code": 0 },
+    "full_diff_check": { "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\diff-check-final-20260814T194000Z.log", "sha256": "6A470CFA4ECAB42D69ACF4EE441FC517EDE6564BCA1DC0CBE1AA9C31667C2793", "exit_code": 2, "reason": "older review evidence patch whitespace diagnostics" }
+  },
+  "reviewer_access_assumption": "A different session or model can read this index/spec, Git history, applicable constitution files, candidate-5 root, smoke run and artifacts, and every absolute evidence path. No prior chat state is required.",
+  "meta": {
+    "changed_files_or_diff": "comparison_base.patch plus the exact command and counts above",
+    "reviewer_access_assumption": "Exact files and hashes are supplied; author summaries are not accepted as output evidence.",
+    "evidence_package": {
+      "constitution": [
+        { "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\AGENTS.md", "bytes": 10453, "sha256": "4E22E0747C79B2AD9F17F08FE7F083035F3F37C6765DD02E9AAD029DAE2BA322", "applicable": true },
+        { "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\AGENTS.md", "bytes": 9613, "sha256": "50407D74E8897E2D4F7413ED089AAFDAD2C7658365804755164141C40A63A66C", "applicable": true },
+        { "path": "GEMINI.md/CLAUDE.md", "state": "not found in repository or stated parent; no path inferred" }
+      ],
+      "candidate": {
+        "manifest_path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-final-candidates-5\\candidate-55e66fa7d6004a0c84bce001c97d2c4d\\candidate-manifest.json",
+        "manifest_bytes": 31011,
+        "manifest_sha256": "0DBB42E55AC3E400A758D38CE996321775FA2E3215E2B1AACFA6C1592062F68E",
+        "manifest_mtime_utc": "2026-08-13T20:41:32.9598094Z",
+        "source_commit": "6fe72b7f2b5240c272f4e4e6244a07c76695645b",
+        "source_dirty": false,
+        "tree_sha256": "07D5889D48E55B866698777D5EBD22DDFF7DE8F4E8CABB7C4451B5CFA53D7A27",
+        "tracked_file_count": 125,
+        "pre_smoke_recheck": {
+          "json_path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-evidence\\candidate-5-recheck-20260813T2042Z.json",
+          "json_bytes": 4507,
+          "json_sha256": "E504021F7ADFE10636481DBE9AC947BE2AE31B96073DBE160825BFF6B69FA3E5",
+          "checked_at_utc": "2026-08-13T20:41:53.3031413Z",
+          "entry_count": 8,
+          "all_matched": true
+        },
+        "post_smoke_recheck": {
+          "script_path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-evidence\\candidate-5-recheck-20260813T2047Z.ps1",
+          "script_bytes": 2632,
+          "script_sha256": "08F5CCDACEDA5D5AFA32BC17D7CB83A4DD2AD90ADB1CF6B2E11DA65BDD73E302",
+          "raw_log_path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-evidence\\candidate-5-recheck-20260813T2047Z.raw.log",
+          "raw_log_bytes": 1099,
+          "raw_log_sha256": "9525E97D9BEDB4DDDE17C1E4E8771627CD4C07C20BA29659754B32C46C7D37",
+          "checked_at_utc": "2026-08-13T20:46:49.0916544Z",
+          "entry_count": 8,
+          "all_matched": true,
+          "quote": "Assert-CandidateManifestSeal PASS; all declared payload hashes and lengths matched; EXIT_CODE=0"
+        }
+      },
+      "build": {
+        "raw_log_path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-evidence\\build-candidate-5-20260813T203735Z.raw.log",
+        "raw_log_bytes": 1222,
+        "raw_log_sha256": "455AD0C6F2F65BFB8D4F794188738D75F240F31D5CC2DA449175552A7887A3CF",
+        "status_path": "C:\\Users\\ceo\\AppData\\Local\\Temp\\ytdlp-interface-evidence\\build-candidate-5-20260813T203735Z.status.json",
+        "status_bytes": 1609,
+        "status_sha256": "AE865F82D6C08E1883AF5510DDE4EB98C575468F9647896BA4F142677E61CB27",
+        "start_utc": "2026-08-13T20:37:35.4388803Z",
+        "end_utc": "2026-08-13T20:41:37.3846617Z",
+        "exit_code": 0,
+        "quote": "SOURCE_HEAD=6fe72b7f2b5240c272f4e4e6244a07c76695645b; SOURCE_STATUS=; EXIT_CODE=0"
+      },
+      "tests": [
+        { "name": "native", "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\native-final-20260814T194000Z.log", "sha256": "DB10640B6DA697AD57A0AC4D7BDE9ACC2264632A01620F94AD00726AE021E742", "quote": "BUILD_EXIT=0; TEST_EXIT=0" },
+        { "name": "contract", "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\contract-final-20260814T194000Z.log", "sha256": "7D7C1762CA8B9F2B5419CD89B92144FE0F463451C200F36D7E7A9DC120403950", "quote": "Ran 20 tests in 8.161s; OK; EXIT_CODE=0" },
+        { "name": "powershell", "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\powershell-final-20260814T194000Z.log", "sha256": "711CFFF45BBED6A07BA6C00EE23B1C2E1E0697121523E43055A9493A49FCEA01", "quote": "runtime-maintenance tests passed; smoke-localhost fixture tests passed; EXIT_CODE=0" }
+      ],
+      "smoke": {
+        "run_id": "add8b0130fdd43f2bd020e924ea1e59f",
+        "manifest_path": "C:\\Users\\ceo\\Downloads\\ytdlp-interface-smoke-evidence\\runs\\add8b0130fdd43f2bd020e924ea1e59f.json",
+        "manifest_bytes": 1766,
+        "manifest_sha256": "F362C55FB7D2B68C8C2749058FF5BC38CB893ED0C467ADAEE4DD5B961D89BE57",
+        "completed_at_utc": "2026-08-13T20:46:32.3907330Z",
+        "mode": "artifact-only",
+        "succeeded": true,
+        "candidate_manifest_sha256": "0DBB42E55AC3E400A758D38CE996321775FA2E3215E2B1AACFA6C1592062F68E",
+        "base_candidate_manifest_sha256": "0DBB42E55AC3E400A758D38CE996321775FA2E3215E2B1AACFA6C1592062F68E",
+        "settings_sha256": "817FE80902CAFA58EE802E568D249094C6FA40D6FC99F11F915933E201B7292D",
+        "artifact_mp3": { "path": "C:\\Users\\ceo\\Downloads\\ytdlp-interface-smoke-evidence\\artifacts\\add8b0130fdd43f2bd020e924ea1e59f\\output.mp3", "bytes": 9328, "sha256": "188ACFB52B9592FB2EADEED48B4BFD07BE1FE698B1A9AC8B144974AB5AB7D9D5" },
+        "settings": { "path": "C:\\Users\\ceo\\Downloads\\ytdlp-interface-smoke-evidence\\artifacts\\add8b0130fdd43f2bd020e924ea1e59f\\ytdlp-interface.json", "bytes": 12595, "sha256": "817FE80902CAFA58EE802E568D249094C6FA40D6FC99F11F915933E201B7292D" },
+        "ffprobe": { "path": "C:\\Users\\ceo\\Downloads\\ytdlp-interface-smoke-evidence\\artifacts\\add8b0130fdd43f2bd020e924ea1e59f\\ffprobe.txt", "bytes": 33, "sha256": "312A974BFE98206258E69671AE8F50CDAA44C2C1BD1D55BB944A4F5C0ECCC41A", "quote": "codec_name=mp3; duration=2.020136" },
+        "duration": 2.020136,
+        "no_part_files": true,
+        "cleanup_succeeded": true,
+        "gui_interaction_proven": false,
+        "operator_attested": false,
+        "raw_log": { "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\artifact-smoke-candidate5-20260813T205500Z.log", "sha256": "FAD277F43EB76698DCE4994E5EF73561C0DF907FC99F599F3549FC99B245FAB1", "exit_code": 0, "quote": "Valid=true; ReasonCode=ok; Duration=2.020136" },
+        "status": { "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\artifact-smoke-candidate5-20260813T205500Z.status.json", "sha256": "43A6915C22C9CD0EAA8FB9230309B9F136EEA808EB41ABDA6DE323CFFDDBE887", "exit_code": 0 }
+      },
+      "gui": {
+        "state": "missing_for_candidate_5",
+        "note": "F526 GUI screenshots/ledger are explicitly excluded because F526 was later mutated and independently found unsealed. No candidate-5-bound GUI ledger was supplied at capture time."
+      },
+      "prior_invalidated_candidate": {
+        "manifest_sha256": "F5263136E613A81A58B998D00A46732ED793234D6CE127E6FD5C2934DD428057",
+        "independent_review_path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\independent-review-F5263136-20260814T205500Z.md",
+        "independent_review_sha256": "4050CBF8CC3D47817BBDD7DC93DD09A73387B615772772B47F05AFA313B39FF2",
+        "invalidated_reason": "post-run ytdlp-interface.json changed to 8,478 bytes/SHA 3A113AE7CA3AB37219834906D226B60CE595764987549DAA6A3E021F4F80C30C while manifest required 12,531 bytes/SHA 9D52BD66A45FDA25E257A9D89184C27896A44484412F2B32CD37E99FE3DB9F05"
+      },
+      "untracked_inventory": {
+        "path": "C:\\Users\\ceo\\OneDrive\\Desktop\\01_AllWork\\ytdlp-interface\\src\\review\\evidence\\untracked-inventory-final-20260814T193500Z.json",
+        "sha256": "022409B6CF3D2E4617D0EA85CE2C088F5762D44625F0AA56E880C009AF3DB7D3",
+        "note": "predates candidate-5 package files; a post-capture inventory remains required"
+      }
+    }
+  },
+  "threat_model": {
+    "trust_boundary": ["network", "proxy", "file_io", "process_exec", "deserialize", "environment/tool discovery", "local runtime replacement"],
+    "trusted": ["comparison-base Git object", "reviewed dependency archive SHA", "validated catalog", "candidate only after pre/post seal recheck", "smoke artifacts after direct hash/FFprobe checks"],
+    "untrusted": ["network metadata before hash/version verification", "archive entries before traversal checks", "stale settings paths", "translated captions as state", "arbitrary fixture output", "GUI evidence from a different candidate", "child success before direct exit code"],
+    "security_scope": "The subtitle fallback change expands no auth, secret, token, proxy-credential, permission, eval, SQL, or environment-secret boundary; localhost smoke is isolated."
+  },
+  "evidence_quotes": [
+    { "source": "candidate-5-recheck-20260813T2047Z.raw.log", "timestamp_utc": "2026-08-13T20:46:49.0916544Z", "quote": "MANIFEST_SHA256=0DBB42...; ENTRY_COUNT=8; ALL_MATCHED=True; Assert-CandidateManifestSeal PASS; EXIT_CODE=0" },
+    { "source": "artifact-smoke-candidate5-20260813T205500Z.log", "timestamp_utc": "2026-08-13T20:46:32.5435154Z", "quote": "CANDIDATE_MANIFEST_SHA256=0DBB42...; Valid=true; ReasonCode=ok; Duration=2.020136" },
+    { "source": "ffprobe.txt", "timestamp_utc": "2026-08-13T20:46:32Z", "quote": "codec_name=mp3; duration=2.020136" },
+    { "source": "independent-review-F5263136-20260814T205500Z.md", "timestamp_utc": "2026-08-13T20:55:00Z", "quote": "F526 candidate seal failed; prior candidate invalidated; successor candidate required" }
+  ],
+  "risks": [
+    { "id": "GUI", "severity": "high", "handling": "accepted_unresolved", "detail": "No candidate-5-bound GUI ledger/screenshot set; F526 GUI evidence is excluded after mutation." },
+    { "id": "DPI", "severity": "high", "handling": "accepted_unresolved", "detail": "Manual 100%, 150%, and 200% display-scale observations are absent." },
+    { "id": "REVIEWER", "severity": "high", "handling": "plan", "detail": "Different-session-or-model verdict for the exact candidate-5 package is pending." },
+    { "id": "SMOKE_SCOPE", "severity": "high", "handling": "safeguard", "detail": "Artifact smoke is successful but explicitly guiInteractionProven=false and operatorAttested=false." },
+    { "id": "F526_INVALIDATION", "severity": "high", "handling": "safeguard", "detail": "F526 post-run mutation and independent GUILTY review are preserved; no F526 evidence is reused." },
+    { "id": "INVENTORY", "severity": "medium", "handling": "plan", "detail": "Current untracked inventory predates candidate-5 package files." },
+    { "id": "DIFF", "severity": "medium", "handling": "safeguard", "detail": "Source-only diff check passes; full check exits 2 due old review evidence whitespace." }
+  ],
+  "review_package": {
+    "state": "partial",
+    "required_slots": ["spec_file_content", "changed_files_or_diff", "test_logs_or_evidence_quotes", "relevant_runtime_outputs"],
+    "present": ["candidate-5 manifest", "pre/post 8-entry rechecks", "build raw/status logs", "successful candidate-5 artifact smoke", "MP3/settings/FFprobe/no-part evidence", "constitution hashes", "threat model", "F526 invalidation record"],
+    "missing": ["candidate-5 GUI ledger and screenshots", "manual DPI 100/150/200", "different-session-or-model verdict", "post-capture untracked inventory"],
+    "reviewer_required": "different_session_or_model"
+  }
+}

@@ -1,0 +1,54 @@
+﻿{
+    "createdAtUtc":  "2026-08-13T19:35:53.3047685Z",
+    "head":  "6fe72b7f2b5240c272f4e4e6244a07c76695645b",
+    "entries":  [
+                    {
+                        "path":  "docs/superpowers/plans/2026-08-14-korean-subtitle-gui-finalization.md",
+                        "length":  5601,
+                        "lastWriteTimeUtc":  "2026-08-13T19:19:29.6816801Z",
+                        "sha256":  "F9248B667DF214F1FC18BD972B46D8FC52D54F01E1009023D63E91553A6847B9"
+                    },
+                    {
+                        "path":  "review/evidence/comparison-base-to-final-20260814T193500Z.patch",
+                        "length":  2750358,
+                        "lastWriteTimeUtc":  "2026-08-13T19:35:43.8954087Z",
+                        "sha256":  "0A683E31236CF28513B90C65F278ADDDF4AFC2324506B91E929EC77025B3E2AF"
+                    },
+                    {
+                        "path":  "review/evidence/comparison-base-to-head-20260814T182700Z.patch",
+                        "length":  1392781,
+                        "lastWriteTimeUtc":  "2026-08-13T18:24:48.5773311Z",
+                        "sha256":  "1560E47995C287A3452DF204AC7D8E4BABFB9B689C932360A765665A22D83F70"
+                    },
+                    {
+                        "path":  "review/evidence/fresh-evidence-index-20260813T183300Z.json",
+                        "length":  2903,
+                        "lastWriteTimeUtc":  "2026-08-13T18:35:03.9972216Z",
+                        "sha256":  "34462F907C5DB3C19B85A2D2F1B352589DA97A140AB292B5F06BEF0BCF437EF3"
+                    },
+                    {
+                        "path":  "review/evidence/independent-review-20260813T183747Z.md",
+                        "length":  1406,
+                        "lastWriteTimeUtc":  "2026-08-13T18:37:59.3296406Z",
+                        "sha256":  "6F51C9A91CB6723E7F083798667227129F3DA63901518941D4378B0E7855246D"
+                    },
+                    {
+                        "path":  "review/evidence/run-operator-guided-smoke-20260814T183100Z.ps1",
+                        "length":  1153,
+                        "lastWriteTimeUtc":  "2026-08-13T18:26:03.9505955Z",
+                        "sha256":  "8594322E64A5F90B2CB1840B3103898C9B50796E4173076C93538D226C1729A5"
+                    },
+                    {
+                        "path":  "review/spec_20260813_183300_korean_i18n_recovery_fresh_evidence.md",
+                        "length":  7028,
+                        "lastWriteTimeUtc":  "2026-08-13T18:32:39.1058680Z",
+                        "sha256":  "E851C3F03F2A7692ECE8486859E57FE27735F7E6954279EB6B8B82C3A34674CF"
+                    },
+                    {
+                        "path":  "review/spec_20260813_185600_korean_i18n_gui_addendum.md",
+                        "length":  3702,
+                        "lastWriteTimeUtc":  "2026-08-13T18:56:48.3359411Z",
+                        "sha256":  "4E392BC7D9D13AC571163FF347F5ED00A6D1FF41A53A1CE44EBE4B2E25A5F1D1"
+                    }
+                ]
+}
