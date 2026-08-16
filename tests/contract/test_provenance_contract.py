@@ -16,6 +16,7 @@ RELEASE_ASSET_URL = (
     "https://github.com/KaronLabs/ytdlp-korean-interface/releases/download/"
     "v2.19.1-karon.1/ytdlp-korean-interface-v2.19.1-karon.1-win-x64.zip"
 )
+README_DOWNLOAD_BANNER = "docs/win-download-here.png"
 
 REQUIRED_FILES = [
     "NOTICE",
@@ -97,11 +98,17 @@ class ProvenanceContractTests(unittest.TestCase):
         self.assertIn("Download for Windows", readme)
         self.assertIn(RELEASE_ASSET, readme)
         self.assertIn(RELEASE_ASSET_URL, readme)
+        self.assertIn(README_DOWNLOAD_BANNER, readme)
         self.assertIn("Code → Download ZIP", readme)
         self.assertLess(
             readme.index(RELEASE_ASSET_URL),
             readme.index("## 이 프로젝트는 무엇인가요?"),
             "direct Windows binary download must appear before the project introduction",
+        )
+        self.assertLess(
+            readme.index(README_DOWNLOAD_BANNER),
+            readme.index("## 이 프로젝트는 무엇인가요?"),
+            "download banner must appear before the project introduction",
         )
 
     def test_existing_upstream_mit_notice_is_preserved(self):
