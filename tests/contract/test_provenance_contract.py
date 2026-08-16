@@ -16,7 +16,7 @@ RELEASE_ASSET_URL = (
     "https://github.com/KaronLabs/ytdlp-korean-interface/releases/download/"
     "v2.19.1-karon.1/ytdlp-korean-interface-v2.19.1-karon.1-win-x64.zip"
 )
-README_DOWNLOAD_BANNER = "docs/win-download-here.png"
+README_DOWNLOAD_BANNER = "docs/win-downlaod-here.png"
 
 REQUIRED_FILES = [
     "NOTICE",
