@@ -46,7 +46,7 @@ function Read-ReleaseRequest {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw 'release_request_missing' }
     try { $request = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop }
     catch { throw 'release_request_invalid' }
-    Assert-ReleaseRequest -Request $request
+    $null = Assert-ReleaseRequest -Request $request
     return $request
 }
 
