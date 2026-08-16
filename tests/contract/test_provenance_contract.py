@@ -7,6 +7,10 @@ CANONICAL_REPOSITORY = "KaronLabs/ytdlp-korean-interface"
 DIRECT_UPSTREAM = "ErrorFlynn/ytdlp-interface"
 UPSTREAM_TAG = "v2.19.1"
 UPSTREAM_COMMIT = "2173316ebb5e50af49a2a4e939693fa8c3a3459c"
+RELEASE_TAG = "v2.19.1-karon.1"
+RELEASE_COMMIT = "c053c1edf5508b05beac1da27ddfcdbefd1bc2bd"
+RELEASE_URL = "https://github.com/KaronLabs/ytdlp-korean-interface/releases/tag/v2.19.1-karon.1"
+RELEASE_DATE = "2026-08-16"
 
 REQUIRED_FILES = [
     "NOTICE",
@@ -55,25 +59,33 @@ class ProvenanceContractTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, attribution)
 
-    def test_citation_is_mit_and_does_not_invent_a_release(self):
+    def test_citation_records_first_canonical_release(self):
         citation = read("CITATION.cff")
         self.assertIn("license: MIT", citation)
         self.assertIn("repository-code: https://github.com/KaronLabs/ytdlp-korean-interface", citation)
-        self.assertFalse(
-            any(line.startswith("version:") for line in citation.splitlines()),
-            "CITATION.cff must not invent a KaronLabs release version",
-        )
-        self.assertNotIn("v2.19.1-karon.1", citation)
+        self.assertIn(f'version: "{RELEASE_TAG}"', citation)
+        self.assertIn(f"date-released: {RELEASE_DATE}", citation)
 
-    def test_readme_exposes_provenance_records(self):
+    def test_provenance_records_first_canonical_release_identity(self):
+        provenance = read("PROVENANCE.md")
+        for value in [RELEASE_TAG, RELEASE_COMMIT, RELEASE_URL]:
+            with self.subTest(value=value):
+                self.assertIn(value, provenance)
+        self.assertNotIn("Current canonical release | None yet", provenance)
+        self.assertNotIn("do not invent one", provenance.lower())
+
+    def test_readme_exposes_provenance_records_and_release_download(self):
         readme = read("README.md")
-        for link in [
+        for value in [
             "[NOTICE](NOTICE)",
             "[PROVENANCE.md](PROVENANCE.md)",
             "[ATTRIBUTION.md](ATTRIBUTION.md)",
+            RELEASE_TAG,
+            RELEASE_URL,
         ]:
-            with self.subTest(link=link):
-                self.assertIn(link, readme)
+            with self.subTest(value=value):
+                self.assertIn(value, readme)
+        self.assertNotIn("공개 Release 바이너리가 없습니다", readme)
 
     def test_existing_upstream_mit_notice_is_preserved(self):
         license_text = read("LICENSE")
