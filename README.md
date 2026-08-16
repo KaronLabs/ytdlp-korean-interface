@@ -3,6 +3,9 @@
 
 
 
+
+---
+
 # ytdlp-korean-interface
 
 이 프로젝트는 [yt-dlp](https://github.com/yt-dlp/yt-dlp)를 위한 Windows GUI 인터페이스로, 기본적으로는 유튜브 다운로드용으로 설계되었습니다.  
