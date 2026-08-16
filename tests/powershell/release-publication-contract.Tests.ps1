@@ -78,10 +78,8 @@ Invoke-Test 'publication workflow is fixed, minimal-permission, and verification
 Invoke-Test 'release notes preserve upstream lineage and verification instructions' {
     Assert-True (Test-Path -LiteralPath $Notes -PathType Leaf) 'release notes missing'
     $text=Get-Content -LiteralPath $Notes -Raw -Encoding UTF8
-    $karonLine = -join @(
-        0xC791,0xC740,0x20,0xC77C,0xC774,0xC5C8,0xB294,0xB370,0x20,
-        0xC791,0xC9C0,0x20,0xC54A,0xAC8C,0x20,0xB410,0xC2B5,0xB2C8,0xB2E4
-    | ForEach-Object { [char]$_ })
+    $karonCodes = @(0xC791,0xC740,0x20,0xC77C,0xC774,0xC5C8,0xB294,0xB370,0x20,0xC791,0xC9C0,0x20,0xC54A,0xAC8C,0x20,0xB410,0xC2B5,0xB2C8,0xB2E4)
+    $karonLine = -join ($karonCodes | ForEach-Object { [char]$_ })
     Assert-True ($text -match 'ErrorFlynn/ytdlp-interface.*v2\.19\.1') 'direct upstream disclosure missing'
     Assert-True ($text -match 'SHA256SUMS\.txt') 'checksum instructions missing'
     Assert-True ($text -match 'release-manifest\.json') 'release manifest instructions missing'
