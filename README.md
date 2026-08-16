@@ -4,6 +4,34 @@
 v1.2부터는 유튜브 URL 외의 주소도 입력할 수 있어, `yt-dlp`가 지원하는 거의 모든 사이트를 이론적으로 다운로드할 수 있습니다.  
 지원 사이트 목록은 [여기](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)를 참고하세요.
 
+## 원본(yt-dlp) 대비 차이점
+
+이 저장소는 `yt-dlp`를 대체하는 프로젝트가 아니라, Windows 사용자를 위한 **전용 GUI 계층**입니다.
+
+| 범주 | yt-dlp 원본 | ytdlp-korean-interface |
+| --- | --- | --- |
+| 플랫폼 | Windows, macOS, Linux 등 다중 | Windows 기본 지원 |
+| 사용자 인터페이스 | CLI(CLI 옵션 기반) | Nana GUI 기반 데스크톱 인터페이스 |
+| 언어/로컬라이제이션 | 기본적으로 영어 우선 문서/메시지 | `ko-KR` 중심 번역 개선(설정/문구/UI 텍스트) |
+| 배포 방식 | `yt-dlp` 바이너리/패키지 | Windows 실행 파일/압축 배포 + 빌드 절차 |
+| 옵션 노출 | 전체 CLI 옵션 직접 노출 | GUI에서 자주 쓰는 동작 중심으로 선택/입력 |
+| 상태 저장 | 실행 중심 | 설정 저장, 큐/출력 이력 관리 중심 화면 흐름 |
+| 사용 대상 | 스크립트 및 자동화 친화 사용자 | 마우스 조작 위주의 Windows 실사용자 |
+| 주요 제한 | 운영체제 제약이 상대적으로 적음 | Windows 빌드·런타임 환경 종속 |
+
+## 이 프로젝트에서 달라진 점
+
+- 원본 명령형 워크플로를 Windows GUI로 쉽게 접근할 수 있게 구성했습니다.
+- `ko-KR` 기반 번역 자산을 추가해 화면 문자열·메시지·설정 항목을 한글화했습니다.
+- 설정 저장 흐름을 개선해 반복 실행 시 사용자 환경이 유지되도록 구성했습니다.
+- 대량 URL 큐 처리, 출력 로그 창, 기본 동작을 직관적으로 접근 가능한 패널로 정리해 사용 흐름을 단순화했습니다.
+
+## 미지원/제한
+
+- 본 프로젝트는 **`yt-dlp`의 전부 CLI 옵션을 그대로 대체하지 않습니다**.
+- 현재 Windows 외 실행 환경은 공식 범위가 아닙니다.
+- 배포/업데이트/릴리스 정책은 원본 `yt-dlp`와 별도로 운영될 수 있으므로, 실제 사용 가능한 기능은 릴리스 노트와 동작 환경을 확인해 주세요.
+
 사용하려면 원하는 경로에 새 폴더를 만든 뒤 압축을 풀고 `ytdlp-interface.exe`를 실행하면 됩니다.
 
 ## 최신 버전 다운로드
@@ -15,7 +43,6 @@ v1.2부터는 유튜브 URL 외의 주소도 입력할 수 있어, `yt-dlp`가 �
 Windows 7 64bit: https://github.com/ErrorFlynn/ytdlp-interface/releases/download/v2.19.0/ytdlp-interface_win7.7z  
 
 Windows 7 32bit: https://github.com/ErrorFlynn/ytdlp-interface/releases/download/v2.19.0/ytdlp-interface_x86_win7.7z
-
 
 ---
 
