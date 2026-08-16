@@ -47,6 +47,18 @@ function Test-ReleasePathContained {
     return $pathFull.StartsWith($rootFull + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
 }
 
+function Test-ReleasePathsOverlap {
+    param(
+        [Parameter(Mandatory = $true)] [string] $First,
+        [Parameter(Mandatory = $true)] [string] $Second
+    )
+    $firstFull = [IO.Path]::GetFullPath($First).TrimEnd('\','/')
+    $secondFull = [IO.Path]::GetFullPath($Second).TrimEnd('\','/')
+    if ($firstFull -eq $secondFull) { return $true }
+    return (Test-ReleasePathContained -Root $firstFull -Path $secondFull) -or
+        (Test-ReleasePathContained -Root $secondFull -Path $firstFull)
+}
+
 function Initialize-ReleaseParentSettings {
     param([Parameter(Mandatory = $true)] [string] $ParentRuntime)
     if (-not (Test-Path -LiteralPath $ParentRuntime -PathType Container)) { throw 'release_parent_runtime_missing' }
@@ -186,7 +198,7 @@ function Invoke-ReleaseCandidateBuild {
     $parent = [IO.Path]::GetFullPath($ParentRuntime)
     $candidateBaseFull = [IO.Path]::GetFullPath($CandidateBase)
     [IO.Directory]::CreateDirectory($candidateBaseFull) | Out-Null
-    if (Test-ReleasePathContained -Root $parent -Path $candidateBaseFull -or Test-ReleasePathContained -Root $candidateBaseFull -Path $parent -or $parent -ceq $candidateBaseFull) {
+    if (Test-ReleasePathsOverlap -First $parent -Second $candidateBaseFull) {
         throw 'release_candidate_parent_overlap'
     }
     $buildScript = Join-Path $source 'tools\build-candidate.ps1'
