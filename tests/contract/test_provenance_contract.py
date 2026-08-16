@@ -11,6 +11,11 @@ RELEASE_TAG = "v2.19.1-karon.1"
 RELEASE_COMMIT = "c053c1edf5508b05beac1da27ddfcdbefd1bc2bd"
 RELEASE_URL = "https://github.com/KaronLabs/ytdlp-korean-interface/releases/tag/v2.19.1-karon.1"
 RELEASE_DATE = "2026-08-16"
+RELEASE_ASSET = "ytdlp-korean-interface-v2.19.1-karon.1-win-x64.zip"
+RELEASE_ASSET_URL = (
+    "https://github.com/KaronLabs/ytdlp-korean-interface/releases/download/"
+    "v2.19.1-karon.1/ytdlp-korean-interface-v2.19.1-karon.1-win-x64.zip"
+)
 
 REQUIRED_FILES = [
     "NOTICE",
@@ -86,6 +91,18 @@ class ProvenanceContractTests(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertIn(value, readme)
         self.assertNotIn("공개 Release 바이너리가 없습니다", readme)
+
+    def test_readme_has_prominent_direct_windows_binary_download(self):
+        readme = read("README.md")
+        self.assertIn("Download for Windows", readme)
+        self.assertIn(RELEASE_ASSET, readme)
+        self.assertIn(RELEASE_ASSET_URL, readme)
+        self.assertIn("Code → Download ZIP", readme)
+        self.assertLess(
+            readme.index(RELEASE_ASSET_URL),
+            readme.index("## 이 프로젝트는 무엇인가요?"),
+            "direct Windows binary download must appear before the project introduction",
+        )
 
     def test_existing_upstream_mit_notice_is_preserved(self):
         license_text = read("LICENSE")
