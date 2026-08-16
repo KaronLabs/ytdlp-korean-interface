@@ -95,6 +95,48 @@ function Assert-ReleaseSourceRevision {
     return $head
 }
 
+function Assert-UpstreamArchiveHash {
+    param([Parameter(Mandatory = $true)] [string] $ArchivePath)
+    $config = Get-FirstReleaseConfiguration
+    if (-not (Test-Path -LiteralPath $ArchivePath -PathType Leaf) -or (Split-Path -Leaf $ArchivePath) -cne $config.UpstreamAssetName) {
+        throw 'upstream_archive_invalid'
+    }
+    $actual = (Get-FileHash -LiteralPath $ArchivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actual -cne $config.UpstreamArchiveSha256.ToLowerInvariant()) { throw 'upstream_archive_hash_mismatch' }
+    return $actual
+}
+
+function Get-UpstreamRuntimeRequiredFiles {
+    return @('ytdlp-interface.exe','yt-dlp.exe','ffmpeg.exe','ffprobe.exe','deno.exe','7z.dll','ytdlp-interface.json')
+}
+
+function Test-UpstreamRuntimeComplete {
+    param([Parameter(Mandatory = $true)] [string] $RuntimeRoot)
+    foreach ($name in Get-UpstreamRuntimeRequiredFiles) {
+        if (-not (Test-Path -LiteralPath (Join-Path $RuntimeRoot $name) -PathType Leaf)) { return $false }
+    }
+    return $true
+}
+
+function Resolve-UpstreamRuntimeRoot {
+    param([Parameter(Mandatory = $true)] [string] $ExtractedRoot)
+    if (-not (Test-Path -LiteralPath $ExtractedRoot -PathType Container)) { throw 'upstream_runtime_incomplete' }
+    $root = [IO.Path]::GetFullPath($ExtractedRoot)
+    foreach ($item in @(Get-ChildItem -LiteralPath $root -Recurse -Force)) {
+        if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'upstream_runtime_reparse_point' }
+    }
+    $candidateRoots = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    if (Test-UpstreamRuntimeComplete -RuntimeRoot $root) { $candidateRoots.Add($root) | Out-Null }
+    foreach ($product in @(Get-ChildItem -LiteralPath $root -Recurse -File -Filter 'ytdlp-interface.exe' -Force)) {
+        $parent = [IO.Path]::GetFullPath($product.DirectoryName)
+        if (Test-UpstreamRuntimeComplete -RuntimeRoot $parent) { $candidateRoots.Add($parent) | Out-Null }
+    }
+    $resolved = @($candidateRoots)
+    if ($resolved.Count -eq 0) { throw 'upstream_runtime_incomplete' }
+    if ($resolved.Count -ne 1) { throw 'upstream_runtime_ambiguous' }
+    return $resolved[0]
+}
+
 function Copy-ReleaseTree {
     param([Parameter(Mandatory = $true)] [string] $SourceRoot, [Parameter(Mandatory = $true)] [string] $DestinationRoot)
     $source = [IO.Path]::GetFullPath($SourceRoot)
