@@ -110,8 +110,10 @@ function global:git {
         }
         return $state.CachedPaths
     }
-    if ($joined -match '^add -- ') {
-        $paths = @($argv[2..($argv.Count - 1)] | ForEach-Object { $_ -replace '^:\(literal\)', '' })
+    if ($joined -match '^add(?: --)? ') {
+        $start = 1
+        if ($argv.Count -gt 1 -and $argv[1] -eq '--') { $start = 2 }
+        $paths = @($argv[$start..($argv.Count - 1)] | ForEach-Object { $_ -replace '^:\(literal\)', '' })
         $state.CachedPaths = $paths
         return
     }
