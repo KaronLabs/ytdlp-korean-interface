@@ -1,0 +1,71 @@
+name: Diagnose release source attestation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/diagnose-release-source-attestation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: windows-2022
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Compare tracked and isolated source paths
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Set-StrictMode -Version Latest
+          . .\tools\build-candidate.ps1
+
+          $source = [IO.Path]::GetFullPath($env:GITHUB_WORKSPACE)
+          $git = Get-Command git.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1
+          $tracked = @(Get-GitTrackedPaths -SourceRoot $source -GitPath $git.Source)
+          $manifest = Get-DependencyArchiveManifest -SourceRoot $source
+          $dependencyRoots = @($manifest.roots | ForEach-Object { [string]$_ })
+
+          Write-Host ('TRACKED_COUNT=' + $tracked.Count)
+          Write-Host ('DEPENDENCY_ROOTS=' + ($dependencyRoots -join ','))
+
+          $badOriginal = @()
+          foreach ($relative in $tracked) {
+            $rootName = ($relative -split '[/\\]')[0]
+            $path = Join-Path $source $relative
+            $valid = -not [string]::IsNullOrWhiteSpace($relative) -and -not [IO.Path]::IsPathRooted($relative) -and $relative -notmatch '(^|[\\/])\.\.([\\/]|$)' -and (Test-Path -LiteralPath $path -PathType Leaf)
+            if (-not $valid) {
+              $badOriginal += [pscustomobject]@{ path=$relative; root=$rootName; exists=(Test-Path -LiteralPath $path); leaf=(Test-Path -LiteralPath $path -PathType Leaf) }
+            }
+          }
+          Write-Host ('BAD_ORIGINAL_COUNT=' + $badOriginal.Count)
+          foreach ($item in $badOriginal) { Write-Host ('BAD_ORIGINAL ' + ($item | ConvertTo-Json -Compress)) }
+
+          $workspace = Join-Path $env:RUNNER_TEMP 'source-attestation-diagnostic'
+          if (Test-Path -LiteralPath $workspace) { Remove-Item -LiteralPath $workspace -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $workspace | Out-Null
+          $isolated = New-IsolatedBuildSource -SourceRoot $source -WorkspaceRoot $workspace -DependencyRoots $dependencyRoots -TrackedPaths $tracked
+
+          $missing = @()
+          foreach ($relative in $tracked) {
+            $rootName = ($relative -split '[/\\]')[0]
+            $path = Join-Path $isolated $relative
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              $missing += [pscustomobject]@{ path=$relative; root=$rootName; expectedExcluded=($dependencyRoots -contains $rootName -or $rootName -eq '.git') }
+            }
+          }
+          Write-Host ('MISSING_ISOLATED_COUNT=' + $missing.Count)
+          foreach ($item in $missing) { Write-Host ('MISSING_ISOLATED ' + ($item | ConvertTo-Json -Compress)) }
+
+          try {
+            $copyAttestation = Get-SourceInputAttestation -SourceRoot $isolated -Commit ('${{ github.sha }}') -StatusPorcelain '' -TrackedPaths $tracked
+            Write-Host ('ATTESTATION_OK trackedFileCount=' + $copyAttestation.trackedFileCount + ' treeSha256=' + $copyAttestation.treeSha256)
+          }
+          catch {
+            Write-Host ('ATTESTATION_ERROR=' + $_.Exception.Message)
+            throw
+          }
