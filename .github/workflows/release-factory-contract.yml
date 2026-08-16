@@ -43,3 +43,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/powershell/release-publication-contract.Tests.ps1
           exit $LASTEXITCODE
+      - name: Run full pre-release repository contracts
+        shell: powershell
+        env:
+          RECOVERED_CATALOG: locales/ko-KR.json
+        run: |
+          python tests/run_contract_tests.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/run_powershell_tests.ps1
+          exit $LASTEXITCODE
