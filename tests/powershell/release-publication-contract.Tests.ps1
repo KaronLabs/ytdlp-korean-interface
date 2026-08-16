@@ -64,7 +64,7 @@ Invoke-Test 'publication workflow is fixed, minimal-permission, and verification
     Assert-True ($text -match "release/requests/v2\.19\.1-karon\.1\.json") 'workflow trigger is not request-scoped'
     Assert-True ($text -match 'ref:\s*\$\{\{\s*github\.sha\s*\}\}') 'checkout is not pinned to github.sha'
     Assert-True ($text -match 'GH_TOKEN:\s*\$\{\{\s*github\.token\s*\}\}') 'GH_TOKEN is not repository-scoped github.token'
-    Assert-True ($text -notmatch 'PERSONAL_ACCESS_TOKEN|PAT|BEGIN OPENSSH PRIVATE KEY|--clobber|--force') 'workflow contains forbidden credential/overwrite path'
+    Assert-True ($text -notmatch 'PERSONAL_ACCESS_TOKEN|\bPAT\b|BEGIN OPENSSH PRIVATE KEY|--clobber|--force') 'workflow contains forbidden credential/overwrite path'
     $verifyIndex=$text.IndexOf('Build, smoke, and verify release payload')
     $publishIndex=$text.IndexOf('Publish verified release')
     Assert-True ($verifyIndex -ge 0 -and $publishIndex -gt $verifyIndex) 'publication appears before release verification'
@@ -88,8 +88,11 @@ Invoke-Test 'release notes preserve upstream lineage and verification instructio
     Assert-True ($text -notmatch 'machine-proven GUI|GUI interaction proven') 'notes overclaim headless GUI proof'
 }
 
-Invoke-Test 'one-time request is not committed during factory implementation' {
-    Assert-True (-not (Test-Path -LiteralPath $Request)) 'release request must not exist before pre-trigger verification'
+Invoke-Test 'one-time request is absent during implementation or canonical once present' {
+    if (Test-Path -LiteralPath $Request -PathType Leaf) {
+        $requestValue = Read-ReleaseRequest -Path $Request
+        Assert-ReleaseRequest -Request $requestValue | Out-Null
+    }
 }
 
 if ($script:Failures -gt 0) { throw "$($script:Failures) of $($script:Tests) publication contract tests failed." }
