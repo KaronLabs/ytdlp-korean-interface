@@ -1,16 +1,40 @@
 # KaronLabs `ytdlp-korean-interface` 배포(SSH) 매뉴얼
 
-이 문서는 `E:\03_AllWork\ytdlp-korean-interface\src` 기준으로
-`KaronLabs/ytdlp-korean-interface`에 SSH 방식으로 안전하게 푸시하는 절차입니다.
+이 문서는 `E:\03_AllWork\ytdlp-korean-interface\src` 기준으로  
+`KaronLabs/ytdlp-korean-interface`에 SSH 방식으로 안전하게 푸시하기 위한 규칙입니다.
 
-## 0. 전제
+## 0. 원칙(필수 준수)
 
-- 배포 대상 저장소: `https://github.com/KaronLabs/ytdlp-korean-interface`
-- SSH 원격: `git@github.com:KaronLabs/ytdlp-korean-interface.git`
-- 배포 브랜치: `main`
-- 강제 푸시 금지
+- 배포 대상: `https://github.com/KaronLabs/ytdlp-korean-interface`
+- 원격 URL: `git@github.com:KaronLabs/ytdlp-korean-interface.git`
+- 배포 브랜치: `main` 고정
+- `git push --force` / 강제 우회 금지
+- 푸시 전·후 원격 SHA 비교(동시 푸시 감지)
+- 작업 트리와 스테이징 범위 분리, 무관 파일 혼합 금지
 
-## 1) GitHub 인증 확인
+> 로컬 SSH 키 정책(권장):  
+> `C:\Users\Administrator\.ssh\config`의 `Host github.com`에 사용할 키를 고정해 두면
+> 호스트별 키 충돌로 인한 인증 실패를 줄일 수 있습니다.
+
+```
+Host github.com
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/new-api-key
+```
+
+⚠️ 위 설정은 작업자 로컬 환경용입니다. `.ssh/config` 자체를 이 저장소에 커밋하지 않습니다.
+
+## 1) 작업 루트 고정
+
+```powershell
+Set-Location -LiteralPath "E:\03_AllWork\ytdlp-korean-interface\src"
+git rev-parse --show-toplevel
+```
+
+`...\\ytdlp-korean-interface\\src`가 아니라면 중단하고 경로를 수정하세요.
+
+## 2) GitHub 인증 확인
 
 ```powershell
 ssh -T git@github.com
@@ -18,87 +42,96 @@ ssh -T git@github.com
 
 성공 응답은 보통 `Hi <user>! You've successfully authenticated...` 형태입니다.
 
-## 2) 배포 루트 고정
+## 3) origin 정합성 확인/보정
 
 ```powershell
-Set-Location -LiteralPath "E:\03_AllWork\ytdlp-korean-interface\src"
-git rev-parse --show-toplevel
+git -C E:\03_AllWork\ytdlp-korean-interface\src remote -v
+git -C E:\03_AllWork\ytdlp-korean-interface\src remote set-url origin git@github.com:KaronLabs/ytdlp-korean-interface.git
+git -C E:\03_AllWork\ytdlp-korean-interface\src remote get-url origin
 ```
 
-`src`가 출력되지 않으면 저장소 루트가 잘못 지정된 상태이므로 중단하세요.
+최종 출력이 `git@github.com:KaronLabs/ytdlp-korean-interface.git`인지 확인하세요.
+다르면 중단 후 재설정합니다.
 
-## 3) origin 원격을 배포 저장소로 정렬
+## 4) 배포 전 상태 점검
 
 ```powershell
-git remote -v
-git remote set-url origin git@github.com:KaronLabs/ytdlp-korean-interface.git
-git remote -v
+git -C E:\03_AllWork\ytdlp-korean-interface\src status --short
+git -C E:\03_AllWork\ytdlp-korean-interface\src rev-parse --abbrev-ref HEAD
 ```
 
-원격이 `KaronLabs/ytdlp-korean-interface`가 아니면 `origin`을 수정하고 재확인하세요.
+- `status --short`는 빈 값이어야 기본 게이트 통과입니다.
+- `main` 외 브랜치에서 푸시할 예정이라면 먼저 `main`으로 이동하거나 정책상 `HEAD:refs/heads/main`로 강제 동기화를 다시 검토하세요.
 
-## 4) 푸시 게이트(반드시 통과)
+## 5) 변경 커밋(스코프 분리)
 
-- `git status --short`가 비어 있어야 합니다.  
-  - 또는 `-StagePaths` + `-CommitMessage`를 지정해 해당 파일만 커밋하는 방식을 사용해도 됩니다.
-- 푸시 대상은 `main`입니다.
-- `git push --force` 또는 강제우회 옵션을 사용하지 않습니다.
+무관 파일은 섞지 않습니다.
 
 ```powershell
-$repoRoot = (git rev-parse --show-toplevel).Trim()
-if ($repoRoot -notlike '*\ytdlp-korean-interface\src') { throw 'Repository root must be ...\\ytdlp-korean-interface\\src' }
+git -C E:\03_AllWork\ytdlp-korean-interface\src add -- README.md
+git -C E:\03_AllWork\ytdlp-korean-interface\src commit -m "docs: localize README and document upstream diff"
+```
 
-git status --short
-$remoteBefore = ((git ls-remote origin refs/heads/main) -split '\s+')[0]
-if ([string]::IsNullOrWhiteSpace($remoteBefore)) { throw 'Could not read remote main SHA.' }
+예시: 배포 문서만 수정한 경우
+
+```powershell
+git -C E:\03_AllWork\ytdlp-korean-interface\src add -- docs/karonlabs-github-deploy-manual-korean-interface.md
+git -C E:\03_AllWork\ytdlp-korean-interface\src commit -m "docs: align SSH deploy flow for main branch and remote SHA checks"
+```
+
+## 6) 푸시 SHA 게이트
+
+```powershell
+$branch = "main"
+$remoteBefore = ((git -C E:\03_AllWork\ytdlp-korean-interface\src ls-remote origin ("refs/heads/$branch")) | Out-String).Trim()
 Write-Output "REMOTE_BEFORE=$remoteBefore"
+
+$localSha = ((git -C E:\03_AllWork\ytdlp-korean-interface\src rev-parse HEAD) | Out-String).Trim()
+Write-Output "LOCAL_SHA=$localSha"
+
+git -C E:\03_AllWork\ytdlp-korean-interface\src push origin HEAD:refs/heads/main
+
+$remoteAfterRaw = ((git -C E:\03_AllWork\ytdlp-korean-interface\src ls-remote origin ("refs/heads/$branch")) | Out-String).Trim()
+$remoteAfter = if ([string]::IsNullOrWhiteSpace($remoteAfterRaw)) { "" } else { ($remoteAfterRaw -split '\s+')[0] }
+Write-Output "REMOTE_AFTER=$remoteAfter"
+
+if ([string]::IsNullOrWhiteSpace($remoteAfter)) { throw "원격 SHA 조회 실패" }
+if ($remoteAfter -ne $localSha) { throw "원격 SHA 불일치: expected=$localSha actual=$remoteAfter" }
+
+# 원격 변경 감지(동시 푸시)
+if (-not [string]::IsNullOrWhiteSpace($remoteBefore)) {
+  $remoteBeforeSha = ($remoteBefore -split '\s+')[0]
+  if ($remoteBeforeSha -ne $remoteAfter) {
+    Write-Output "WARN: remote-before/after changed by third-party push in flow."
+  }
+}
 ```
 
-## 5) 변경 커밋(선택, 권장)
+> 권고: 실제 운영에서는 `git ls-remote` 결과에서 해시 부분만 추출해 비교하면 경고 정확도가 높아집니다.
 
-이 단계는 변경이 있을 때만 수행합니다.
+## 7) 최초 main 부트스트랩(선택)
 
-```powershell
-git add -- README.md
-git commit -m "release: update ..."
-```
-
-`git add -A`/`git add .` 대신 변경 파일을 명시적으로 지정하세요.
-
-## 6) SHA 보호 푸시 + 검증
-
-```powershell
-$sha = (git rev-parse HEAD).Trim()
-$remoteNow = ((git ls-remote origin refs/heads/main) -split '\s+')[0]
-if ($remoteNow -ne $remoteBefore) { throw "원격이 변경됨: $remoteBefore -> $remoteNow" }
-
-git push origin HEAD:refs/heads/main
-
-$remoteAfter = ((git ls-remote origin refs/heads/main) -split '\s+')[0]
-if ($remoteAfter -ne $sha) { throw "원격 SHA 불일치: expected=$sha actual=$remoteAfter" }
-Write-Output "PUSH_OK=$sha"
-```
-
-### 최초 main 브랜치 부트스트랩
-
-원격 `main`이 아직 없는 상태에서 첫 배포를 할 때는 다음 명령으로 시작하세요.
+원격 `main`이 존재하지 않는 초기 상태는 아래 명령만 허용합니다.
 
 ```powershell
 & 'E:\03_AllWork\ytdlp-korean-interface\src\tools\deploy-ssh-main.ps1' -AllowMainBootstrap
 ```
 
-`-AllowMainBootstrap` 옵션은 사전 승인된 첫 푸시에서만 사용하고, 사용 로그를 남겨야 합니다.
+이 플래그는 승인된 최초 배포에서만 사용합니다.
 
-## 7) 스크립트 사용(권장)
+## 8) 스크립트 추천 플로우
 
-검증 규칙을 반복 실수 없이 사용하려면 함께 제공되는 배포 스크립트를 사용하세요.
+반복 실행을 줄이려면 아래 스크립트 사용을 권장합니다.
 
 ```powershell
 & 'E:\03_AllWork\ytdlp-korean-interface\src\tools\deploy-ssh-main.ps1'
 ```
 
-배포를 더 강하게 운영하려면 다음을 추가하세요.
+`deploy-ssh-main.ps1`는 다음을 강제합니다.
 
-- 푸시 전후 `git log -1 --oneline` 확인
-- GitHub Actions 결과 확인 후 Cloudflare 배포
-- 릴리스 태그 정책 적용
+- origin URL 검증 (`git@github.com:KaronLabs/ytdlp-korean-interface.git`)
+- working tree 정합성 또는 명시 StagePaths 검증
+- 푸시 전 원격 SHA 보관, 푸시 후 동일 SHA 확인
+- `main` 브랜치 강제 푸시 (`HEAD:refs/heads/main`)
+- `-AllowMainBootstrap` 없이는 빈 `main` 허용하지 않음
+- `--force` 사용 차단
