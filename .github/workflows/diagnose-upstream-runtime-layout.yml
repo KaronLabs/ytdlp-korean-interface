@@ -44,5 +44,6 @@ jobs:
 
           Write-Host '=== TOP-LEVEL ==='
           foreach ($item in @(Get-ChildItem -LiteralPath $extract -Force)) {
-            Write-Host (($item.PSIsContainer ? 'DIR  ' : 'FILE ') + $item.Name)
+            if ($item.PSIsContainer) { $kind = 'DIR  ' } else { $kind = 'FILE ' }
+            Write-Host ($kind + $item.Name)
           }
