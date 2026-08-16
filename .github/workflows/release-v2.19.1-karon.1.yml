@@ -51,8 +51,13 @@ jobs:
 
           function Assert-GitHubObjectMissing {
             param([Parameter(Mandatory = $true)] [string] $Endpoint, [Parameter(Mandatory = $true)] [string] $Label)
-            $output = @(& gh api $Endpoint 2>&1)
-            $code = $LASTEXITCODE
+            $probeErrorActionPreference = $ErrorActionPreference
+            try {
+              $ErrorActionPreference = 'Continue'
+              $output = @(& gh api $Endpoint 2>&1)
+              $code = $LASTEXITCODE
+            }
+            finally { $ErrorActionPreference = $probeErrorActionPreference }
             if ($code -eq 0) { throw "$Label already exists; refusing to overwrite it." }
             $text = ($output | Out-String).Trim()
             if ($text -notmatch 'HTTP 404|Not Found') { throw "Could not prove $Label absence: $text" }
@@ -151,8 +156,13 @@ jobs:
 
           function Assert-GitHubObjectMissing {
             param([Parameter(Mandatory = $true)] [string] $Endpoint, [Parameter(Mandatory = $true)] [string] $Label)
-            $output = @(& gh api $Endpoint 2>&1)
-            $code = $LASTEXITCODE
+            $probeErrorActionPreference = $ErrorActionPreference
+            try {
+              $ErrorActionPreference = 'Continue'
+              $output = @(& gh api $Endpoint 2>&1)
+              $code = $LASTEXITCODE
+            }
+            finally { $ErrorActionPreference = $probeErrorActionPreference }
             if ($code -eq 0) { throw "$Label already exists; refusing to overwrite it." }
             $text = ($output | Out-String).Trim()
             if ($text -notmatch 'HTTP 404|Not Found') { throw "Could not prove $Label absence: $text" }
