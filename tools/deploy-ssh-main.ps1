@@ -74,10 +74,10 @@ function Invoke-StrictShaCheck {
     $output = @(Invoke-GitStrict -Arguments @('ls-remote', $CanonicalRemoteUrl, $ref))
     $lines = @($output | ForEach-Object { ([string] $_).Trim() } | Where-Object { $_ })
     if ($lines.Count -eq 0) { return $null }
-    if ($lines.Count -ne 1) { throw "Unexpected ls-remote response count for $ref: $($lines.Count)" }
+    if ($lines.Count -ne 1) { throw "Unexpected ls-remote response count for ${ref}: $($lines.Count)" }
 
     $match = [regex]::Match($lines[0], '^([0-9a-fA-F]{40})\s+refs/heads/main$')
-    if (-not $match.Success) { throw "Malformed ls-remote response for $ref: $($lines[0])" }
+    if (-not $match.Success) { throw "Malformed ls-remote response for ${ref}: $($lines[0])" }
     return $match.Groups[1].Value.ToLowerInvariant()
 }
 
