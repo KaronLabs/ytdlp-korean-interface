@@ -286,6 +286,7 @@ python tests/run_contract_tests.py
 - placeholder 일치
 - 번역 catalog와 C++ source reference 관계
 - runtime artifact가 source tree 경계를 침범하는지 여부
+- provenance 문서와 canonical repository/upstream 정보의 일관성
 
 ## Native C++ tests
 
@@ -438,6 +439,28 @@ FFprobe 검증
 - 기존 한국어 실행 파일의 byte-for-byte 복제
 
 기능 욕심이 생겨도 일단 원래 프로그램을 다운로드 프로그램으로 남겨두는 것을 중요하게 생각합니다. 갑자기 Kubernetes control plane이 되면 곤란합니다.
+
+---
+
+# Reuse & Attribution
+
+이 저장소는 계속 **MIT License 기반 오픈소스**로 유지합니다.
+
+포크, 수정, 재배포, 상업적 사용, 유료 강의에서의 사용을 막기 위한 문서가 아닙니다. 실제 사용 권리는 [`LICENSE`](LICENSE)가 정합니다.
+
+다만 이 저장소가 어디에서 왔고, upstream과 KaronLabs의 작업 경계가 어디인지 확인하기 쉽도록 provenance 기록을 함께 유지합니다.
+
+- [NOTICE](NOTICE) — 짧은 원산지/계보 안내
+- [PROVENANCE.md](PROVENANCE.md) — upstream baseline, commit SHA, KaronLabs repository history, 검증 절차
+- [ATTRIBUTION.md](ATTRIBUTION.md) — 파생 프로젝트를 정확하게 소개하는 방법과 오해를 부르는 표현의 예
+- [`CITATION.cff`](CITATION.cff) — 기계가 읽을 수 있는 citation metadata
+- [`docs/provenance-dispute-response.md`](docs/provenance-dispute-response.md) — 원산지 주장이 충돌했을 때의 evidence-first 대응 절차
+
+> **코드는 가져가셔도 됩니다. 족보까지 새로 쓰지는 말아주세요.**
+
+KaronLabs 역시 `ErrorFlynn/ytdlp-interface`와 `yt-dlp` 위에서 작업하고 있으므로 upstream 저작/기여 관계도 그대로 보존합니다. 반대로 제3자 파생물이 KaronLabs 공식 릴리스·공식 강의·공식 제품인 것처럼 표시되는 것은 일반적인 MIT 코드 재사용과 별개의 provenance/identity 문제입니다.
+
+이 문서들은 새로운 소프트웨어 사용 제한을 추가하기 위한 것이 아니라, **오픈소스 자유는 유지하면서 기록된 역사를 확인하기 쉽게 만들기 위한 것**입니다.
 
 ---
 
