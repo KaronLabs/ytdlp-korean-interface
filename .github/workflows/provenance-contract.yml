@@ -1,0 +1,39 @@
+name: Provenance contract
+
+on:
+  push:
+    paths:
+      - NOTICE
+      - PROVENANCE.md
+      - ATTRIBUTION.md
+      - CITATION.cff
+      - README.md
+      - LICENSE
+      - docs/provenance-dispute-response.md
+      - tests/contract/test_provenance_contract.py
+      - .github/workflows/provenance-contract.yml
+  pull_request:
+    paths:
+      - NOTICE
+      - PROVENANCE.md
+      - ATTRIBUTION.md
+      - CITATION.cff
+      - README.md
+      - LICENSE
+      - docs/provenance-dispute-response.md
+      - tests/contract/test_provenance_contract.py
+      - .github/workflows/provenance-contract.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  provenance-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run provenance contract
+        run: python3 -m unittest tests.contract.test_provenance_contract -v
