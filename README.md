@@ -3,12 +3,15 @@
 **`ytdlp-interface` v2.19.1 기반의 한국어 UI 복구·개선 프로젝트입니다.**  
 실제 다운로드 엔진은 [yt-dlp](https://github.com/yt-dlp/yt-dlp), Windows GUI의 직접적인 upstream은 [ErrorFlynn/ytdlp-interface](https://github.com/ErrorFlynn/ytdlp-interface)입니다.
 
-[![Download for Windows](https://img.shields.io/badge/Download_for_Windows-v2.19.1--karon.1-blue?style=for-the-badge&logo=windows11&logoColor=white)](https://github.com/KaronLabs/ytdlp-korean-interface/releases/download/v2.19.1-karon.1/ytdlp-korean-interface-v2.19.1-karon.1-win-x64.zip)
+[![윈도우 실행판 바로 다운로드](docs/win-downlaod-here.png)](https://github.com/KaronLabs/ytdlp-korean-interface/releases/download/v2.19.1-karon.1/ytdlp-korean-interface-v2.19.1-karon.1-win-x64.zip)
 
-**⬇ Download for Windows (x64):** `ytdlp-korean-interface-v2.19.1-karon.1-win-x64.zip`  
+**Download for Windows (x64)**  
+[`ytdlp-korean-interface-v2.19.1-karon.1-win-x64.zip`](https://github.com/KaronLabs/ytdlp-korean-interface/releases/download/v2.19.1-karon.1/ytdlp-korean-interface-v2.19.1-karon.1-win-x64.zip)  
 [Release notes & SHA-256](https://github.com/KaronLabs/ytdlp-korean-interface/releases/tag/v2.19.1-karon.1)
 
-> ⚠️ GitHub의 **Code → Download ZIP**은 약 8.8MB의 **소스 코드**입니다. 바로 실행할 Windows 버전은 위 **Download for Windows** 버튼을 사용하세요.
+> ⚠️ GitHub의 **Code → Download ZIP**은 약 8.8MB의 **소스 코드**입니다. 바로 실행할 Windows 버전은 위 **큰 배너**를 누르세요.
+>
+> ✅ 사용 방법: **배너 클릭 → 압축 해제 → `ytdlp-interface.exe` 실행**
 
 ![Platform](https://img.shields.io/badge/platform-Windows-blue)
 ![Language](https://img.shields.io/badge/language-C%2B%2B-00599C)
