@@ -59,7 +59,10 @@ class ProvenanceContractTests(unittest.TestCase):
         citation = read("CITATION.cff")
         self.assertIn("license: MIT", citation)
         self.assertIn("repository-code: https://github.com/KaronLabs/ytdlp-korean-interface", citation)
-        self.assertNotIn("version:", citation)
+        self.assertFalse(
+            any(line.startswith("version:") for line in citation.splitlines()),
+            "CITATION.cff must not invent a KaronLabs release version",
+        )
         self.assertNotIn("v2.19.1-karon.1", citation)
 
     def test_readme_exposes_provenance_records(self):
