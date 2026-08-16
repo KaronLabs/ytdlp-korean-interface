@@ -3,15 +3,17 @@ message: "If you reuse this repository, please preserve the recorded upstream an
 title: "ytdlp-korean-interface"
 type: software
 authors:
-  - family-names: "KaronLabs"
+  - name: "KaronLabs"
 repository-code: https://github.com/KaronLabs/ytdlp-korean-interface
-url: https://github.com/KaronLabs/ytdlp-korean-interface
+url: https://github.com/KaronLabs/ytdlp-korean-interface/releases/tag/v2.19.1-karon.1
 license: MIT
+version: "v2.19.1-karon.1"
+date-released: 2026-08-16
 abstract: >-
   Korean localization recovery and hardening repository based on
   ErrorFlynn/ytdlp-interface v2.19.1. This citation identifies the KaronLabs
-  repository and its recovery, testing, maintenance, and provenance history;
-  it does not claim KaronLabs sole authorship of unchanged upstream code.
+  repository and its recovery, testing, maintenance, release, and provenance
+  history; it does not claim KaronLabs sole authorship of unchanged upstream code.
 keywords:
   - yt-dlp
   - ytdlp-interface
