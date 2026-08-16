@@ -73,14 +73,39 @@ jobs:
           Write-Host ('MISSING_ISOLATED_COUNT=' + $missing.Count)
           foreach ($item in $missing) { Write-Host ('MISSING_ISOLATED ' + ($item | ConvertTo-Json -Compress)) }
 
+          $sourceAttestation = Get-SourceAttestation -SourceRoot $source -GitPath $git.Source -TrackedPaths $tracked
+          Write-Host ('SOURCE_ATTESTATION_OK trackedFileCount=' + $sourceAttestation.trackedFileCount + ' treeSha256=' + $sourceAttestation.treeSha256)
+          $copyAttestation = Get-SourceInputAttestation -SourceRoot $isolated -Commit $sourceAttestation.commit -StatusPorcelain '' -TrackedPaths $tracked
+          Write-Host ('COPY_ATTESTATION_OK trackedFileCount=' + $copyAttestation.trackedFileCount + ' treeSha256=' + $copyAttestation.treeSha256)
+          if ($sourceAttestation.treeSha256 -cne $copyAttestation.treeSha256) { throw 'diagnostic_tree_digest_mismatch' }
+      - name: Reproduce parent bootstrap and candidate build with stack trace
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Set-StrictMode -Version Latest
+          . .\tools\release-factory.ps1
+          . .\tools\release-orchestrator.ps1
+
+          $root = Join-Path $env:RUNNER_TEMP 'candidate-build-diagnostic'
+          if (Test-Path -LiteralPath $root) { Remove-Item -LiteralPath $root -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $root | Out-Null
+
           try {
-            $sourceAttestation = Get-SourceAttestation -SourceRoot $source -GitPath $git.Source -TrackedPaths $tracked
-            Write-Host ('SOURCE_ATTESTATION_OK trackedFileCount=' + $sourceAttestation.trackedFileCount + ' treeSha256=' + $sourceAttestation.treeSha256)
-            $copyAttestation = Get-SourceInputAttestation -SourceRoot $isolated -Commit $sourceAttestation.commit -StatusPorcelain '' -TrackedPaths $tracked
-            Write-Host ('COPY_ATTESTATION_OK trackedFileCount=' + $copyAttestation.trackedFileCount + ' treeSha256=' + $copyAttestation.treeSha256)
-            if ($sourceAttestation.treeSha256 -cne $copyAttestation.treeSha256) { throw 'diagnostic_tree_digest_mismatch' }
+            Write-Host 'DIAG_PHASE=parent-bootstrap'
+            $parent = New-VerifiedUpstreamParentRuntime -SourceRoot $env:GITHUB_WORKSPACE -WorkspaceRoot (Join-Path $root 'parent')
+            Write-Host ('DIAG_PARENT_OK=' + $parent.ParentRuntime)
+            Write-Host ('DIAG_YTDLP_TAG=' + $parent.YtDlpTag)
+            Write-Host ('DIAG_YTDLP_SHA=' + $parent.YtDlpSha256)
+
+            Write-Host 'DIAG_PHASE=candidate-build'
+            $candidate = Invoke-ReleaseCandidateBuild -SourceRoot $env:GITHUB_WORKSPACE -ParentRuntime $parent.ParentRuntime -CandidateBase (Join-Path $root 'candidates')
+            Write-Host ('DIAG_CANDIDATE_OK=' + $candidate.CandidateRoot)
+            Write-Host ('DIAG_MANIFEST_SHA=' + $candidate.ManifestSha256)
           }
           catch {
-            Write-Host ('ATTESTATION_ERROR=' + $_.Exception.Message)
+            Write-Host ('DIAG_ERROR_TYPE=' + $_.Exception.GetType().FullName)
+            Write-Host ('DIAG_ERROR_MESSAGE=' + $_.Exception.Message)
+            Write-Host ('DIAG_POSITION=' + $_.InvocationInfo.PositionMessage)
+            Write-Host ('DIAG_SCRIPT_STACK=' + $_.ScriptStackTrace)
             throw
           }
