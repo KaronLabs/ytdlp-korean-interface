@@ -226,3 +226,4 @@ if ($script:Failures -gt 0) {
 }
 
 Write-Host "All $($script:Tests) deploy security tests passed."
+exit 0
