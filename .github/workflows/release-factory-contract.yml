@@ -1,0 +1,27 @@
+name: Release factory contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/release-factory.ps1'
+      - 'tests/powershell/release-factory.Tests.ps1'
+      - '.github/workflows/release-factory-contract.yml'
+  pull_request:
+    paths:
+      - 'tools/release-factory.ps1'
+      - 'tests/powershell/release-factory.Tests.ps1'
+      - '.github/workflows/release-factory-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  release-factory-contract:
+    runs-on: windows-2022
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Run release factory contract tests
+        shell: powershell
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/powershell/release-factory.Tests.ps1
