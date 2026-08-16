@@ -1,0 +1,29 @@
+name: Deploy SSH security contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/deploy-ssh-main.ps1'
+      - 'tests/powershell/deploy-ssh-main-security.Tests.ps1'
+      - 'docs/karonlabs-github-deploy-manual-korean-interface.md'
+      - '.github/workflows/deploy-ssh-security.yml'
+  pull_request:
+    paths:
+      - 'tools/deploy-ssh-main.ps1'
+      - 'tests/powershell/deploy-ssh-main-security.Tests.ps1'
+      - 'docs/karonlabs-github-deploy-manual-korean-interface.md'
+      - '.github/workflows/deploy-ssh-security.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-ssh-security:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Run deploy SSH security regression tests
+        shell: pwsh
+        run: ./tests/powershell/deploy-ssh-main-security.Tests.ps1
