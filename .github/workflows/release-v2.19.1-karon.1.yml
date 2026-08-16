@@ -61,6 +61,7 @@ jobs:
             if ($code -eq 0) { throw "$Label already exists; refusing to overwrite it." }
             $text = ($output | Out-String).Trim()
             if ($text -notmatch 'HTTP 404|Not Found') { throw "Could not prove $Label absence: $text" }
+            $global:LASTEXITCODE = 0
           }
 
           Assert-GitHubObjectMissing -Endpoint ("repos/$env:GITHUB_REPOSITORY/releases/tags/" + $config.Tag) -Label 'release'
@@ -166,6 +167,7 @@ jobs:
             if ($code -eq 0) { throw "$Label already exists; refusing to overwrite it." }
             $text = ($output | Out-String).Trim()
             if ($text -notmatch 'HTTP 404|Not Found') { throw "Could not prove $Label absence: $text" }
+            $global:LASTEXITCODE = 0
           }
 
           Assert-GitHubObjectMissing -Endpoint ("repos/$env:GITHUB_REPOSITORY/releases/tags/" + $config.Tag) -Label 'release'
