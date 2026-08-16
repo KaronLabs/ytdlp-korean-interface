@@ -5,12 +5,16 @@ on:
     branches: [main]
     paths:
       - 'tools/release-factory.ps1'
+      - 'tools/release-orchestrator.ps1'
       - 'tests/powershell/release-factory.Tests.ps1'
+      - 'tests/powershell/release-orchestrator.Tests.ps1'
       - '.github/workflows/release-factory-contract.yml'
   pull_request:
     paths:
       - 'tools/release-factory.ps1'
+      - 'tools/release-orchestrator.ps1'
       - 'tests/powershell/release-factory.Tests.ps1'
+      - 'tests/powershell/release-orchestrator.Tests.ps1'
       - '.github/workflows/release-factory-contract.yml'
 
 permissions:
@@ -24,4 +28,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Run release factory contract tests
         shell: powershell
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/powershell/release-factory.Tests.ps1
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/powershell/release-factory.Tests.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/powershell/release-orchestrator.Tests.ps1
+          exit $LASTEXITCODE
