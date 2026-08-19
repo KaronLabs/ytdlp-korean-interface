@@ -1,7 +1,8 @@
 # ytdlp-korean-interface 🇰🇷
 
 **`ytdlp-interface` v2.19.1 기반의 한국어 UI 복구·개선 프로젝트입니다.**  
-실제 다운로드 엔진은 [yt-dlp](https://github.com/yt-dlp/yt-dlp), Windows GUI의 직접적인 upstream은 [ErrorFlynn/ytdlp-interface](https://github.com/ErrorFlynn/ytdlp-interface)입니다.
+실제 다운로드 엔진은 [yt-dlp](https://github.com/yt-dlp/yt-dlp), 
+Windows GUI의 직접적인 upstream은 [ErrorFlynn/ytdlp-interface](https://github.com/ErrorFlynn/ytdlp-interface)입니다.
 
 [![윈도우 실행판 바로 다운로드](docs/win-downlaod-here.png)](https://github.com/KaronLabs/ytdlp-korean-interface/releases/download/v2.19.1-karon.1/ytdlp-korean-interface-v2.19.1-karon.1-win-x64.zip)
 
