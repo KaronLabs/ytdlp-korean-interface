@@ -350,8 +350,8 @@ function New-HermeticBuildContext {
         EffectiveProperties = $properties
         WorkingDirectory = $source
         AttestedWorkingDirectory = '<source>'
-        EnvironmentOverrides = [ordered]@{ PreferredToolArchitecture = 'x64' }
-        AttestedEnvironment = [ordered]@{ PreferredToolArchitecture = 'x64' }
+        EnvironmentOverrides = [ordered]@{ PreferredToolArchitecture = 'x64'; PROCESSOR_ARCHITECTURE = 'AMD64' }
+        AttestedEnvironment = [ordered]@{ PreferredToolArchitecture = 'x64'; PROCESSOR_ARCHITECTURE = 'AMD64' }
     }
 }
 
