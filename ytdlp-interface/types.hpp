@@ -8,6 +8,7 @@
 #include <mutex>
 #include "json.hpp"
 #include "settings_json.hpp"
+#include "download_policy.hpp"
 
 #define WM_SET_QLINE_TEXT (WM_APP + 0x0001)
 #define WM_LBQ_AUTODRAW (WM_APP + 0x0002)
@@ -102,6 +103,8 @@ struct theme_t
 
 struct settings_t
 {
+	download_policy::policy download;
+	nlohmann::json queue_download_policies = nlohmann::json::object();
 	std::filesystem::path ytdlp_path, ffmpeg_path, outpath, cookies_path;
 	std::wstring output_template_default {L"%(title)s.%(ext)s"}, playlist_indexing_default {L"%(playlist_index)d - "},
 		output_template_default_bandcamp {L"%(artist)s - %(album)s - %(track_number)02d - %(track)s.%(ext)s"};

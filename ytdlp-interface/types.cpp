@@ -377,6 +377,7 @@ void settings_t::to_jpreset(nlohmann::json &j) const
 	using namespace nana;
 	if(!j.empty())
 		j.clear();
+	j["download_policy"] = download_policy::serialize(download);
 	j["outpath"] = outpath;
 	j["fmt1"] = to_utf8(fmt1);
 	j["fmt2"] = to_utf8(fmt2);
@@ -441,6 +442,7 @@ void settings_t::to_jpreset(nlohmann::json &j) const
 
 void settings_t::from_jpreset(const nlohmann::json &j)
 {
+	download = download_policy::deserialize(j.contains("download_policy") ? j["download_policy"] : nlohmann::json{});
 	using nana::to_wstring;
 	outpath = j["outpath"].get<std::string>();
 	fmt1 = to_wstring(j["fmt1"].get<std::string>());
@@ -522,6 +524,7 @@ void settings_t::from_jpreset(const nlohmann::json &j)
 
 void settings_t::from_preset(const settings_t &p)
 {
+	download = p.download;
 	outpath = p.outpath;
 	fmt1 = p.fmt1;
 	fmt2 = p.fmt2;
@@ -580,6 +583,7 @@ void settings_t::from_preset(const settings_t &p)
 
 bool settings_t::equals_preset(const settings_t &p)
 {
+	if(download_policy::serialize(download) != download_policy::serialize(p.download)) return false;
 	return 
 		outpath == p.outpath &&
 		fmt1 == p.fmt1 &&
@@ -639,6 +643,7 @@ bool settings_t::equals_preset(const settings_t &p)
 
 void settings_t::to_json(nlohmann::json &j) const
 {
+	j["download_policy"] = download_policy::serialize(download);
 	using nana::to_utf8;
 
 	j["cb_custom_dark_theme"] = cb_custom_dark_theme;
@@ -647,6 +652,7 @@ void settings_t::to_json(nlohmann::json &j) const
 	theme_light.to_json(j["theme"]["light"]);
 
 	settings_json_t {language, unfinished_queue_items, unfinished_queue_states}.to_json(j);
+	j["queue_download_policies"] = queue_download_policies;
 
 	auto &jpresets {j["presets"] = nlohmann::json::array()};
 	for(const auto &el : GUI::conf_presets)
@@ -750,14 +756,17 @@ void settings_t::to_json(nlohmann::json &j) const
 
 void settings_t::from_json(const nlohmann::json &j)
 {
+	download = download_policy::deserialize(j.contains("download_policy") ? j["download_policy"] : nlohmann::json{});
 	using nana::to_wstring;
+	if(j.contains("queue_download_policies") && j["queue_download_policies"].is_object())
+		queue_download_policies = j["queue_download_policies"];
 	settings_json_t saved_settings;
 	saved_settings.from_json(j);
 	language = std::move(saved_settings.language);
 	unfinished_queue_items = std::move(saved_settings.unfinished_queue_items);
 	unfinished_queue_states = std::move(saved_settings.unfinished_queue_states);
 
-	ytdlp_path = j["ytdlp_path"].get<std::string>();
+	ytdlp_path = j.value("ytdlp_path", ytdlp_path.string());
 	if(!ytdlp_path.empty())
 		ytdlp_path = util::to_relative_path(ytdlp_path);
 	if(ytdlp_path.empty() || !fs::exists(ytdlp_path))
@@ -768,11 +777,11 @@ void settings_t::from_json(const nlohmann::json &j)
 		else if(fs::exists(appdir / ytdlp_fname))
 			ytdlp_path = ".\\" + ytdlp_fname;
 	}
-	outpath = util::to_relative_path(j["outpath"].get<std::string>());
-	fmt1 = to_wstring(j["fmt1"].get<std::string>());
-	fmt2 = to_wstring(j["fmt2"].get<std::string>());
-	ratelim = j["ratelim"];
-	ratelim_unit = j["ratelim_unit"];
+	outpath = util::to_relative_path(nana::to_wstring(j.value("outpath", nana::to_utf8(util::get_sys_folder(FOLDERID_Downloads)))));
+	fmt1 = to_wstring(j.value("fmt1", std::string{}));
+	fmt2 = to_wstring(j.value("fmt2", std::string{}));
+	ratelim = j.value("ratelim", 0.0);
+	ratelim_unit = j.value("ratelim_unit", 1u);
 	if(j.contains("cbkeyframes")) // v1.1
 	{
 		cbsubs = j["cbsubs"];
