@@ -33,3 +33,9 @@ Offline fixture must expose muxed 360p, separate 720p/1080p video and audio. Rea
 Reuse build-candidate.ps1 and candidate manifest. Runtime input is the existing deployed directory under E:/Util/ytdlp-korean-interface-v2.19.1-karon.1-win-x64 (2)/ytdlp-korean-interface-v2.19.1-karon.1-win-x64. Use v2.19.1-karon.2 as the next candidate tag only after confirming it is unused. Keep app baseline version semantics if required by upstream updater; display downstream release identity without enabling upstream overwrite.
 
 Review source independently, repair blockers, make scoped commits, build a clean exact commit, validate the packaged bytes with fresh and legacy settings, preserve previous release. Record engine/runtime versions and hashes. Read remote main SHA again immediately before non-force HEAD:refs/heads/main and compare after. Publish only a reviewed and tested ZIP; if required validation is unavailable, retain candidate and report the exact remaining gate, not success.
+
+## Controller clarification: public-release GUI acceptance
+
+The full user-approved plan requires Korean and English at 100, 150, and 200 percent scaling. All six combinations remain required for public release. Earlier abbreviated wording about tooling availability does not waive these checks. An unavailable check must stay pending or blocked, never PASS. Local implementation/build artifacts can be retained without publishing them.
+
+Independent source, shipping-privacy, and third-party-license reviews may be represented by actual review procedures and hash-bound reports. They must not be disguised as process executions. Executable/media tests still require actual process results.
