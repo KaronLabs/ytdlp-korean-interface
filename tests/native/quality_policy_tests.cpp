@@ -75,12 +75,20 @@ void test_policy()
     p = {};
     expect(has(dp::arguments(p, "v1080+audio"), "v1080+audio")
            && !has(dp::arguments(p, "v1080+audio"), "bv*+ba/b"), "pin replaces selector without fallback");
-    for(const auto& id : {"best", "b", "ba", "bv", "all", "mergeall", "w", "wa", "wv", "worstvideo", "worstaudio", "v1080/best", "v1080,720",
+    for(const auto& id : {"best", "b", "ba", "bv", "all", "mergeall", "w", "wa", "wv", "worstvideo", "worstaudio",
+                         "best.2", "bv.2", "ba.2", "worst.2", "wv.2", "wa.2", "bestvideo.2", "worstaudio.2",
+                         "mp4", "webm", "m4a", "mp3", "v1080+ba", "bv+audio", "v1080/best", "v1080,720",
                          "v1080[height<=1080]", "v1080;echo", "v1080\"", "v1080+", "+audio", "v1080++audio"})
     {
         bool threw = false;
         try { dp::arguments(p, id); } catch(const std::invalid_argument&) { threw = true; }
         expect(threw, std::string("reject nonliteral pin: ") + id);
+    }
+    for(const auto& id : {"137+140", "v1080+audio", "h264.1+audio.en", "dash-video_1080+audio", "22", "0"})
+    {
+        bool accepted = false;
+        try { accepted = has(dp::arguments(p, id), id); } catch(const std::invalid_argument&) {}
+        expect(accepted, std::string("preserve literal format IDs: ") + id);
     }
 }
 
