@@ -8,6 +8,7 @@ void GUI::fm_formats()
 	using ::widgets::theme;
 	auto url {qurl};
 	auto &bottom {bottoms.at(url)};
+	if(bottom.started || bottom.info_thread.joinable() || bottom.info_thread_active) return;
 	auto &vidinfo {bottom.is_scplaylist ? bottom.playlist_info["entries"][0] : bottom.vidinfo};
 
 	themed_form fm {nullptr, *this, {}, appear::decorate<appear::minimize, appear::sizable>{}};
@@ -44,7 +45,7 @@ void GUI::fm_formats()
 	::widgets::Separator sep1 {fm}, sep2 {fm};
 	::widgets::cbox cb_streams {fm, i18n::tr("formats.multistream", "Select multiple audio formats to merge into .mkv file as audio tracks (this passes --audio-multistreams to yt-dlp)")};
 	::widgets::Listbox list {fm, nullptr, true};
-	::widgets::Button btnok {fm, i18n::tr("formats.use_selected", "Use the selected format(s)")}, btncancel {fm, i18n::tr("formats.use_default", "Let yt-dlp choose the best formats (default)")};
+	::widgets::Button btnok {fm, i18n::tr("formats.use_selected", "Use the selected format(s)")}, btncancel {fm, i18n::tr("quality.automatic", "Automatic / recommended quality")};
 	const auto no_category {static_cast<size_t>(-1)};
 	size_t audio_category {1}, video_category {2};
 
@@ -215,6 +216,8 @@ void GUI::fm_formats()
 			lbq.item_from_value(url).text(7, filesize);
 		}
 		bottom.use_strfmt = false;
+		if(!bottom.is_playlist() && !bottom.is_ytchan && !bottom.is_bcchan && !bottom.live_scheduled && !download_policy::detail::boundary(bottom.vidinfo))
+			set_quality_policy({});
 		fm.close();
 	});
 
@@ -347,7 +350,13 @@ void GUI::fm_formats()
 			}
 		}
 
+		bottom.policy.mode_value = download_policy::mode::advanced;
+		conf.download = bottom.policy;
+		++bottom.policy_generation;
+		bottom.policy_refresh_pending = false;
+		bottom.preview = {};
 		bottom.use_strfmt = true;
+		quality_ui();
 		if(bottom.using_custom_fmt())
 		{
 			::widgets::msgbox mbox {fm, i18n::tr("formats.conflict_title", "Warning: conflicting -f arguments")};
@@ -389,6 +398,7 @@ void GUI::fm_formats()
 	}
 
 	l_title.caption(title);
+	list.at(0).text(i18n::tr("quality.video_audio", "Video + audio"));
 	list.append({i18n::tr("formats.audio_only", "Audio only"), i18n::tr("formats.video_only", "Video only")});
 
 	int dur {0};

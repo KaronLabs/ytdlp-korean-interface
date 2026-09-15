@@ -607,6 +607,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 					{
 						item.text(3, queue_status_skipped_label());
 						item.value<lbqval_t>().state = queue_item_state::skipped;
+						bottoms.at(item.value<lbqval_t>().url).policy_start_pending = false;
 					}
 					else
 					{
@@ -653,6 +654,15 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 				{
 					m.append(i18n::tr("queue.stop_all", "Stop all"), [&](menu::item_proxy)
 					{
+						autostart_next_item = false;
+						for(auto row : lbq.at(item.pos().cat))
+						{
+							auto& bottom {bottoms.at(row.value<lbqval_t>().url)};
+							if(!download_policy::is_basic(bottom.policy)) continue;
+							if(bottom.policy_start_pending.exchange(false)) bottom.policy_stop_requested = true;
+							bottom.policy_advance_after_cancel = false;
+							if(bottom.policy_download_active) process_basic_item(bottom);
+						}
 						thr_menu_start_stop = std::thread([&]
 						{
 							menu_working = true;
@@ -661,6 +671,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 							{
 								if(!menu_working) break;
 								auto url {item.value<lbqval_t>().url};
+								if(download_policy::is_basic(bottoms.at(url).policy)) continue;
 								//on_btn_dl(url);
 								process_queue_item(url);
 							}
@@ -711,6 +722,14 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 
 			m.append(cmdtext, [startables, stoppables, this](menu::item_proxy)
 			{
+				autostart_next_item = false;
+				for(const auto& url : stoppables)
+				{
+					auto& bottom {bottoms.at(url)};
+					if(!download_policy::is_basic(bottom.policy)) continue;
+					bottom.policy_advance_after_cancel = false;
+					if(bottom.policy_download_active) process_basic_item(bottom);
+				}
 				thr_menu_start_stop = std::thread([this, startables, stoppables]
 				{
 					menu_working = true;
@@ -718,6 +737,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 					for(auto url : stoppables)
 					{
 						if(!menu_working) break;
+						if(download_policy::is_basic(bottoms.at(url).policy)) continue;
 						process_queue_item(url);
 					}
 					for(auto url : startables)
@@ -770,6 +790,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 					{
 						item.text(3, check ? queue_status_skipped_label() : queue_status_queued_label());
 						item.value<lbqval_t>().state = check ? queue_item_state::skipped : queue_item_state::queued;
+						if(check) bottoms.at(item.value<lbqval_t>().url).policy_start_pending = false;
 						item.check(check);
 					}
 					lbq.refresh_theme();
@@ -787,6 +808,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 						{
 							item.text(3, queue_status_skipped_label());
 							item.value<lbqval_t>().state = queue_item_state::skipped;
+							bottoms.at(item.value<lbqval_t>().url).policy_start_pending = false;
 							item.check(true);
 						}
 						lbq.refresh_theme();
@@ -817,6 +839,7 @@ std::wstring GUI::queue_pop_menu(int x, int y)
 						{
 							item.text(3, queue_status_skipped_label());
 							item.value<lbqval_t>().state = queue_item_state::skipped;
+							bottoms.at(item.value<lbqval_t>().url).policy_start_pending = false;
 							item.check(true);
 						}
 						for(auto item : skippers)
@@ -1140,6 +1163,7 @@ bool GUI::queue_save()
 	{
 		conf.unfinished_queue_items.clear();
 		conf.unfinished_queue_states.clear();
+		conf.queue_download_policies = nlohmann::json::object();
 		for(size_t cat {0}; cat < lbq.size_categ(); cat++)
 		{
 			auto icat {lbq.at(cat)};
@@ -1150,9 +1174,11 @@ bool GUI::queue_save()
 				for(auto item : icat)
 				{
 					const auto state {item.value<lbqval_t>().state};
-					if(state != queue_item_state::done && (state != queue_item_state::error || conf.cb_save_errors))
+					if(state != queue_item_state::done && (state != queue_item_state::error || conf.cb_save_errors || download_policy::is_basic(bottoms.at(item.value<lbqval_t>().url).policy)))
 					{
-						qitems.push_back(nana::to_utf8(item.value<lbqval_t>().url));
+						const auto policy_url {nana::to_utf8(item.value<lbqval_t>().url)};
+						conf.queue_download_policies[policy_url] = bottoms.at(policy_url).policy_to_json();
+						qitems.push_back(policy_url);
 						qstates.push_back(state);
 					}
 				}
@@ -1166,6 +1192,14 @@ bool GUI::queue_save()
 
 void GUI::queue_save_data(size_t max_qitems_to_process)
 {
+	conf.queue_download_policies = nlohmann::json::object();
+	for(size_t category {0}; category < lbq.size_categ(); ++category)
+		for(auto item : lbq.at(category))
+			if(item.value<lbqval_t>().state != queue_item_state::done)
+			{
+				const auto key {nana::to_utf8(item.value<lbqval_t>().url)};
+				conf.queue_download_policies[key] = bottoms.at(key).policy_to_json();
+			}
 	conf.unfinished_queue_items.clear();
 	conf.unfinished_queue_states.clear();
 	unfinished_qitems_data.clear();
@@ -1178,7 +1212,7 @@ void GUI::queue_save_data(size_t max_qitems_to_process)
 			for(auto item : icat)
 			{
 				const auto state {item.value<lbqval_t>().state};
-				if(state != queue_item_state::done && (state != queue_item_state::error || conf.cb_save_errors))
+				if(state != queue_item_state::done && (state != queue_item_state::error || conf.cb_save_errors || download_policy::is_basic(bottoms.at(item.value<lbqval_t>().url).policy)))
 				{
 					auto &bot {bottoms.at(item.value<lbqval_t>())};
 					if(!bot.vidinfo.empty() || !bot.playlist_info.empty())
@@ -1201,7 +1235,7 @@ void GUI::queue_save_data(size_t max_qitems_to_process)
 				for(auto item : icat)
 				{
 					const auto state {item.value<lbqval_t>().state};
-					if(state != queue_item_state::done && (state != queue_item_state::error || conf.cb_save_errors))
+					if(state != queue_item_state::done && (state != queue_item_state::error || conf.cb_save_errors || download_policy::is_basic(bottoms.at(item.value<lbqval_t>().url).policy)))
 					{
 						const auto wurl {item.value<lbqval_t>().url};
 						const auto url {nana::to_utf8(wurl)};

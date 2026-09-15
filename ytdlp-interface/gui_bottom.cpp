@@ -27,6 +27,8 @@ void GUI::show_btnfmt(bool show)
 
 fs::path GUI::gui_bottom::file_path()
 {
+	if(download_policy::is_basic(policy))
+		return !printed_path.empty() && fs::exists(printed_path) ? printed_path : fs::path{};
 	if(!printed_path.empty())
 	{
 		if(printed_path.extension().string() != "NA")
@@ -158,6 +160,8 @@ GUI::gui_bottom::gui_bottom(GUI &gui)
 
 	auto &conf {GUI::conf};
 	pgui = &gui;
+	policy = conf.download;
+	capture_policy_settings();
 
 	auto prevbot {gui.bottoms.back()};
 	if(prevbot)
@@ -297,6 +301,7 @@ bool GUI::gui_bottom::vidinfo_contains(std::string key)
 void GUI::gui_bottom::from_json(const nlohmann::json &j)
 {
 	using nana::to_wstring;
+	const auto key {nana::to_utf8(url)};
 
 	if(j.contains("vidinfo"))
 	{
@@ -374,12 +379,22 @@ void GUI::gui_bottom::from_json(const nlohmann::json &j)
 		prog_amount = j["prog_amount"];
 		progval_shadow = j["progval_shadow"];
 	}
+	// The metadata-independent snapshot is authoritative over an older metadata cache.
+	policy_from_json(conf.queue_download_policies.contains(key) ? conf.queue_download_policies[key] : j);
+	if(download_policy::is_basic(policy) && !vidinfo.empty())
+	{
+		std::lock_guard lock(policy_mutex);
+		preview = download_policy::inspect_selected(vidinfo, policy);
+		preview_generation = policy_generation.load();
+		policy_ui_dirty = true;
+	}
 }
 
 
 void GUI::gui_bottom::to_json(nlohmann::json &j)
 {
 	using namespace nana;
+	j.update(policy_to_json());
 	if(!vidinfo.empty())
 		j["vidinfo"] = vidinfo;
 	if(!playlist_info.empty())

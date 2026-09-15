@@ -134,6 +134,7 @@ void GUI::gui_bottoms::show(std::wstring key)
 	if(!conf.common_dl_options && gui->lbq.item_count() > 1)
 		gui->show_btncopy(true);
 	gui->btndl.caption(bot.started ? gui->stop_download_label : gui->start_download_label);
+	gui->quality_ui();
 }
 
 
@@ -181,6 +182,7 @@ void GUI::gui_bottoms::propagate_cb_options(const gui_bottom &srcbot)
 		auto &bot {*pbot.second};
 		if(&bot != &srcbot)
 		{
+			if(bot.started || download_policy::is_basic(bot.policy)) continue;
 			bot.cbargs = srcbot.cbargs;
 			bot.cbkeyframes = srcbot.cbkeyframes;
 			bot.cbmp3 = srcbot.cbmp3;
@@ -199,6 +201,7 @@ void GUI::gui_bottoms::propagate_args_options(const gui_bottom &srcbot)
 		auto &bot {*pbot.second};
 		if(&bot != &srcbot)
 		{
+			if(bot.started || download_policy::is_basic(bot.policy)) continue;
 			bot.argset = srcbot.argset;
 		}
 	}
@@ -212,6 +215,7 @@ void GUI::gui_bottoms::propagate_misc_options(const gui_bottom &srcbot)
 		auto &bot {*pbot.second};
 		if(&bot != &srcbot)
 		{
+			if(bot.started || download_policy::is_basic(bot.policy)) continue;
 			bot.com_chap = srcbot.com_chap;
 			bot.rate = srcbot.rate;
 			bot.ratelim_unit = srcbot.ratelim_unit;

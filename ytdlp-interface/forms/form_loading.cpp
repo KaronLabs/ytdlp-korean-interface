@@ -55,7 +55,8 @@ void GUI::fm_loading(bool saving)
 					{
 						auto text {item.text(3)};
 						const auto state {item.value<lbqval_t>().state};
-						if(state != queue_item_state::done && (state != queue_item_state::error || conf.cb_save_errors))
+if(state != queue_item_state::done && (state != queue_item_state::error || conf.cb_save_errors ||
+							download_policy::is_basic(bottoms.at(item.value<lbqval_t>().url).policy)))
 						{
 							const auto wurl {item.value<lbqval_t>().url};
 							const auto url {to_utf8(wurl)};

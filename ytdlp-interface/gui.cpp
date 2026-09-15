@@ -150,6 +150,7 @@ GUI::GUI() : themed_form {std::bind(&GUI::apply_theme, this, std::placeholders::
 	tqueue.interval(std::chrono::milliseconds {350});
 	tqueue.elapse([this]
 	{
+		quality_tick();
 		if(conf.cb_clear_done)
 		{
 			std::vector<std::wstring> completed;
@@ -336,6 +337,8 @@ bool GUI::process_queue_item(std::wstring url)
 	auto &tbpipe_overlay {overlay};
 	auto &working {bottom.working};
 	auto &graceful_exit {bottom.graceful_exit};
+	if(bottom.policy_download_active || download_policy::is_basic(bottom.policy))
+		return process_basic_item(bottom);
 
 	if(!bottom.started)
 	{
@@ -1040,22 +1043,10 @@ bool GUI::process_queue_item(std::wstring url)
 				if(qurl == url)
 					btndl.caption(start_download_label);
 				bottom.started = false;
-				if(!start_next_urls(url)) // if no more urls are startable
-				{
-					if(pwr_shutdown || pwr_hibernate || pwr_sleep)
-					{
-						auto items_currently_downloading {0};
-						for(const auto &bottom : bottoms)
-							if(bottom.second->started)
-								items_currently_downloading++;
-						if(!items_currently_downloading)
-							start_suspend_fm = true;
-					}
-				}
+				start_next_urls(url);
 				if(working && bottom.dl_thread.joinable())
 					bottom.dl_thread.detach();
-				if(close_when_finished)
-					close();
+				queue_completion_pending = true;
 			}
 		});
 		return true; // started
@@ -1126,6 +1117,18 @@ bool GUI::process_queue_item(std::wstring url)
 void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 {
 	using namespace nana;
+	if(refresh && bottoms.contains(url))
+	{
+		auto &existing {bottoms.at(url)};
+		if(existing.started) return;
+		if(existing.info_thread.joinable() || existing.info_thread_active)
+		{
+			++existing.policy_generation;
+			{ std::lock_guard lock(existing.policy_mutex); existing.preview = {}; }
+			existing.policy_refresh_pending = true;
+			return;
+		}
+	}
 
 	auto item {lbq.item_from_value(url)};
 
@@ -1152,15 +1155,24 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 			bottom.vidinfo.clear();
 			bottom.playlist_info.clear();
 			bottom.live_scheduled = false;
+			{ std::lock_guard lock(bottom.policy_mutex); bottom.preview = {}; }
 		}
 
+		if(download_policy::is_basic(bottom.policy) && (bottom.is_playlist() || bottom.is_ytchan || bottom.is_bcchan || bottom.is_yttab))
+		{
+			bottom.policy.mode_value = download_policy::mode::advanced;
+			bottom.policy_notice = i18n::tr("quality.boundary", "Playlist/live input uses Advanced mode. Basic quality presets do not apply.");
+		}
 		bottom.working_info = true;
+		const auto generation {++bottom.policy_generation};
+		const bool basic_info {download_policy::is_basic(bottom.policy)};
+		bottom.policy_info_basic = basic_info && (refresh || !unfinished_qitems_data.contains(to_utf8(url)));
 
-		bottom.info_thread = std::thread([&, url, refresh, saveq]
+		bottom.info_thread = std::thread([&, url, refresh, saveq, generation, basic_info]
 		{
 			total_info_threads++;
 			bottom.info_thread_id = GetCurrentThreadId();
-			const bool has_data {!unfinished_qitems_data.empty() && unfinished_qitems_data.contains(to_utf8(url))};
+			const bool has_data {!refresh && !unfinished_qitems_data.empty() && unfinished_qitems_data.contains(to_utf8(url))};
 
 			while(active_info_threads >= (has_data ? number_of_processors : conf.max_data_threads))
 			{
@@ -1173,6 +1185,15 @@ void GUI::add_url(std::wstring url, bool refresh, bool saveq, const size_t cat)
 			}
 			active_info_threads++;
 			bottom.info_thread_active = true;
+			if(basic_info && !has_data)
+			{
+				quality_analyze(bottom, generation);
+				--active_info_threads;
+				--total_info_threads;
+				bottom.info_thread_active = false;
+				bottom.policy_info_finished = true;
+				return;
+			}
 
 			auto favicon_url {lbq.favicon_url_from_value(url)};
 			if(!favicon_url.empty())
@@ -1989,7 +2010,7 @@ void GUI::show_queue(bool freeze_redraw)
 	if(freeze_redraw)
 		SendMessage(hwnd, WM_SETREDRAW, FALSE, 0);
 	const auto px {nana::API::screen_dpi(true) >= 144};
-	change_field_attr("Bottom", "weight", 298 - 240 * expcol.collapsed() - px);
+	change_field_attr("Bottom", "weight", 378 - 240 * expcol.collapsed() - px);
 	auto &plc {get_place()};
 		btnq.caption(show_output_label);
 	plc.field_display("prog", false);
@@ -2008,7 +2029,7 @@ void GUI::show_queue(bool freeze_redraw)
 void GUI::show_output()
 {
 	SendMessage(hwnd, WM_SETREDRAW, FALSE, 0);
-	change_field_attr("Bottom", "weight", 325 - 240 * expcol.collapsed());
+	change_field_attr("Bottom", "weight", 405 - 240 * expcol.collapsed());
 		btnq.caption(i18n::tr("main.show_queue", "Show queue"));
 	auto &curbot {bottoms.current()};
 	auto &plc {get_place()};
@@ -2495,7 +2516,7 @@ unsigned GUI::start_next_urls(std::wstring current_url)
 			{
 				for(auto &item : lbq.at(cat))
 				{
-					if(item == current_item)
+					if(item == current_item || item.checked() || bottoms.at(item.value<lbqval_t>().url).policy_stop_requested)
 						continue;
 					const auto state {item.value<lbqval_t>().state};
 					if(state == queue_item_state::queued || state == queue_item_state::stopped ||
@@ -2520,7 +2541,10 @@ unsigned GUI::start_next_urls(std::wstring current_url)
 			if(items_currently_downloading < conf.max_concurrent_downloads)
 				for(auto &pos : preceding_startables)
 				{
-					process_queue_item(lbq.at(pos).value<lbqval_t>());
+					auto candidate {lbq.at(pos)};
+					if(candidate.checked() || candidate.value<lbqval_t>().state == queue_item_state::skipped ||
+						bottoms.at(candidate.value<lbqval_t>().url).policy_stop_requested) continue;
+					process_queue_item(candidate.value<lbqval_t>());
 					urls_started++;
 					if(++items_currently_downloading >= conf.max_concurrent_downloads)
 						break;

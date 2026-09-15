@@ -109,9 +109,10 @@ std::vector<HWND> util::hwnds_from_pid(DWORD pid)
 std::string util::run_piped_process
 (
 	std::wstring cmd, std::atomic_bool *working, append_callback cbappend, progress_callback cbprog, 
-	std::atomic_bool *graceful_exit, std::string suppress
+	std::atomic_bool *graceful_exit, std::string suppress, DWORD *exit_status
 )
 {
+	if(exit_status) *exit_status = static_cast<DWORD>(-1);
 	const std::string strtid {"[tid " + (std::stringstream {} << std::hex << std::this_thread::get_id()).str() + "]"};
 	std::wstring modpath(4096, '\0');
 	modpath.resize(GetModuleFileNameW(0, &modpath.front(), modpath.size()));
@@ -354,6 +355,7 @@ std::string util::run_piped_process
 		}
 	}
 
+	if(exit_status) GetExitCodeProcess(pi.hProcess, exit_status);
 	CloseHandle(hPipeWrite);
 	CloseHandle(hPipeRead);
 	CloseHandle(pi.hProcess);

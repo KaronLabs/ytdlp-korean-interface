@@ -212,6 +212,7 @@
     <ClCompile Include="forms\form_subs.cpp" />
     <ClCompile Include="forms\form_suspend.cpp" />
     <ClCompile Include="gui.cpp" />
+    <ClCompile Include="gui_quality.cpp" />
     <ClCompile Include="gui_bottom.cpp" />
     <ClCompile Include="gui_bottoms.cpp" />
     <ClCompile Include="gui_make.cpp" />
@@ -231,6 +232,7 @@
   <ItemGroup>
     <ClInclude Include="forms\form_colors.hpp" />
     <ClInclude Include="gui.hpp" />
+    <ClInclude Include="download_policy.hpp" />
     <ClInclude Include="hsl_picker.hpp" />
 	<ClInclude Include="i18n.hpp" />
 	<ClInclude Include="settings_json.hpp" />

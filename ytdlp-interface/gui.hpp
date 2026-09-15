@@ -55,6 +55,7 @@ private:
 	std::string inet_error, url_latest_ffmpeg, url_latest_ytdlp, url_latest_deno, url_latest_ytdlp_relnotes, url_latest_deno_relnotes;
 	std::wstring drop_cliptext_temp, lbq_url_to_select, lbq_erase_url_to_select;
 	std::atomic_int active_info_threads {0}, total_info_threads {0};
+	std::atomic_bool queue_completion_pending {false};
 	std::wstringstream multiple_url_text;
 	long minw {0}, minh {0}; // min frame size
 	unsigned size_latest_ffmpeg {0}, size_latest_ytdlp {0}, size_latest_deno {0}, number_of_processors {4};
@@ -66,7 +67,7 @@ private:
 		thr_qitem_data, thr_queue_remove, thr_ver_deno, thr_releases_deno, thr_updater_deno;
 	ITaskbarList3 *i_taskbar {nullptr};
 	UINT WM_TASKBAR_BUTTON_CREATED {0};
-	const std::string ver_tag {"v2.19.1"}, title {"ytdlp-interface " + ver_tag/*.substr(0, 5)*/};
+	const std::string ver_tag {"v2.19.1"}, title {"ytdlp-interface " + ver_tag + "-karon.2"};
 	const unsigned MINW {900}, MINH {700}; // min client area size
 	nana::drawerbase::listbox::item_proxy *last_selected {nullptr};
 	nana::timer tmsg, tqueue, t_load_qitem_data, t_url_flash;
@@ -106,10 +107,25 @@ private:
 	public:
 		gui_bottom(GUI &gui);
 
-		bool is_ytlink {false}, use_strfmt {false}, received_procmsg {false}, info_thread_active {false}, is_gen_playlist {false},
+		bool is_ytlink {false}, use_strfmt {false}, received_procmsg {false}, is_gen_playlist {false},
 			is_ytplaylist {false}, is_ytchan {false}, is_bcplaylist {false}, is_bclink {false}, is_bcchan {false}, is_yttab {false},
 			is_scplaylist {false}, live_scheduled {false}, cbtime {false}, cbthumb {false}, cbsubs {false}, cbkeyframes {false}, cbmp3 {false}, cbargs {false};
 
+		download_policy::policy policy;
+		settings_t policy_settings;
+		download_policy::inspection preview;
+		std::mutex policy_mutex;
+		std::atomic_uint64_t policy_generation {0};
+		std::uint64_t preview_generation {0};
+		std::atomic_bool info_thread_active {false}, policy_refresh_pending {false}, policy_ui_dirty {false},
+			policy_download_active {false}, policy_download_finished {false}, policy_blocked {false}, policy_route_advanced {false},
+			policy_info_basic {false}, policy_info_finished {false}, policy_start_pending {false},
+			policy_stop_requested {false}, policy_advance_after_cancel {true};
+		bool policy_success {false}, policy_cancelled {false};
+		std::string policy_notice, policy_stage, policy_command;
+		void capture_policy_settings();
+		nlohmann::json policy_to_json();
+		void policy_from_json(const nlohmann::json &j);
 		std::atomic_bool working {false}, graceful_exit {false}, working_info {true}, started {false};
 		fs::path outpath, outfile, merger_path, download_path, printed_path;
 		nlohmann::json vidinfo, playlist_info;
@@ -265,6 +281,18 @@ private:
 	widgets::cbox cbkeyframes {gpopt, i18n::tr("main.force_keyframes", "Force keyframes at cuts")}, cbmp3 {gpopt, i18n::tr("main.convert_mp3", "Convert audio to MP3")},
 		cbsubs {gpopt, i18n::tr("main.embed_subtitles", "Embed subtitles")}, cbthumb {gpopt, i18n::tr("main.embed_thumbnail", "Embed thumbnail")},
 		cbtime {gpopt, i18n::tr("main.no_mtime", "File modification time = time of writing")}, cbargs {gpopt, i18n::tr("main.custom_arguments", "Custom arguments:")};
+	widgets::Combox com_mode {*this}, com_quality {*this};
+	widgets::Label l_quality {*this, ""};
+	widgets::Button btn_recommended {*this, i18n::tr("quality.recommended", "Recommended settings")},
+		btn_analyze {*this, i18n::tr("quality.analyze", "Analyze")},
+		btn_policy_settings {*this, i18n::tr("quality.settings", "Tools / settings")};
+	bool policy_showing {false};
+	void set_quality_policy(download_policy::policy policy);
+	void quality_ui();
+	void quality_tick();
+	void queue_completion_actions();
+	void quality_analyze(gui_bottom &bottom, std::uint64_t generation);
+	bool process_basic_item(gui_bottom &bottom);
 	widgets::Separator separator {*this};
 	widgets::Expcol expcol {*this};
 
@@ -401,6 +429,10 @@ private:
 				for(size_t item {0}; item < el.second.size(); item++)
 				{
 					auto &url {el.second[item]};
+					auto &restored {bottoms.add(nana::to_wstring(url))};
+					if(conf.queue_download_policies.contains(url))
+						restored.policy_from_json(conf.queue_download_policies[url]);
+					else restored.policy = download_policy::deserialize(nullptr);
 					add_url(nana::to_wstring(url), false, false, cat);
 					lbq.at(cat).back().value<lbqval_t>().state = saved_category < conf.unfinished_queue_states.size() &&
 						item < conf.unfinished_queue_states[saved_category].size() ? conf.unfinished_queue_states[saved_category][item] : queue_item_state::queued;

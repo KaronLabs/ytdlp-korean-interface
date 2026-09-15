@@ -11,7 +11,10 @@ void GUI::make_form()
 	queue_make_listbox();
 
 	div(R"(vert margin=20 <Top> <weight=20>
-			<Bottom weight=325 vert
+			<Bottom weight=405 vert
+				<weight=30 <com_mode weight=185> <weight=10> <com_quality weight=130> <weight=10>
+					<btn_recommended> <weight=10> <btn_analyze weight=100> <weight=10> <btn_policy_settings weight=145>>
+				<l_quality weight=50>
 				<prog weight=30> 
 				<separator weight=3>
 				<weight=20 <> <expcol weight=20>>
@@ -312,6 +315,47 @@ void GUI::make_form_bottom()
 	auto &plc {get_place()};
 
 	btndl.enabled(false);
+	plc["com_mode"] << com_mode;
+	plc["com_quality"] << com_quality;
+	plc["btn_recommended"] << btn_recommended;
+	plc["btn_analyze"] << btn_analyze;
+	plc["btn_policy_settings"] << btn_policy_settings;
+	plc["l_quality"] << l_quality;
+	com_mode.editable(false);
+	com_quality.editable(false);
+	com_mode.push_back(i18n::tr("quality.video", "Video (basic)"));
+	com_mode.push_back(i18n::tr("quality.audio", "Audio (MP3)"));
+	com_mode.push_back(i18n::tr("quality.advanced", "Advanced"));
+	com_quality.push_back(i18n::tr("quality.p1080", "Up to 1080p"));
+	com_quality.push_back(i18n::tr("quality.p720", "Up to 720p"));
+	com_quality.push_back(i18n::tr("quality.best", "Best available"));
+	com_mode.events().selected([this] {
+		if(policy_showing) return;
+		auto p {bottoms.current().policy};
+		p.mode_value = com_mode.option() == 0 ? download_policy::mode::basic_video :
+			com_mode.option() == 1 ? download_policy::mode::basic_audio : download_policy::mode::advanced;
+		set_quality_policy(p);
+	});
+	com_quality.events().selected([this] {
+		if(policy_showing) return;
+		auto p {bottoms.current().policy};
+		p.quality_value = com_quality.option() == 0 ? download_policy::quality::p1080 :
+			com_quality.option() == 1 ? download_policy::quality::p720 : download_policy::quality::best;
+		set_quality_policy(p);
+	});
+	btn_recommended.events().click([this] { set_quality_policy({}); });
+	btn_analyze.events().click([this] {
+		auto &bot {bottoms.current()};
+		if(bot.started || bot.url.empty()) return;
+		bot.policy_blocked = false;
+		{ std::lock_guard lock(bot.policy_mutex); bot.preview = {}; bot.policy_notice.clear(); }
+		add_url(bot.url, true);
+	});
+	btn_policy_settings.events().click([this] {
+		fm_settings();
+		auto &bot {bottoms.current()};
+		if(!bot.started && download_policy::is_basic(bot.policy)) set_quality_policy(bot.policy);
+	});
 	plc["prog"] << prog;
 	plc["separator"] << separator;
 	plc["expcol"] << expcol;
@@ -573,7 +617,7 @@ void GUI::make_form_bottom()
 		auto wdsz {api::window_size(*this)};
 		const auto px {(nana::API::screen_dpi(true) >= 144) * queue_panel.visible()};
 		auto &plc {get_place()};
-		change_field_attr(plc, "Bottom", "weight", 325 - 240 * expcol.collapsed() - 27 * queue_panel.visible() - px);
+		change_field_attr(plc, "Bottom", "weight", 405 - 240 * expcol.collapsed() - 27 * queue_panel.visible() - px);
 		auto &bot {bottoms.current()};
 		if(expcol.collapsed())
 		{
@@ -813,6 +857,7 @@ void GUI::make_form_bottom()
 		}
 	});
 
+	quality_ui();
 	queue_panel.focus();
 	plc.collocate();
 }

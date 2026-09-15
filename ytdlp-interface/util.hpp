@@ -45,7 +45,7 @@ namespace util
 	HWND hwnd_from_pid(DWORD pid);
 	std::vector<HWND> hwnds_from_pid(DWORD pid);
 	std::string run_piped_process(std::wstring cmd, std::atomic_bool *working = nullptr, append_callback cbappend = nullptr,
-								  progress_callback cbprog = nullptr, std::atomic_bool *graceful_exit = nullptr, std::string suppress = "");
+								  progress_callback cbprog = nullptr, std::atomic_bool *graceful_exit = nullptr, std::string suppress = "", DWORD *exit_status = nullptr);
 	DWORD other_instance(std::wstring path = L"");
 	unsigned close_children(bool report_only = false);
 	std::wstring get_sys_folder(REFKNOWNFOLDERID rfid);
