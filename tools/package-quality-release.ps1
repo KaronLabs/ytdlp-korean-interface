@@ -276,10 +276,13 @@ function Get-KaronPackageCandidateEntries {
     }
 
     $manifestPath = $actual['candidate-manifest.json'].FullPath
-    $manifest = Read-KaronPackageJson -Path $manifestPath -ErrorId 'package_candidate_manifest_invalid'
+    $manifestDocument = ConvertFrom-KaronPackageJsonStrict ([IO.File]::ReadAllText($manifestPath, [Text.UTF8Encoding]::new($false, $true))) 'package_candidate_manifest_invalid'
+    $manifest = $manifestDocument.Value
     if ($manifest.schemaVersion -ne 1 -or -not (Test-KaronPackageProperty $manifest 'files')) {
         throw 'package_candidate_manifest_invalid'
     }
+    $applicationSourceCommit = Get-KaronPackageRawString (Get-KaronPackageRawProperty $manifestDocument.Raw 'applicationSourceCommit' 'package_candidate_manifest_invalid') 'package_candidate_manifest_invalid'
+    if ($applicationSourceCommit -notmatch '^[a-fA-F0-9]{40}$') { throw 'package_candidate_manifest_invalid' }
     $manifestFiles = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($entry in @($manifest.files)) {
         $relative = [string]$entry.path
@@ -844,118 +847,33 @@ function Get-KaronPackageGitBlobSha1 {
     finally { $algorithm.Dispose() }
 }
 
-function Resolve-KaronPackageJsonSchemaReference {
-    param([Text.Json.JsonElement] $Root, [string] $Reference, [string] $ErrorId)
-    if (-not $Reference.StartsWith('#/$defs/', [StringComparison]::Ordinal)) { throw $ErrorId }
-    $name = $Reference.Substring(8)
-    if ([string]::IsNullOrWhiteSpace($name) -or $name.Contains('/')) { throw $ErrorId }
-    $definitions = Get-KaronPackageRawProperty $Root '$defs' $ErrorId
-    Get-KaronPackageRawProperty $definitions $name $ErrorId
-}
-
-function Assert-KaronPackageJsonSchemaClosedObjects {
-    param([Text.Json.JsonElement] $Schema, [string] $ErrorId)
-    if ($Schema.ValueKind -eq [Text.Json.JsonValueKind]::Array) {
-        foreach ($item in $Schema.EnumerateArray()) { Assert-KaronPackageJsonSchemaClosedObjects $item $ErrorId }
-        return
-    }
-    if ($Schema.ValueKind -ne [Text.Json.JsonValueKind]::Object) { return }
-    if (Test-KaronPackageRawProperty $Schema 'type') {
-        $type = Get-KaronPackageRawProperty $Schema 'type' $ErrorId
-        if ($type.ValueKind -eq [Text.Json.JsonValueKind]::String -and $type.GetString() -ceq 'object') {
-            $additional = Get-KaronPackageRawProperty $Schema 'additionalProperties' $ErrorId
-            if ($additional.ValueKind -ne [Text.Json.JsonValueKind]::False) { throw $ErrorId }
-        }
-    }
-    foreach ($property in $Schema.EnumerateObject()) { Assert-KaronPackageJsonSchemaClosedObjects $property.Value $ErrorId }
-}
-
-function Assert-KaronPackageJsonSchemaValue {
+function Get-KaronPackageApplicationProvenance {
     param(
-        [Text.Json.JsonElement] $Value,
-        [Text.Json.JsonElement] $Schema,
-        [Text.Json.JsonElement] $Root,
-        [string] $ErrorId
+        [Parameter(Mandatory)] [object] $Lock,
+        [Parameter(Mandatory)] [Collections.Generic.Dictionary[string, object]] $CandidateEntries,
+        [Parameter(Mandatory)] [string] $RepositoryRoot,
+        [Parameter(Mandatory)] [string] $PackagingCommit
     )
-    if (Test-KaronPackageRawProperty $Schema '$ref') {
-        $reference = Get-KaronPackageRawString (Get-KaronPackageRawProperty $Schema '$ref' $ErrorId) $ErrorId
-        Assert-KaronPackageJsonSchemaValue $Value (Resolve-KaronPackageJsonSchemaReference $Root $reference $ErrorId) $Root $ErrorId
-        return
-    }
-    if (Test-KaronPackageRawProperty $Schema 'oneOf') {
-        $matches = 0
-        foreach ($option in Get-KaronPackageRawArray (Get-KaronPackageRawProperty $Schema 'oneOf' $ErrorId) $ErrorId) {
-            try { Assert-KaronPackageJsonSchemaValue $Value $option $Root $ErrorId; $matches++ } catch {}
-        }
-        if ($matches -ne 1) { throw $ErrorId }
-        return
-    }
-    $type = Get-KaronPackageRawString (Get-KaronPackageRawProperty $Schema 'type' $ErrorId) $ErrorId
-    $integer = 0L
-    $typeMatches = switch ($type) {
-        'object' { $Value.ValueKind -eq [Text.Json.JsonValueKind]::Object }
-        'array' { $Value.ValueKind -eq [Text.Json.JsonValueKind]::Array }
-        'string' { $Value.ValueKind -eq [Text.Json.JsonValueKind]::String }
-        'integer' { $Value.ValueKind -eq [Text.Json.JsonValueKind]::Number -and $Value.TryGetInt64([ref]$integer) }
-        'boolean' { $Value.ValueKind -in @([Text.Json.JsonValueKind]::True, [Text.Json.JsonValueKind]::False) }
-        'null' { $Value.ValueKind -eq [Text.Json.JsonValueKind]::Null }
-        default { $false }
-    }
-    if (-not $typeMatches) { throw $ErrorId }
-    if (Test-KaronPackageRawProperty $Schema 'const') {
-        $constant = Get-KaronPackageRawProperty $Schema 'const' $ErrorId
-        if ($Value.GetRawText() -cne $constant.GetRawText()) { throw $ErrorId }
-    }
-    if (Test-KaronPackageRawProperty $Schema 'enum') {
-        $found = $false
-        foreach ($allowed in Get-KaronPackageRawArray (Get-KaronPackageRawProperty $Schema 'enum' $ErrorId) $ErrorId) {
-            if ($Value.GetRawText() -ceq $allowed.GetRawText()) { $found = $true; break }
-        }
-        if (-not $found) { throw $ErrorId }
-    }
-    if ($type -ceq 'object') {
-        $properties = Get-KaronPackageRawProperty $Schema 'properties' $ErrorId
-        $additional = Get-KaronPackageRawProperty $Schema 'additionalProperties' $ErrorId
-        if ($properties.ValueKind -ne [Text.Json.JsonValueKind]::Object -or $additional.ValueKind -ne [Text.Json.JsonValueKind]::False) { throw $ErrorId }
-        foreach ($required in Get-KaronPackageRawArray (Get-KaronPackageRawProperty $Schema 'required' $ErrorId) $ErrorId) {
-            $name = Get-KaronPackageRawString $required $ErrorId
-            if (-not (Test-KaronPackageRawProperty $Value $name)) { throw $ErrorId }
-        }
-        foreach ($property in $Value.EnumerateObject()) {
-            if (-not (Test-KaronPackageRawProperty $properties $property.Name)) { throw $ErrorId }
-            Assert-KaronPackageJsonSchemaValue $property.Value (Get-KaronPackageRawProperty $properties $property.Name $ErrorId) $Root $ErrorId
-        }
-    }
-    elseif ($type -ceq 'array') {
-        $items = @($Value.EnumerateArray())
-        if (Test-KaronPackageRawProperty $Schema 'minItems') {
-            if ($items.Count -lt (Get-KaronPackageRawInt64 (Get-KaronPackageRawProperty $Schema 'minItems' $ErrorId) $ErrorId)) { throw $ErrorId }
-        }
-        if (Test-KaronPackageRawProperty $Schema 'maxItems') {
-            if ($items.Count -gt (Get-KaronPackageRawInt64 (Get-KaronPackageRawProperty $Schema 'maxItems' $ErrorId) $ErrorId)) { throw $ErrorId }
-        }
-        if (Test-KaronPackageRawProperty $Schema 'uniqueItems') {
-            $unique = Get-KaronPackageRawBoolean (Get-KaronPackageRawProperty $Schema 'uniqueItems' $ErrorId) $ErrorId
-            if ($unique) {
-                $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-                foreach ($item in $items) { if (-not $seen.Add($item.GetRawText())) { throw $ErrorId } }
-            }
-        }
-        $itemSchema = Get-KaronPackageRawProperty $Schema 'items' $ErrorId
-        foreach ($item in $items) { Assert-KaronPackageJsonSchemaValue $item $itemSchema $Root $ErrorId }
-    }
-    elseif ($type -ceq 'string') {
-        $text = $Value.GetString()
-        if (Test-KaronPackageRawProperty $Schema 'minLength') {
-            if ($text.Length -lt (Get-KaronPackageRawInt64 (Get-KaronPackageRawProperty $Schema 'minLength' $ErrorId) $ErrorId)) { throw $ErrorId }
-        }
-        if (Test-KaronPackageRawProperty $Schema 'pattern') {
-            $pattern = Get-KaronPackageRawString (Get-KaronPackageRawProperty $Schema 'pattern' $ErrorId) $ErrorId
-            if ($text -cnotmatch $pattern) { throw $ErrorId }
-        }
-    }
-    elseif ($type -ceq 'integer' -and (Test-KaronPackageRawProperty $Schema 'minimum')) {
-        if ($integer -lt (Get-KaronPackageRawInt64 (Get-KaronPackageRawProperty $Schema 'minimum' $ErrorId) $ErrorId)) { throw $ErrorId }
+    $manifest = ConvertFrom-KaronPackageJsonStrict ([IO.File]::ReadAllText($CandidateEntries['candidate-manifest.json'].SourcePath, [Text.UTF8Encoding]::new($false, $true))) 'package_candidate_manifest_invalid'
+    $applicationSourceCommit = Get-KaronPackageRawString (Get-KaronPackageRawProperty $manifest.Raw 'applicationSourceCommit' 'package_candidate_manifest_invalid') 'package_candidate_manifest_invalid'
+    if ($applicationSourceCommit -notmatch '^[a-fA-F0-9]{40}$' -or $PackagingCommit -notmatch '^[a-fA-F0-9]{40}$') { throw 'package_application_source_invalid' }
+    $applicationSourceCommit = $applicationSourceCommit.ToLowerInvariant()
+    $packaging = $PackagingCommit.ToLowerInvariant()
+    $applicationComponents = @($Lock.components | Where-Object { [string]$_.id -ceq 'application' })
+    if ($applicationComponents.Count -ne 1) { throw 'package_application_source_invalid' }
+    $metadataCommit = ([string]$Lock.release.metadataPackage.sourceCommit).ToLowerInvariant()
+    $componentCommit = ([string]$applicationComponents[0].sourceCommit).ToLowerInvariant()
+    if ($metadataCommit -ceq $packaging -or $componentCommit -ceq $packaging -or $applicationSourceCommit -ceq $packaging) { throw 'package_provenance_self_reference' }
+    if ($metadataCommit -cne $applicationSourceCommit -or $componentCommit -cne $applicationSourceCommit) { throw 'package_application_source_mismatch' }
+    $resolved = @(& git -C $RepositoryRoot rev-parse --verify ($applicationSourceCommit + '^{commit}') 2>&1)
+    if ($LASTEXITCODE -ne 0 -or (($resolved | Out-String).Trim()).ToLowerInvariant() -cne $applicationSourceCommit) { throw 'package_application_source_object_invalid' }
+    $treeOutput = @(& git -C $RepositoryRoot rev-parse --verify ($applicationSourceCommit + '^{tree}') 2>&1)
+    $applicationSourceTree = (($treeOutput | Out-String).Trim()).ToLowerInvariant()
+    if ($LASTEXITCODE -ne 0 -or $applicationSourceTree -notmatch '^[a-f0-9]{40}$') { throw 'package_application_source_object_invalid' }
+    [pscustomobject]@{
+        ApplicationSourceCommit = $applicationSourceCommit
+        ApplicationSourceTree = $applicationSourceTree
+        PackagingCommit = $packaging
     }
 }
 
@@ -964,19 +882,15 @@ function Get-KaronPackageGuiSchemaContract {
     $record = Get-KaronPackageBoundRecord $Lock 'guiValidationSchema' 'path'
     if ($record.Name -cne $script:KaronPackageGuiSchemaRepositoryPath) { throw 'package_gui_schema_path_invalid' }
     $tracked = Get-KaronPackageTrackedFileRecord $RepositoryRoot $script:KaronPackageGuiSchemaRepositoryPath 'gui-validation-output.schema.json' 'package_gui_schema_untracked'
-    if ($tracked.length -ne $record.Length -or $tracked.sha256 -cne $record.Sha256) { throw 'package_gui_schema_lock_mismatch' }
+    if ($tracked.length -ne 11516L -or $tracked.sha256 -cne 'e49cc70253bd5dd4b4abd8ee00406f5dd8ed39434e309e3e3c74694b85c1b80e' -or
+        $tracked.length -ne $record.Length -or $tracked.sha256 -cne $record.Sha256) { throw 'package_gui_schema_lock_mismatch' }
     $document = ConvertFrom-KaronPackageJsonStrict ([IO.File]::ReadAllText($tracked.localPath, [Text.UTF8Encoding]::new($false, $true))) 'package_gui_schema_invalid'
     $root = $document.Raw
     if ((Get-KaronPackageRawString (Get-KaronPackageRawProperty $root '$schema' 'package_gui_schema_invalid') 'package_gui_schema_invalid') -cne 'https://json-schema.org/draft/2020-12/schema' -or
-        (Get-KaronPackageRawString (Get-KaronPackageRawProperty $root '$id' 'package_gui_schema_invalid') 'package_gui_schema_invalid') -cne 'https://github.com/KaronLabs/ytdlp-korean-interface/release/validation/v2.19.1-karon.2/gui-validation-output.schema.json') {
-        throw 'package_gui_schema_invalid'
+        (Get-KaronPackageRawString (Get-KaronPackageRawProperty $root '$id' 'package_gui_schema_invalid') 'package_gui_schema_invalid') -cne 'https://github.com/KaronLabs/ytdlp-korean-interface/blob/v2.19.1-karon.2/release/validation/v2.19.1-karon.2/gui-validation-output.schema.json') {
+        throw 'package_gui_schema_identity_invalid'
     }
-    $definitions = Get-KaronPackageRawProperty $root '$defs' 'package_gui_schema_invalid'
-    foreach ($name in @('fileRecord', 'candidate', 'summaryCase', 'evidenceFile', 'generatedProbe', 'representativeChecks', 'summary', 'manifest')) {
-        [void](Get-KaronPackageRawProperty $definitions $name 'package_gui_schema_invalid')
-    }
-    Assert-KaronPackageJsonSchemaClosedObjects $root 'package_gui_schema_not_closed'
-    [pscustomobject]@{ Root = $root; Definitions = $definitions; Tracked = $tracked }
+    [pscustomobject]@{ Root = $root; Tracked = $tracked }
 }
 
 function Assert-KaronPackageGuiCandidateRecord {
@@ -1007,8 +921,20 @@ function Assert-KaronPackageGuiContract {
     $schema = Get-KaronPackageGuiSchemaContract $Lock $RepositoryRoot
     $summary = ConvertFrom-KaronPackageJsonStrict ([IO.File]::ReadAllText($SummaryPath, [Text.UTF8Encoding]::new($false, $true))) 'package_gui_summary_invalid'
     $manifest = ConvertFrom-KaronPackageJsonStrict ([IO.File]::ReadAllText($ManifestPath, [Text.UTF8Encoding]::new($false, $true))) 'package_gui_manifest_invalid'
-    Assert-KaronPackageJsonSchemaValue $summary.Raw (Get-KaronPackageRawProperty $schema.Definitions 'summary' 'package_gui_schema_invalid') $schema.Root 'package_gui_summary_invalid'
-    Assert-KaronPackageJsonSchemaValue $manifest.Raw (Get-KaronPackageRawProperty $schema.Definitions 'manifest' 'package_gui_schema_invalid') $schema.Root 'package_gui_manifest_invalid'
+    try {
+        if (-not (Test-Json -LiteralPath $SummaryPath -SchemaFile $schema.Tracked.localPath -ErrorAction Stop)) { throw 'invalid' }
+    }
+    catch { throw 'package_gui_summary_schema_invalid' }
+    try {
+        if (-not (Test-Json -LiteralPath $ManifestPath -SchemaFile $schema.Tracked.localPath -ErrorAction Stop)) { throw 'invalid' }
+    }
+    catch { throw 'package_gui_manifest_schema_invalid' }
+    $guiRoot = Split-Path -Parent ([IO.Path]::GetFullPath($ManifestPath))
+    if ((Split-Path -Parent ([IO.Path]::GetFullPath($SummaryPath))) -cne $guiRoot) { throw 'package_gui_evidence_inventory_invalid' }
+    $actualGuiFiles = Get-KaronPackageSafeInventory $guiRoot 'package_gui_evidence'
+    $declaredGuiFiles = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
+    [void]$declaredGuiFiles.Add('gui-validation-summary.json', $true)
+    [void]$declaredGuiFiles.Add('gui-validation-evidence-manifest.json', $true)
     $summaryCandidate = Get-KaronPackageRawProperty $summary.Raw 'candidate' 'package_gui_summary_invalid'
     $manifestCandidate = Get-KaronPackageRawProperty $manifest.Raw 'candidate' 'package_gui_manifest_invalid'
     if ($summaryCandidate.GetRawText() -cne $manifestCandidate.GetRawText()) { throw 'package_gui_candidate_mismatch' }
@@ -1026,11 +952,15 @@ function Assert-KaronPackageGuiContract {
         Assert-KaronPackageRawExactKeys $file @('path', 'sha256', 'length') 'package_gui_manifest_invalid'
         $relative = Get-KaronPackageRawString (Get-KaronPackageRawProperty $file 'path' 'package_gui_manifest_invalid') 'package_gui_manifest_invalid'
         Assert-KaronPackageRelativePath $relative 'package_gui_manifest_invalid'
-        if ($evidence.ContainsKey($relative)) { throw 'package_gui_manifest_invalid' }
-        $evidence.Add($relative, [pscustomobject]@{
+        if (-not [string]::Equals($relative.Normalize([Text.NormalizationForm]::FormC), $relative, [StringComparison]::Ordinal) -or $evidence.ContainsKey($relative) -or
+            -not $declaredGuiFiles.TryAdd($relative, $true)) { throw 'package_gui_manifest_invalid' }
+        $record = [pscustomobject]@{
+            Name = $relative
             Sha256 = (Get-KaronPackageRawString (Get-KaronPackageRawProperty $file 'sha256' 'package_gui_manifest_invalid') 'package_gui_manifest_invalid').ToLowerInvariant()
             Length = Get-KaronPackageRawInt64 (Get-KaronPackageRawProperty $file 'length' 'package_gui_manifest_invalid') 'package_gui_manifest_invalid'
-        })
+        }
+        Assert-KaronPackageBoundFile $record (Get-KaronPackageChildPath $guiRoot $relative 'package_gui_evidence_invalid') $relative 'package_gui_evidence_mismatch'
+        $evidence.Add($relative, $record)
     }
     if ((Get-KaronPackageRawInt64 (Get-KaronPackageRawProperty $summary.Raw 'evidenceFileCount' 'package_gui_summary_invalid') 'package_gui_summary_invalid') -ne $evidence.Count) {
         throw 'package_gui_evidence_inventory_invalid'
@@ -1065,7 +995,6 @@ function Assert-KaronPackageGuiContract {
     $summaryProbes = Get-KaronPackageRawProperty $summary.Raw 'generatedProbes' 'package_gui_summary_invalid'
     $manifestProbes = Get-KaronPackageRawProperty $manifest.Raw 'generatedProbeFiles' 'package_gui_manifest_invalid'
     if ($summaryProbes.GetRawText() -cne $manifestProbes.GetRawText()) { throw 'package_gui_probe_inventory_invalid' }
-    $guiRoot = Split-Path -Parent ([IO.Path]::GetFullPath($ManifestPath))
     $seenProbes = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     $videoCases = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     $mp3Cases = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
@@ -1076,7 +1005,10 @@ function Assert-KaronPackageGuiContract {
         $relative = Get-KaronPackageRawString (Get-KaronPackageRawProperty $probe 'path' 'package_gui_manifest_invalid') 'package_gui_manifest_invalid'
         Assert-KaronPackageRelativePath $sourcePath 'package_gui_manifest_invalid'
         Assert-KaronPackageRelativePath $relative 'package_gui_manifest_invalid'
-        if (-not $evidence.ContainsKey($sourcePath) -or -not $seenProbes.Add($relative)) { throw 'package_gui_probe_inventory_invalid' }
+        if (-not [string]::Equals($sourcePath.Normalize([Text.NormalizationForm]::FormC), $sourcePath, [StringComparison]::Ordinal) -or
+            -not [string]::Equals($relative.Normalize([Text.NormalizationForm]::FormC), $relative, [StringComparison]::Ordinal) -or
+            -not $evidence.ContainsKey($sourcePath) -or -not $seenProbes.Add($relative) -or
+            -not $declaredGuiFiles.TryAdd($relative, $true)) { throw 'package_gui_probe_inventory_invalid' }
         $record = [pscustomobject]@{
             Name = $relative
             Length = Get-KaronPackageRawInt64 (Get-KaronPackageRawProperty $probe 'length' 'package_gui_manifest_invalid') 'package_gui_manifest_invalid'
@@ -1086,10 +1018,16 @@ function Assert-KaronPackageGuiContract {
         if ($kind -ceq 'video') { [void]$videoCases.Add($caseId) } else { [void]$mp3Cases.Add($caseId) }
     }
     if (-not $videoCases.Contains('ko-KR-100') -or -not $videoCases.Contains('en-US-200')) { throw 'package_gui_lifecycle_invalid' }
-    foreach ($caseId in $representativeIds.mp3Conversion) {
-        if ($mp3Cases.Contains($caseId)) { return $schema.Tracked }
+    $representativeValid = $false
+    foreach ($caseId in $representativeIds.mp3Conversion) { if ($mp3Cases.Contains($caseId)) { $representativeValid = $true } }
+    if (-not $representativeValid) { throw 'package_gui_representative_invalid' }
+    if ($actualGuiFiles.Count -ne $declaredGuiFiles.Count) { throw 'package_gui_evidence_inventory_invalid' }
+    foreach ($relative in $declaredGuiFiles.Keys) {
+        if (-not $actualGuiFiles.ContainsKey($relative) -or [string]$actualGuiFiles[$relative].RelativePath -cne $relative) {
+            throw 'package_gui_evidence_inventory_invalid'
+        }
     }
-    throw 'package_gui_representative_invalid'
+    $schema.Tracked
 }
 
 function Assert-KaronPackageNestedSourceArchive {
@@ -1228,6 +1166,17 @@ function Assert-KaronPackageSpdxContract {
     $bound = Get-KaronPackageBoundRecord $Lock 'spdx'
     Assert-KaronPackageBoundFile $bound $Path $script:KaronPackageSpdxName 'package_spdx_lock_mismatch'
     $json = ConvertFrom-KaronPackageJsonStrict ([IO.File]::ReadAllText($Path, [Text.UTF8Encoding]::new($false, $true))) 'package_spdx_invalid'
+    $schema = Get-KaronPackageTrackedFileRecord $RepositoryRoot 'tests/powershell/fixtures/spdx-2.3-schema-aadf3b0b.json' 'spdx-2.3-schema-aadf3b0b.json' 'package_spdx_schema_untracked'
+    if ($schema.length -ne 45313L -or $schema.sha256 -cne '3ec6cd5b8ba0c9a3e821da48536fa1b814567dc7e4376efe98d3e7b2a7a8d230') { throw 'package_spdx_schema_pin_mismatch' }
+    try {
+        if (-not (Test-Json -LiteralPath $Path -SchemaFile $schema.localPath -ErrorAction Stop)) { throw 'invalid' }
+    }
+    catch { throw 'package_spdx_schema_invalid' }
+    $creationInfo = Get-KaronPackageRawProperty $json.Raw 'creationInfo' 'package_spdx_schema_invalid'
+    [void](Get-KaronPackageRawString (Get-KaronPackageRawProperty $creationInfo 'created' 'package_spdx_schema_invalid') 'package_spdx_schema_invalid')
+    foreach ($creator in Get-KaronPackageRawArray (Get-KaronPackageRawProperty $creationInfo 'creators' 'package_spdx_schema_invalid') 'package_spdx_schema_invalid') {
+        [void](Get-KaronPackageRawString $creator 'package_spdx_schema_invalid')
+    }
     foreach ($contract in @(
         [pscustomobject]@{ Name = 'spdxVersion'; Value = 'SPDX-2.3' },
         [pscustomobject]@{ Name = 'dataLicense'; Value = 'CC0-1.0' },
@@ -1269,6 +1218,7 @@ function Assert-KaronPackageSpdxContract {
     if ($packages.Count -ne $expectedPackages.Count) { throw 'package_spdx_package_inventory_invalid' }
     $seenPackages = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     foreach ($package in $packages) {
+        [void](Get-KaronPackageRawString (Get-KaronPackageRawProperty $package 'copyrightText' 'package_spdx_schema_invalid') 'package_spdx_schema_invalid')
         $id = Get-KaronPackageRawString (Get-KaronPackageRawProperty $package 'SPDXID' 'package_spdx_invalid') 'package_spdx_invalid'
         if (-not $seenPackages.Add($id) -or -not $expectedPackages.ContainsKey($id)) { throw 'package_spdx_package_inventory_invalid' }
         $expected = $expectedPackages[$id]
@@ -1304,6 +1254,7 @@ function Assert-KaronPackageSpdxContract {
     if ($files.Count -ne $expectedFiles.Count) { throw 'package_spdx_file_inventory_invalid' }
     $seenFiles = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($file in $files) {
+        [void](Get-KaronPackageRawString (Get-KaronPackageRawProperty $file 'copyrightText' 'package_spdx_schema_invalid') 'package_spdx_schema_invalid')
         $name = Get-KaronPackageRawString (Get-KaronPackageRawProperty $file 'fileName' 'package_spdx_invalid') 'package_spdx_invalid'
         if (-not $name.StartsWith('./', [StringComparison]::Ordinal)) { throw 'package_spdx_file_inventory_invalid' }
         $relative = $name.Substring(2)
@@ -1367,8 +1318,8 @@ function Assert-KaronPackageSpdxContract {
             throw 'package_spdx_license_ref_invalid'
         }
         $definition = $definitions[$licenseId]
-        $noticePath = Get-KaronPackageChildPath $RepositoryRoot ([string]$definition.noticePath) 'package_spdx_license_ref_invalid'
-        $expectedText = [IO.File]::ReadAllText($noticePath, [Text.UTF8Encoding]::new($false, $true))
+        $notice = Get-KaronPackageTrackedFileRecord $RepositoryRoot ([string]$definition.noticePath) ([IO.Path]::GetFileName([string]$definition.noticePath)) 'package_spdx_license_ref_invalid'
+        $expectedText = [IO.File]::ReadAllText($notice.localPath, [Text.UTF8Encoding]::new($false, $true))
         if ((Get-KaronPackageRawString (Get-KaronPackageRawProperty $item 'name' 'package_spdx_invalid') 'package_spdx_invalid') -cne [string]$definition.name -or
             (Get-KaronPackageRawString (Get-KaronPackageRawProperty $item 'extractedText' 'package_spdx_invalid') 'package_spdx_invalid') -cne $expectedText) {
             throw 'package_spdx_license_ref_invalid'
@@ -1448,17 +1399,31 @@ function Assert-KaronPackageByteSnapshots {
 function Get-KaronPackageLicenseCorpusRecords {
     param([object] $Lock, [string] $RepositoryRoot)
     $paths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $declaredHashes = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::Ordinal)
     foreach ($component in @($Lock.components)) {
+        $componentPaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
         foreach ($notice in @($component.noticeFiles)) {
             $path = [string]$notice.path
-            if (-not $path.StartsWith($script:KaronPackageLicensePrefix, [StringComparison]::Ordinal) -or -not $paths.Add($path)) {
+            $sha256 = ([string]$notice.sha256).ToLowerInvariant()
+            if (-not $path.StartsWith($script:KaronPackageLicensePrefix, [StringComparison]::Ordinal) -or
+                $sha256 -notmatch '^[a-f0-9]{64}$' -or -not $componentPaths.Add($path) -or
+                -not $paths.Add($path) -or -not $declaredHashes.TryAdd($path, $sha256)) {
                 throw 'package_license_inventory_mismatch'
             }
+        }
+        foreach ($licenseRef in $(if (Test-KaronPackageProperty $component 'licenseRefs') { @($component.licenseRefs) } else { @() })) {
+            $noticePath = [string]$licenseRef.noticePath
+            if (-not $noticePath.StartsWith($script:KaronPackageLicensePrefix, [StringComparison]::Ordinal) -or
+                -not $componentPaths.Contains($noticePath)) { throw 'package_license_ref_notice_invalid' }
         }
     }
     $sorted = [string[]]@($paths)
     [Array]::Sort($sorted, [StringComparer]::Ordinal)
-    @($sorted | ForEach-Object { Get-KaronPackageTrackedFileRecord $RepositoryRoot $_ ([IO.Path]::GetFileName($_)) })
+    @($sorted | ForEach-Object {
+        $tracked = Get-KaronPackageTrackedFileRecord $RepositoryRoot $_ ([IO.Path]::GetFileName($_))
+        if ($tracked.sha256 -cne $declaredHashes[$_]) { throw 'package_license_notice_hash_mismatch' }
+        $tracked
+    })
 }
 
 function Assert-KaronPackageReceiptTrackedRecord {
@@ -1498,19 +1463,22 @@ function Assert-KaronReleaseReceipt {
     }
     $json = ConvertFrom-KaronPackageJsonStrict ([IO.File]::ReadAllText($receipt, [Text.UTF8Encoding]::new($false, $true))) 'package_receipt_invalid'
     Assert-KaronPackageRawExactKeys $json.Raw @(
-        'schemaVersion', 'tag', 'platform', 'sourceCommit', 'candidateManifest', 'application', 'ffprobe',
+        'schemaVersion', 'tag', 'platform', 'applicationSourceCommit', 'applicationSourceTree', 'packagingCommit', 'candidateManifest', 'application', 'ffprobe',
         'guiValidationSummary', 'guiValidationEvidenceManifest', 'guiValidationSchema', 'licenseLock', 'rootThirdPartyNotices',
         'licenseCorpus', 'correspondingSources', 'spdx', 'releaseNotes', 'guiCaseIds', 'publicAssets'
     ) 'package_receipt_invalid'
-    if ((Get-KaronPackageRawString (Get-KaronPackageRawProperty $json.Raw 'schemaVersion' 'package_receipt_invalid') 'package_receipt_invalid') -cne 'karon-release-receipt/v1' -or
+    if ((Get-KaronPackageRawString (Get-KaronPackageRawProperty $json.Raw 'schemaVersion' 'package_receipt_invalid') 'package_receipt_invalid') -cne 'karon-release-receipt/v2' -or
         (Get-KaronPackageRawString (Get-KaronPackageRawProperty $json.Raw 'tag' 'package_receipt_invalid') 'package_receipt_invalid') -cne $script:KaronPackageTag -or
         (Get-KaronPackageRawString (Get-KaronPackageRawProperty $json.Raw 'platform' 'package_receipt_invalid') 'package_receipt_invalid') -cne 'win-x64') {
         throw 'package_receipt_invalid'
     }
-    $sourceCommit = Get-KaronPackageRawString (Get-KaronPackageRawProperty $json.Raw 'sourceCommit' 'package_receipt_invalid') 'package_receipt_invalid'
-    if ($sourceCommit -notmatch '^[a-fA-F0-9]{40}$' -or $sourceCommit.ToLowerInvariant() -cne (Get-KaronPackageRepositoryHead $repo)) {
-        throw 'package_receipt_source_mismatch'
-    }
+    $applicationSourceCommit = (Get-KaronPackageRawString (Get-KaronPackageRawProperty $json.Raw 'applicationSourceCommit' 'package_receipt_invalid') 'package_receipt_invalid').ToLowerInvariant()
+    $applicationSourceTree = (Get-KaronPackageRawString (Get-KaronPackageRawProperty $json.Raw 'applicationSourceTree' 'package_receipt_invalid') 'package_receipt_invalid').ToLowerInvariant()
+    $packagingCommit = (Get-KaronPackageRawString (Get-KaronPackageRawProperty $json.Raw 'packagingCommit' 'package_receipt_invalid') 'package_receipt_invalid').ToLowerInvariant()
+    if ($applicationSourceCommit -notmatch '^[a-f0-9]{40}$' -or $applicationSourceTree -notmatch '^[a-f0-9]{40}$' -or
+        $packagingCommit -notmatch '^[a-f0-9]{40}$') { throw 'package_receipt_invalid' }
+    if ($applicationSourceCommit -ceq $packagingCommit) { throw 'package_receipt_provenance_confused' }
+    if ($packagingCommit -cne (Get-KaronPackageRepositoryHead $repo)) { throw 'package_receipt_packaging_commit_mismatch' }
     $value = $json.Value
     foreach ($name in @('candidateManifest', 'application', 'ffprobe', 'guiValidationSummary', 'guiValidationEvidenceManifest', 'correspondingSources', 'spdx')) {
         $rawRecord = Get-KaronPackageRawProperty $json.Raw $name 'package_receipt_invalid'
@@ -1544,6 +1512,10 @@ function Assert-KaronReleaseReceipt {
 
     $candidateRoot = Split-Path -Parent ([string]$value.candidateManifest.localPath)
     $candidateEntries = Get-KaronPackageCandidateEntries $lock $candidateRoot
+    $provenance = Get-KaronPackageApplicationProvenance $lock $candidateEntries $repo $packagingCommit
+    if ($applicationSourceCommit -cne $provenance.ApplicationSourceCommit -or $applicationSourceTree -cne $provenance.ApplicationSourceTree) {
+        throw 'package_receipt_application_source_mismatch'
+    }
     if ($candidateEntries['ytdlp-interface.exe'].Sha256 -cne ([string]$value.application.sha256).ToLowerInvariant() -or
         $candidateEntries['ffprobe.exe'].Sha256 -cne ([string]$value.ffprobe.sha256).ToLowerInvariant()) { throw 'package_receipt_candidate_mismatch' }
     [void](Assert-KaronPackageGuiContract $lock $repo ([string]$value.guiValidationSummary.localPath) ([string]$value.guiValidationEvidenceManifest.localPath) $candidateEntries)
@@ -1570,7 +1542,9 @@ function Assert-KaronReleaseReceipt {
         }
     }
     [pscustomobject]@{
-        SourceCommit = $sourceCommit.ToLowerInvariant()
+        ApplicationSourceCommit = $applicationSourceCommit
+        ApplicationSourceTree = $applicationSourceTree
+        PackagingCommit = $packagingCommit
         NotesPath = $notesPath
         NotesBlobSha1 = [string]$notesRecord.gitBlobSha1
         NotesBody = [IO.File]::ReadAllText($notesPath, [Text.UTF8Encoding]::new($false, $true))
@@ -1684,12 +1658,13 @@ function Invoke-QualityReleasePackage {
     $expectedLockPath = [IO.Path]::GetFullPath((Join-Path $repo 'release\dependencies\v2.19.1-karon.2.lock.json'))
     $actualLockPath = Assert-KaronPackagePathChain $LockPath
     if (-not $actualLockPath.Equals($expectedLockPath, [StringComparison]::OrdinalIgnoreCase)) { throw 'package_lock_path_invalid' }
-    $sourceCommit = Get-KaronPackageRepositoryHead $repo
+    $packagingCommit = Get-KaronPackageRepositoryHead $repo
     $lockTracked = Get-KaronPackageTrackedFileRecord $repo 'release/dependencies/v2.19.1-karon.2.lock.json' 'v2.19.1-karon.2.lock.json'
     $lockDocument = Read-KaronPackageStrictLockDocument $actualLockPath
     $lock = $lockDocument.Value
     Assert-KaronPackageStatusContract $lock
     $candidateEntries = Get-KaronPackageCandidateEntries $lock $candidateRoot
+    $provenance = Get-KaronPackageApplicationProvenance $lock $candidateEntries $repo $packagingCommit
     $candidateManifestRecord = Get-KaronPackageBoundRecord $lock 'candidateManifest'
     Assert-KaronPackageBoundFile $candidateManifestRecord $candidateEntries['candidate-manifest.json'].SourcePath 'candidate-manifest.json' 'package_candidate_manifest_lock_mismatch'
     $guiSchemaTracked = Assert-KaronPackageGuiContract $lock $repo $GuiValidationSummaryPath $GuiValidationEvidenceManifestPath $candidateEntries
@@ -1729,10 +1704,12 @@ function Invoke-QualityReleasePackage {
     $sourcesFinal = Join-Path $outputRoot $script:KaronPackageSourcesName
     $spdxFinal = Join-Path $outputRoot $script:KaronPackageSpdxName
     $receiptValue = [ordered]@{
-        schemaVersion = 'karon-release-receipt/v1'
+        schemaVersion = 'karon-release-receipt/v2'
         tag = $script:KaronPackageTag
         platform = 'win-x64'
-        sourceCommit = $sourceCommit
+        applicationSourceCommit = $provenance.ApplicationSourceCommit
+        applicationSourceTree = $provenance.ApplicationSourceTree
+        packagingCommit = $provenance.PackagingCommit
         candidateManifest = New-KaronPackageLocalRecord $candidateEntries['candidate-manifest.json'].SourcePath 'candidate-manifest.json'
         application = New-KaronPackageLocalRecord $candidateEntries['ytdlp-interface.exe'].SourcePath 'ytdlp-interface.exe'
         ffprobe = New-KaronPackageLocalRecord $candidateEntries['ffprobe.exe'].SourcePath 'ffprobe.exe'

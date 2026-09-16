@@ -10,6 +10,9 @@ $script:SpdxName = 'ytdlp-korean-interface-v2.19.1-karon.2.spdx.json'
 $script:SumsName = 'SHA256SUMS.txt'
 $script:AssetNames = @($script:BinaryName, $script:SourcesName, $script:SpdxName, $script:SumsName)
 $script:GuiSchemaRepositoryPath = 'release/validation/v2.19.1-karon.2/gui-validation-output.schema.json'
+$script:ProducerGuiSchemaFixture = Join-Path $PSScriptRoot 'fixtures\gui-validation-output.schema-e49cc702.json'
+$script:ProducerGuiSchemaSha256 = 'e49cc70253bd5dd4b4abd8ee00406f5dd8ed39434e309e3e3c74694b85c1b80e'
+$script:SpdxSchemaFixture = Join-Path $PSScriptRoot 'fixtures\spdx-2.3-schema-aadf3b0b.json'
 $script:GuiCases = @(
     [pscustomobject]@{ id = 'ko-KR-100'; language = 'ko-KR'; dpi = 100 },
     [pscustomobject]@{ id = 'ko-KR-150'; language = 'ko-KR'; dpi = 150 },
@@ -18,112 +21,6 @@ $script:GuiCases = @(
     [pscustomobject]@{ id = 'en-US-150'; language = 'en-US'; dpi = 150 },
     [pscustomobject]@{ id = 'en-US-200'; language = 'en-US'; dpi = 200 }
 )
-
-function New-TestGuiOutputSchema {
-    $hash = [ordered]@{ type = 'string'; pattern = '^[a-f0-9]{64}$' }
-    $fileRecord = [ordered]@{
-        type = 'object'
-        additionalProperties = $false
-        required = @('fileName', 'sha256', 'length')
-        properties = [ordered]@{
-            fileName = [ordered]@{ type = 'string'; minLength = 1 }
-            sha256 = $hash
-            length = [ordered]@{ type = 'integer'; minimum = 1 }
-        }
-    }
-    $probeRecord = [ordered]@{
-        type = 'object'
-        additionalProperties = $false
-        required = @('caseId', 'kind', 'sourceEvidencePath', 'path', 'sha256', 'length')
-        properties = [ordered]@{
-            caseId = [ordered]@{ type = 'string'; enum = @($script:GuiCases.id) }
-            kind = [ordered]@{ type = 'string'; enum = @('video', 'mp3') }
-            sourceEvidencePath = [ordered]@{ type = 'string'; minLength = 1 }
-            path = [ordered]@{ type = 'string'; minLength = 1 }
-            sha256 = $hash
-            length = [ordered]@{ type = 'integer'; minimum = 1 }
-        }
-    }
-    [ordered]@{
-        '$schema' = 'https://json-schema.org/draft/2020-12/schema'
-        '$id' = 'https://github.com/KaronLabs/ytdlp-korean-interface/release/validation/v2.19.1-karon.2/gui-validation-output.schema.json'
-        '$defs' = [ordered]@{
-            fileRecord = $fileRecord
-            candidate = [ordered]@{
-                type = 'object'
-                additionalProperties = $false
-                required = @('executable', 'ffprobe', 'manifest')
-                properties = [ordered]@{
-                    executable = [ordered]@{ '$ref' = '#/$defs/fileRecord' }
-                    ffprobe = [ordered]@{ '$ref' = '#/$defs/fileRecord' }
-                    manifest = [ordered]@{ oneOf = @([ordered]@{ type = 'null' }, [ordered]@{ '$ref' = '#/$defs/fileRecord' }) }
-                }
-            }
-            summaryCase = [ordered]@{
-                type = 'object'
-                additionalProperties = $false
-                required = @('caseId', 'language', 'dpi', 'evidenceFile', 'evidenceSha256')
-                properties = [ordered]@{
-                    caseId = [ordered]@{ type = 'string'; enum = @($script:GuiCases.id) }
-                    language = [ordered]@{ type = 'string'; enum = @('ko-KR', 'en-US') }
-                    dpi = [ordered]@{ type = 'integer'; enum = @(100, 150, 200) }
-                    evidenceFile = [ordered]@{ type = 'string'; minLength = 1 }
-                    evidenceSha256 = $hash
-                }
-            }
-            evidenceFile = [ordered]@{
-                type = 'object'
-                additionalProperties = $false
-                required = @('path', 'sha256', 'length')
-                properties = [ordered]@{
-                    path = [ordered]@{ type = 'string'; minLength = 1 }
-                    sha256 = $hash
-                    length = [ordered]@{ type = 'integer'; minimum = 1 }
-                }
-            }
-            generatedProbe = $probeRecord
-            representativeChecks = [ordered]@{
-                type = 'object'
-                additionalProperties = $false
-                required = @('mp3Conversion', 'settingsSaveRestartRestore', 'legacySettingsTransition')
-                properties = [ordered]@{
-                    mp3Conversion = [ordered]@{ type = 'array'; minItems = 1; uniqueItems = $true; items = [ordered]@{ type = 'string'; enum = @($script:GuiCases.id) } }
-                    settingsSaveRestartRestore = [ordered]@{ type = 'array'; minItems = 1; uniqueItems = $true; items = [ordered]@{ type = 'string'; enum = @($script:GuiCases.id) } }
-                    legacySettingsTransition = [ordered]@{ type = 'array'; minItems = 1; uniqueItems = $true; items = [ordered]@{ type = 'string'; enum = @($script:GuiCases.id) } }
-                }
-            }
-            summary = [ordered]@{
-                type = 'object'
-                additionalProperties = $false
-                required = @('schemaVersion', 'releaseVersion', 'status', 'candidate', 'cases', 'fullVideoLifecycleCases', 'representativeChecks', 'generatedProbes', 'evidenceFileCount', 'evidenceManifestFile')
-                properties = [ordered]@{
-                    schemaVersion = [ordered]@{ type = 'integer'; const = 2 }
-                    releaseVersion = [ordered]@{ type = 'string'; const = $script:Tag }
-                    status = [ordered]@{ type = 'string'; const = 'PASS' }
-                    candidate = [ordered]@{ '$ref' = '#/$defs/candidate' }
-                    cases = [ordered]@{ type = 'array'; minItems = 6; maxItems = 6; items = [ordered]@{ '$ref' = '#/$defs/summaryCase' } }
-                    fullVideoLifecycleCases = [ordered]@{ type = 'array'; minItems = 2; maxItems = 2; uniqueItems = $true; items = [ordered]@{ type = 'string'; enum = @('ko-KR-100', 'en-US-200') } }
-                    representativeChecks = [ordered]@{ '$ref' = '#/$defs/representativeChecks' }
-                    generatedProbes = [ordered]@{ type = 'array'; minItems = 3; items = [ordered]@{ '$ref' = '#/$defs/generatedProbe' } }
-                    evidenceFileCount = [ordered]@{ type = 'integer'; minimum = 1 }
-                    evidenceManifestFile = [ordered]@{ type = 'string'; const = 'gui-validation-evidence-manifest.json' }
-                }
-            }
-            manifest = [ordered]@{
-                type = 'object'
-                additionalProperties = $false
-                required = @('schemaVersion', 'releaseVersion', 'candidate', 'evidenceFiles', 'generatedProbeFiles')
-                properties = [ordered]@{
-                    schemaVersion = [ordered]@{ type = 'integer'; const = 2 }
-                    releaseVersion = [ordered]@{ type = 'string'; const = $script:Tag }
-                    candidate = [ordered]@{ '$ref' = '#/$defs/candidate' }
-                    evidenceFiles = [ordered]@{ type = 'array'; minItems = 6; items = [ordered]@{ '$ref' = '#/$defs/evidenceFile' } }
-                    generatedProbeFiles = [ordered]@{ type = 'array'; minItems = 3; items = [ordered]@{ '$ref' = '#/$defs/generatedProbe' } }
-                }
-            }
-        }
-    }
-}
 
 if (-not (Test-Path -LiteralPath $script:PackageTool -PathType Leaf) -or
     -not (Test-Path -LiteralPath $script:PublishTool -PathType Leaf)) {
@@ -164,7 +61,7 @@ function Invoke-TestGit {
 
 function Commit-TestRepository {
     param([Parameter(Mandatory)] [object] $Case, [string] $Message = 'fixture update')
-    [void](Invoke-TestGit $Case.Repository @('add', '--', 'THIRD-PARTY-NOTICES.txt', 'release/dependencies/v2.19.1-karon.2.lock.json', 'release/licenses/v2.19.1-karon.2', 'release/notes/v2.19.1-karon.2.md', $script:GuiSchemaRepositoryPath))
+    [void](Invoke-TestGit $Case.Repository @('add', '--', 'src/application-source.txt', 'THIRD-PARTY-NOTICES.txt', 'release/dependencies/v2.19.1-karon.2.lock.json', 'release/licenses/v2.19.1-karon.2', 'release/notes/v2.19.1-karon.2.md', $script:GuiSchemaRepositoryPath, 'tests/powershell/fixtures/spdx-2.3-schema-aadf3b0b.json'))
     $pending = & git -C $Case.Repository diff --cached --quiet
     if ($LASTEXITCODE -ne 0) { [void](Invoke-TestGit $Case.Repository @('commit', '-q', '-m', $Message)) }
     [string](Invoke-TestGit $Case.Repository @('rev-parse', 'HEAD'))
@@ -228,6 +125,19 @@ function New-ReleaseContractCase {
     $receipt = Join-Path $root 'private\release-receipt.json'
     foreach ($directory in @($repository, $candidate, $generated, $gui, $output)) { [void](New-Item -ItemType Directory -Path $directory) }
 
+    [void](Invoke-TestGit $repository @('init', '-q'))
+    [void](Invoke-TestGit $repository @('config', 'user.email', 'release-contract@example.invalid'))
+    [void](Invoke-TestGit $repository @('config', 'user.name', 'Release Contract Test'))
+    $applicationSourcePath = Join-Path $repository 'src\application-source.txt'
+    Write-TestUtf8 $applicationSourcePath ('sealed application source' + [char]10)
+    [void](Invoke-TestGit $repository @('add', '--', 'src/application-source.txt'))
+    [void](Invoke-TestGit $repository @('commit', '-q', '-m', 'sealed application source'))
+    $applicationSourceCommit = [string](Invoke-TestGit $repository @('rev-parse', 'HEAD^{commit}'))
+    $applicationSourceTree = [string](Invoke-TestGit $repository @('rev-parse', 'HEAD^{tree}'))
+    $spdxSchemaPath = Join-Path $repository 'tests\powershell\fixtures\spdx-2.3-schema-aadf3b0b.json'
+    [void](New-Item -ItemType Directory -Path (Split-Path -Parent $spdxSchemaPath))
+    [IO.File]::Copy($script:SpdxSchemaFixture, $spdxSchemaPath, $false)
+
     $appPath = Join-Path $candidate 'ytdlp-interface.exe'
     $ffprobePath = Join-Path $candidate 'ffprobe.exe'
     Write-TestUtf8 $appPath ('sealed application bytes' + [char]10)
@@ -236,6 +146,7 @@ function New-ReleaseContractCase {
     $manifest = [ordered]@{
         schemaVersion = 1
         createdAtUtc = '2026-09-16T00:00:00Z'
+        applicationSourceCommit = $applicationSourceCommit
         files = @(
             [ordered]@{ path = 'ffprobe.exe'; sha256 = Get-TestSha256 $ffprobePath; length = [long](Get-Item $ffprobePath).Length },
             [ordered]@{ path = 'ytdlp-interface.exe'; sha256 = Get-TestSha256 $appPath; length = [long](Get-Item $appPath).Length }
@@ -261,15 +172,15 @@ function New-ReleaseContractCase {
         version = $script:Tag
         licenseExpression = 'CC0-1.0'
         licenseConcluded = 'CC0-1.0'
-        sourceCommit = $script:HeadSha
-        downloadLocation = 'https://github.com/KaronLabs/ytdlp-korean-interface/archive/' + $script:HeadSha + '.zip'
+        sourceCommit = $applicationSourceCommit
+        downloadLocation = 'https://github.com/KaronLabs/ytdlp-korean-interface/archive/' + $applicationSourceCommit + '.zip'
     }
     $component = [ordered]@{
         id = 'application'
         name = 'Fixture application'
         version = '1.0.0'
         sourceRepository = 'https://github.com/KaronLabs/ytdlp-korean-interface'
-        sourceCommit = $script:HeadSha
+        sourceCommit = $applicationSourceCommit
         licenseExpression = 'MIT'
         verificationStatus = 'verified'
         modified = $true
@@ -279,8 +190,8 @@ function New-ReleaseContractCase {
         })
         sourceArchives = @([ordered]@{
             fileName = 'application-source.zip'
-            commit = $script:HeadSha
-            url = 'https://github.com/KaronLabs/ytdlp-korean-interface/archive/' + $script:HeadSha + '.zip'
+            commit = $applicationSourceCommit
+            url = 'https://github.com/KaronLabs/ytdlp-korean-interface/archive/' + $applicationSourceCommit + '.zip'
             sha256 = Get-TestSha256 $sourceArchive
             length = [long](Get-Item $sourceArchive).Length
             verificationStatus = 'verified'
@@ -358,6 +269,7 @@ function New-ReleaseContractCase {
                 [ordered]@{ algorithm = 'SHA256'; checksumValue = $entry.sha256 }
             )
             licenseConcluded = $entry.licenseConcluded
+            licenseInfoInFiles = @('NOASSERTION')
             copyrightText = 'Fixture file copyright.'
         }
         $relationships += [ordered]@{
@@ -373,6 +285,10 @@ function New-ReleaseContractCase {
         SPDXID = 'SPDXRef-DOCUMENT'
         name = 'ytdlp-korean-interface-v2.19.1-karon.2-win-x64'
         documentNamespace = 'https://github.com/KaronLabs/ytdlp-korean-interface/spdx/v2.19.1-karon.2/' + ('a' * 64)
+        creationInfo = [ordered]@{
+            created = '2026-09-16T00:00:00Z'
+            creators = @('Tool: release-publication-contract.Tests.ps1')
+        }
         documentDescribes = @('SPDXRef-Package-application', 'SPDXRef-Package-release-metadata')
         packages = $packages
         files = $spdxFiles
@@ -436,9 +352,10 @@ function New-ReleaseContractCase {
     }
     Write-TestJson $summaryPath $summary
     Write-TestJson $guiManifestPath $guiManifest
-    $guiSchema = New-TestGuiOutputSchema
     $guiSchemaPath = Join-Path $repository ($script:GuiSchemaRepositoryPath.Replace('/', '\'))
-    Write-TestJson $guiSchemaPath $guiSchema
+    [void](New-Item -ItemType Directory -Path (Split-Path -Parent $guiSchemaPath))
+    [IO.File]::Copy($script:ProducerGuiSchemaFixture, $guiSchemaPath, $false)
+    $guiSchema = Get-Content -Raw $guiSchemaPath | ConvertFrom-Json -Depth 64
 
     $outerLock = $baseLock | ConvertTo-Json -Depth 64 | ConvertFrom-Json -Depth 64
     $receiptInputs = [ordered]@{
@@ -454,9 +371,6 @@ function New-ReleaseContractCase {
     $outerLock.release | Add-Member -MemberType NoteProperty -Name receiptInputs -Value $receiptInputs
     $lockPath = Join-Path $repository 'release\dependencies\v2.19.1-karon.2.lock.json'
     Write-TestJson $lockPath $outerLock
-    [void](Invoke-TestGit $repository @('init', '-q'))
-    [void](Invoke-TestGit $repository @('config', 'user.email', 'release-contract@example.invalid'))
-    [void](Invoke-TestGit $repository @('config', 'user.name', 'Release Contract Test'))
     $case = [pscustomobject]@{
         Root = $root
         Repository = $repository
@@ -485,6 +399,10 @@ function New-ReleaseContractCase {
         AppPath = $appPath
         FfprobePath = $ffprobePath
         ManifestPath = $manifestPath
+        CandidateManifest = $manifest
+        Spdx = $spdx
+        ApplicationSourceCommit = $applicationSourceCommit
+        ApplicationSourceTree = $applicationSourceTree
     }
     [void](Commit-TestRepository $case 'fixture baseline')
     $case
@@ -527,6 +445,28 @@ function Save-TestSummary {
     Refresh-TestInputRecord $Case 'guiValidationSummary' $Case.SummaryPath 'gui-validation-summary.json'
 }
 
+function Save-TestSpdx {
+    param([object] $Case)
+    Write-TestJson $Case.SpdxPath $Case.Spdx
+    Refresh-TestInputRecord $Case 'spdx' $Case.SpdxPath $script:SpdxName
+}
+
+function Set-TestApplicationSourceCommit {
+    param([object] $Case, [string] $Commit)
+    $url = 'https://github.com/KaronLabs/ytdlp-korean-interface/archive/' + $Commit + '.zip'
+    foreach ($lock in @($Case.Lock, $Case.InnerLock)) {
+        $lock.release.metadataPackage.sourceCommit = $Commit
+        $lock.release.metadataPackage.downloadLocation = $url
+        $lock.components[0].sourceCommit = $Commit
+        $lock.components[0].sourceArchives[0].commit = $Commit
+        $lock.components[0].sourceArchives[0].url = $url
+    }
+    ($Case.Spdx.packages | Where-Object SPDXID -ceq 'SPDXRef-Package-application').downloadLocation = $url
+    ($Case.Spdx.packages | Where-Object SPDXID -ceq 'SPDXRef-Package-release-metadata').downloadLocation = $url
+    Rebuild-TestCorrespondingSources $Case
+    Save-TestSpdx $Case
+}
+
 function Invoke-TestPackage {
     param([object] $Case, [switch] $PlanOnly)
     $arguments = @{
@@ -567,13 +507,13 @@ function New-FakePublicationRunner {
         Origin = 'git@github.com:KaronLabs/ytdlp-korean-interface.git'
         PushOrigin = 'git@github.com:KaronLabs/ytdlp-korean-interface.git'
         Dirty = ''
-        Head = [string]$receipt.sourceCommit
-        RemoteHead = [string]$receipt.sourceCommit
+        Head = [string]$receipt.packagingCommit
+        RemoteHead = [string]$receipt.packagingCommit
         TagType = 'tag'
         TagObject = $script:TagObjectSha
-        TagTarget = [string]$receipt.sourceCommit
+        TagTarget = [string]$receipt.packagingCommit
         RemoteTagObject = $script:TagObjectSha
-        RemoteTagTarget = [string]$receipt.sourceCommit
+        RemoteTagTarget = [string]$receipt.packagingCommit
         NotesBlob = [string]$receipt.releaseNotes.gitBlobSha1
         Stage = 'absent'
         DigestMode = 'null'
@@ -591,6 +531,7 @@ function New-FakePublicationRunner {
         DuplicateTagKey = $false
         ReleaseTitle = $script:Tag
         ReleaseBody = [IO.File]::ReadAllText($Case.NotesPath, [Text.UTF8Encoding]::new($false, $true))
+        AssetIdRaceAt = 0
     }
     foreach ($key in $Options.Keys) { $state[$key] = $Options[$key] }
     $calls = [Collections.Generic.List[object]]::new()
@@ -638,7 +579,9 @@ function New-FakePublicationRunner {
                     $digest = $null
                     if ($state.DigestMode -ceq 'match') { $digest = 'sha256:' + (Get-TestSha256 $path) }
                     if ($state.DigestMode -ceq 'mismatch' -and $name -ceq $binaryName) { $digest = 'sha256:' + ('f' * 64) }
-                    $assets += [ordered]@{ id = 7000 + $assets.Count; name = $name; size = [long](Get-Item $path).Length; state = 'uploaded'; digest = $digest }
+                    $assetId = 7000 + $assets.Count
+                    if ($state.AssetIdRaceAt -eq $state.ReleaseQueries -and $assets.Count -eq 0) { $assetId += 1000 }
+                    $assets += [ordered]@{ id = $assetId; name = $name; size = [long](Get-Item $path).Length; state = 'uploaded'; digest = $digest }
                 }
             }
             $releaseId = if ($state.ReleaseIdRaceAt -eq $state.ReleaseQueries) { [long]$state.ReleaseId + 1L } else { [long]$state.ReleaseId }
@@ -682,6 +625,13 @@ function New-FakePublicationRunner {
             }
             return & $ok 'downloaded'
         }
+        if ($Executable -ceq 'gh' -and $Arguments.Count -eq 6 -and $Arguments[0] -ceq 'api' -and
+            $Arguments[1] -ceq '--method' -and $Arguments[2] -ceq 'PATCH' -and
+            $Arguments[3] -ceq ('repos/KaronLabs/ytdlp-korean-interface/releases/' + [string]$state.ReleaseId) -and
+            $Arguments[4] -ceq '--field') {
+            if ($Arguments[5] -ceq 'draft=false') { $state.Stage = 'stable'; return & $ok 'published' }
+            if ($Arguments[5] -ceq 'draft=true') { $state.Stage = 'draft-assets'; return & $ok 'draft restored' }
+        }
         if ($Executable -ceq 'gh' -and $Arguments.Count -ge 5 -and $Arguments[0] -ceq 'release' -and $Arguments[1] -ceq 'edit') {
             if ($Arguments -contains '--draft=false') { $state.Stage = 'stable'; return & $ok 'published' }
             if ($Arguments -contains '--draft') { $state.Stage = 'draft-assets'; return & $ok 'draft restored' }
@@ -714,6 +664,7 @@ Describe 'Single production publication entry point' {
     It 'contains no latest flag and every release create literal is draft-first' {
         $text = [IO.File]::ReadAllText($script:PublishTool)
         $text | Should Not Match '(?i)--latest'
+        $text | Should Not Match "(?i)'release'\s*,\s*'edit'"
         $tokens = $null
         $errors = $null
         $ast = [Management.Automation.Language.Parser]::ParseFile($script:PublishTool, [ref]$tokens, [ref]$errors)
@@ -727,6 +678,162 @@ Describe 'Single production publication entry point' {
         $createFunctions[0].Extent.Text | Should Match '(?i)--verify-tag'
         $createFunctions[0].Extent.Text | Should Match '(?i)--draft'
         $createFunctions[0].Extent.Text | Should Not Match '(?i)--latest'
+    }
+}
+
+Describe 'Independent immutable provenance anchors' {
+    It 'writes application and packaging anchors without an overloaded sourceCommit' {
+        $case = New-PackagedPublicationCase 'provenance-receipt-shape'
+        $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json -Depth 32
+        (@($receipt.PSObject.Properties.Name) -contains 'applicationSourceCommit') | Should Be $true
+        (@($receipt.PSObject.Properties.Name) -contains 'applicationSourceTree') | Should Be $true
+        (@($receipt.PSObject.Properties.Name) -contains 'packagingCommit') | Should Be $true
+        (@($receipt.PSObject.Properties.Name) -contains 'sourceCommit') | Should Be $false
+        $receipt.applicationSourceCommit | Should Be $case.ApplicationSourceCommit
+        $receipt.applicationSourceTree | Should Be $case.ApplicationSourceTree
+        $receipt.packagingCommit | Should Not Be $receipt.applicationSourceCommit
+    }
+
+    It 'rejects application source substitution independently of packaging HEAD' {
+        $case = New-ReleaseContractCase 'provenance-application-substitution'
+        Set-TestApplicationSourceCommit $case ('b' * 40)
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_application_source_mismatch'
+    }
+
+    It 'rejects an application lock that self-references the packaging commit' {
+        $case = New-ReleaseContractCase 'provenance-self-reference'
+        $packagingCommit = 'b' * 40
+        $case.Lock.release.metadataPackage.sourceCommit = $packagingCommit
+        $case.Lock.components[0].sourceCommit = $packagingCommit
+        $entries = Get-KaronPackageCandidateEntries $case.Lock $case.Candidate
+        (Get-TestFailure {
+            Get-KaronPackageApplicationProvenance $case.Lock $entries $case.Repository $packagingCommit
+        }) | Should Match 'package_provenance_self_reference'
+    }
+
+    It 'rejects equality confusion in a private receipt' {
+        $case = New-PackagedPublicationCase 'provenance-equality-confusion'
+        $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json -Depth 32
+        $packagingCommit = [string]$receipt.packagingCommit
+        $packagingTree = [string](Invoke-TestGit $case.Repository @('rev-parse', 'HEAD^{tree}'))
+        $receipt.applicationSourceCommit = $packagingCommit
+        $receipt.applicationSourceTree = $packagingTree
+        Write-TestJson $case.ReceiptPath $receipt
+        $fake = New-FakePublicationRunner $case
+        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly }) | Should Match 'package_receipt_provenance_confused'
+        $fake.Calls.Count | Should Be 0
+    }
+
+    It 'rejects a stale receipt after packaging HEAD advances' {
+        $case = New-PackagedPublicationCase 'provenance-stale-receipt'
+        Write-TestUtf8 (Join-Path $case.Repository 'contract-revision.txt') ('new packaging commit' + [char]10)
+        [void](Invoke-TestGit $case.Repository @('add', '--', 'contract-revision.txt'))
+        [void](Invoke-TestGit $case.Repository @('commit', '-q', '-m', 'advance packaging contract'))
+        $fake = New-FakePublicationRunner $case
+        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly }) | Should Match 'package_receipt_packaging_commit_mismatch'
+        $fake.Calls.Count | Should Be 0
+    }
+}
+
+Describe 'GUI evidence byte allowlist' {
+    It 'rejects missing, extra, and same-length substituted GUI evidence bytes' -TestCases @(
+        @{ Name = 'missing'; Mutate = { param($case) Remove-Item -LiteralPath (Join-Path $case.Gui $case.GuiManifest.evidenceFiles[0].path) } },
+        @{ Name = 'extra'; Mutate = { param($case) Write-TestUtf8 (Join-Path $case.Gui 'cases/undeclared.json') ('undeclared' + [char]10) } },
+        @{ Name = 'same-length'; Mutate = { param($case) $path = Join-Path $case.Gui $case.GuiManifest.evidenceFiles[0].path; $bytes = [IO.File]::ReadAllBytes($path); $bytes[0] = $bytes[0] -bxor 1; [IO.File]::WriteAllBytes($path, $bytes) } }
+    ) {
+        param($Name, $Mutate)
+        $case = New-ReleaseContractCase ('gui-evidence-' + $Name)
+        & $Mutate $case
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_gui_evidence_'
+    }
+
+    It 'rejects case-fold and NFC-colliding GUI evidence records' -TestCases @(
+        @{ Name = 'case-fold'; Mutate = {
+            param($case)
+            $record = $case.GuiManifest.evidenceFiles[0]
+            $case.GuiManifest.evidenceFiles += [ordered]@{ path = $record.path.ToUpperInvariant(); sha256 = $record.sha256; length = $record.length }
+        } },
+        @{ Name = 'nfc'; Mutate = {
+            param($case)
+            $composed = 'cases/caf' + [char]0x00E9 + '.json'
+            $decomposed = 'cases/cafe' + [char]0x0301 + '.json'
+            foreach ($relative in @($composed, $decomposed)) {
+                $path = Join-Path $case.Gui $relative
+                Write-TestUtf8 $path ('unicode evidence' + [char]10)
+                $case.GuiManifest.evidenceFiles += [ordered]@{ path = $relative; sha256 = Get-TestSha256 $path; length = [long](Get-Item $path).Length }
+            }
+        } }
+    ) {
+        param($Name, $Mutate)
+        $case = New-ReleaseContractCase ('gui-evidence-collision-' + $Name)
+        & $Mutate $case
+        $case.Summary.evidenceFileCount = $case.GuiManifest.evidenceFiles.Count
+        Save-TestGuiManifest $case
+        Save-TestSummary $case
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_gui_(manifest_invalid|evidence_inventory_invalid)'
+    }
+}
+
+Describe 'Pinned SPDX and LicenseRef enforcement' {
+    It 'pins the exact canonical producer GUI schema fixture' {
+        (Get-TestSha256 $script:ProducerGuiSchemaFixture) | Should Be $script:ProducerGuiSchemaSha256
+    }
+
+    It 'rejects SPDX documents missing official 2.3 required evidence' -TestCases @(
+        @{ Name = 'creation-info'; Mutate = { param($case) [void]$case.Spdx.Remove('creationInfo') } },
+        @{ Name = 'package-copyright'; Mutate = { param($case) [void]$case.Spdx.packages[0].Remove('copyrightText') } },
+        @{ Name = 'file-copyright'; Mutate = { param($case) [void]$case.Spdx.files[0].Remove('copyrightText') } }
+    ) {
+        param($Name, $Mutate)
+        $case = New-ReleaseContractCase ('spdx-required-' + $Name)
+        & $Mutate $case
+        Save-TestSpdx $case
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_spdx_schema_invalid'
+    }
+
+    It 'rejects a LicenseRef notice hidden in dot-git and absent from component noticeFiles' {
+        $case = New-ReleaseContractCase 'license-ref-rogue-git'
+        $roguePath = Join-Path $case.Repository '.git\rogue-license.txt'
+        Write-TestUtf8 $roguePath ('rogue license text' + [char]10)
+        foreach ($lock in @($case.Lock, $case.InnerLock)) {
+            $component = $lock.components[0]
+            $component.licenseExpression = 'LicenseRef-Rogue'
+            $component.licenseConcluded = 'LicenseRef-Rogue'
+            $component | Add-Member NoteProperty licenseRefs @([ordered]@{
+                licenseId = 'LicenseRef-Rogue'
+                name = 'Rogue license'
+                noticePath = '.git/rogue-license.txt'
+            }) -Force
+        }
+        $package = $case.Spdx.packages | Where-Object SPDXID -ceq 'SPDXRef-Package-application'
+        $package.licenseDeclared = 'LicenseRef-Rogue'
+        $package.licenseConcluded = 'LicenseRef-Rogue'
+        $case.Spdx.hasExtractedLicensingInfos = @([ordered]@{
+            licenseId = 'LicenseRef-Rogue'
+            name = 'Rogue license'
+            extractedText = [IO.File]::ReadAllText($roguePath, [Text.UTF8Encoding]::new($false, $true))
+        })
+        Rebuild-TestCorrespondingSources $case
+        Save-TestSpdx $case
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_license_ref_notice_invalid'
+    }
+}
+
+Describe 'Canonical producer GUI schema handshake' {
+    It 'rejects the legacy no-blob schema identity' {
+        $case = New-ReleaseContractCase 'gui-schema-legacy-id'
+        $case.GuiSchema.'$id' = 'https://github.com/KaronLabs/ytdlp-korean-interface/release/validation/v2.19.1-karon.2/gui-validation-output.schema.json'
+        Write-TestJson $case.GuiSchemaPath $case.GuiSchema
+        Refresh-TestInputRecord $case 'guiValidationSchema' $case.GuiSchemaPath $script:GuiSchemaRepositoryPath 'path'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_gui_schema_(lock_mismatch|identity_invalid)'
+    }
+
+    It 'accepts producer $defs.evidenceManifest without the stale $defs.manifest alias' {
+        $case = New-ReleaseContractCase 'gui-schema-producer-integration'
+        [IO.File]::Copy($script:ProducerGuiSchemaFixture, $case.GuiSchemaPath, $true)
+        Refresh-TestInputRecord $case 'guiValidationSchema' $case.GuiSchemaPath $script:GuiSchemaRepositoryPath 'path'
+        $result = Invoke-TestPackage $case -PlanOnly
+        $result.Mode | Should Be 'plan'
     }
 }
 
@@ -810,7 +917,7 @@ Describe 'Exact package, GUI evidence, and receipt contract' {
 
     It 'rejects producer schema divergence even when the changed schema is tracked and lock-bound' {
         $case = New-ReleaseContractCase 'package-gui-schema-divergence'
-        $case.GuiSchema.'$defs'.summary.properties.releaseVersion.const = 'v2.19.1-karon.other'
+        $case.GuiSchema.'$id' = 'https://github.com/KaronLabs/ytdlp-korean-interface/blob/v2.19.1-karon.other/release/validation/v2.19.1-karon.2/gui-validation-output.schema.json'
         Write-TestJson $case.GuiSchemaPath $case.GuiSchema
         Refresh-TestInputRecord $case 'guiValidationSchema' $case.GuiSchemaPath $script:GuiSchemaRepositoryPath 'path'
         (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_gui_'
@@ -974,10 +1081,10 @@ Describe 'Fail-closed publication preflight and receipt checks' {
     It 'rejects receipt tampering before external commands' {
         $case = New-PackagedPublicationCase 'publish-receipt-tamper'
         $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json -Depth 32
-        $receipt.sourceCommit = 'f' * 40
+        $receipt.packagingCommit = 'f' * 40
         Write-TestJson $case.ReceiptPath $receipt
         $fake = New-FakePublicationRunner $case
-        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly }) | Should Match 'package_receipt_source_mismatch'
+        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly }) | Should Match 'package_receipt_packaging_commit_mismatch'
         $fake.Calls.Count | Should Be 0
     }
 
@@ -1027,7 +1134,8 @@ Describe 'Draft-first publication, redownload proof, and race gates' {
             $command.Arguments[6] | Should Be $script:AssetNames[$index]
             ($command.Arguments -contains '--clobber') | Should Be $false
         }
-        ($result.Commands[6].Arguments -join '|') | Should Be ('release|edit|' + $script:Tag + '|--repo|KaronLabs/ytdlp-korean-interface|--draft=false')
+        @($result.Commands[2..5] | ForEach-Object { $_.Arguments[8] } | Select-Object -Unique).Count | Should Be 1
+        ($result.Commands[6].Arguments -join '|') | Should Be 'api|--method|PATCH|repos/KaronLabs/ytdlp-korean-interface/releases/{sealed-release-id}|--field|draft=false'
         (@($fake.Calls | Where-Object { $_.Executable -ceq 'gh' -and $_.Arguments[0] -ceq 'release' })).Count | Should Be 0
     }
 
@@ -1041,8 +1149,9 @@ Describe 'Draft-first publication, redownload proof, and race gates' {
         $releaseCalls = @($fake.Calls | Where-Object { $_.Executable -ceq 'gh' -and $_.Arguments[0] -ceq 'release' })
         ($releaseCalls | ForEach-Object { $_.Arguments[1] } | Where-Object { $_ -ceq 'download' }).Count | Should Be 4
         (@($releaseCalls | Where-Object { $_.Arguments[1] -ceq 'verify-asset' })).Count | Should Be 0
-        $publishIndex = [Array]::FindIndex([object[]]$releaseCalls, [Predicate[object]]{ param($call) $call.Arguments -contains '--draft=false' })
-        $lastDownloadIndex = [Array]::FindLastIndex([object[]]$releaseCalls, [Predicate[object]]{ param($call) $call.Arguments[1] -ceq 'download' })
+        $allCalls = [object[]]@($fake.Calls)
+        $publishIndex = [Array]::FindIndex($allCalls, [Predicate[object]]{ param($call) $call.Executable -ceq 'gh' -and $call.Arguments[0] -ceq 'api' -and $call.Arguments -contains 'draft=false' })
+        $lastDownloadIndex = [Array]::FindLastIndex($allCalls, [Predicate[object]]{ param($call) $call.Executable -ceq 'gh' -and $call.Arguments[0] -ceq 'release' -and $call.Arguments[1] -ceq 'download' })
         ($publishIndex -gt $lastDownloadIndex) | Should Be $true
         $fake.State.ReleaseQueries | Should BeGreaterThan 8
     }
@@ -1055,14 +1164,14 @@ Describe 'Draft-first publication, redownload proof, and race gates' {
         $case = New-PackagedPublicationCase ('publish-release-id-' + $Name)
         $fake = New-FakePublicationRunner $case $Options
         (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should Match 'publication_release_'
-        $fake.State.Stage | Should Be 'draft-assets'
+        $fake.State.Stage | Should Match '^draft-'
     }
 
     It 'rejects array-valued tag_name before PowerShell coercion' {
         $case = New-PackagedPublicationCase 'publish-array-tag-name'
         $fake = New-FakePublicationRunner $case @{ TagNameAsArray = $true }
         (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should Match 'publication_release_json_invalid'
-        $fake.State.Stage | Should Be 'draft-assets'
+        $fake.State.Stage | Should Match '^draft-'
     }
 
     It 'rejects release title or body drift while preserving draft state' -TestCases @(
@@ -1073,7 +1182,7 @@ Describe 'Draft-first publication, redownload proof, and race gates' {
         $case = New-PackagedPublicationCase ('publish-release-metadata-' + $Name)
         $fake = New-FakePublicationRunner $case $Options
         (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should Match 'publication_release_'
-        $fake.State.Stage | Should Be 'draft-assets'
+        $fake.State.Stage | Should Match '^draft-'
     }
 
     It 'leaves the release draft when a redownload hash differs' {
@@ -1114,12 +1223,47 @@ Describe 'Draft-first publication, redownload proof, and race gates' {
 
     It 'rolls a stable transition back to draft if the final ref recheck races' {
         $case = New-PackagedPublicationCase 'publish-poststable-race'
-        $fake = New-FakePublicationRunner $case @{ MainRaceAt = 6 }
+        $fake = New-FakePublicationRunner $case @{ MainRaceAt = 7 }
         (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should Match 'publication_'
         $fake.State.Stage | Should Be 'draft-assets'
         (@($fake.Calls | Where-Object {
-            $_.Executable -ceq 'gh' -and $_.Arguments[0] -ceq 'release' -and
-            $_.Arguments[1] -ceq 'edit' -and $_.Arguments -contains '--draft'
+            $_.Executable -ceq 'gh' -and $_.Arguments[0] -ceq 'api' -and
+            $_.Arguments[2] -ceq 'PATCH' -and $_.Arguments -contains 'draft=true'
         })).Count | Should Be 1
+    }
+
+    It 'seals every numeric remote asset id after upload' -TestCases @(
+        @{ Name = 'post-upload'; Query = 4 },
+        @{ Name = 'mid-redownload'; Query = 7 },
+        @{ Name = 'post-stable'; Query = 10 }
+    ) {
+        param($Name, $Query)
+        $case = New-PackagedPublicationCase ('publish-asset-id-race-' + $Name)
+        $fake = New-FakePublicationRunner $case @{ AssetIdRaceAt = $Query }
+        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should Match 'publication_remote_asset_identity_mismatch'
+        $fake.State.Stage | Should Be 'draft-assets'
+    }
+
+    It 'uses one fresh verification directory for all four pre-stable downloads' {
+        $case = New-PackagedPublicationCase 'publish-single-verification-directory'
+        $fake = New-FakePublicationRunner $case
+        $plan = Invoke-TestPublication $case $fake -PlanOnly
+        $directories = @($plan.Commands | Where-Object Name -like 'download-*' | ForEach-Object { [string]$_.Arguments[8] } | Select-Object -Unique)
+        $directories.Count | Should Be 1
+        [IO.Path]::GetFileName($directories[0]) | Should Match '^karon-release-verify-[a-f0-9]{32}$'
+    }
+
+    It 'targets stable mutation by sealed numeric release id and never by tag' {
+        $case = New-PackagedPublicationCase 'publish-numeric-id-mutation'
+        $fake = New-FakePublicationRunner $case
+        [void](Invoke-TestPublication $case $fake)
+        $patches = @($fake.Calls | Where-Object {
+            $_.Executable -ceq 'gh' -and $_.Arguments[0] -ceq 'api' -and $_.Arguments[2] -ceq 'PATCH'
+        })
+        $patches.Count | Should Be 1
+        ($patches[0].Arguments -join '|') | Should Be 'api|--method|PATCH|repos/KaronLabs/ytdlp-korean-interface/releases/424242|--field|draft=false'
+        (@($fake.Calls | Where-Object {
+            $_.Executable -ceq 'gh' -and $_.Arguments[0] -ceq 'release' -and $_.Arguments[1] -ceq 'edit'
+        })).Count | Should Be 0
     }
 }

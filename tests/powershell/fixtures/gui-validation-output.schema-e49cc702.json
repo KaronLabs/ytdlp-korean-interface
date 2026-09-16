@@ -1,0 +1,533 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/KaronLabs/ytdlp-korean-interface/blob/v2.19.1-karon.2/release/validation/v2.19.1-karon.2/gui-validation-output.schema.json",
+  "title": "v2.19.1-karon.2 GUI validation output",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/summary"
+    },
+    {
+      "$ref": "#/$defs/evidenceManifest"
+    }
+  ],
+  "$defs": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 2
+    },
+    "releaseVersion": {
+      "type": "string",
+      "const": "v2.19.1-karon.2"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "positiveLength": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "candidateFile": {
+      "type": "object",
+      "required": [
+        "fileName",
+        "sha256",
+        "length"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "fileName": {
+          "type": "string"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "length": {
+          "$ref": "#/$defs/positiveLength"
+        }
+      }
+    },
+    "candidateExecutable": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/candidateFile"
+        },
+        {
+          "properties": {
+            "fileName": {
+              "const": "ytdlp-interface.exe"
+            }
+          }
+        }
+      ]
+    },
+    "candidateFfprobe": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/candidateFile"
+        },
+        {
+          "properties": {
+            "fileName": {
+              "const": "ffprobe.exe"
+            }
+          }
+        }
+      ]
+    },
+    "candidateManifestFile": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/candidateFile"
+        },
+        {
+          "properties": {
+            "fileName": {
+              "const": "candidate-manifest.json"
+            }
+          }
+        }
+      ]
+    },
+    "candidate": {
+      "type": "object",
+      "required": [
+        "executable",
+        "ffprobe",
+        "manifest"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "executable": {
+          "$ref": "#/$defs/candidateExecutable"
+        },
+        "ffprobe": {
+          "$ref": "#/$defs/candidateFfprobe"
+        },
+        "manifest": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/candidateManifestFile"
+            }
+          ]
+        }
+      }
+    },
+    "caseRecord": {
+      "type": "object",
+      "required": [
+        "caseId",
+        "language",
+        "dpi",
+        "evidenceFile",
+        "evidenceSha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "caseId": {
+          "enum": [
+            "ko-KR-100",
+            "ko-KR-150",
+            "ko-KR-200",
+            "en-US-100",
+            "en-US-150",
+            "en-US-200"
+          ]
+        },
+        "language": {
+          "enum": [
+            "ko-KR",
+            "en-US"
+          ]
+        },
+        "dpi": {
+          "enum": [
+            100,
+            150,
+            200
+          ]
+        },
+        "evidenceFile": {
+          "type": "string",
+          "pattern": "^cases/(?:ko-KR|en-US)-(?:100|150|200)\\.json$"
+        },
+        "evidenceSha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "caseKo100": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/caseRecord"
+        },
+        {
+          "properties": {
+            "caseId": {
+              "const": "ko-KR-100"
+            },
+            "language": {
+              "const": "ko-KR"
+            },
+            "dpi": {
+              "const": 100
+            },
+            "evidenceFile": {
+              "const": "cases/ko-KR-100.json"
+            }
+          }
+        }
+      ]
+    },
+    "caseKo150": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/caseRecord"
+        },
+        {
+          "properties": {
+            "caseId": {
+              "const": "ko-KR-150"
+            },
+            "language": {
+              "const": "ko-KR"
+            },
+            "dpi": {
+              "const": 150
+            },
+            "evidenceFile": {
+              "const": "cases/ko-KR-150.json"
+            }
+          }
+        }
+      ]
+    },
+    "caseKo200": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/caseRecord"
+        },
+        {
+          "properties": {
+            "caseId": {
+              "const": "ko-KR-200"
+            },
+            "language": {
+              "const": "ko-KR"
+            },
+            "dpi": {
+              "const": 200
+            },
+            "evidenceFile": {
+              "const": "cases/ko-KR-200.json"
+            }
+          }
+        }
+      ]
+    },
+    "caseEn100": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/caseRecord"
+        },
+        {
+          "properties": {
+            "caseId": {
+              "const": "en-US-100"
+            },
+            "language": {
+              "const": "en-US"
+            },
+            "dpi": {
+              "const": 100
+            },
+            "evidenceFile": {
+              "const": "cases/en-US-100.json"
+            }
+          }
+        }
+      ]
+    },
+    "caseEn150": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/caseRecord"
+        },
+        {
+          "properties": {
+            "caseId": {
+              "const": "en-US-150"
+            },
+            "language": {
+              "const": "en-US"
+            },
+            "dpi": {
+              "const": 150
+            },
+            "evidenceFile": {
+              "const": "cases/en-US-150.json"
+            }
+          }
+        }
+      ]
+    },
+    "caseEn200": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/caseRecord"
+        },
+        {
+          "properties": {
+            "caseId": {
+              "const": "en-US-200"
+            },
+            "language": {
+              "const": "en-US"
+            },
+            "dpi": {
+              "const": 200
+            },
+            "evidenceFile": {
+              "const": "cases/en-US-200.json"
+            }
+          }
+        }
+      ]
+    },
+    "caseId": {
+      "type": "string",
+      "enum": [
+        "ko-KR-100",
+        "ko-KR-150",
+        "ko-KR-200",
+        "en-US-100",
+        "en-US-150",
+        "en-US-200"
+      ]
+    },
+    "probe": {
+      "type": "object",
+      "required": [
+        "caseId",
+        "kind",
+        "sourceEvidencePath",
+        "path",
+        "sha256",
+        "length"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "caseId": {
+          "$ref": "#/$defs/caseId"
+        },
+        "kind": {
+          "enum": [
+            "video",
+            "mp3"
+          ]
+        },
+        "sourceEvidencePath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^probes/(?:ko-KR|en-US)-(?:100|150|200)-(?:video|mp3)\\.ffprobe\\.json$"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "length": {
+          "$ref": "#/$defs/positiveLength"
+        }
+      }
+    },
+    "evidenceFile": {
+      "type": "object",
+      "required": [
+        "path",
+        "sha256",
+        "length"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "length": {
+          "$ref": "#/$defs/positiveLength"
+        }
+      }
+    },
+    "representativeChecks": {
+      "type": "object",
+      "required": [
+        "mp3Conversion",
+        "settingsSaveRestartRestore",
+        "legacySettingsTransition"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "mp3Conversion": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/caseId"
+          }
+        },
+        "settingsSaveRestartRestore": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/caseId"
+          }
+        },
+        "legacySettingsTransition": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/caseId"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "releaseVersion",
+        "status",
+        "candidate",
+        "cases",
+        "fullVideoLifecycleCases",
+        "representativeChecks",
+        "generatedProbes",
+        "evidenceFileCount",
+        "evidenceManifestFile"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/schemaVersion"
+        },
+        "releaseVersion": {
+          "$ref": "#/$defs/releaseVersion"
+        },
+        "status": {
+          "type": "string",
+          "const": "PASS"
+        },
+        "candidate": {
+          "$ref": "#/$defs/candidate"
+        },
+        "cases": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/caseKo100"
+            },
+            {
+              "$ref": "#/$defs/caseKo150"
+            },
+            {
+              "$ref": "#/$defs/caseKo200"
+            },
+            {
+              "$ref": "#/$defs/caseEn100"
+            },
+            {
+              "$ref": "#/$defs/caseEn150"
+            },
+            {
+              "$ref": "#/$defs/caseEn200"
+            }
+          ],
+          "items": false
+        },
+        "fullVideoLifecycleCases": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            {
+              "const": "ko-KR-100"
+            },
+            {
+              "const": "en-US-200"
+            }
+          ],
+          "items": false
+        },
+        "representativeChecks": {
+          "$ref": "#/$defs/representativeChecks"
+        },
+        "generatedProbes": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/probe"
+          }
+        },
+        "evidenceFileCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "evidenceManifestFile": {
+          "type": "string",
+          "const": "gui-validation-evidence-manifest.json"
+        }
+      }
+    },
+    "evidenceManifest": {
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "releaseVersion",
+        "candidate",
+        "evidenceFiles",
+        "generatedProbeFiles"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/schemaVersion"
+        },
+        "releaseVersion": {
+          "$ref": "#/$defs/releaseVersion"
+        },
+        "candidate": {
+          "$ref": "#/$defs/candidate"
+        },
+        "evidenceFiles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidenceFile"
+          }
+        },
+        "generatedProbeFiles": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/probe"
+          }
+        }
+      }
+    }
+  }
+}
