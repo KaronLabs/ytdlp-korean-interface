@@ -208,6 +208,32 @@ function Get-BytesSha256 {
     finally { $sha.Dispose() }
 }
 
+function Read-BoundedPrivateFileBytes {
+    param(
+        [Parameter(Mandatory = $true)][string] $Path,
+        [Parameter(Mandatory = $true)][long] $MaximumLength,
+        [Parameter(Mandatory = $true)][string] $Label
+    )
+    [void](Assert-ReparseFreePath -Path $Path -Label $Label)
+    $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
+    try {
+        $length = $stream.Length
+        if ($length -le 0 -or $length -gt $MaximumLength -or $length -gt [int]::MaxValue) { throw ($Label + '_size_invalid') }
+        $bytes = New-Object byte[] ([int]$length)
+        $offset = 0
+        while ($offset -lt $bytes.Length) {
+            $read = $stream.Read($bytes, $offset, $bytes.Length - $offset)
+            if ($read -le 0) { throw ($Label + '_read_incomplete') }
+            $offset += $read
+        }
+        if ($stream.ReadByte() -ne -1) { throw ($Label + '_length_changed') }
+        return ,$bytes
+    }
+    finally {
+        $stream.Dispose()
+    }
+}
+
 function Get-PathSha256 {
     param([Parameter(Mandatory = $true)] [string] $Path)
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToUpperInvariant()
@@ -697,7 +723,13 @@ function New-DeterministicZip {
         }
         else {
             $bytes = [byte[]]$entry.bytes
-            $prepared.Add([ordered]@{ name = $name; bytes = $bytes; expectedSha256 = Get-BytesSha256 $bytes; expectedLength = $bytes.Length })
+            $actualSha256 = Get-BytesSha256 $bytes
+            $actualLength = [long]$bytes.Length
+            $declaredSha256 = [string](Get-ObjectProperty -Value $entry -Name 'expectedSha256')
+            $declaredLength = Get-ObjectProperty -Value $entry -Name 'expectedLength'
+            if (-not [string]::IsNullOrWhiteSpace($declaredSha256) -and $actualSha256 -cne $declaredSha256.ToUpperInvariant()) { throw ('bundle_entry_hash_mismatch:' + $name) }
+            if ($null -ne $declaredLength -and $actualLength -ne [long]$declaredLength) { throw ('bundle_entry_length_mismatch:' + $name) }
+            $prepared.Add([ordered]@{ name = $name; bytes = $bytes; expectedSha256 = $actualSha256; expectedLength = $actualLength })
         }
     }
     $partial = $OutputPath + '.partial.' + $PID + '.' + [Guid]::NewGuid().ToString('N')
@@ -762,6 +794,10 @@ $bundleEntries = New-Object 'Collections.Generic.List[object]'
 $nlohmannEvidenceBytes = $null
 $applicationSourceArchive = $null
 $candidate = $null
+$candidateManifestBytes = $null
+$candidateManifestSha256 = $null
+$candidateManifestLength = $null
+$candidateManifestParseFailed = $false
 $dependencyExtracted = $null
 $task5RuntimeExtracted = $null
 $task5SourceExtracted = $null
@@ -815,8 +851,19 @@ foreach ($input in @(
 }
 
 if (-not [string]::IsNullOrWhiteSpace($CandidateManifestPath)) {
-    try { $CandidateManifestPath = Copy-InputToPrivateStaging -SourcePath $CandidateManifestPath -RelativePath 'inputs\candidate-manifest.json' -Label 'candidate-manifest' }
-    catch { Add-EvidenceBlocker $_.Exception.Message; $CandidateManifestPath = '' }
+    try {
+        $CandidateManifestPath = Copy-InputToPrivateStaging -SourcePath $CandidateManifestPath -RelativePath 'inputs\candidate-manifest.json' -Label 'candidate-manifest'
+        $candidateManifestBytes = Read-BoundedPrivateFileBytes -Path $CandidateManifestPath -MaximumLength (1MB) -Label 'candidate_manifest'
+        $candidateManifestLength = [int64]$candidateManifestBytes.Length
+        $candidateManifestSha256 = Get-BytesSha256 $candidateManifestBytes
+        $candidateText = (New-Object Text.UTF8Encoding($false, $true)).GetString($candidateManifestBytes)
+        $candidate = $candidateText | ConvertFrom-Json
+    }
+    catch {
+        if ($_.Exception.Message -ceq 'candidate_manifest_size_invalid') { Add-EvidenceBlocker 'candidate_manifest_size_invalid' }
+        else { Add-EvidenceBlocker ('candidate_manifest_invalid:' + $_.Exception.Message) }
+        $candidateManifestParseFailed = $true
+    }
 }
 
 if (-not [string]::IsNullOrWhiteSpace($SevenZipExecutable)) {
@@ -1120,10 +1167,11 @@ if ($null -ne $manifest) {
         catch { Add-EvidenceBlocker ('application_source_archive_failed:' + $_.Exception.Message) }
     }
 
-    if ([string]::IsNullOrWhiteSpace($CandidateManifestPath) -or -not (Test-Path -LiteralPath $CandidateManifestPath -PathType Leaf)) { Add-EvidenceBlocker 'candidate_manifest_required' }
+    if ([string]::IsNullOrWhiteSpace($CandidateManifestPath)) { Add-EvidenceBlocker 'candidate_manifest_required' }
+    elseif ($candidateManifestParseFailed) { }
+    elseif ($null -eq $candidate) { Add-EvidenceBlocker 'candidate_manifest_invalid:root_null' }
     else {
         try {
-            $candidate = Get-Content -LiteralPath $CandidateManifestPath -Raw | ConvertFrom-Json
             if ([string]$candidate.attestation.source.commit -cne $ApplicationCommit -or [bool]$candidate.attestation.source.dirty) { Add-EvidenceBlocker 'candidate_source_binding_mismatch' }
             $dependency = $manifest.sharedInputs.dependencyArchive
             if ([string]$candidate.attestation.dependencyArchive.name -cne [string]$dependency.fileName -or
@@ -1156,7 +1204,8 @@ $inventory = [ordered]@{
     manifestSha256 = $manifestSha256
     manifestProjectionSha256 = $manifestProjectionSha256
     applicationCommit = $(if ([string]::IsNullOrWhiteSpace($ApplicationCommit)) { $null } else { $ApplicationCommit })
-    candidateManifestSha256 = $(if (-not [string]::IsNullOrWhiteSpace($CandidateManifestPath) -and (Test-Path -LiteralPath $CandidateManifestPath -PathType Leaf)) { Get-PathSha256 $CandidateManifestPath } else { $null })
+    candidateManifestSha256 = $candidateManifestSha256
+    candidateManifestLength = $candidateManifestLength
     dependencyArchiveSha256 = $(if (Test-Path -LiteralPath $DependencyArchivePath -PathType Leaf) { Get-PathSha256 $DependencyArchivePath } else { $null })
     sevenZipTask5 = [ordered]@{
         runtimeArchiveSha256 = $(if (Test-Path -LiteralPath $SevenZipRuntimeArchivePath -PathType Leaf) { Get-PathSha256 $SevenZipRuntimeArchivePath } else { $null })
@@ -1170,6 +1219,18 @@ $inventoryPath = Join-Path $OutputDirectory 'source-cache-inventory.json'
 
 try {
     Write-AtomicBytes $inventoryPath $inventoryBytes
+    if ([string]$manifest.approvalProfile -ceq $fixtureApprovalProfile -and
+        $env:KARON_EVIDENCE_INTERNAL_TEST_HOOK -ceq 'candidate-after-inventory-v1') {
+        $hookSignalPath = Join-Path $OutputDirectory '.candidate-after-inventory.signal'
+        $hookContinuePath = Join-Path $OutputDirectory '.candidate-after-inventory.continue'
+        if ((Test-Path -LiteralPath $hookSignalPath) -or (Test-Path -LiteralPath $hookContinuePath)) { throw 'internal_candidate_hook_path_exists' }
+        [IO.File]::WriteAllText($hookSignalPath, $CandidateManifestPath, (New-Object Text.UTF8Encoding($false)))
+        $hookDeadline = [DateTime]::UtcNow.AddSeconds(30)
+        while (-not [IO.File]::Exists($hookContinuePath)) {
+            if ([DateTime]::UtcNow -ge $hookDeadline) { throw 'internal_candidate_hook_timeout' }
+            Start-Sleep -Milliseconds 5
+        }
+    }
     if ($script:blockers.Count -gt 0) {
         $orderedBlockers = $script:blockers.ToArray()
         [Array]::Sort($orderedBlockers, [StringComparer]::Ordinal)
@@ -1197,7 +1258,7 @@ try {
     $bundleEntries.Add([ordered]@{ name = 'component-manifest.json'; path = $ManifestPath; expectedSha256 = $manifestSha256; expectedLength = $manifestBytes.Length })
     $bundleEntries.Add([ordered]@{ name = 'source-cache-inventory.json'; bytes = $inventoryBytes })
     $bundleEntries.Add([ordered]@{ name = 'application/' + (Split-Path -Leaf $applicationSourceArchive); path = $applicationSourceArchive; expectedSha256 = Get-PathSha256 $applicationSourceArchive; expectedLength = (Get-Item -LiteralPath $applicationSourceArchive).Length })
-    $bundleEntries.Add([ordered]@{ name = 'evidence/candidate-manifest.json'; path = $CandidateManifestPath; expectedSha256 = Get-PathSha256 $CandidateManifestPath; expectedLength = (Get-Item -LiteralPath $CandidateManifestPath).Length })
+    $bundleEntries.Add([ordered]@{ name = 'evidence/candidate-manifest.json'; bytes = $candidateManifestBytes; expectedSha256 = $candidateManifestSha256; expectedLength = $candidateManifestLength })
     $bundleEntries.Add([ordered]@{ name = 'evidence/nlohmann-json-header.transform.json'; bytes = $nlohmannEvidenceBytes })
     $bundleEntries.Add([ordered]@{ name = 'evidence/dependency-archive/' + (Split-Path -Leaf $DependencyArchivePath); path = $DependencyArchivePath; expectedSha256 = ([string]$manifest.sharedInputs.dependencyArchive.sha256).ToUpperInvariant(); expectedLength = [long]$manifest.sharedInputs.dependencyArchive.length })
     $bundleEntries.Add([ordered]@{ name = 'evidence/task5/' + (Split-Path -Leaf $SevenZipRuntimeArchivePath); path = $SevenZipRuntimeArchivePath; expectedSha256 = ([string]$manifest.sharedInputs.sevenZipTask5.runtimeArchiveSha256).ToUpperInvariant(); expectedLength = [long]$manifest.sharedInputs.sevenZipTask5.runtimeArchiveLength })

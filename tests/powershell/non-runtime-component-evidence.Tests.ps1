@@ -906,4 +906,182 @@ Describe 'non-runtime component evidence collector' {
         (Test-Path -LiteralPath (Join-Path $fixture.Root 'output-a\non-runtime-component-blockers.json')) | Should Be $false
         (Get-TestSha256 $bundleA) | Should Be (Get-TestSha256 $bundleB)
     }
+    It 'rejects the exact 64 MiB candidate replacement race after inventory' {
+        $fixture = New-ComponentEvidenceFixture 'candidate-race-64mib'
+        $raceOutput = Join-Path $fixture.Root 'output'
+        $raceTemp = Join-Path $fixture.Root 'private-temp'
+        [void](New-Item -ItemType Directory -Path $raceTemp -Force)
+
+        $validCandidateBytes = [System.IO.File]::ReadAllBytes($fixture.Candidate)
+        $candidateLength = [int64](64MB)
+        $candidateStream = [System.IO.File]::Open($fixture.Candidate, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+        try {
+            $candidateStream.Write($validCandidateBytes, 0, $validCandidateBytes.Length)
+            $spaces = New-Object byte[] (1MB)
+            [Array]::Fill[byte]($spaces, [byte]0x20)
+            $remaining = $candidateLength - $validCandidateBytes.Length
+            while ($remaining -gt 0) {
+                $count = [int][Math]::Min([int64]$spaces.Length, $remaining)
+                $candidateStream.Write($spaces, 0, $count)
+                $remaining -= $count
+            }
+            $candidateStream.Flush($true)
+        }
+        finally {
+            $candidateStream.Dispose()
+        }
+        $originalCandidateSha256 = Get-TestSha256 $fixture.Candidate
+
+        $forgedCandidateBytes = [System.Text.Encoding]::UTF8.GetBytes('{"forgedAfterValidation":true}')
+        $forgedCandidatePath = Join-Path $fixture.Root 'forged-candidate-manifest.json'
+        [System.IO.File]::WriteAllBytes($forgedCandidatePath, $forgedCandidateBytes)
+        $forgedCandidateSha256 = [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($forgedCandidateBytes))
+
+        $signalPath = Join-Path $raceOutput '.candidate-after-inventory.signal'
+        $continuePath = Join-Path $raceOutput '.candidate-after-inventory.continue'
+        $inventoryPath = Join-Path $raceOutput 'source-cache-inventory.json'
+        $swapJob = Start-Job -ArgumentList @($signalPath, $continuePath, $inventoryPath, $raceTemp, $forgedCandidatePath) -ScriptBlock {
+            param($SignalPath, $ContinuePath, $InventoryPath, $RaceTemp, $ForgedCandidatePath)
+
+            $deadline = [DateTime]::UtcNow.AddSeconds(45)
+            $stagedCandidatePath = $null
+            while (-not [System.IO.File]::Exists($SignalPath) -and -not [System.IO.File]::Exists($InventoryPath)) {
+                if ([DateTime]::UtcNow -ge $deadline) { throw '64 MiB candidate race synchronization timeout' }
+                if ($null -eq $stagedCandidatePath) {
+                    $candidate = Get-ChildItem -LiteralPath $RaceTemp -Recurse -File -Filter 'candidate-manifest.json' -ErrorAction SilentlyContinue |
+                        Where-Object { $_.FullName -like '*karon-component-evidence-staging-*' } |
+                        Select-Object -First 1
+                    if ($null -ne $candidate) { $stagedCandidatePath = $candidate.FullName }
+                }
+                Start-Sleep -Milliseconds 5
+            }
+
+            if (-not [System.IO.File]::Exists($SignalPath)) {
+                $hookDeadline = [DateTime]::UtcNow.AddMilliseconds(150)
+                while (-not [System.IO.File]::Exists($SignalPath) -and [DateTime]::UtcNow -lt $hookDeadline) {
+                    Start-Sleep -Milliseconds 5
+                }
+            }
+
+            $mode = 'fallback'
+            if ([System.IO.File]::Exists($SignalPath)) {
+                $mode = 'hook'
+                $stagedCandidatePath = [System.IO.File]::ReadAllText($SignalPath).Trim()
+            }
+            if ([string]::IsNullOrWhiteSpace($stagedCandidatePath)) { throw 'staged 64 MiB candidate was not observed' }
+
+            [System.IO.File]::WriteAllBytes($stagedCandidatePath, [System.IO.File]::ReadAllBytes($ForgedCandidatePath))
+            if ($mode -eq 'hook') { [System.IO.File]::WriteAllText($ContinuePath, 'continue') }
+            "$mode|$stagedCandidatePath"
+        }
+
+        $previousTemp = $env:TEMP
+        $previousTmp = $env:TMP
+        $previousHook = $env:KARON_EVIDENCE_INTERNAL_TEST_HOOK
+        try {
+            $env:TEMP = $raceTemp
+            $env:TMP = $raceTemp
+            $env:KARON_EVIDENCE_INTERNAL_TEST_HOOK = 'candidate-after-inventory-v1'
+            $result = Invoke-TestCollector -Fixture $fixture -OutputDirectory $raceOutput
+            $swapOutcome = Receive-Job -Job $swapJob -Wait -ErrorAction Stop | Select-Object -Last 1
+        }
+        finally {
+            $env:TEMP = $previousTemp
+            $env:TMP = $previousTmp
+            $env:KARON_EVIDENCE_INTERNAL_TEST_HOOK = $previousHook
+            if ($null -ne $swapJob) {
+                if ($swapJob.State -eq 'Running') { Stop-Job -Job $swapJob -ErrorAction SilentlyContinue }
+                Remove-Job -Job $swapJob -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        $swapOutcome | Should Match '^(fallback|hook)\|'
+        $inventory = Get-Content -LiteralPath $inventoryPath -Raw | ConvertFrom-Json
+        $bundlePath = Join-Path $raceOutput 'test-fixture-non-runtime-component-evidence.zip'
+        if (Test-Path -LiteralPath $bundlePath -PathType Leaf) {
+            $archive = [System.IO.Compression.ZipFile]::OpenRead($bundlePath)
+            try {
+                $entry = @($archive.Entries | Where-Object { $_.FullName -ceq 'evidence/candidate-manifest.json' })[0]
+                $entryStream = $entry.Open()
+                $memory = New-Object System.IO.MemoryStream
+                try { $entryStream.CopyTo($memory); $bundleCandidateBytes = $memory.ToArray() }
+                finally { $entryStream.Dispose(); $memory.Dispose() }
+            }
+            finally { $archive.Dispose() }
+            $bundleCandidateSha256 = [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($bundleCandidateBytes))
+            Write-Host ("RACE_RED original={0} inventory={1} zip={2} forged={3}" -f $originalCandidateSha256, $inventory.candidateManifestSha256, $bundleCandidateSha256, $forgedCandidateSha256)
+            $inventory.candidateManifestSha256 | Should BeExactly $originalCandidateSha256
+            $bundleCandidateSha256 | Should Not BeExactly $forgedCandidateSha256
+        }
+
+        $result.ExitCode | Should Be 1
+        $blockerText = [System.IO.File]::ReadAllText((Join-Path $raceOutput 'non-runtime-component-blockers.json'))
+        $blockerText | Should Match 'candidate_manifest_size_invalid'
+        (Test-Path -LiteralPath $bundlePath) | Should Be $false
+    }
+
+    It 'keeps a small validated candidate immutable after its staged path is replaced' {
+        $fixture = New-ComponentEvidenceFixture 'candidate-post-validation-swap'
+        $raceOutput = Join-Path $fixture.Root 'output'
+        $originalCandidateBytes = [System.IO.File]::ReadAllBytes($fixture.Candidate)
+        $originalCandidateSha256 = [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($originalCandidateBytes))
+        $originalCandidateLength = [int64]$originalCandidateBytes.Length
+        $forgedCandidateBytes = [System.Text.Encoding]::UTF8.GetBytes('{"forgedAfterValidation":true}')
+        $forgedCandidatePath = Join-Path $fixture.Root 'forged-candidate-manifest.json'
+        [System.IO.File]::WriteAllBytes($forgedCandidatePath, $forgedCandidateBytes)
+        $forgedCandidateSha256 = [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($forgedCandidateBytes))
+
+        $signalPath = Join-Path $raceOutput '.candidate-after-inventory.signal'
+        $continuePath = Join-Path $raceOutput '.candidate-after-inventory.continue'
+        $swapJob = Start-Job -ArgumentList @($signalPath, $continuePath, $forgedCandidatePath) -ScriptBlock {
+            param($SignalPath, $ContinuePath, $ForgedCandidatePath)
+            $deadline = [DateTime]::UtcNow.AddSeconds(20)
+            while (-not [System.IO.File]::Exists($SignalPath)) {
+                if ([DateTime]::UtcNow -ge $deadline) { throw 'internal candidate hook was not reached' }
+                Start-Sleep -Milliseconds 5
+            }
+            $stagedCandidatePath = [System.IO.File]::ReadAllText($SignalPath).Trim()
+            [System.IO.File]::WriteAllBytes($stagedCandidatePath, [System.IO.File]::ReadAllBytes($ForgedCandidatePath))
+            [System.IO.File]::WriteAllText($ContinuePath, 'continue')
+            "hook|$stagedCandidatePath"
+        }
+
+        $previousHook = $env:KARON_EVIDENCE_INTERNAL_TEST_HOOK
+        try {
+            $env:KARON_EVIDENCE_INTERNAL_TEST_HOOK = 'candidate-after-inventory-v1'
+            $result = Invoke-TestCollector -Fixture $fixture -OutputDirectory $raceOutput
+            $swapOutcome = Receive-Job -Job $swapJob -Wait -ErrorAction Stop | Select-Object -Last 1
+        }
+        finally {
+            $env:KARON_EVIDENCE_INTERNAL_TEST_HOOK = $previousHook
+            if ($null -ne $swapJob) {
+                if ($swapJob.State -eq 'Running') { Stop-Job -Job $swapJob -ErrorAction SilentlyContinue }
+                Remove-Job -Job $swapJob -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        $result.ExitCode | Should Be 0
+        $swapOutcome | Should Match '^hook\|'
+        $inventoryPath = Join-Path $raceOutput 'source-cache-inventory.json'
+        $inventory = Get-Content -LiteralPath $inventoryPath -Raw | ConvertFrom-Json
+        $bundlePath = Join-Path $raceOutput 'test-fixture-non-runtime-component-evidence.zip'
+        $archive = [System.IO.Compression.ZipFile]::OpenRead($bundlePath)
+        try {
+            $entries = @($archive.Entries | Where-Object { $_.FullName -ceq 'evidence/candidate-manifest.json' })
+            $entries.Count | Should Be 1
+            $entryStream = $entries[0].Open()
+            $memory = New-Object System.IO.MemoryStream
+            try { $entryStream.CopyTo($memory); $bundleCandidateBytes = $memory.ToArray() }
+            finally { $entryStream.Dispose(); $memory.Dispose() }
+        }
+        finally { $archive.Dispose() }
+
+        $bundleCandidateSha256 = [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($bundleCandidateBytes))
+        $inventory.candidateManifestSha256 | Should BeExactly $originalCandidateSha256
+        ([int64]$inventory.candidateManifestLength) | Should Be $originalCandidateLength
+        $bundleCandidateSha256 | Should BeExactly $inventory.candidateManifestSha256
+        ([int64]$bundleCandidateBytes.Length) | Should Be ([int64]$inventory.candidateManifestLength)
+        $bundleCandidateSha256 | Should Not BeExactly $forgedCandidateSha256
+        [System.Text.Encoding]::UTF8.GetString($bundleCandidateBytes) | Should Not Match 'forgedAfterValidation'
+    }
 }
