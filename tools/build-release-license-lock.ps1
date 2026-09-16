@@ -6,7 +6,13 @@ param(
     [Parameter(Mandatory = $true)] [string] $NonRuntimeManifestPath,
     [Parameter(Mandatory = $true)] [string] $NonRuntimeInventoryPath,
     [Parameter(Mandatory = $true)] [string] $NonRuntimeEvidenceBundlePath,
-    [Parameter(Mandatory = $true)] [string] $DenoComponentManifestPath,
+        [Parameter(Mandatory = $true)]
+    [string]$DenoRunEvidencePath,
+
+    [Parameter(Mandatory = $true)]
+    [ValidatePattern('^[0-9a-fA-F]{40}$')]
+    [string]$DenoCollectorSourceCommit,
+[Parameter(Mandatory = $true)] [string] $DenoComponentManifestPath,
     [Parameter(Mandatory = $true)] [string] $DenoSourceInventoryPath,
     [Parameter(Mandatory = $true)] [string] $DenoNoticesPath,
     [Parameter(Mandatory = $true)] [string] $DenoSourcesArchivePath,
@@ -14,7 +20,9 @@ param(
     [Parameter(Mandatory = $true)] [string] $FfmpegSourcesArchivePath,
     [Parameter(Mandatory = $true)] [string] $SevenZipRuntimeArchivePath,
     [Parameter(Mandatory = $true)] [string] $SevenZipSourceArchivePath,
-    [Parameter(Mandatory = $true)] [string] $SevenZipVerificationPath,
+        [Parameter(Mandatory = $true)]
+    [string]$SevenZipSourceWrapperPath,
+[Parameter(Mandatory = $true)] [string] $SevenZipVerificationPath,
     [Parameter(Mandatory = $true)] [string] $GuiValidationSummaryPath,
     [Parameter(Mandatory = $true)] [string] $GuiValidationEvidenceManifestPath,
     [Parameter(Mandatory = $true)] [string] $GuiValidationSchemaPath,
@@ -440,7 +448,7 @@ function Assert-NonRuntimeContract {
     }
 }
 
-function Assert-SevenZipContract {
+function Assert-SevenZipBaseContract {
     param([object] $NonRuntimeManifest, [object] $Verification, [Collections.Generic.Dictionary[string, object]] $CandidateRecords)
     Assert-EvidenceClean $Verification
     $task5 = Get-ExactProperty (Get-ExactProperty $NonRuntimeManifest 'sharedInputs') 'sevenZipTask5'
@@ -473,7 +481,7 @@ function Assert-SevenZipContract {
     [ordered]@{ runtimeArchive = $runtime; sourceArchive = $source; verification = $verificationRecord; dll = $dll }
 }
 
-function Assert-DenoContract {
+function Assert-DenoBaseContract {
     param([object] $ComponentManifest, [object] $Inventory, [object] $LockComponent, [Collections.Generic.Dictionary[string, object]] $CandidateRecords)
     if ([string](Get-ExactProperty $ComponentManifest 'schemaVersion') -cne 'deno-third-party-components/v3' -or
         [string](Get-ExactProperty $Inventory 'schemaVersion') -cne 'deno-source-inventory/v2') { throw 'release_license_lock_schema_unsupported' }
@@ -536,6 +544,586 @@ function Assert-DenoContract {
         sourcesArchive = $sourceRecord
     }
 }
+
+function Get-IntegratorBoundFileRecord {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    if (-not [IO.Path]::IsPathFullyQualified($Path)) {
+        throw "${Context}_path_not_absolute"
+    }
+    if (@($Path -split '[\\/]' | Where-Object { $_ -eq '.' -or $_ -eq '..' }).Count -ne 0) {
+        throw "${Context}_path_escape"
+    }
+
+    $fullPath = [IO.Path]::GetFullPath($Path)
+    if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+        throw "${Context}_missing"
+    }
+    if (($OutputPath) -and $fullPath.Equals([IO.Path]::GetFullPath($OutputPath), [StringComparison]::OrdinalIgnoreCase)) {
+        throw "${Context}_output_alias"
+    }
+
+    $item = Get-Item -LiteralPath $fullPath -Force
+    if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "${Context}_path_alias"
+    }
+
+    $stream = [IO.File]::Open($fullPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    $sha256 = [Security.Cryptography.SHA256]::Create()
+    try {
+        $digest = [Convert]::ToHexString($sha256.ComputeHash($stream)).ToLowerInvariant()
+    }
+    finally {
+        $sha256.Dispose()
+        $stream.Dispose()
+    }
+
+    return [pscustomobject][ordered]@{
+        fileName = [IO.Path]::GetFileName($fullPath)
+        length = [long]$item.Length
+        sha256 = $digest
+        fullPath = $fullPath
+    }
+}
+
+function Get-IntegratorExactProperty {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowNull()]
+        [object]$Object,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    if ($null -eq $Object) {
+        throw "${Context}_missing_property_$Name"
+    }
+
+    $matches = @($Object.PSObject.Properties | Where-Object { $_.Name -ceq $Name })
+    if ($matches.Count -ne 1) {
+        throw "${Context}_missing_property_$Name"
+    }
+    return $matches[0].Value
+}
+
+function Assert-IntegratorExactPropertySet {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Object,
+
+        [Parameter(Mandatory = $true)]
+        [string[]]$Expected,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    $actual = @($Object.PSObject.Properties.Name)
+    if ($actual.Count -ne $Expected.Count) {
+        throw "${Context}_unsupported_shape"
+    }
+
+    $expectedSet = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($name in $Expected) {
+        [void]$expectedSet.Add($name)
+    }
+    foreach ($name in $actual) {
+        if (-not $expectedSet.Remove($name)) {
+            throw "${Context}_unsupported_shape"
+        }
+    }
+    if ($expectedSet.Count -ne 0) {
+        throw "${Context}_unsupported_shape"
+    }
+}
+
+function ConvertFrom-IntegratorStrictJsonElement {
+    param([Parameter(Mandatory = $true)][Text.Json.JsonElement]$Element)
+
+    switch ($Element.ValueKind) {
+        ([Text.Json.JsonValueKind]::Object) {
+            $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+            $result = [ordered]@{}
+            foreach ($property in $Element.EnumerateObject()) {
+                if (-not $seen.Add($property.Name)) {
+                    throw "deno_run_duplicate_property_$($property.Name)"
+                }
+                $result[$property.Name] = ConvertFrom-IntegratorStrictJsonElement -Element $property.Value
+            }
+            return [pscustomobject]$result
+        }
+        ([Text.Json.JsonValueKind]::Array) {
+            $values = [Collections.Generic.List[object]]::new()
+            foreach ($item in $Element.EnumerateArray()) {
+                $values.Add((ConvertFrom-IntegratorStrictJsonElement -Element $item))
+            }
+            return ,$values.ToArray()
+        }
+        ([Text.Json.JsonValueKind]::String) {
+            return $Element.GetString()
+        }
+        ([Text.Json.JsonValueKind]::Number) {
+            [long]$integer = 0
+            if ($Element.TryGetInt64([ref]$integer)) {
+                return $integer
+            }
+            [decimal]$decimalValue = 0
+            if ($Element.TryGetDecimal([ref]$decimalValue)) {
+                return $decimalValue
+            }
+            throw 'deno_run_number_out_of_range'
+        }
+        ([Text.Json.JsonValueKind]::True) {
+            return $true
+        }
+        ([Text.Json.JsonValueKind]::False) {
+            return $false
+        }
+        ([Text.Json.JsonValueKind]::Null) {
+            return $null
+        }
+        default {
+            throw 'deno_run_unsupported_json_value'
+        }
+    }
+}
+
+function Read-IntegratorStrictJson {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $bytes = [IO.File]::ReadAllBytes($Path)
+    $document = [Text.Json.JsonDocument]::Parse([ReadOnlyMemory[byte]]::new($bytes))
+    try {
+        return ConvertFrom-IntegratorStrictJsonElement -Element $document.RootElement
+    }
+    finally {
+        $document.Dispose()
+    }
+}
+
+function Assert-IntegratorEvidenceClean {
+    param(
+        [AllowNull()]
+        [object]$Value,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    if ($null -eq $Value) {
+        return
+    }
+    if ($Value -is [string]) {
+        if ($Value.IndexOf('NOT_VERIFIED', [StringComparison]::OrdinalIgnoreCase) -ge 0) {
+            throw "${Context}_not_verified"
+        }
+        return
+    }
+    if ($Value -is [Collections.IEnumerable] -and $Value -isnot [pscustomobject] -and $Value -isnot [Collections.IDictionary]) {
+        foreach ($item in $Value) {
+            Assert-IntegratorEvidenceClean -Value $item -Context $Context
+        }
+        return
+    }
+
+    foreach ($property in $Value.PSObject.Properties) {
+        if ($property.Name -match '^(blockerCount|blockers|unclassifiedFileCount|unclassifiedFiles)$') {
+            $blockerValue = $property.Value
+            $isZero = $null -eq $blockerValue
+            if ($blockerValue -is [ValueType]) {
+                $isZero = ([decimal]$blockerValue -eq 0)
+            }
+            elseif ($blockerValue -is [string]) {
+                $isZero = [string]::IsNullOrWhiteSpace($blockerValue) -or $blockerValue -ceq '0'
+            }
+            elseif ($blockerValue -is [Collections.ICollection]) {
+                $isZero = $blockerValue.Count -eq 0
+            }
+            if (-not $isZero) {
+                throw "${Context}_blocker"
+            }
+        }
+        Assert-IntegratorEvidenceClean -Value $property.Value -Context $Context
+    }
+}
+
+function Get-IntegratorCanonicalDigest {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$BaseEvidence,
+
+        [Parameter(Mandatory = $true)]
+        [object]$Inventory
+    )
+
+    $baseProperty = @($BaseEvidence.PSObject.Properties | Where-Object {
+        $_.Name -ceq 'canonicalTreeDigest' -or $_.Name -ceq 'canonicalTreeSha256'
+    })
+    if ($baseProperty.Count -eq 1) {
+        $value = $baseProperty[0].Value
+        if ($value -is [string]) {
+            return $value.ToLowerInvariant()
+        }
+        $shaProperty = @($value.PSObject.Properties | Where-Object { $_.Name -ceq 'sha256' })
+        if ($shaProperty.Count -eq 1 -and $shaProperty[0].Value -is [string]) {
+            return $shaProperty[0].Value.ToLowerInvariant()
+        }
+    }
+
+    $inventoryProperty = @($Inventory.PSObject.Properties | Where-Object {
+        $_.Name -ceq 'canonicalTreeDigest' -or $_.Name -ceq 'canonicalTreeSha256'
+    })
+    if ($inventoryProperty.Count -ne 1) {
+        throw 'deno_inventory_canonical_digest_missing'
+    }
+    $value = $inventoryProperty[0].Value
+    if ($value -is [string]) {
+        return $value.ToLowerInvariant()
+    }
+    $shaProperty = @($value.PSObject.Properties | Where-Object { $_.Name -ceq 'sha256' })
+    if ($shaProperty.Count -eq 1 -and $shaProperty[0].Value -is [string]) {
+        return $shaProperty[0].Value.ToLowerInvariant()
+    }
+    throw 'deno_inventory_canonical_digest_invalid'
+}
+
+function Assert-DenoContract {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$ComponentManifest,
+
+        [Parameter(Mandatory = $true)]
+        [object]$Inventory,
+
+        [Parameter(Mandatory = $true)]
+        [object]$LockComponent,
+
+        [Parameter(Mandatory = $true)]
+        [object]$CandidateRecords
+    )
+
+    $approvedCollectorCommit = '09ced74a90248fbeb54969ea03d5aacb98dfc38b'
+    if ($DenoCollectorSourceCommit -cne $approvedCollectorCommit) {
+        throw 'release_license_lock_deno_collector_invalid'
+    }
+
+    try {
+        $observedComponentSentinel = Get-IntegratorExactProperty `
+            -Object $ComponentManifest `
+            -Name 'overallReleasePass' `
+            -Context 'deno_component_manifest'
+        if ($observedComponentSentinel -isnot [bool] -or $observedComponentSentinel -ne $false) {
+            throw 'invalid'
+        }
+    }
+    catch {
+        throw "release_license_lock_deno_sentinel_invalid: $($_.Exception.Message)"
+    }
+
+    $baseEvidence = Assert-DenoBaseContract `
+        -ComponentManifest $ComponentManifest `
+        -Inventory $Inventory `
+        -LockComponent $LockComponent `
+        -CandidateRecords $CandidateRecords
+
+    try {
+    $runRecord = Get-IntegratorBoundFileRecord -Path $DenoRunEvidencePath -Context 'deno_run_evidence'
+    $componentRecord = Get-IntegratorBoundFileRecord -Path $DenoComponentManifestPath -Context 'deno_component_manifest'
+    $inventoryRecord = Get-IntegratorBoundFileRecord -Path $DenoSourceInventoryPath -Context 'deno_source_inventory'
+    $noticeRecord = Get-IntegratorBoundFileRecord -Path $DenoNoticesPath -Context 'deno_notices'
+    $sourceRecord = Get-IntegratorBoundFileRecord -Path $DenoSourcesArchivePath -Context 'deno_source_zip'
+
+    $run = Read-IntegratorStrictJson -Path $runRecord.fullPath
+    Assert-IntegratorExactPropertySet -Object $run -Expected @(
+        'exitCode',
+        'elapsedMilliseconds',
+        'elapsed',
+        'result',
+        'error'
+    ) -Context 'deno_run'
+    Assert-IntegratorEvidenceClean -Value $run -Context 'deno_run'
+    Assert-IntegratorEvidenceClean -Value $ComponentManifest -Context 'deno_component_manifest'
+    Assert-IntegratorEvidenceClean -Value $Inventory -Context 'deno_source_inventory'
+
+    $noticeText = [IO.File]::ReadAllText($noticeRecord.fullPath, [Text.UTF8Encoding]::new($false, $true))
+    if ($noticeText.IndexOf('NOT_VERIFIED', [StringComparison]::OrdinalIgnoreCase) -ge 0) {
+        throw 'deno_notices_not_verified'
+    }
+
+    $exitCode = Get-IntegratorExactProperty -Object $run -Name 'exitCode' -Context 'deno_run'
+    if ($exitCode -isnot [long] -or $exitCode -ne 0) {
+        throw 'deno_run_exit_code_invalid'
+    }
+    if ($null -ne (Get-IntegratorExactProperty -Object $run -Name 'error' -Context 'deno_run')) {
+        throw 'deno_run_error_present'
+    }
+
+    $result = Get-IntegratorExactProperty -Object $run -Name 'result' -Context 'deno_run'
+    Assert-IntegratorExactPropertySet -Object $result -Expected @(
+        'status',
+        'closureClassification',
+        'outputRoot',
+        'noticePath',
+        'noticeSha256',
+        'zipPath',
+        'zipSha256',
+        'canonicalTreeSha256',
+        'counts',
+        'overallReleasePass'
+    ) -Context 'deno_run_result'
+
+    if ((Get-IntegratorExactProperty -Object $result -Name 'status' -Context 'deno_run_result') -cne 'complete') {
+        throw 'deno_run_status_invalid'
+    }
+    $classification = Get-IntegratorExactProperty -Object $result -Name 'closureClassification' -Context 'deno_run_result'
+    if ($classification -cne 'verified-conservative-superset') {
+        throw 'deno_run_classification_invalid'
+    }
+
+    $runSentinel = Get-IntegratorExactProperty -Object $result -Name 'overallReleasePass' -Context 'deno_run_result'
+    $componentSentinel = Get-IntegratorExactProperty -Object $ComponentManifest -Name 'overallReleasePass' -Context 'deno_component_manifest'
+    if ($runSentinel -isnot [bool] -or $runSentinel -ne $false) {
+        throw 'deno_run_overall_release_pass_invalid'
+    }
+    if ($componentSentinel -isnot [bool] -or $componentSentinel -ne $false) {
+        throw 'deno_component_overall_release_pass_invalid'
+    }
+
+    $componentClassification = Get-IntegratorExactProperty -Object $ComponentManifest -Name 'closureClassification' -Context 'deno_component_manifest'
+    if ($componentClassification -cne $classification) {
+        throw 'deno_component_classification_mismatch'
+    }
+
+    $outputRootValue = Get-IntegratorExactProperty -Object $result -Name 'outputRoot' -Context 'deno_run_result'
+    if ($outputRootValue -isnot [string] -or -not [IO.Path]::IsPathFullyQualified($outputRootValue)) {
+        throw 'deno_run_output_root_invalid'
+    }
+    $outputRoot = [IO.Path]::GetFullPath($outputRootValue)
+    if (-not (Test-Path -LiteralPath $outputRoot -PathType Container)) {
+        throw 'deno_run_output_root_missing'
+    }
+
+    foreach ($record in @($componentRecord, $inventoryRecord, $noticeRecord, $sourceRecord)) {
+        if (-not [IO.Path]::GetDirectoryName($record.fullPath).Equals($outputRoot, [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'deno_artifact_output_root_mismatch'
+        }
+    }
+
+    $expectedFiles = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($record in @($componentRecord, $inventoryRecord, $noticeRecord, $sourceRecord)) {
+        [void]$expectedFiles.Add($record.fullPath)
+    }
+    $children = @(Get-ChildItem -LiteralPath $outputRoot -Force)
+    $files = @($children | Where-Object { -not $_.PSIsContainer })
+    $directories = @($children | Where-Object { $_.PSIsContainer })
+    if ($directories.Count -ne 1 -or
+        $directories[0].Name -cne 'bundle' -or
+        ($directories[0].Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw 'deno_output_scope_invalid'
+    }
+    if ($files.Count -ne 4) {
+        throw 'deno_output_scope_invalid'
+    }
+    foreach ($child in $files) {
+        if (-not $expectedFiles.Remove($child.FullName)) {
+            throw 'deno_output_scope_invalid'
+        }
+    }
+    if ($expectedFiles.Count -ne 0) {
+        throw 'deno_output_scope_invalid'
+    }
+
+    $recordedNoticePath = Get-IntegratorExactProperty -Object $result -Name 'noticePath' -Context 'deno_run_result'
+    $recordedZipPath = Get-IntegratorExactProperty -Object $result -Name 'zipPath' -Context 'deno_run_result'
+    if (-not [IO.Path]::GetFullPath($recordedNoticePath).Equals($noticeRecord.fullPath, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'deno_run_notice_path_mismatch'
+    }
+    if (-not [IO.Path]::GetFullPath($recordedZipPath).Equals($sourceRecord.fullPath, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'deno_run_zip_path_mismatch'
+    }
+    if ((Get-IntegratorExactProperty -Object $result -Name 'noticeSha256' -Context 'deno_run_result') -cne $noticeRecord.sha256) {
+        throw 'deno_run_notice_hash_mismatch'
+    }
+    if ((Get-IntegratorExactProperty -Object $result -Name 'zipSha256' -Context 'deno_run_result') -cne $sourceRecord.sha256) {
+        throw 'deno_run_zip_hash_mismatch'
+    }
+
+    $canonicalDigest = Get-IntegratorCanonicalDigest -BaseEvidence $baseEvidence -Inventory $Inventory
+    if ((Get-IntegratorExactProperty -Object $result -Name 'canonicalTreeSha256' -Context 'deno_run_result') -cne $canonicalDigest) {
+        throw 'deno_run_canonical_digest_mismatch'
+    }
+
+    $runCounts = Get-IntegratorExactProperty -Object $result -Name 'counts' -Context 'deno_run_result'
+    $componentCounts = Get-IntegratorExactProperty -Object $ComponentManifest -Name 'counts' -Context 'deno_component_manifest'
+    $runCountNames = @($runCounts.PSObject.Properties.Name)
+    $componentCountNames = @($componentCounts.PSObject.Properties.Name)
+    if ($runCountNames.Count -eq 0 -or $runCountNames.Count -ne $componentCountNames.Count) {
+        throw 'deno_run_counts_mismatch'
+    }
+    foreach ($property in $componentCounts.PSObject.Properties) {
+        $runValue = Get-IntegratorExactProperty -Object $runCounts -Name $property.Name -Context 'deno_run_counts'
+        if ($null -eq $runValue -or $null -eq $property.Value -or $runValue.GetType() -ne $property.Value.GetType() -or $runValue -ne $property.Value) {
+            throw 'deno_run_counts_mismatch'
+        }
+    }
+
+    return [pscustomobject][ordered]@{
+        scope = 'deno-third-party-notice-source-closure'
+        predicateVersion = 'deno-component-pass/v1'
+        closureClassification = $classification
+        componentPass = $true
+        overallReleasePassObserved = $false
+        collectorSourceCommit = $DenoCollectorSourceCommit
+        evidence = [pscustomobject][ordered]@{
+            runEvidence = [pscustomobject][ordered]@{
+                fileName = $runRecord.fileName
+                length = $runRecord.length
+                sha256 = $runRecord.sha256
+            }
+            componentManifest = [pscustomobject][ordered]@{
+                fileName = $componentRecord.fileName
+                length = $componentRecord.length
+                sha256 = $componentRecord.sha256
+            }
+            inventory = [pscustomobject][ordered]@{
+                fileName = $inventoryRecord.fileName
+                length = $inventoryRecord.length
+                sha256 = $inventoryRecord.sha256
+                schemaVersion = 'deno-source-inventory/v2'
+                canonicalTreeDigest = $canonicalDigest
+            }
+            notices = [pscustomobject][ordered]@{
+                fileName = $noticeRecord.fileName
+                length = $noticeRecord.length
+                sha256 = $noticeRecord.sha256
+            }
+            sourceZip = [pscustomobject][ordered]@{
+                fileName = $sourceRecord.fileName
+                length = $sourceRecord.length
+                sha256 = $sourceRecord.sha256
+            }
+        }
+    }
+    }
+    catch {
+        $message = $_.Exception.Message
+        if ($message -match '(?i)blocker|blocked') {
+            throw "release_license_lock_blocked: $message"
+        }
+        if ($message -match '(?i)not_verified') {
+            throw "release_license_lock_not_verified: $message"
+        }
+        if ($message -match '(?i)overall_release_pass') {
+            throw "release_license_lock_deno_sentinel_invalid: $message"
+        }
+        if ($message -match '(?i)(path|hash|digest)_mismatch|artifact_output_root') {
+            throw "release_license_lock_deno_artifact_mismatch: $message"
+        }
+        if ($message -match '(?i)output_scope_invalid') {
+            throw "release_license_lock_deno_scope_invalid: $message"
+        }
+        throw "release_license_lock_deno_run_invalid: $message"
+    }
+}
+
+function Assert-SevenZipContract {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$NonRuntimeManifest,
+
+        [Parameter(Mandatory = $true)]
+        [object]$Verification,
+
+        [Parameter(Mandatory = $true)]
+        [object]$CandidateRecords
+    )
+
+    $baseEvidence = Assert-SevenZipBaseContract `
+        -NonRuntimeManifest $NonRuntimeManifest `
+        -Verification $Verification `
+        -CandidateRecords $CandidateRecords
+
+    $rawRecord = Get-IntegratorBoundFileRecord -Path $SevenZipSourceArchivePath -Context 'sevenzip_raw_source'
+    $wrapperRecord = Get-IntegratorBoundFileRecord -Path $SevenZipSourceWrapperPath -Context 'sevenzip_source_wrapper'
+    if ($rawRecord.fileName -cne '7z2601-x64-no-rar-source.7z') {
+        throw 'sevenzip_raw_source_name_invalid'
+    }
+    if ($wrapperRecord.fileName -cne '7z2601-x64-no-rar-source.zip') {
+        throw 'sevenzip_source_wrapper_name_invalid'
+    }
+
+    $stream = [IO.File]::Open($wrapperRecord.fullPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    $archive = $null
+    try {
+        $archive = [IO.Compression.ZipArchive]::new($stream, [IO.Compression.ZipArchiveMode]::Read, $false, [Text.Encoding]::UTF8)
+        $entries = @($archive.Entries)
+        if ($entries.Count -ne 1) {
+            throw 'release_license_lock_sevenzip_wrapper_mismatch'
+        }
+        $entry = $entries[0]
+        if ($entry.FullName -cne 'sevenzip/7z2601-x64-no-rar-source.7z' -or
+            $entry.Name -cne '7z2601-x64-no-rar-source.7z' -or
+            $entry.Length -ne $rawRecord.length -or
+            $entry.CompressedLength -ne $entry.Length) {
+            throw 'release_license_lock_sevenzip_wrapper_mismatch'
+        }
+
+        $entryStream = $entry.Open()
+        $sha256 = [Security.Cryptography.SHA256]::Create()
+        try {
+            $innerSha256 = [Convert]::ToHexString($sha256.ComputeHash($entryStream)).ToLowerInvariant()
+        }
+        finally {
+            $sha256.Dispose()
+            $entryStream.Dispose()
+        }
+    }
+    finally {
+        if ($null -ne $archive) {
+            $archive.Dispose()
+        }
+        else {
+            $stream.Dispose()
+        }
+    }
+
+    if ($innerSha256 -cne $rawRecord.sha256) {
+        throw 'release_license_lock_sevenzip_wrapper_mismatch'
+    }
+
+    $result = [ordered]@{}
+    foreach ($property in $baseEvidence.PSObject.Properties) {
+        $result[$property.Name] = $property.Value
+    }
+    $result['rawSourceArchive'] = [pscustomobject][ordered]@{
+        fileName = $rawRecord.fileName
+        length = $rawRecord.length
+        sha256 = $rawRecord.sha256
+    }
+    $result['sourceWrapper'] = [pscustomobject][ordered]@{
+        fileName = $wrapperRecord.fileName
+        outerLength = $wrapperRecord.length
+        outerSha256 = $wrapperRecord.sha256
+        entryPath = 'sevenzip/7z2601-x64-no-rar-source.7z'
+        innerLength = $rawRecord.length
+        innerSha256 = $innerSha256
+    }
+    return [pscustomobject]$result
+}
+
 
 function Assert-FfmpegContract {
     param([object] $Manifest, [object] $LockComponent, [Collections.Generic.Dictionary[string, object]] $CandidateRecords)
@@ -736,7 +1324,7 @@ $integrationEvidence = [ordered]@{
         applicationSourceCommit = $candidate.Commit
         applicationSourceTree = $candidate.Tree
     }
-    deno = $denoEvidence
+    denoComponent = $denoEvidence
     ffmpeg = $ffmpegEvidence
     sevenZip = $sevenZipEvidence
     gui = $guiEvidence

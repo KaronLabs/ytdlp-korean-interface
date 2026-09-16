@@ -9,6 +9,7 @@ $script:SpdxConsumer = Join-Path $script:RepositoryRoot 'tools\generate-release-
 $script:PackageConsumer = Join-Path $script:RepositoryRoot 'tools\package-quality-release.ps1'
 $script:Utf8 = New-Object Text.UTF8Encoding($false)
 $script:Tag = 'v2.19.1-karon.2'
+$script:ApprovedDenoCollectorCommit = '09ced74a90248fbeb54969ea03d5aacb98dfc38b'
 
 function Write-TestText {
     param([string] $Path, [string] $Text)
@@ -39,7 +40,7 @@ function Get-TestRecord {
 }
 
 function New-TestZip {
-    param([string] $Path, [Collections.IDictionary] $Entries)
+    param([string] $Path, [Collections.IDictionary] $Entries, [switch] $NoCompression)
     $parent = Split-Path -Parent $Path
     if (-not (Test-Path -LiteralPath $parent)) { [IO.Directory]::CreateDirectory($parent) | Out-Null }
     $stream = [IO.File]::Open($Path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
@@ -47,7 +48,8 @@ function New-TestZip {
         $archive = New-Object IO.Compression.ZipArchive($stream, [IO.Compression.ZipArchiveMode]::Create, $true)
         try {
             foreach ($name in @($Entries.Keys | Sort-Object)) {
-                $entry = $archive.CreateEntry(([string]$name).Replace('\', '/'), [IO.Compression.CompressionLevel]::Optimal)
+                $level = if ($NoCompression) { [IO.Compression.CompressionLevel]::NoCompression } else { [IO.Compression.CompressionLevel]::Optimal }
+                $entry = $archive.CreateEntry(([string]$name).Replace('\', '/'), $level)
                 $entry.LastWriteTime = [DateTimeOffset]::new(1980, 1, 1, 0, 0, 0, [TimeSpan]::Zero)
                 $input = [IO.File]::OpenRead([string]$Entries[$name])
                 $output = $entry.Open()
@@ -145,8 +147,8 @@ function New-TestFixture {
     $cache = Join-Path $root 'source-cache'
     [IO.Directory]::CreateDirectory($cache) | Out-Null
     $applicationSource = Join-Path $cache 'application-source.zip'
-    $sevenZipSource = Join-Path $cache 'sevenzip-no-rar-source.7z'
-    $sevenZipConsumerSource = Join-Path $cache 'sevenzip-no-rar-source.zip'
+    $sevenZipSource = Join-Path $cache '7z2601-x64-no-rar-source.7z'
+    $sevenZipConsumerSource = Join-Path $cache '7z2601-x64-no-rar-source.zip'
     $ytDlpSource = Join-Path $cache 'yt-dlp-source.zip'
     $applicationSourcePayload = Join-Path $root 'source-payloads\application.txt'
     $ytDlpSourcePayload = Join-Path $root 'source-payloads\yt-dlp.txt'
@@ -154,16 +156,20 @@ function New-TestFixture {
     Write-TestText $ytDlpSourcePayload 'yt-dlp corresponding source'
     New-TestZip $applicationSource ([ordered]@{ 'application.txt' = $applicationSourcePayload })
     Write-TestText $sevenZipSource 'sevenzip corresponding source without rar paths'
-    New-TestZip $sevenZipConsumerSource ([ordered]@{ 'sevenzip-no-rar-source.7z' = $sevenZipSource })
+    New-TestZip $sevenZipConsumerSource ([ordered]@{ 'sevenzip/7z2601-x64-no-rar-source.7z' = $sevenZipSource }) -NoCompression
     New-TestZip $ytDlpSource ([ordered]@{ 'yt-dlp.txt' = $ytDlpSourcePayload })
 
-    $denoNotices = Join-Path $root 'deno\THIRD-PARTY-NOTICES.txt'
-    $denoLicense = Join-Path $root 'deno\license.txt'
+    $denoOutputRoot = Join-Path $root 'deno'
+    [IO.Directory]::CreateDirectory((Join-Path $denoOutputRoot 'bundle')) | Out-Null
+    $denoNotices = Join-Path $denoOutputRoot 'THIRD-PARTY-NOTICES.txt'
+    $denoLicense = Join-Path $root 'source-payloads\deno-license.txt'
     Write-TestText $denoNotices "Deno third-party notices`n"
     Write-TestText $denoLicense "MIT license`n"
-    $denoSources = Join-Path $cache 'deno-2.7.14-verified-conservative-superset-sources.zip'
+    $denoSources = Join-Path $denoOutputRoot 'deno-2.7.14-verified-conservative-superset-sources.zip'
     New-TestZip $denoSources ([ordered]@{ 'LICENSES/a.txt' = $denoLicense; 'THIRD-PARTY-NOTICES.txt' = $denoNotices })
-    $denoInventoryPath = Join-Path $root 'deno\source-inventory.json'
+    $denoCacheSources = Join-Path $cache (Split-Path -Leaf $denoSources)
+    Copy-Item -LiteralPath $denoSources -Destination $denoCacheSources
+    $denoInventoryPath = Join-Path $denoOutputRoot 'source-inventory.json'
     $denoInventoryFiles = @(
         [ordered]@{ path = 'LICENSES/a.txt'; length = [long](Get-Item $denoLicense).Length; sha256 = Get-TestSha256 $denoLicense },
         [ordered]@{ path = 'THIRD-PARTY-NOTICES.txt'; length = [long](Get-Item $denoNotices).Length; sha256 = Get-TestSha256 $denoNotices }
@@ -183,7 +189,7 @@ function New-TestFixture {
         }
         files = $denoInventoryFiles
     })
-    $denoComponentPath = Join-Path $root 'deno\component-manifest.json'
+    $denoComponentPath = Join-Path $denoOutputRoot 'component-manifest.json'
     Write-TestJson $denoComponentPath ([ordered]@{
         schemaVersion = 'deno-third-party-components/v3'
         closureClassification = 'verified-conservative-superset'
@@ -195,6 +201,25 @@ function New-TestFixture {
         nativeGitTreeEvidence = [ordered]@{ commit = ('3' * 40); tree = ('4' * 40); gitlinks = @() }
         nativeComponents = @([ordered]@{ name = 'fixture'; classification = 'SPDX' })
         overallReleasePass = $false
+    })
+    $denoRunEvidencePath = Join-Path $root 'g6-run-evidence.json'
+    Write-TestJson $denoRunEvidencePath ([ordered]@{
+        exitCode = 0
+        elapsedMilliseconds = 1
+        elapsed = '00:00:00.0010000'
+        result = [ordered]@{
+            status = 'complete'
+            closureClassification = 'verified-conservative-superset'
+            outputRoot = $denoOutputRoot
+            noticePath = $denoNotices
+            noticeSha256 = Get-TestSha256 $denoNotices
+            zipPath = $denoSources
+            zipSha256 = Get-TestSha256 $denoSources
+            canonicalTreeSha256 = $treeDigest
+            counts = [ordered]@{ cargoLockPackages = 1; resolvedRegistryPackages = 1; workspacePackages = 1; resolvedWorkspacePackages = 1; nativeComponents = 1; embeddedComponents = 1 }
+            overallReleasePass = $false
+        }
+        error = $null
     })
 
     $ffmpegBuildConf = Join-Path $root 'ffmpeg\buildconf.txt'
@@ -337,7 +362,7 @@ function New-TestFixture {
         (New-TestComponent 'application' '2.19.1-karon.2' $applicationCommit 'MIT' $notices.application.relative $notices.application.sha $applicationSource),
         (New-TestComponent '7zip' '26.01' ('1' * 40) 'LGPL-2.1-or-later' $notices.'7zip'.relative $notices.'7zip'.sha $sevenZipConsumerSource),
         (New-TestComponent 'yt-dlp' '2026.09.11' ('2' * 40) 'Unlicense' $notices.'yt-dlp'.relative $notices.'yt-dlp'.sha $ytDlpSource),
-        (New-TestComponent 'deno' '2.7.14' ('3' * 40) 'MIT' $notices.deno.relative $notices.deno.sha $denoSources),
+        (New-TestComponent 'deno' '2.7.14' ('3' * 40) 'MIT' $notices.deno.relative $notices.deno.sha $denoCacheSources),
         (New-TestComponent 'ffmpeg' 'fixture' ('6' * 40) 'LGPL-2.1-or-later' $notices.ffmpeg.relative $notices.ffmpeg.sha $ffmpegSources)
     )
     $lockCandidateFiles = @()
@@ -362,9 +387,10 @@ function New-TestFixture {
         Root = $root; Repository = $repo; SourceRoot = $sourceRoot; Candidate = $candidate; Cache = $cache
         Template = $template; Output = $output; CandidateManifest = $candidateManifestPath
         NonRuntimeManifest = $nonRuntimeManifestPath; NonRuntimeInventory = $nonRuntimeInventoryPath; NonRuntimeBundle = $nonRuntimeBundle
+        DenoRunEvidence = $denoRunEvidencePath; DenoCollectorSourceCommit = $script:ApprovedDenoCollectorCommit
         DenoComponent = $denoComponentPath; DenoInventory = $denoInventoryPath; DenoNotices = $denoNotices; DenoSources = $denoSources
         FfmpegManifest = $ffmpegManifestPath; FfmpegSources = $ffmpegSources
-        SevenZipRuntime = $sevenZipRuntime; SevenZipSource = $sevenZipSource; SevenZipVerification = $sevenZipVerification
+        SevenZipRuntime = $sevenZipRuntime; SevenZipSource = $sevenZipSource; SevenZipWrapper = $sevenZipConsumerSource; SevenZipVerification = $sevenZipVerification
         GuiSummary = $guiSummary; GuiEvidence = $guiEvidence; GuiSchema = $guiSchema
         CorrespondingSources = $prebuiltSources; Spdx = $prebuiltSpdx; RootNotices = $rootNotices; ReleaseNotes = $releaseNotes
         ApplicationCommit = $applicationCommit; ApplicationTree = $applicationTree
@@ -382,6 +408,8 @@ function Get-BuilderArguments {
         NonRuntimeManifestPath = $Fixture.NonRuntimeManifest
         NonRuntimeInventoryPath = $Fixture.NonRuntimeInventory
         NonRuntimeEvidenceBundlePath = $Fixture.NonRuntimeBundle
+        DenoRunEvidencePath = $Fixture.DenoRunEvidence
+        DenoCollectorSourceCommit = $Fixture.DenoCollectorSourceCommit
         DenoComponentManifestPath = $Fixture.DenoComponent
         DenoSourceInventoryPath = $Fixture.DenoInventory
         DenoNoticesPath = $Fixture.DenoNotices
@@ -390,6 +418,7 @@ function Get-BuilderArguments {
         FfmpegSourcesArchivePath = $Fixture.FfmpegSources
         SevenZipRuntimeArchivePath = $Fixture.SevenZipRuntime
         SevenZipSourceArchivePath = $Fixture.SevenZipSource
+        SevenZipSourceWrapperPath = $Fixture.SevenZipWrapper
         SevenZipVerificationPath = $Fixture.SevenZipVerification
         GuiValidationSummaryPath = $Fixture.GuiSummary
         GuiValidationEvidenceManifestPath = $Fixture.GuiEvidence
@@ -474,9 +503,15 @@ Describe 'final verified release license lock integrator' {
         @($lock.release.blockers).Count | Should Be 0
         @($lock.components | Where-Object verificationStatus -ne 'verified').Count | Should Be 0
         @($lock.components.sourceArchives | Where-Object verificationStatus -ne 'verified').Count | Should Be 0
-        $lock.release.integrationEvidence.deno.inventorySchemaVersion | Should Be 'deno-source-inventory/v2'
-        $lock.release.integrationEvidence.deno.canonicalTreeDigest.sha256 | Should Be (Read-TestJson $fixture.DenoInventory).canonicalTreeDigest.sha256
-        $lock.release.integrationEvidence.deno.componentOverallReleasePass | Should Be $false
+        $lock.release.integrationEvidence.denoComponent.scope | Should Be 'deno-third-party-notice-source-closure'
+        $lock.release.integrationEvidence.denoComponent.predicateVersion | Should Be 'deno-component-pass/v1'
+        $lock.release.integrationEvidence.denoComponent.componentPass | Should Be $true
+        $lock.release.integrationEvidence.denoComponent.overallReleasePassObserved | Should Be $false
+        $lock.release.integrationEvidence.denoComponent.collectorSourceCommit | Should Be $script:ApprovedDenoCollectorCommit
+        $lock.release.integrationEvidence.denoComponent.evidence.inventory.schemaVersion | Should Be 'deno-source-inventory/v2'
+        $lock.release.integrationEvidence.denoComponent.evidence.inventory.canonicalTreeDigest | Should Be (Read-TestJson $fixture.DenoInventory).canonicalTreeDigest.sha256
+        $lock.release.integrationEvidence.sevenZip.sourceWrapper.innerSha256 | Should Be (Get-TestSha256 $fixture.SevenZipSource)
+        $lock.release.integrationEvidence.sevenZip.sourceWrapper.outerSha256 | Should Be (Get-TestSha256 $fixture.SevenZipWrapper)
         (Get-Command $script:Builder).Parameters.ContainsKey('verificationStatus') | Should Be $false
     }
 
@@ -506,7 +541,7 @@ Describe 'final verified release license lock integrator' {
         Assert-TestRejected $fixture 'release_license_lock_gui_binding_mismatch'
     }
 
-    It 'accepts Deno inventory v2 while rejecting old schema, bad digest, blockers, NOT_VERIFIED, and artifact drift' {
+    It 'derives the Deno component predicate only from the approved successful conjunction' {
         $fixture = New-TestFixture 'deno-v1'
         $inventory = Read-TestJson $fixture.DenoInventory
         $inventory.schemaVersion = 'deno-source-inventory/v1'
@@ -534,6 +569,50 @@ Describe 'final verified release license lock integrator' {
         $fixture = New-TestFixture 'deno-artifact'
         Write-TestText $fixture.DenoNotices 'changed notices'
         Assert-TestRejected $fixture 'release_license_lock_deno_artifact_mismatch'
+
+        $fixture = New-TestFixture 'deno-run-status'
+        $run = Read-TestJson $fixture.DenoRunEvidence
+        $run.result.status = 'failed'
+        Write-TestJson $fixture.DenoRunEvidence $run
+        Assert-TestRejected $fixture 'release_license_lock_deno_run_invalid'
+
+        $fixture = New-TestFixture 'deno-run-error'
+        $run = Read-TestJson $fixture.DenoRunEvidence
+        $run.error = 'collector failed'
+        Write-TestJson $fixture.DenoRunEvidence $run
+        Assert-TestRejected $fixture 'release_license_lock_deno_run_invalid'
+
+        $fixture = New-TestFixture 'deno-run-blocker'
+        $run = Read-TestJson $fixture.DenoRunEvidence
+        $run.result | Add-Member -NotePropertyName blockers -NotePropertyValue @('blocked')
+        Write-TestJson $fixture.DenoRunEvidence $run
+        Assert-TestRejected $fixture 'release_license_lock_blocked'
+
+        $fixture = New-TestFixture 'deno-sentinel-true'
+        $component = Read-TestJson $fixture.DenoComponent
+        $component.overallReleasePass = $true
+        Write-TestJson $fixture.DenoComponent $component
+        Assert-TestRejected $fixture 'release_license_lock_deno_sentinel_invalid'
+
+        $fixture = New-TestFixture 'deno-sentinel-malformed'
+        $component = Read-TestJson $fixture.DenoComponent
+        $component.overallReleasePass = 'false'
+        Write-TestJson $fixture.DenoComponent $component
+        Assert-TestRejected $fixture 'release_license_lock_deno_sentinel_invalid'
+
+        $fixture = New-TestFixture 'deno-collector-commit'
+        $fixture.DenoCollectorSourceCommit = ('0' * 40)
+        Assert-TestRejected $fixture 'release_license_lock_deno_collector_invalid'
+
+        $fixture = New-TestFixture 'deno-run-artifact'
+        $run = Read-TestJson $fixture.DenoRunEvidence
+        $run.result.noticeSha256 = ('0' * 64)
+        Write-TestJson $fixture.DenoRunEvidence $run
+        Assert-TestRejected $fixture 'release_license_lock_deno_artifact_mismatch'
+
+        $fixture = New-TestFixture 'deno-blocker-report'
+        Write-TestJson (Join-Path (Split-Path -Parent $fixture.DenoComponent) 'blocker-report.json') ([ordered]@{ blockers = @('failed') })
+        Assert-TestRejected $fixture 'release_license_lock_deno_scope_invalid'
     }
 
     It 'rejects incomplete, blocked, non-LGPL, source-drifted, or runtime-drifted FFmpeg closure' {
@@ -582,6 +661,18 @@ Describe 'final verified release license lock integrator' {
         $manifest.sharedInputs.sevenZipTask5.excludedObjects = @()
         Write-TestJson $fixture.NonRuntimeManifest $manifest
         Assert-TestRejected $fixture 'release_license_lock_sevenzip_policy_invalid|release_license_lock_binding_mismatch|release_license_lock_nonruntime_binding_mismatch'
+
+        $fixture = New-TestFixture 'sevenzip-wrapper-inner'
+        Remove-Item -LiteralPath $fixture.SevenZipWrapper
+        $wrongInner = Join-Path $fixture.Root 'wrong-source.7z'
+        Write-TestText $wrongInner 'different inner bytes'
+        New-TestZip $fixture.SevenZipWrapper ([ordered]@{ 'sevenzip/7z2601-x64-no-rar-source.7z' = $wrongInner }) -NoCompression
+        $template = Read-TestJson $fixture.Template
+        $archive = @($template.components | Where-Object id -eq '7zip')[0].sourceArchives[0]
+        $archive.sha256 = Get-TestSha256 $fixture.SevenZipWrapper
+        $archive.length = [long](Get-Item $fixture.SevenZipWrapper).Length
+        Write-TestJson $fixture.Template $template
+        Assert-TestRejected $fixture 'release_license_lock_sevenzip_wrapper_mismatch'
     }
 
     It 'rejects non-runtime stale identity, blockers, unclassified files, and component binding drift' {
