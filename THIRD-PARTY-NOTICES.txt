@@ -3,8 +3,10 @@ THIRD-PARTY NOTICES AND EXACT SOURCE LOCATIONS
 
 This is a technical compliance bundle, not legal advice. The portable package
 is not licensed as a whole under MIT. Each component remains under its own
-license. Full license texts and upstream notices are under
-release/licenses/v2.19.1-karon.2/.
+license. Available license texts and upstream notices are under
+release/licenses/v2.19.1-karon.2/. This collection is not yet complete: the
+Deno dependency corpus and FFmpeg external-library source/license closure
+remain explicitly unverified below.
 
 APPLICATION
 ytdlp-interface application; MIT; modified by KaronLabs.
@@ -14,9 +16,9 @@ Source SHA-256: bd76aaa80c620aa4c8339bb68011c82e1b7fcc72ee7a7dc9dff1602328335586
 STATIC APPLICATION DEPENDENCIES
 bit7z 4.1.0; MPL-2.0; commit c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742.
 Source SHA-256: 6af52b2e1b9895e8f1193728880206326161940e7a961e3162ec39752dbb3379
-Nana 1.8; Boost-1.0; upstream baseline 554c4fe87fc31b8ee104228e9117d545d34855b5; locally modified build files.
+Nana 1.8; BSL-1.0; upstream baseline 554c4fe87fc31b8ee104228e9117d545d34855b5; locally modified build files.
 Source SHA-256: ef657036a4623bbb5c4e0df4e8aa699dc6ac713ca4a6725b30d3fd8175c4c145
-libpng 1.6.37; Libpng; commit a40189cf881e9f0db80511c382292a5604c3c3d1.
+libpng 1.6.37; libpng-2.0; commit a40189cf881e9f0db80511c382292a5604c3c3d1.
 Source SHA-256: b3af9e92167f9c4233482f49aff02730b7dc3a275871ce637ed668413da6283f
 zlib 1.2.5; Zlib; commit 9712272c78b9d9c93746d9c8e156a3728c65ca72.
 Source SHA-256: 66faa243ea50094c2b399f5644cd4aa6110e739eae26800120124bbd1da00535
@@ -28,8 +30,10 @@ The tracked single header differs byte-for-byte from the upstream amalgamation;
 the lock therefore marks the vendored form as modified.
 
 SEPARATELY SHIPPED COMPONENTS
-7z.dll 26.01 target; LGPL-2.1-or-later AND BSD-3-Clause; unRAR excluded;
-source commit 8c63d71ff886bda90c86db28466287f977374237.
+7z.dll 26.01 target; LGPL-2.1-or-later AND BSD-3-Clause AND BSD-2-Clause;
+source commit 8c63d71ff886bda90c86db28466287f977374237. The intended
+no-unRAR/no-RAR-handler configuration has not yet been proven by a link map;
+the conservative expression retains all potentially applicable portions.
 Source SHA-256: 01589aeda50512955e66d360c6534b961ec95c51111a76e2fa2976a8daa55271
 
 yt-dlp nightly 2026.08.04.234419; source commit

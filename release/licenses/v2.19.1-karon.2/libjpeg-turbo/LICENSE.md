@@ -133,5 +133,3 @@ License specifically refers to the Independent JPEG Group and does not extend
 attribution and endorsement protections to other entities.  Thus, it was
 desirable to choose a license that granted us the same protections for new code
 that were granted to the IJG for code derived from their software.
-
-

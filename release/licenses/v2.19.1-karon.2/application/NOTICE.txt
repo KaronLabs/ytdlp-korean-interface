@@ -28,5 +28,3 @@ Code reuse, modification, redistribution, commercial use, and teaching remain
 governed by the MIT License. Provenance documentation exists so lawful reuse
 can remain open without rewriting the recorded history of where the code and
 repository-specific changes came from.
-
-

@@ -12,10 +12,10 @@
     - C/ZstdDec.c: the "BSD 3-clause License"
     - C/Xxh64.c: the "BSD 2-clause License"
     - Some files are "public domain" files, if "public domain" status is stated in source file.
-    - the "GNU LGPL" for all other files. If there is no license information in 
+    - the "GNU LGPL" for all other files. If there is no license information in
        some source file, that file is under the "GNU LGPL".
 
-  The "GNU LGPL" with "unRAR license restriction" means that you must follow both 
+  The "GNU LGPL" with "unRAR license restriction" means that you must follow both
   "GNU LGPL" rules and "unRAR license restriction" rules.
 
 
@@ -35,7 +35,7 @@ GNU LGPL information
     Lesser General Public License for more details.
 
     You should have received a copy of the GNU Lesser General Public
-    License along with this library; if not, 
+    License along with this library; if not,
     you can get a copy of the GNU Lesser General Public License from
     http://www.gnu.org/
 
@@ -149,5 +149,3 @@ The license for original unRAR code has the following restriction:
   not be used to develop a RAR (WinRAR) compatible archiver.
 
 --
-
-
