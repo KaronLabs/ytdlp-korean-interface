@@ -94,7 +94,29 @@
       ]
     }
   ],
-  "unresolved": [
+  "licenseRefMappings": [
+    {
+      "id": "fxhash@0.2.1",
+      "licenseRefId": "LicenseRef-fxhash-0.2.1-apache-2.0-mit-a7af1b0aa267",
+      "declaredLicense": "Apache-2.0/MIT",
+      "declaredTextSha256": "a7af1b0aa267b3f10741de1fc27fae1ea4e8e50af6376fa7186f4e1b53b3703a",
+      "crateSourcePath": "fxhash-0.2.1.crate",
+      "crateArchiveSha256": "c31b6d751ae2c7f11320402d34e41349dd1016f8d5d45e48c4312bc8625af50c",
+      "manifest": {
+        "path": "fxhash-0.2.1/Cargo.toml.orig",
+        "length": 564,
+        "sha256": "42f07fb23f8b37acf45914ccb71df077455a353850e148afeabb5c684f8ebaab"
+      },
+      "canonicalTexts": [
+        {"id":"Apache-2.0","path":"text/Apache-2.0.txt","length":10280,"sha256":"074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff"},
+        {"id":"MIT","path":"text/MIT.txt","length":1078,"sha256":"b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"}
+      ],
+      "licenseComments": "The author's slash syntax Apache-2.0/MIT is preserved verbatim. This mapping does not silently normalize or reinterpret the slash as SPDX OR or AND. The extracted text supplies the complete pinned canonical texts named literally by that declaration.",
+      "spdxSpecification": "2.3",
+      "resolution": "content-addressed-explicit-LicenseRef"
+    }
+  ],
+  "researchEvidence": [
     {
       "id": "fxhash@0.2.1",
       "declaredLicense": "Apache-2.0/MIT",
@@ -109,5 +131,6 @@
       "licenseFilesFoundInExaminedCommits": 0,
       "blocker": "invalid legacy slash expression and no immutable version-tied upstream license file"
     }
-  ]
+  ],
+  "unresolved": []
 }

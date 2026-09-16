@@ -15,3 +15,7 @@ License resolution precedence: package-provided files, canonical text from the
 pinned SPDX License List Data v3.28.0 corpus, then immutable version-tied
 upstream commit files for invalid or custom package expressions. Every fallback
 is recorded per component; no copyright holder is inferred.
+
+SPDX 2.3 custom LicenseRef entries preserve non-standard author declarations
+verbatim and provide content-addressed extracted text. A LicenseRef does not
+silently convert legacy separators into SPDX OR or AND semantics.

@@ -35,6 +35,11 @@ are absent, fully valid SPDX expressions resolve to canonical text from pinned
 SPDX License List Data v3.28.0. Invalid or custom expressions require an exact
 version-tied upstream commit license fallback.
 
+The historical `fxhash@0.2.1` declaration `Apache-2.0/MIT` is preserved
+verbatim as a content-addressed SPDX 2.3 `LicenseRef`. Its extracted text binds
+the exact crate and manifest hashes and includes the complete pinned canonical
+Apache-2.0 and MIT texts without interpreting the slash as `OR` or `AND`.
+
 Any unresolved expression, checksum mismatch, mutable source, native omission,
 path collision, or graph mismatch produces `deno-collection-blockers.json` and
 no notice/source bundle. This task does not modify the release-wide

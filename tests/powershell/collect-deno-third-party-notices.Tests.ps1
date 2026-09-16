@@ -96,6 +96,33 @@ Describe 'Deno third-party notice fail-closed contracts' {
         Get-TestExceptionMessage { Resolve-DenoSpdxExpression -Expression 'LicenseRef-private OR MIT' -SpdxRoot $spdx } | Should Be 'deno_spdx_expression_invalid:LicenseRef-private OR MIT'
     }
 
+    It 'rejects legacy slash syntax without an explicit mapping' {
+        $spdx = Join-Path $TestDrive 'spdx-slash'
+        New-TestSpdxCorpus $spdx
+
+        Get-TestExceptionMessage { Resolve-DenoSpdxExpression -Expression 'Apache-2.0/MIT' -SpdxRoot $spdx } | Should Be 'deno_spdx_expression_invalid:Apache-2.0/MIT'
+    }
+
+    It 'accepts only the exact content-addressed fxhash LicenseRef mapping' {
+        foreach ($variable in @('DENO_FXHASH_CRATE', 'DENO_FXHASH_VENDOR', 'DENO_SPDX_ROOT')) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($variable))) { throw "$variable is required for this test" }
+        }
+        $fallbackPath = Join-Path (Split-Path -Parent (Split-Path -Parent $collectorPath)) 'release/runtime/v2.19.1-karon.2/deno/upstream-license-fallbacks.json'
+        $fallbacks = Read-DenoJson $fallbackPath
+        $mapping = @($fallbacks.licenseRefMappings | Where-Object id -ceq 'fxhash@0.2.1')[0]
+        $package = [pscustomobject]@{ name = 'fxhash'; version = '0.2.1'; checksum = 'c31b6d751ae2c7f11320402d34e41349dd1016f8d5d45e48c4312bc8625af50c' }
+
+        $result = Resolve-DenoExplicitLicenseRef -Package $package -DeclaredLicense 'Apache-2.0/MIT' -CrateArchivePath $env:DENO_FXHASH_CRATE -SpdxRoot $env:DENO_SPDX_ROOT -Mapping $mapping
+
+        $result.licenseRefId | Should Be 'LicenseRef-fxhash-0.2.1-apache-2.0-mit-a7af1b0aa267'
+        $result.extractedText | Should Match 'Author-declared license text \(verbatim\):\r?\nApache-2\.0/MIT'
+        $result.extractedText | Should Match 'Canonical text named by the literal declaration: Apache-2\.0'
+        $result.extractedText | Should Match 'Canonical text named by the literal declaration: MIT'
+        Get-TestExceptionMessage { Resolve-DenoExplicitLicenseRef -Package $package -DeclaredLicense 'MIT/Apache-2.0' -CrateArchivePath $env:DENO_FXHASH_CRATE -SpdxRoot $env:DENO_SPDX_ROOT -Mapping $mapping } | Should Be 'deno_license_ref_declaration_mismatch:fxhash@0.2.1'
+        $fakePackage = [pscustomobject]@{ name = 'fxhash'; version = '0.2.1'; checksum = ('0' * 64) }
+        Get-TestExceptionMessage { Resolve-DenoExplicitLicenseRef -Package $fakePackage -DeclaredLicense 'Apache-2.0/MIT' -CrateArchivePath $env:DENO_FXHASH_CRATE -SpdxRoot $env:DENO_SPDX_ROOT -Mapping $mapping } | Should Be 'deno_license_ref_crate_hash_mismatch:fxhash@0.2.1'
+    }
+
     It 'produces deterministic success ZIP output' {
         $first = Join-Path $TestDrive 'zip-first'
         $second = Join-Path $TestDrive 'zip-second'
