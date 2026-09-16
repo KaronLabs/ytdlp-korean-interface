@@ -222,8 +222,16 @@ function ConvertTo-KaronFinalPath {
 }
 
 function ConvertTo-KaronPathIdentity {
-    param([KaronPathHandle] $Handle)
-    $identity = $Handle.Refresh()
+    param($Handle)
+    if ($Handle -is [KaronPathHandle]) {
+        $identity = $Handle.Refresh()
+    }
+    elseif ($Handle -is [Microsoft.Win32.SafeHandles.SafeFileHandle]) {
+        $identity = [KaronPathSafety]::ReadIdentity($Handle)
+    }
+    else {
+        throw 'ffmpeg_source_invalid_path_handle'
+    }
     [pscustomobject][ordered]@{
         FinalPath = ConvertTo-KaronFinalPath $identity.FinalPath
         VolumeSerialNumber = [uint64] $identity.VolumeSerialNumber
@@ -908,13 +916,13 @@ function Remove-VerifiedBundleSnapshot {
     $access = Open-VerifiedBundleSnapshot $Snapshot -ForCleanup
     $childHandles = [Collections.Generic.List[object]]::new()
     try {
-        if ($null -eq $Snapshot.PSObject.Properties['OwnedLeafNames']) {
+        if ($null -eq $Snapshot.PSObject.Properties['CreatedLeafIdentities']) {
             throw 'ffmpeg_source_snapshot_ownership_mismatch'
         }
         $expected = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
         $expected.Add('.owner') | Out-Null
-        foreach ($name in @($Snapshot.OwnedLeafNames)) {
-            if (-not $expected.Add([string] $name)) { throw 'ffmpeg_source_snapshot_ownership_mismatch' }
+        foreach ($createdLeaf in @($Snapshot.CreatedLeafIdentities)) {
+            if (-not $expected.Add([string] $createdLeaf.Name)) { throw 'ffmpeg_source_snapshot_ownership_mismatch' }
         }
         $actual = @([IO.Directory]::EnumerateFileSystemEntries($access.Root))
         if ($actual.Count -ne $expected.Count) { throw 'ffmpeg_source_snapshot_ownership_mismatch' }
@@ -922,13 +930,8 @@ function Remove-VerifiedBundleSnapshot {
             if (-not $expected.Contains([IO.Path]::GetFileName($path))) { throw 'ffmpeg_source_snapshot_ownership_mismatch' }
         }
 
-        $itemsByLeaf = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
-        foreach ($item in @($Snapshot.Items)) {
-            $itemsByLeaf.Add([IO.Path]::GetFileName([string] $item.SourcePath), $item)
-        }
-        foreach ($name in @($Snapshot.OwnedLeafNames)) {
-            if (-not $itemsByLeaf.ContainsKey([string] $name)) { throw 'ffmpeg_source_snapshot_ownership_mismatch' }
-            $path = Join-Path $access.Root ([string] $name)
+        foreach ($createdLeaf in @($Snapshot.CreatedLeafIdentities)) {
+            $path = Join-Path $access.Root ([string] $createdLeaf.Name)
             $handle = [KaronPathSafety]::Open($path, $true, $true, $true)
             try {
                 $identity = ConvertTo-KaronPathIdentity $handle
@@ -937,7 +940,7 @@ function Remove-VerifiedBundleSnapshot {
                     throw 'ffmpeg_source_snapshot_reparse_point'
                 }
                 Assert-KaronDirectChild $access.RootChain.Final.Identity $identity 'ffmpeg_source_snapshot_ownership_mismatch'
-                Assert-KaronPathIdentity $itemsByLeaf[[string] $name].SourceIdentity $identity 'ffmpeg_source_snapshot_identity_changed' $path
+                Assert-KaronPathIdentity $createdLeaf.Identity $identity 'ffmpeg_source_snapshot_identity_changed' $path
                 $childHandles.Add([pscustomobject]@{ Handle = $handle; Identity = $identity; Path = $path }) | Out-Null
                 $handle = $null
             }
@@ -1006,7 +1009,7 @@ function New-VerifiedBundleSnapshot {
             ParentIdentity = $parentChain.Final.Identity
             RootIdentity = $rootChain.Final.Identity
             OwnerIdentity = $ownerIdentity
-            OwnedLeafNames = @()
+            CreatedLeafIdentities = @()
             Items = @()
         }
 
@@ -1018,6 +1021,12 @@ function New-VerifiedBundleSnapshot {
             try {
                 $openedSource = Open-VerifiedBundleSource $item
                 $output = [IO.File]::Open($destination, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+                $createdIdentity = ConvertTo-KaronPathIdentity $output.SafeFileHandle
+                $snapshot.CreatedLeafIdentities = @($snapshot.CreatedLeafIdentities) + [pscustomobject][ordered]@{
+                    Name = [IO.Path]::GetFileName($destination)
+                    Identity = $createdIdentity
+                }
+                Assert-KaronDirectChild $rootChain.Final.Identity $createdIdentity 'ffmpeg_source_snapshot_ownership_mismatch'
                 Copy-KaronHandleToStream $openedSource.SourceChain.Final.Handle $output
             }
             finally {
@@ -1038,6 +1047,7 @@ function New-VerifiedBundleSnapshot {
                     throw 'ffmpeg_source_snapshot_reparse_point'
                 }
                 Assert-KaronDirectChild $rootChain.Final.Identity $stagedIdentity 'ffmpeg_source_snapshot_ownership_mismatch'
+                Assert-KaronPathIdentity $createdIdentity $stagedIdentity 'ffmpeg_source_snapshot_identity_changed' $destination
                 $digest = Get-KaronHandleDigest $stagedHandle
                 if ($digest.Sha256 -cne $item.Sha256 -or $digest.Bytes -ne $item.Bytes) {
                     throw "ffmpeg_source_staged_sha256_mismatch:$($item.EntryPath)"
@@ -1053,7 +1063,6 @@ function New-VerifiedBundleSnapshot {
                 }
             }
             finally { $stagedHandle.Dispose() }
-            $snapshot.OwnedLeafNames = @($snapshot.OwnedLeafNames) + [IO.Path]::GetFileName($destination)
             $snapshot.Items = @($snapshot.Items) + $stagedItem
             $index++
         }

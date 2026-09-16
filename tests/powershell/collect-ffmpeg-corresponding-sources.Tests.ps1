@@ -310,6 +310,74 @@ Describe 'FFmpeg corresponding-source collector schema 3' {
         { New-DeterministicZip @($item) $zip @($root) } | Should Throw 'ffmpeg_source_staged_sha256_mismatch'
     }
 
+    It 'removes a partial snapshot after an expected SHA mismatch' {
+        $root = Join-Path $TestDrive partial-sha-root
+        $stageParent = Join-Path $TestDrive partial-sha-stage
+        [IO.Directory]::CreateDirectory($root) | Out-Null
+        [IO.Directory]::CreateDirectory($stageParent) | Out-Null
+        $source = Join-Path $root source.txt
+        [IO.File]::WriteAllText($source, 'partial bytes')
+        $item = New-BundleItem $source entry.txt
+        $item.Sha256 = '0' * 64
+
+        { New-VerifiedBundleSnapshot @($item) $stageParent @($root) } |
+            Should Throw 'ffmpeg_source_staged_sha256_mismatch'
+        @(Get-ChildItem -LiteralPath $stageParent -Directory -Filter 'ffmpeg-bundle-stage-*').Count | Should Be 0
+    }
+
+    It 'removes a partial snapshot after an expected length mismatch' {
+        $root = Join-Path $TestDrive partial-length-root
+        $stageParent = Join-Path $TestDrive partial-length-stage
+        [IO.Directory]::CreateDirectory($root) | Out-Null
+        [IO.Directory]::CreateDirectory($stageParent) | Out-Null
+        $source = Join-Path $root source.txt
+        [IO.File]::WriteAllText($source, 'partial bytes')
+        $item = New-BundleItem $source entry.txt
+        $item.Bytes = $item.Bytes + 1
+
+        { New-VerifiedBundleSnapshot @($item) $stageParent @($root) } |
+            Should Throw 'ffmpeg_source_staged_sha256_mismatch'
+        @(Get-ChildItem -LiteralPath $stageParent -Directory -Filter 'ffmpeg-bundle-stage-*').Count | Should Be 0
+    }
+
+    It 'refuses to delete a same-byte replacement of a failed partial leaf' {
+        $root = Join-Path $TestDrive partial-replacement-root
+        $stageParent = Join-Path $TestDrive partial-replacement-stage
+        [IO.Directory]::CreateDirectory($root) | Out-Null
+        [IO.Directory]::CreateDirectory($stageParent) | Out-Null
+        $source = Join-Path $root source.txt
+        [IO.File]::WriteAllText($source, 'same partial bytes')
+        $item = New-BundleItem $source entry.txt
+        $item.Sha256 = '0' * 64
+        $replacementBytes = [IO.File]::ReadAllBytes($source)
+        $observation = [pscustomobject]@{ Root = $null; ReplacementPath = $null; CleanupError = $null }
+        $originalCleanup = (Get-Item Function:\Remove-VerifiedBundleSnapshot).ScriptBlock
+        $attackingCleanup = {
+            param($Snapshot)
+            $observation.Root = $Snapshot.Root
+            $observation.ReplacementPath = Join-Path $Snapshot.Root '00000000.bin'
+            Remove-Item -LiteralPath $observation.ReplacementPath -Force
+            [IO.File]::WriteAllBytes($observation.ReplacementPath, $replacementBytes)
+            try { & $originalCleanup $Snapshot }
+            catch { $observation.CleanupError = $_.Exception.Message }
+        }.GetNewClosure()
+
+        Set-Item -Path Function:\Remove-VerifiedBundleSnapshot -Value $attackingCleanup
+        try {
+            { New-VerifiedBundleSnapshot @($item) $stageParent @($root) } |
+                Should Throw 'ffmpeg_source_staged_sha256_mismatch'
+            $observation.CleanupError | Should Match '^ffmpeg_source_snapshot_identity_changed:'
+            (Test-Path -LiteralPath $observation.ReplacementPath -PathType Leaf) | Should Be $true
+            @(Get-ChildItem -LiteralPath $stageParent -Directory -Filter 'ffmpeg-bundle-stage-*').Count | Should Be 1
+        }
+        finally {
+            Set-Item -Path Function:\Remove-VerifiedBundleSnapshot -Value $originalCleanup
+            if ($observation.Root -and (Test-Path -LiteralPath $observation.Root)) {
+                Remove-Item -LiteralPath $observation.Root -Recurse -Force
+            }
+        }
+    }
+
     It 'rejects a same-byte source identity replacement after validation' {
         $root = Join-Path $TestDrive identity-source-root
         $stageParent = Join-Path $TestDrive identity-source-stage
