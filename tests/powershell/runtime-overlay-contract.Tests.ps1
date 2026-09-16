@@ -81,7 +81,7 @@ function New-OverlayFixture {
     [IO.Directory]::CreateDirectory((Join-Path $sevenSource 'x64')) | Out-Null
     [IO.File]::WriteAllText((Join-Path $sevenSource 'x64\7z.dll'), 'overlay-7z', [Text.UTF8Encoding]::new($false))
     [IO.File]::WriteAllText((Join-Path $sevenSource 'x64\Rar.dll'), 'must-not-ship-rar', [Text.UTF8Encoding]::new($false))
-    $sevenArchiveName = '7z2601-extra.7z'
+    $sevenArchiveName = '7z2601-x64-no-rar.7z'
     $sevenArchive = Join-Path $archives $sevenArchiveName
     New-SevenZipArchive -Path $sevenArchive -WorkingDirectory $sevenSource -RelativePaths @('x64\7z.dll', 'x64\Rar.dll')
 

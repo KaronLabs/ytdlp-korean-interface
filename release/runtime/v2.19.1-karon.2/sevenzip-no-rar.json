@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "artifactName": "7z2601-x64-no-rar.7z",
+  "correspondingSourceArchiveName": "7z2601-x64-no-rar-source.7z",
+  "source": {
+    "repository": "ip7z/7zip",
+    "release": "26.01",
+    "commit": "8c63d71ff886bda90c86db28466287f977374237",
+    "archiveUrl": "https://github.com/ip7z/7zip/archive/8c63d71ff886bda90c86db28466287f977374237.zip",
+    "archiveSha256": "01589AEDA50512955E66D360C6534B961EC95C51111A76E2FA2976A8DAA55271",
+    "archiveRoot": "7zip-8c63d71ff886bda90c86db28466287f977374237",
+    "arcMakPath": "CPP/7zip/Bundles/Format7zF/Arc.mak",
+    "arcMakSha256": "21BDEC7EF04A92DBB7A19E71146929A85A851A6E7A4D992AC9529E963D9BF381",
+    "patchedArcMakSha256": "F8C87876AE5BDD74A338E01BE7A02EDB699E2470468F02DA380D4B061E353FBE"
+  },
+  "excludedObjects": [
+    "RarHandler.obj",
+    "Rar5Handler.obj",
+    "Rar1Decoder.obj",
+    "Rar2Decoder.obj",
+    "Rar3Decoder.obj",
+    "Rar3Vm.obj",
+    "Rar5Decoder.obj",
+    "RarCodecsRegister.obj",
+    "Rar20Crypto.obj",
+    "Rar5Aes.obj",
+    "RarAes.obj"
+  ],
+  "requiredObjects": [
+    "7zHandler.obj",
+    "7zRegister.obj",
+    "ZipHandler.obj",
+    "ZipRegister.obj"
+  ],
+  "sourceExclusions": [
+    "CPP/7zip/Archive/Rar/",
+    "CPP/7zip/Compress/Rar*",
+    "CPP/7zip/Crypto/Rar*",
+    "DOC/License.txt",
+    "DOC/unRarLicense.txt"
+  ],
+  "runtimeArchiveEntries": [
+    "BSD-NOTICES.txt",
+    "COPYING.LGPL-2.1.txt",
+    "provenance/build-commands.log",
+    "provenance/build-map.json",
+    "provenance/build-provenance.json",
+    "x64/7z.dll"
+  ]
+}
