@@ -4,6 +4,7 @@ param(
     [string] $ManifestRoot = (Join-Path (Split-Path -Parent $PSScriptRoot) 'release/runtime/v2.19.1-karon.2/deno'),
     [string] $DenoSourceRoot,
     [string] $RustyV8SourceRoot,
+    [string] $RustyV8GitRepositoryPath,
     [string] $V8SourceRoot,
     [string] $VendorRoot,
     [string] $OfficialMetadataPath,
@@ -26,19 +27,64 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Assert-DenoNoReparsePath {
+    param([Parameter(Mandatory)] [string] $Path)
+    $full = [IO.Path]::GetFullPath($Path)
+    $root = [IO.Path]::GetPathRoot($full)
+    $current = $root
+    if ([IO.Directory]::Exists($root)) {
+        $rootItem = Get-Item -LiteralPath $root -Force
+        if (($rootItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "deno_reparse_path_rejected:$full" }
+    }
+    foreach ($segment in $full.Substring($root.Length).Split([char[]]@('\', '/'), [StringSplitOptions]::RemoveEmptyEntries)) {
+        $current = Join-Path $current $segment
+        if ([IO.File]::Exists($current) -or [IO.Directory]::Exists($current)) {
+            $item = Get-Item -LiteralPath $current -Force
+            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "deno_reparse_path_rejected:$full" }
+        }
+    }
+    return $full
+}
+
+function New-DenoProcessStageRoot {
+    param([Parameter(Mandatory)] [string] $ScratchRoot)
+    $scratch = Assert-DenoNoReparsePath $ScratchRoot
+    if (-not [IO.Directory]::Exists($scratch)) { [void][IO.Directory]::CreateDirectory($scratch) }
+    $scratch = Assert-DenoNoReparsePath $scratch
+    $stage = Join-Path $scratch ('.deno-third-party-stage-' + $PID + '-' + [guid]::NewGuid().ToString('N'))
+    if ([IO.Directory]::Exists($stage) -or [IO.File]::Exists($stage)) { throw 'deno_process_stage_collision' }
+    [void][IO.Directory]::CreateDirectory($stage)
+    $stage = Assert-DenoNoReparsePath $stage
+    if ([IO.Path]::GetPathRoot($stage) -cne [IO.Path]::GetPathRoot($scratch)) { throw 'deno_process_stage_volume_mismatch' }
+    return $stage
+}
+
+function Complete-DenoAtomicDirectory {
+    param([Parameter(Mandatory)] [string] $Source, [Parameter(Mandatory)] [string] $Destination)
+    $sourceFull = Assert-DenoNoReparsePath $Source
+    $destinationFull = Assert-DenoNoReparsePath $Destination
+    if (-not [IO.Directory]::Exists($sourceFull)) { throw 'deno_process_stage_missing' }
+    if ([IO.Directory]::Exists($destinationFull) -or [IO.File]::Exists($destinationFull)) { throw 'deno_output_already_exists' }
+    if ([IO.Path]::GetPathRoot($sourceFull) -cne [IO.Path]::GetPathRoot($destinationFull)) { throw 'deno_process_stage_volume_mismatch' }
+    [IO.Directory]::Move($sourceFull, $destinationFull)
+}
+
 function Get-DenoSha256 {
     param([Parameter(Mandatory)] [string] $Path)
-    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    $full = Assert-DenoNoReparsePath $Path
+    return (Get-FileHash -LiteralPath $full -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
 function Write-DenoUtf8Text {
     param([Parameter(Mandatory)] [string] $Path, [Parameter(Mandatory)] [string] $Text)
+    $Path = Assert-DenoNoReparsePath $Path
     $normalized = $Text.Replace("`r`n", "`n").Replace("`r", "`n")
     [IO.File]::WriteAllText($Path, $normalized, [Text.UTF8Encoding]::new($false))
 }
 
 function Read-DenoJson {
     param([Parameter(Mandatory)] [string] $Path)
+    $Path = Assert-DenoNoReparsePath $Path
     $raw = [IO.File]::ReadAllText($Path, [Text.UTF8Encoding]::new($false, $true))
     return ConvertFrom-Json -InputObject $raw -Depth 100
 }
@@ -81,15 +127,45 @@ function Assert-DenoUniquePaths {
 
 function Assert-DenoNativeClosure {
     param(
-        [Parameter(Mandatory)] [string[]] $RequiredComponents,
-        [Parameter(Mandatory)] [string[]] $ObservedComponents
+        [Parameter(Mandatory)] [object[]] $Components,
+        [Parameter(Mandatory)] [string] $RustyV8GitRepositoryPath,
+        [Parameter(Mandatory)] [string] $ExpectedCommit,
+        [Parameter(Mandatory)] [string] $ExpectedTree
     )
-    $observed = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-    foreach ($component in $ObservedComponents) { [void]$observed.Add($component) }
-    foreach ($component in $RequiredComponents | Sort-Object) {
-        if (-not $observed.Contains($component)) { throw "deno_native_component_missing:$component" }
+    $repository = Assert-DenoNoReparsePath $RustyV8GitRepositoryPath
+    if (-not [IO.Directory]::Exists($repository)) { throw 'deno_rusty_v8_git_repository_missing' }
+    $commitExpression = "$ExpectedCommit^{commit}"
+    $actualCommit = @(& git.exe -C $repository rev-parse $commitExpression 2>$null)
+    if ($LASTEXITCODE -ne 0 -or $actualCommit.Count -ne 1 -or $actualCommit[0] -cne $ExpectedCommit) { throw 'deno_rusty_v8_git_commit_mismatch' }
+    $treeExpression = "$ExpectedCommit^{tree}"
+    $actualTree = @(& git.exe -C $repository rev-parse $treeExpression 2>$null)
+    if ($LASTEXITCODE -ne 0 -or $actualTree.Count -ne 1 -or $actualTree[0] -cne $ExpectedTree) { throw 'deno_rusty_v8_git_tree_mismatch' }
+    $treeLines = @(& git.exe -C $repository ls-tree -r $ExpectedCommit 2>$null)
+    if ($LASTEXITCODE -ne 0) { throw 'deno_rusty_v8_git_tree_unreadable' }
+    $gitlinks = [Collections.Generic.List[object]]::new()
+    $gitlinkMap = [Collections.Generic.Dictionary[string,string]]::new([StringComparer]::Ordinal)
+    foreach ($line in $treeLines) {
+        if ($line -notmatch '^160000 commit (?<commit>[0-9a-f]{40})\t(?<path>.+)$') { continue }
+        $path = $Matches.path.Replace('\', '/')
+        if ($gitlinkMap.ContainsKey($path)) { throw "deno_native_gitlink_duplicate:$path" }
+        $gitlinkMap.Add($path, $Matches.commit)
+        $gitlinks.Add([ordered]@{ path = $path; commit = $Matches.commit })
     }
-    return $true
+    Assert-DenoUniquePaths @($gitlinks.path) | Out-Null
+    $manifestMap = [Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+    foreach ($component in $Components) {
+        $path = ([string]$component.path).Replace('\', '/')
+        if ($manifestMap.ContainsKey($path)) { throw "deno_native_component_duplicate:$path" }
+        $manifestMap.Add($path, $component)
+    }
+    foreach ($gitlink in $gitlinks | Sort-Object path) {
+        if (-not $manifestMap.ContainsKey([string]$gitlink.path)) { throw "deno_native_component_missing:$($gitlink.path)" }
+        if ([string]$manifestMap[[string]$gitlink.path].commit -cne [string]$gitlink.commit) { throw "deno_native_component_commit_mismatch:$($gitlink.path)" }
+    }
+    foreach ($component in $Components | Sort-Object path) {
+        if (-not $gitlinkMap.ContainsKey([string]$component.path)) { throw "deno_native_component_not_gitlink:$($component.path)" }
+    }
+    return [pscustomobject]@{ commit = $ExpectedCommit; tree = $ExpectedTree; gitlinks = @($gitlinks | Sort-Object path) }
 }
 
 function Assert-DenoTargetClosure {
@@ -125,8 +201,10 @@ function Assert-DenoReleaseIdentity {
 function Get-DenoLicenseFiles {
     param([Parameter(Mandatory)] [string] $Root, [string] $DeclaredLicenseFile)
     $files = [Collections.Generic.List[IO.FileInfo]]::new()
-    foreach ($file in Get-ChildItem -LiteralPath $Root -Recurse -File -Force) {
-        if ($file.Name -match '^(?i:LICENSE|LICENCE|COPYING|NOTICE|PATENTS|COPYRIGHT)(?:[._-].*)?$') { $files.Add($file) }
+    $Root = Assert-DenoNoReparsePath $Root
+    foreach ($item in Get-ChildItem -LiteralPath $Root -Recurse -Force) {
+        if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "deno_reparse_path_rejected:$($item.FullName)" }
+        if (-not $item.PSIsContainer -and $item.Name -match '^(?i:LICENSE|LICENCE|COPYING|NOTICE|PATENTS|COPYRIGHT)(?:[._-].*)?$') { $files.Add($item) }
     }
     if (-not [string]::IsNullOrWhiteSpace($DeclaredLicenseFile)) {
         $declared = [IO.Path]::GetFullPath((Join-Path $Root $DeclaredLicenseFile))
@@ -241,7 +319,8 @@ function Resolve-DenoExplicitLicenseRef {
         [Parameter(Mandatory)] [string] $DeclaredLicense,
         [Parameter(Mandatory)] [string] $CrateArchivePath,
         [Parameter(Mandatory)] [string] $SpdxRoot,
-        [Parameter(Mandatory)] [object] $Mapping
+        [Parameter(Mandatory)] [object] $Mapping,
+        [object] $CrateEvidence
     )
     $id = ([string]$Package.name) + '@' + ([string]$Package.version)
     if ([string]$Mapping.id -cne $id) { throw "deno_license_ref_mapping_mismatch:$id" }
@@ -249,20 +328,14 @@ function Resolve-DenoExplicitLicenseRef {
     $declaredHash = Get-DenoUtf8StringSha256 $DeclaredLicense
     if ($declaredHash -cne [string]$Mapping.declaredTextSha256) { throw "deno_license_ref_declaration_hash_mismatch:$id" }
     if ([string]$Package.checksum -cne [string]$Mapping.crateArchiveSha256) { throw "deno_license_ref_crate_hash_mismatch:$id" }
-    Assert-DenoHash $CrateArchivePath ([string]$Mapping.crateArchiveSha256)
     $expectedRef = New-DenoLicenseRefId -PackageId $id -DeclaredLicense $DeclaredLicense
     if ([string]$Mapping.licenseRefId -cne $expectedRef) { throw "deno_license_ref_id_mismatch:$id" }
-
-    $manifestTemp = Join-Path ([IO.Path]::GetTempPath()) ('deno-license-ref-' + [guid]::NewGuid().ToString('N'))
-    try {
-        Copy-DenoTarEntry -ArchivePath $CrateArchivePath -EntryPath ([string]$Mapping.manifest.path) -Destination $manifestTemp
-        $manifestItem = Get-Item -LiteralPath $manifestTemp
-        if ($manifestItem.Length -ne [long]$Mapping.manifest.length -or (Get-DenoSha256 $manifestTemp) -cne [string]$Mapping.manifest.sha256) { throw "deno_license_ref_manifest_hash_mismatch:$id" }
-        $manifestText = [IO.File]::ReadAllText($manifestTemp, [Text.UTF8Encoding]::new($false, $true))
-        $manifestLicense = [regex]::Match($manifestText, '(?m)^license\s*=\s*"([^"]+)"').Groups[1].Value
-        if ($manifestLicense -cne $DeclaredLicense) { throw "deno_license_ref_manifest_declaration_mismatch:$id" }
-    }
-    finally { if (Test-Path -LiteralPath $manifestTemp) { Remove-Item -LiteralPath $manifestTemp -Force } }
+    if ($null -eq $CrateEvidence) { $CrateEvidence = Get-DenoCrateArchiveEvidence -Package $Package -CrateArchivePath $CrateArchivePath }
+    if ([string]$CrateEvidence.manifest.path -cne [string]$Mapping.manifest.path -or
+        [long]$CrateEvidence.manifest.length -ne [long]$Mapping.manifest.length -or
+        [string]$CrateEvidence.manifest.sha256 -cne [string]$Mapping.manifest.sha256) { throw "deno_license_ref_manifest_hash_mismatch:$id" }
+    $manifestLicense = Get-DenoTomlString -Text ([string]$CrateEvidence.manifestText) -Name 'license'
+    if ($manifestLicense -cne $DeclaredLicense) { throw "deno_license_ref_manifest_declaration_mismatch:$id" }
 
     $canonical = [Collections.Generic.List[object]]::new()
     $builder = [Text.StringBuilder]::new()
@@ -283,21 +356,133 @@ function Resolve-DenoExplicitLicenseRef {
     return [pscustomobject]@{ licenseRefId = $expectedRef; extractedText = $extractedText; extractedTextSha256 = $extractedHash; licenseComments = [string]$Mapping.licenseComments; canonicalTexts = @($canonical); resolvedLicenseFiles = @($file); provenance = $Mapping }
 }
 
-function Assert-DenoVendorChecksums {
-    param([Parameter(Mandatory)] [string] $VendorPath, [Parameter(Mandatory)] [object] $Checksum, [Parameter(Mandatory)] [string] $Id)
-    $declaredPaths = @($Checksum.files.psobject.Properties.Name)
-    Assert-DenoUniquePaths $declaredPaths | Out-Null
-    $declared = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-    foreach ($path in $declaredPaths) {
-        [void]$declared.Add($path.Replace('\', '/'))
-        $fullPath = Join-Path $VendorPath $path
-        if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf) -or (Get-DenoSha256 $fullPath) -cne [string]$Checksum.files.$path) {
-            throw "deno_vendor_file_checksum_mismatch:$Id`:$path"
+function Get-DenoSha256Bytes {
+    param([Parameter(Mandatory)] [byte[]] $Bytes)
+    return ([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($Bytes))).ToLowerInvariant()
+}
+
+function Get-DenoTomlString {
+    param([Parameter(Mandatory)] [string] $Text, [Parameter(Mandatory)] [string] $Name)
+    $escaped = [regex]::Escape($Name)
+    $pattern = '(?m)^\s*' + $escaped + '\s*=\s*"(?<value>[^"]*)"'
+    $match = [regex]::Match($Text, $pattern)
+    if (-not $match.Success) { return '' }
+    return $match.Groups['value'].Value
+}
+
+function Get-DenoCrateArchiveEvidence {
+    param([Parameter(Mandatory)] [object] $Package, [Parameter(Mandatory)] [string] $CrateArchivePath)
+    $id = ([string]$Package.name) + '@' + ([string]$Package.version)
+    if ([string]$Package.checksum -notmatch '^[0-9a-f]{64}$') { throw "deno_cargo_checksum_missing:$id" }
+    Assert-DenoHash $CrateArchivePath ([string]$Package.checksum)
+    $prefix = ([string]$Package.name) + '-' + ([string]$Package.version) + '/'
+    $files = [Collections.Generic.List[object]]::new()
+    $fileMap = [Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+    $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $manifest = $null
+    $manifestText = $null
+    $metadataManifest = $null
+    $metadataManifestText = $null
+    $archive = Assert-DenoNoReparsePath $CrateArchivePath
+    $fileStream = [IO.File]::Open($archive, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    try {
+        $gzip = [IO.Compression.GZipStream]::new($fileStream, [IO.Compression.CompressionMode]::Decompress, $true)
+        try {
+            $reader = [System.Formats.Tar.TarReader]::new($gzip, $true)
+            try {
+                while ($null -ne ($entry = $reader.GetNextEntry())) {
+                    $entryPath = $entry.Name.Replace('\', '/')
+                    if ($entry.EntryType -eq [System.Formats.Tar.TarEntryType]::Directory) { continue }
+                    if ($entry.EntryType -notin @([System.Formats.Tar.TarEntryType]::RegularFile, [System.Formats.Tar.TarEntryType]::V7RegularFile)) { throw "deno_crate_archive_non_regular_entry:$id`:$entryPath" }
+                    if (-not $entryPath.StartsWith($prefix, [StringComparison]::Ordinal)) { throw "deno_crate_archive_path_invalid:$id`:$entryPath" }
+                    $relative = $entryPath.Substring($prefix.Length)
+                    Assert-DenoUniquePaths @($relative) | Out-Null
+                    if (-not $seen.Add($relative)) { throw "deno_path_case_collision:$($relative.ToLowerInvariant())" }
+                    $capture = $relative -ceq 'Cargo.toml' -or $relative -ceq 'Cargo.toml.orig'
+                    $memory = if ($capture) { [IO.MemoryStream]::new() } else { $null }
+                    $hash = [Security.Cryptography.IncrementalHash]::CreateHash([Security.Cryptography.HashAlgorithmName]::SHA256)
+                    $length = 0L
+                    try {
+                        $buffer = [byte[]]::new(131072)
+                        if ($null -eq $entry.DataStream) {
+                            if ($entry.Length -ne 0) { throw "deno_crate_archive_stream_missing:$id`:$relative" }
+                        }
+                        else {
+                            while (($read = $entry.DataStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+                                $hash.AppendData($buffer, 0, $read)
+                                if ($capture) { $memory.Write($buffer, 0, $read) }
+                                $length += $read
+                            }
+                        }
+                        $sha256 = ([Convert]::ToHexString($hash.GetHashAndReset())).ToLowerInvariant()
+                    }
+                    finally { $hash.Dispose() }
+                    if ($length -ne [long]$entry.Length) { throw "deno_crate_archive_length_mismatch:$id`:$relative" }
+                    $record = [ordered]@{ path = $relative; archiveEntry = $entryPath; length = $length; sha256 = $sha256 }
+                    $files.Add($record)
+                    $fileMap.Add($relative, $record)
+                    if ($capture) {
+                        try { $capturedText = [Text.UTF8Encoding]::new($false, $true).GetString($memory.ToArray()) } finally { $memory.Dispose() }
+                        $capturedManifest = [ordered]@{ path = $entryPath; length = $length; sha256 = $sha256 }
+                        if ($relative -ceq 'Cargo.toml.orig') {
+                            $manifestText = $capturedText
+                            $manifest = $capturedManifest
+                        }
+                        else {
+                            $metadataManifestText = $capturedText
+                            $metadataManifest = $capturedManifest
+                        }
+                    }
+                }
+            }
+            finally { $reader.Dispose() }
         }
+        finally { $gzip.Dispose() }
     }
-    foreach ($file in Get-ChildItem -LiteralPath $VendorPath -Recurse -File -Force) {
-        $relative = $file.FullName.Substring([IO.Path]::GetFullPath($VendorPath).TrimEnd('\').Length + 1).Replace('\', '/')
-        if ($relative -cne '.cargo-checksum.json' -and -not $declared.Contains($relative)) { throw "deno_vendor_unchecksummed_file:$Id`:$relative" }
+    finally { $fileStream.Dispose() }
+    if ($null -eq $metadataManifest -or [string]::IsNullOrWhiteSpace($metadataManifestText)) { throw "deno_crate_manifest_missing:$id" }
+    if ($null -eq $manifest) {
+        $manifest = $metadataManifest
+        $manifestText = $metadataManifestText
+    }
+    return [pscustomobject]@{ manifest = $manifest; manifestText = $manifestText; metadataManifest = $metadataManifest; metadataManifestText = $metadataManifestText; files = @($files); fileMap = $fileMap }
+}
+
+function Assert-DenoVendorAgainstCrate {
+    param(
+        [Parameter(Mandatory)] [string] $VendorPath,
+        [Parameter(Mandatory)] [object] $CrateEvidence,
+        [Parameter(Mandatory)] [string] $ExpectedPackageChecksum,
+        [Parameter(Mandatory)] [string] $Id
+    )
+    $vendor = (Assert-DenoNoReparsePath $VendorPath).TrimEnd('\')
+    $checksumPath = Join-Path $vendor '.cargo-checksum.json'
+    $checksum = Read-DenoJson $checksumPath
+    if ([string]$checksum.package -cne $ExpectedPackageChecksum) { throw "deno_cargo_checksum_mismatch:$Id" }
+    $checksumProperties = @($checksum.files.psobject.Properties)
+    Assert-DenoUniquePaths @($checksumProperties.Name) | Out-Null
+    $checksumMap = [Collections.Generic.Dictionary[string,string]]::new([StringComparer]::Ordinal)
+    foreach ($property in $checksumProperties) { $checksumMap.Add($property.Name.Replace('\', '/'), [string]$property.Value) }
+    $vendorFiles = [Collections.Generic.List[object]]::new()
+    foreach ($item in Get-ChildItem -LiteralPath $vendor -Recurse -Force) {
+        if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "deno_reparse_path_rejected:$($item.FullName)" }
+        if ($item.PSIsContainer) { continue }
+        $relative = $item.FullName.Substring($vendor.Length + 1).Replace('\', '/')
+        if ($relative -ceq '.cargo-checksum.json') { continue }
+        $vendorFiles.Add([ordered]@{ path = $relative; fullName = $item.FullName })
+    }
+    Assert-DenoUniquePaths @($vendorFiles.path) | Out-Null
+    foreach ($file in $vendorFiles | Sort-Object path) {
+        if (-not $CrateEvidence.fileMap.ContainsKey([string]$file.path)) { throw "deno_vendor_file_not_in_archive:$Id`:$($file.path)" }
+        $archiveHash = [string]$CrateEvidence.fileMap[[string]$file.path].sha256
+        if ((Get-DenoSha256 ([string]$file.fullName)) -cne $archiveHash) { throw "deno_vendor_archive_mismatch:$Id`:$($file.path)" }
+        if (-not $checksumMap.ContainsKey([string]$file.path)) { throw "deno_vendor_unchecksummed_file:$Id`:$($file.path)" }
+        if ($checksumMap[[string]$file.path] -cne $archiveHash) { throw "deno_vendor_checksum_archive_mismatch:$Id`:$($file.path)" }
+    }
+    foreach ($path in $checksumMap.Keys | Sort-Object) {
+        if (-not $CrateEvidence.fileMap.ContainsKey($path)) { throw "deno_vendor_checksum_path_not_in_archive:$Id`:$path" }
+        if ($checksumMap[$path] -cne [string]$CrateEvidence.fileMap[$path].sha256) { throw "deno_vendor_checksum_archive_mismatch:$Id`:$path" }
+        if (-not [IO.File]::Exists((Join-Path $vendor $path))) { throw "deno_vendor_checksum_file_missing:$Id`:$path" }
     }
 }
 
@@ -309,6 +494,23 @@ function Get-DenoZipEntrySha256 {
         if ($entries.Count -ne 1) { throw "deno_upstream_license_entry_missing:$EntryPath" }
         $stream = $entries[0].Open()
         try { $hash = [Security.Cryptography.SHA256]::Create(); try { return ([Convert]::ToHexString($hash.ComputeHash($stream))).ToLowerInvariant() } finally { $hash.Dispose() } } finally { $stream.Dispose() }
+    }
+    finally { $zip.Dispose() }
+}
+
+function Get-DenoZipEntryBytes {
+    param([Parameter(Mandatory)] [string] $ArchivePath, [Parameter(Mandatory)] [string] $EntryPath)
+    $ArchivePath = Assert-DenoNoReparsePath $ArchivePath
+    $zip = [IO.Compression.ZipFile]::OpenRead($ArchivePath)
+    try {
+        $entries = @($zip.Entries | Where-Object { $_.FullName -ceq $EntryPath })
+        if ($entries.Count -ne 1) { throw "deno_upstream_license_entry_missing:$EntryPath" }
+        $stream = $entries[0].Open()
+        try {
+            $memory = [IO.MemoryStream]::new()
+            try { $stream.CopyTo($memory); return ,$memory.ToArray() } finally { $memory.Dispose() }
+        }
+        finally { $stream.Dispose() }
     }
     finally { $zip.Dispose() }
 }
@@ -325,24 +527,100 @@ function Copy-DenoZipEntry {
     finally { $zip.Dispose() }
 }
 
+function Get-DenoTarEntryBytes {
+    param([Parameter(Mandatory)] [string] $ArchivePath, [Parameter(Mandatory)] [string] $EntryPath)
+    $ArchivePath = Assert-DenoNoReparsePath $ArchivePath
+    $fileStream = [IO.File]::Open($ArchivePath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    try {
+        $gzip = [IO.Compression.GZipStream]::new($fileStream, [IO.Compression.CompressionMode]::Decompress, $true)
+        try {
+            $reader = [System.Formats.Tar.TarReader]::new($gzip, $true)
+            try {
+                $found = $null
+                while ($null -ne ($entry = $reader.GetNextEntry())) {
+                    if ($entry.Name.Replace('\', '/') -cne $EntryPath.Replace('\', '/')) { continue }
+                    if ($null -ne $found) { throw "deno_native_license_entry_duplicate:$EntryPath" }
+                    if ($entry.EntryType -notin @([System.Formats.Tar.TarEntryType]::RegularFile, [System.Formats.Tar.TarEntryType]::V7RegularFile)) { throw "deno_native_license_entry_not_regular:$EntryPath" }
+                    $memory = [IO.MemoryStream]::new()
+                    try { $entry.DataStream.CopyTo($memory); $found = $memory.ToArray() } finally { $memory.Dispose() }
+                }
+                if ($null -eq $found) { throw "deno_native_license_entry_missing:$EntryPath" }
+                return ,$found
+            }
+            finally { $reader.Dispose() }
+        }
+        finally { $gzip.Dispose() }
+    }
+    finally { $fileStream.Dispose() }
+}
+
 function Copy-DenoTarEntry {
     param([Parameter(Mandatory)] [string] $ArchivePath, [Parameter(Mandatory)] [string] $EntryPath, [Parameter(Mandatory)] [string] $Destination)
     New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
-    $start = [Diagnostics.ProcessStartInfo]::new()
-    $start.FileName = 'tar.exe'
-    $start.UseShellExecute = $false
-    $start.RedirectStandardOutput = $true
-    $start.ArgumentList.Add('-xOf')
-    $start.ArgumentList.Add($ArchivePath)
-    $start.ArgumentList.Add($EntryPath)
-    $process = [Diagnostics.Process]::new()
-    $process.StartInfo = $start
-    if (-not $process.Start()) { throw "deno_native_license_extract_failed:$EntryPath" }
-    $output = [IO.File]::Open($Destination, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
-    try { $process.StandardOutput.BaseStream.CopyTo($output) } finally { $output.Dispose() }
-    $process.WaitForExit()
-    if ($process.ExitCode -ne 0) { throw "deno_native_license_extract_failed:$EntryPath" }
-    $process.Dispose()
+    $Destination = Assert-DenoNoReparsePath $Destination
+    [IO.File]::WriteAllBytes($Destination, (Get-DenoTarEntryBytes -ArchivePath $ArchivePath -EntryPath $EntryPath))
+}
+
+function Add-DenoEmbeddedComponent {
+    param(
+        [Parameter(Mandatory)] [object] $Component,
+        [Parameter(Mandatory)] [string] $DenoSourceRoot,
+        [Parameter(Mandatory)] [string] $DenoSourceArchivePath,
+        [Parameter(Mandatory)] [string] $SpdxRoot,
+        [Parameter(Mandatory)] [string] $StageRoot,
+        [Parameter(Mandatory)] [Text.StringBuilder] $Notice,
+        [Parameter(Mandatory)] [AllowEmptyCollection()] [Collections.Generic.List[string]] $OutputPaths
+    )
+    $source = $Component.sourceFile
+    $sourceBytes = Get-DenoZipEntryBytes -ArchivePath $DenoSourceArchivePath -EntryPath ([string]$source.archiveEntry)
+    $sourceHash = Get-DenoSha256Bytes $sourceBytes
+    if ($sourceBytes.Length -ne [long]$source.length -or $sourceHash -cne [string]$source.sha256) { throw "deno_embedded_source_mismatch:$($Component.id)" }
+    $sourcePath = Join-Path $DenoSourceRoot ([string]$source.path)
+    $sourceItem = Get-Item -LiteralPath (Assert-DenoNoReparsePath $sourcePath)
+    if ($sourceItem.Length -ne [long]$source.length -or (Get-DenoSha256 $sourcePath) -cne $sourceHash) { throw "deno_embedded_source_root_mismatch:$($Component.id)" }
+    $sourceText = [Text.UTF8Encoding]::new($false, $true).GetString($sourceBytes)
+    foreach ($requiredText in $source.requiredText) {
+        if (-not $sourceText.Contains([string]$requiredText, [StringComparison]::Ordinal)) { throw "deno_embedded_source_content_mismatch:$($Component.id)" }
+    }
+    $buildEvidence = [Collections.Generic.List[object]]::new()
+    foreach ($evidence in $Component.buildInclusionEvidence) {
+        $bytes = Get-DenoZipEntryBytes -ArchivePath $DenoSourceArchivePath -EntryPath ([string]$evidence.archiveEntry)
+        $sha256 = Get-DenoSha256Bytes $bytes
+        $path = Join-Path $DenoSourceRoot ([string]$evidence.path)
+        $item = Get-Item -LiteralPath (Assert-DenoNoReparsePath $path)
+        if ($item.Length -ne $bytes.Length -or (Get-DenoSha256 $path) -cne $sha256) { throw "deno_embedded_build_evidence_mismatch:$($Component.id):$($evidence.path)" }
+        $text = [Text.UTF8Encoding]::new($false, $true).GetString($bytes)
+        if (-not $text.Contains([string]$evidence.requiredText, [StringComparison]::Ordinal)) { throw "deno_embedded_build_reference_missing:$($Component.id):$($evidence.path)" }
+        $buildEvidence.Add([ordered]@{ role = [string]$evidence.role; path = [string]$evidence.path; archiveEntry = [string]$evidence.archiveEntry; length = $bytes.Length; sha256 = $sha256; requiredText = [string]$evidence.requiredText })
+    }
+    $license = $Component.licenseFile
+    $licensePath = Join-Path $SpdxRoot ([string]$license.path)
+    $licenseItem = Get-Item -LiteralPath (Assert-DenoNoReparsePath $licensePath)
+    if ($licenseItem.Length -ne [long]$license.length -or (Get-DenoSha256 $licensePath) -cne [string]$license.sha256) { throw "deno_embedded_license_mismatch:$($Component.id)" }
+    $sourceDestination = Join-Path $StageRoot ([string]$source.bundlePath)
+    New-Item -ItemType Directory -Path (Split-Path -Parent $sourceDestination) -Force | Out-Null
+    [IO.File]::WriteAllBytes((Assert-DenoNoReparsePath $sourceDestination), $sourceBytes)
+    $licenseDestination = Join-Path $StageRoot ([string]$license.bundlePath)
+    New-Item -ItemType Directory -Path (Split-Path -Parent $licenseDestination) -Force | Out-Null
+    Copy-Item -LiteralPath $licensePath -Destination (Assert-DenoNoReparsePath $licenseDestination)
+    $OutputPaths.Add([string]$source.bundlePath)
+    $OutputPaths.Add([string]$license.bundlePath)
+    $licenseText = [IO.File]::ReadAllText($licensePath, [Text.UTF8Encoding]::new($false, $true))
+    $Notice.AppendLine("=== embedded $($Component.name) $($Component.version) ===").AppendLine("Deno source commit: $($Component.denoSourceCommit)").AppendLine("Source path: $($source.path)").AppendLine("Source length: $($source.length)").AppendLine("Source SHA-256: $($source.sha256)").AppendLine("Copyright: $($Component.copyright)").AppendLine("License: $($Component.license)").AppendLine("Inclusion: $($Component.inclusionReason)") | Out-Null
+    foreach ($evidence in $buildEvidence) { $Notice.AppendLine("Build evidence: $($evidence.role) $($evidence.path) $($evidence.sha256)") | Out-Null }
+    $Notice.AppendLine("--- $($license.bundlePath) ---").AppendLine($licenseText).AppendLine() | Out-Null
+    return [ordered]@{
+        id = [string]$Component.id
+        name = [string]$Component.name
+        version = [string]$Component.version
+        denoSourceCommit = [string]$Component.denoSourceCommit
+        sourceFile = [ordered]@{ path = [string]$source.path; archiveEntry = [string]$source.archiveEntry; bundlePath = [string]$source.bundlePath; length = [long]$source.length; sha256 = [string]$source.sha256 }
+        copyright = [string]$Component.copyright
+        license = [string]$Component.license
+        licenseFile = [ordered]@{ origin = 'spdx-license'; path = [string]$license.path; bundlePath = [string]$license.bundlePath; length = [long]$license.length; sha256 = [string]$license.sha256 }
+        buildInclusionEvidence = @($buildEvidence)
+        inclusionReason = [string]$Component.inclusionReason
+    }
 }
 
 function Resolve-DenoUpstreamFallback {
@@ -374,51 +652,55 @@ function Assert-DenoCratePackage {
     $id = ([string]$Package.name) + '@' + ([string]$Package.version)
     Assert-DenoImmutableCargoSource ([string]$Package.source) | Out-Null
     if ([string]$Package.checksum -notmatch '^[0-9a-f]{64}$') { throw "deno_cargo_checksum_missing:$id" }
+    if ([string]::IsNullOrWhiteSpace($CrateArchivePath)) { throw "deno_crate_archive_missing:$id" }
     $checksum = Read-DenoJson (Join-Path $VendorPath '.cargo-checksum.json')
     if ([string]$checksum.package -cne [string]$Package.checksum) { throw "deno_cargo_checksum_mismatch:$id" }
-    if (-not [string]::IsNullOrWhiteSpace($CrateArchivePath)) {
-        Assert-DenoVendorChecksums -VendorPath $VendorPath -Checksum $checksum -Id $id
-        Assert-DenoHash $CrateArchivePath ([string]$Package.checksum)
-    }
-
-    $toml = [IO.File]::ReadAllText((Join-Path $VendorPath 'Cargo.toml'), [Text.UTF8Encoding]::new($false, $true))
-    $license = [regex]::Match($toml, '(?m)^license\s*=\s*"([^"]+)"').Groups[1].Value
-    $licenseFile = [regex]::Match($toml, '(?m)^license-file\s*=\s*"([^"]+)"').Groups[1].Value
-    $repository = [regex]::Match($toml, '(?m)^repository\s*=\s*"([^"]+)"').Groups[1].Value
+    $crateEvidence = Get-DenoCrateArchiveEvidence -Package $Package -CrateArchivePath $CrateArchivePath
+    Assert-DenoVendorAgainstCrate -VendorPath $VendorPath -CrateEvidence $crateEvidence -ExpectedPackageChecksum ([string]$Package.checksum) -Id $id
+    $toml = [string]$crateEvidence.metadataManifestText
+    $manifestName = Get-DenoTomlString -Text $toml -Name 'name'
+    $manifestVersion = Get-DenoTomlString -Text $toml -Name 'version'
+    if ($manifestName -cne [string]$Package.name -or $manifestVersion -cne [string]$Package.version) { throw "deno_crate_manifest_identity_mismatch:$id" }
+    $license = Get-DenoTomlString -Text $toml -Name 'license'
+    $licenseFile = Get-DenoTomlString -Text $toml -Name 'license-file'
+    $repository = Get-DenoTomlString -Text $toml -Name 'repository'
     if ([string]::IsNullOrWhiteSpace($license) -and [string]::IsNullOrWhiteSpace($licenseFile)) {
         throw "deno_crate_license_metadata_missing:$id"
     }
     if ($license -match '(?i)NOASSERTION|UNKNOWN') { throw "deno_crate_license_ambiguous:$id" }
-    $files = @(Get-DenoLicenseFiles -Root $VendorPath -DeclaredLicenseFile $licenseFile)
-    $root = [IO.Path]::GetFullPath($VendorPath).TrimEnd('\')
-    $records = @($files | ForEach-Object {
-        $file = $_
-        [ordered]@{
-            origin = 'package'
-            path = $file.FullName.Substring($root.Length + 1).Replace('\', '/')
-            length = $file.Length
-            sha256 = Get-DenoSha256 $file.FullName
-        }
+    $licensePaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($file in $crateEvidence.files) {
+        if ([IO.Path]::GetFileName([string]$file.path) -match '^(?i:LICENSE|LICENCE|COPYING|NOTICE|PATENTS|COPYRIGHT)(?:[._-].*)?$') { [void]$licensePaths.Add([string]$file.path) }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($licenseFile)) {
+        $declaredPath = $licenseFile.Replace('\', '/')
+        Assert-DenoUniquePaths @($declaredPath) | Out-Null
+        if (-not $crateEvidence.fileMap.ContainsKey($declaredPath)) { throw "deno_declared_license_file_missing:$id" }
+        [void]$licensePaths.Add($declaredPath)
+    }
+    $records = @($licensePaths | Sort-Object | ForEach-Object {
+        $file = $crateEvidence.fileMap[$_]
+        [ordered]@{ origin = 'package-archive'; path = [string]$file.path; archiveEntry = [string]$file.archiveEntry; length = [long]$file.length; sha256 = [string]$file.sha256 }
     })
     if ($records.Count -gt 0) {
-        return [pscustomobject]@{ id = $id; license = $license; licenseFile = $licenseFile; repository = $repository; resolution = 'package-files'; resolvedLicenseFiles = $records; spdxLicenseIds = @(); spdxExceptionIds = @(); licenseRefId = $null; extractedTextSha256 = $null; licenseComments = $null; canonicalTexts = @(); provenance = $null }
+        return [pscustomobject]@{ id = $id; license = $license; licenseFile = $licenseFile; repository = $repository; crateManifest = $crateEvidence.manifest; crateMetadataManifest = $crateEvidence.metadataManifest; resolution = 'package-files'; resolvedLicenseFiles = $records; spdxLicenseIds = @(); spdxExceptionIds = @(); licenseRefId = $null; extractedTextSha256 = $null; licenseComments = $null; canonicalTexts = @(); provenance = $null }
     }
     if (-not [string]::IsNullOrWhiteSpace($SpdxRoot)) {
         try {
             $spdx = Resolve-DenoSpdxExpression -Expression $license -SpdxRoot $SpdxRoot
-            return [pscustomobject]@{ id = $id; license = $license; licenseFile = $licenseFile; repository = $repository; resolution = 'spdx-canonical-fallback'; resolvedLicenseFiles = @($spdx.files); spdxLicenseIds = @($spdx.licenseIds); spdxExceptionIds = @($spdx.exceptionIds); licenseRefId = $null; extractedTextSha256 = $null; licenseComments = $null; canonicalTexts = @(); provenance = [ordered]@{ spdxVersion = $spdx.version } }
+            return [pscustomobject]@{ id = $id; license = $license; licenseFile = $licenseFile; repository = $repository; crateManifest = $crateEvidence.manifest; crateMetadataManifest = $crateEvidence.metadataManifest; resolution = 'spdx-canonical-fallback'; resolvedLicenseFiles = @($spdx.files); spdxLicenseIds = @($spdx.licenseIds); spdxExceptionIds = @($spdx.exceptionIds); licenseRefId = $null; extractedTextSha256 = $null; licenseComments = $null; canonicalTexts = @(); provenance = [ordered]@{ spdxVersion = $spdx.version } }
         }
         catch {
             if ($null -eq $LicenseRefMapping -and $null -eq $UpstreamFallback) { throw }
         }
     }
     if ($null -ne $LicenseRefMapping -and -not [string]::IsNullOrWhiteSpace($CrateArchivePath)) {
-        $licenseRef = Resolve-DenoExplicitLicenseRef -Package $Package -DeclaredLicense $license -CrateArchivePath $CrateArchivePath -SpdxRoot $SpdxRoot -Mapping $LicenseRefMapping
-        return [pscustomobject]@{ id = $id; license = $license; licenseFile = $licenseFile; repository = $repository; resolution = 'spdx-license-ref'; resolvedLicenseFiles = @($licenseRef.resolvedLicenseFiles); spdxLicenseIds = @(); spdxExceptionIds = @(); licenseRefId = $licenseRef.licenseRefId; extractedTextSha256 = $licenseRef.extractedTextSha256; licenseComments = $licenseRef.licenseComments; canonicalTexts = $licenseRef.canonicalTexts; provenance = $licenseRef.provenance }
+        $licenseRef = Resolve-DenoExplicitLicenseRef -Package $Package -DeclaredLicense $license -CrateArchivePath $CrateArchivePath -SpdxRoot $SpdxRoot -Mapping $LicenseRefMapping -CrateEvidence $crateEvidence
+        return [pscustomobject]@{ id = $id; license = $license; licenseFile = $licenseFile; repository = $repository; crateManifest = $crateEvidence.manifest; crateMetadataManifest = $crateEvidence.metadataManifest; resolution = 'spdx-license-ref'; resolvedLicenseFiles = @($licenseRef.resolvedLicenseFiles); spdxLicenseIds = @(); spdxExceptionIds = @(); licenseRefId = $licenseRef.licenseRefId; extractedTextSha256 = $licenseRef.extractedTextSha256; licenseComments = $licenseRef.licenseComments; canonicalTexts = $licenseRef.canonicalTexts; provenance = $licenseRef.provenance }
     }
     if ($null -ne $UpstreamFallback -and -not [string]::IsNullOrWhiteSpace($UpstreamSourceRoot)) {
         $upstream = Resolve-DenoUpstreamFallback -Fallback $UpstreamFallback -UpstreamSourceRoot $UpstreamSourceRoot
-        return [pscustomobject]@{ id = $id; license = $license; licenseFile = $licenseFile; repository = $repository; resolution = 'upstream-commit-license-files'; resolvedLicenseFiles = @($upstream.files); spdxLicenseIds = @(); spdxExceptionIds = @(); licenseRefId = $null; extractedTextSha256 = $null; licenseComments = $null; canonicalTexts = @(); provenance = $upstream.provenance }
+        return [pscustomobject]@{ id = $id; license = $license; licenseFile = $licenseFile; repository = $repository; crateManifest = $crateEvidence.manifest; crateMetadataManifest = $crateEvidence.metadataManifest; resolution = 'upstream-commit-license-files'; resolvedLicenseFiles = @($upstream.files); spdxLicenseIds = @(); spdxExceptionIds = @(); licenseRefId = $null; extractedTextSha256 = $null; licenseComments = $null; canonicalTexts = @(); provenance = $upstream.provenance }
     }
     throw "deno_crate_license_file_missing:$id"
 }
@@ -472,6 +754,7 @@ function Write-DenoBlockerReport {
             workspaceSpdxResolutions = $Counts.workspaceSpdxResolutions
             workspaceUpstreamResolutions = $Counts.workspaceUpstreamResolutions
             nativeComponents = $Counts.nativeComponents
+            embeddedComponents = $Counts.embeddedComponents
         }
         blockers = @($Blockers | Sort-Object -Unique)
         unresolvedEvidence = @($UnresolvedEvidence | Sort-Object id)
@@ -513,6 +796,7 @@ function Invoke-DenoThirdPartyNoticeCollection {
         [Parameter(Mandatory)] [string] $ManifestRoot,
         [Parameter(Mandatory)] [string] $DenoSourceRoot,
         [Parameter(Mandatory)] [string] $RustyV8SourceRoot,
+        [Parameter(Mandatory)] [string] $RustyV8GitRepositoryPath,
         [Parameter(Mandatory)] [string] $V8SourceRoot,
         [Parameter(Mandatory)] [string] $VendorRoot,
         [Parameter(Mandatory)] [string] $OfficialMetadataPath,
@@ -530,13 +814,26 @@ function Invoke-DenoThirdPartyNoticeCollection {
         [Parameter(Mandatory)] [string] $UpstreamFallbackManifest,
         [Parameter(Mandatory)] [string] $ScratchRoot
     )
+    foreach ($inputPath in @($ManifestRoot, $DenoSourceRoot, $RustyV8SourceRoot, $RustyV8GitRepositoryPath,
+            $V8SourceRoot, $VendorRoot, $OfficialMetadataPath, $SupersetMetadataPath, $DenoExePath,
+            $DenoSourceArchivePath, $RustyV8SourceArchivePath, $V8SourceArchivePath,
+            $RustyV8StaticLibArchivePath, $NativeSourceRoot, $CrateArchiveRoot, $SpdxRoot,
+            $SpdxArchivePath, $UpstreamSourceRoot, $UpstreamFallbackManifest)) {
+        [void](Assert-DenoNoReparsePath $inputPath)
+    }
+    $ScratchRoot = Assert-DenoNoReparsePath $ScratchRoot
+    if (-not [IO.Directory]::Exists($ScratchRoot)) { [void][IO.Directory]::CreateDirectory($ScratchRoot) }
+    $ScratchRoot = Assert-DenoNoReparsePath $ScratchRoot
+    $finalOutputRoot = Join-Path $ScratchRoot 'deno-third-party-output'
+    [void](Assert-DenoNoReparsePath $finalOutputRoot)
+    if ([IO.Directory]::Exists($finalOutputRoot) -or [IO.File]::Exists($finalOutputRoot)) { throw 'deno_output_already_exists' }
     $inputs = Read-DenoJson (Join-Path $ManifestRoot 'inputs.json')
     $native = Read-DenoJson (Join-Path $ManifestRoot 'native-components.json')
     $fallbacks = Read-DenoJson $UpstreamFallbackManifest
-    if ($inputs.schemaVersion -cne 'deno-third-party-inputs/v2' -or
+    if ($inputs.schemaVersion -cne 'deno-third-party-inputs/v3' -or
+        $native.schemaVersion -cne 'deno-native-components/v2' -or
         $fallbacks.schemaVersion -cne 'deno-license-fallbacks/v1' -or
         $inputs.closureClassification -cne 'verified-conservative-superset') { throw 'deno_input_manifest_invalid' }
-    New-Item -ItemType Directory -Path $ScratchRoot -Force | Out-Null
     $identity = Assert-DenoReleaseIdentity -DenoExePath $DenoExePath -ExpectedSha256 $inputs.releaseIdentity.denoExeSha256 -ExpectedVersion $inputs.releaseIdentity.version -ExpectedTarget $inputs.releaseIdentity.target
 
     $artifactPaths = @{
@@ -557,6 +854,11 @@ function Invoke-DenoThirdPartyNoticeCollection {
     }
     $spdxIndex = Get-DenoSpdxIndex $SpdxRoot
     if ($spdxIndex.version -cne [string]$inputs.spdxLicenseList.version) { throw 'deno_spdx_version_mismatch' }
+    if ([string]$inputs.spdxLicenseList.tagObject -notmatch '^[0-9a-f]{40}$' -or
+        [string]$inputs.spdxLicenseList.peeledCommit -notmatch '^[0-9a-f]{40}$' -or
+        [string]$inputs.spdxLicenseList.tagObject -ceq [string]$inputs.spdxLicenseList.peeledCommit) { throw 'deno_spdx_git_identity_invalid' }
+    $spdxArtifact = @($inputs.sourceArtifacts | Where-Object id -ceq 'spdxLicenseListData')[0]
+    if ([string]$spdxArtifact.sourceUrl -cne "https://codeload.github.com/spdx/license-list-data/zip/$($inputs.spdxLicenseList.tagObject)") { throw 'deno_spdx_archive_object_mismatch' }
 
     $registryFallbackMap = @{}
     foreach ($fallback in $fallbacks.registryFallbacks) {
@@ -601,9 +903,8 @@ function Invoke-DenoThirdPartyNoticeCollection {
     if ($vendorMap.Count -ne $registryPackages.Count) { throw 'deno_vendor_lock_count_mismatch' }
     if (@(Get-ChildItem -LiteralPath $CrateArchiveRoot -Filter '*.crate' -File).Count -ne $registryPackages.Count) { throw 'deno_crate_archive_lock_count_mismatch' }
 
-    $requiredNative = @($native.components | Where-Object { $_.required } | ForEach-Object { [string]$_.path })
-    $observedNative = @($native.components | ForEach-Object { [string]$_.path })
-    Assert-DenoNativeClosure -RequiredComponents $requiredNative -ObservedComponents $observedNative | Out-Null
+    if ([string]$native.rustyV8Commit -cne [string]$inputs.releaseIdentity.rustyV8Commit) { throw 'deno_native_rusty_v8_commit_mismatch' }
+    $nativeTreeEvidence = Assert-DenoNativeClosure -Components @($native.components) -RustyV8GitRepositoryPath $RustyV8GitRepositoryPath -ExpectedCommit ([string]$native.rustyV8Commit) -ExpectedTree ([string]$native.rustyV8Tree)
     $nativeLicenseMap = @{}
     foreach ($component in $native.components | Where-Object { $_.path -ne 'v8' }) {
         $archive = Join-Path $NativeSourceRoot ([string]$component.archiveFile)
@@ -631,7 +932,7 @@ function Invoke-DenoThirdPartyNoticeCollection {
             $licenseRefMapping = if ($licenseRefMap.ContainsKey($id)) { $licenseRefMap[$id] } else { $null }
             $record = Assert-DenoCratePackage -Package $package -VendorPath $vendorMap[$key] -CrateArchivePath $crateArchive -SpdxRoot $SpdxRoot -LicenseRefMapping $licenseRefMapping -UpstreamFallback $fallback -UpstreamSourceRoot $UpstreamSourceRoot
             $reason = if ($officialSet.Contains($id)) { 'official-workflow-profile' } elseif ($supersetSet.Contains($id)) { 'all-features-conservative-superset' } else { 'cargo-lock-conservative-superset' }
-            $crateRecords.Add([ordered]@{ name = $package.name; version = $package.version; source = $package.source; sourceArchive = [ordered]@{ fileName = (Split-Path $crateArchive -Leaf); length = (Get-Item $crateArchive).Length; sha256 = $package.checksum; url = "https://static.crates.io/crates/$($package.name)/$($package.name)-$($package.version).crate" }; checksum = $package.checksum; license = $record.license; licenseFile = $record.licenseFile; repository = $record.repository; resolution = $record.resolution; resolvedLicenseFiles = $record.resolvedLicenseFiles; spdxLicenseIds = $record.spdxLicenseIds; spdxExceptionIds = $record.spdxExceptionIds; licenseRefId = $record.licenseRefId; extractedTextSha256 = $record.extractedTextSha256; licenseComments = $record.licenseComments; canonicalTexts = $record.canonicalTexts; provenance = $record.provenance; inclusionReason = $reason })
+            $crateRecords.Add([ordered]@{ name = $package.name; version = $package.version; source = $package.source; sourceArchive = [ordered]@{ fileName = (Split-Path $crateArchive -Leaf); length = (Get-Item $crateArchive).Length; sha256 = $package.checksum; url = "https://static.crates.io/crates/$($package.name)/$($package.name)-$($package.version).crate" }; checksum = $package.checksum; crateManifest = $record.crateManifest; license = $record.license; licenseFile = $record.licenseFile; repository = $record.repository; resolution = $record.resolution; resolvedLicenseFiles = $record.resolvedLicenseFiles; spdxLicenseIds = $record.spdxLicenseIds; spdxExceptionIds = $record.spdxExceptionIds; licenseRefId = $record.licenseRefId; extractedTextSha256 = $record.extractedTextSha256; licenseComments = $record.licenseComments; canonicalTexts = $record.canonicalTexts; provenance = $record.provenance; inclusionReason = $reason })
         }
         catch {
             if ($unresolvedMap.ContainsKey($id)) { $blockers.Add("deno_upstream_license_unresolved:$id") }
@@ -691,116 +992,134 @@ function Invoke-DenoThirdPartyNoticeCollection {
         workspaceSpdxResolutions = @($workspaceRecords | Where-Object resolution -ceq 'spdx-canonical-fallback').Count
         workspaceUpstreamResolutions = @($workspaceRecords | Where-Object resolution -ceq 'pinned-workspace-upstream-license').Count
         nativeComponents = @($native.components).Count
+        embeddedComponents = @($inputs.embeddedComponents).Count
     }
     if ($blockers.Count -gt 0) {
         $reportPath = Write-DenoBlockerReport -ScratchRoot $ScratchRoot -Identity $identity -Blockers @($blockers) -Counts $counts -UnresolvedEvidence @($fallbacks.unresolved)
         throw "deno_collection_blocked:$($blockers.Count):$reportPath"
     }
 
-    $outputRoot = Join-Path $ScratchRoot 'deno-third-party-output'
-    if (Test-Path -LiteralPath $outputRoot) { throw 'deno_output_already_exists' }
-    $stage = Join-Path $outputRoot 'bundle'
-    $licenseRoot = Join-Path $stage 'LICENSES/cargo'
-    $workspaceLicenseRoot = Join-Path $stage 'LICENSES/workspace'
-    $nativeLicenseRoot = Join-Path $stage 'LICENSES/native'
-    $sourceRoot = Join-Path $stage 'SOURCES'
-    New-Item -ItemType Directory -Path $licenseRoot, $workspaceLicenseRoot, $nativeLicenseRoot, $sourceRoot | Out-Null
-    $notice = [Text.StringBuilder]::new([IO.File]::ReadAllText((Join-Path $ManifestRoot 'THIRD-PARTY-NOTICES.template.txt')))
-    $notice.Append("`n") | Out-Null
-    $outputPaths = [Collections.Generic.List[string]]::new()
-    foreach ($record in $crateRecords) {
-        $safeId = ($record.name + '-' + $record.version) -replace '[^A-Za-z0-9._+-]', '_'
-        $notice.AppendLine("=== $($record.name) $($record.version) ===").AppendLine("Source: $($record.sourceArchive.url)").AppendLine("Checksum: $($record.checksum)").AppendLine("Repository: $($record.repository)").AppendLine("Author declaration: $($record.license)").AppendLine("Resolved identifier: $(if ($record.licenseRefId) { $record.licenseRefId } else { $record.license })").AppendLine("License comments: $($record.licenseComments)").AppendLine("Resolution: $($record.resolution)").AppendLine("Inclusion: $($record.inclusionReason)") | Out-Null
-        $vendorPath = $vendorMap[$record.name + "`0" + $record.version]
-        foreach ($license in $record.resolvedLicenseFiles) {
-            $destinationRelative = "LICENSES/cargo/$safeId/$($license.origin)/$($license.path)"
-            $destination = Join-Path $stage $destinationRelative
-            switch ([string]$license.origin) {
-                'package' { New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null; Copy-Item -LiteralPath (Join-Path $vendorPath ([string]$license.path)) -Destination $destination }
-                'spdx-license' { New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null; Copy-Item -LiteralPath (Join-Path $SpdxRoot ([string]$license.path)) -Destination $destination }
-                'spdx-exception' { New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null; Copy-Item -LiteralPath (Join-Path $SpdxRoot ([string]$license.path)) -Destination $destination }
-                'upstream-commit' { Copy-DenoZipEntry -ArchivePath (Join-Path $UpstreamSourceRoot ([string]$license.archiveFile)) -EntryPath ([string]$license.path) -Destination $destination }
-                'license-ref-extracted' { New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null; Write-DenoUtf8Text -Path $destination -Text ([string]$license.text) }
-                default { throw "deno_license_origin_invalid:$($license.origin)" }
-            }
-            Assert-DenoHash $destination ([string]$license.sha256)
-            $outputPaths.Add($destinationRelative)
-            $notice.AppendLine("--- $destinationRelative ---").AppendLine([IO.File]::ReadAllText($destination)).AppendLine() | Out-Null
+    $workRoot = New-DenoProcessStageRoot -ScratchRoot $ScratchRoot
+    try {
+        $outputRoot = Join-Path $workRoot 'deno-third-party-output'
+        $stage = Join-Path $outputRoot 'bundle'
+        $licenseRoot = Join-Path $stage 'LICENSES/cargo'
+        $workspaceLicenseRoot = Join-Path $stage 'LICENSES/workspace'
+        $nativeLicenseRoot = Join-Path $stage 'LICENSES/native'
+        $sourceRoot = Join-Path $stage 'SOURCES'
+        New-Item -ItemType Directory -Path $licenseRoot, $workspaceLicenseRoot, $nativeLicenseRoot, $sourceRoot | Out-Null
+        $notice = [Text.StringBuilder]::new([IO.File]::ReadAllText((Assert-DenoNoReparsePath (Join-Path $ManifestRoot 'THIRD-PARTY-NOTICES.template.txt'))))
+        $notice.Append("`n") | Out-Null
+        $outputPaths = [Collections.Generic.List[string]]::new()
+        $embeddedRecords = [Collections.Generic.List[object]]::new()
+        foreach ($component in $inputs.embeddedComponents | Sort-Object id) {
+            $embeddedRecords.Add((Add-DenoEmbeddedComponent -Component $component -DenoSourceRoot $DenoSourceRoot -DenoSourceArchivePath $DenoSourceArchivePath -SpdxRoot $SpdxRoot -StageRoot $stage -Notice $notice -OutputPaths $outputPaths))
         }
-    }
-    foreach ($record in $workspaceRecords) {
-        $safeId = ($record.name + '-' + $record.version) -replace '[^A-Za-z0-9._+-]', '_'
-        $notice.AppendLine("=== workspace $($record.name) $($record.version) ===").AppendLine("Source: $($record.source)").AppendLine("Manifest: $($record.sourceManifest.path)").AppendLine("License: $($record.license)").AppendLine("Resolution: $($record.resolution)").AppendLine("Inclusion: $($record.inclusionReason)") | Out-Null
-        foreach ($license in $record.resolvedLicenseFiles) {
-            $destinationRelative = "LICENSES/workspace/$safeId/$($license.origin)/$($license.path)"
+        foreach ($record in $crateRecords) {
+            $safeId = ($record.name + '-' + $record.version) -replace '[^A-Za-z0-9._+-]', '_'
+            $notice.AppendLine("=== $($record.name) $($record.version) ===").AppendLine("Source: $($record.sourceArchive.url)").AppendLine("Checksum: $($record.checksum)").AppendLine("Manifest: $($record.crateManifest.path) $($record.crateManifest.sha256)").AppendLine("Repository: $($record.repository)").AppendLine("Author declaration: $($record.license)").AppendLine("Resolved identifier: $(if ($record.licenseRefId) { $record.licenseRefId } else { $record.license })").AppendLine("License comments: $($record.licenseComments)").AppendLine("Resolution: $($record.resolution)").AppendLine("Inclusion: $($record.inclusionReason)") | Out-Null
+            foreach ($license in $record.resolvedLicenseFiles) {
+                $destinationRelative = "LICENSES/cargo/$safeId/$($license.origin)/$($license.path)"
+                $destination = Join-Path $stage $destinationRelative
+                switch ([string]$license.origin) {
+                    'package-archive' { Copy-DenoTarEntry -ArchivePath (Join-Path $CrateArchiveRoot ([string]$record.sourceArchive.fileName)) -EntryPath ([string]$license.archiveEntry) -Destination $destination }
+                    'spdx-license' { New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null; Copy-Item -LiteralPath (Join-Path $SpdxRoot ([string]$license.path)) -Destination $destination }
+                    'spdx-exception' { New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null; Copy-Item -LiteralPath (Join-Path $SpdxRoot ([string]$license.path)) -Destination $destination }
+                    'upstream-commit' { Copy-DenoZipEntry -ArchivePath (Join-Path $UpstreamSourceRoot ([string]$license.archiveFile)) -EntryPath ([string]$license.path) -Destination $destination }
+                    'license-ref-extracted' { New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null; Write-DenoUtf8Text -Path $destination -Text ([string]$license.text) }
+                    default { throw "deno_license_origin_invalid:$($license.origin)" }
+                }
+                Assert-DenoHash $destination ([string]$license.sha256)
+                $outputPaths.Add($destinationRelative)
+                $notice.AppendLine("--- $destinationRelative ---").AppendLine([IO.File]::ReadAllText($destination)).AppendLine() | Out-Null
+            }
+        }
+        foreach ($record in $workspaceRecords) {
+            $safeId = ($record.name + '-' + $record.version) -replace '[^A-Za-z0-9._+-]', '_'
+            $notice.AppendLine("=== workspace $($record.name) $($record.version) ===").AppendLine("Source: $($record.source)").AppendLine("Manifest: $($record.sourceManifest.path)").AppendLine("License: $($record.license)").AppendLine("Resolution: $($record.resolution)").AppendLine("Inclusion: $($record.inclusionReason)") | Out-Null
+            foreach ($license in $record.resolvedLicenseFiles) {
+                $destinationRelative = "LICENSES/workspace/$safeId/$($license.origin)/$($license.path)"
+                $destination = Join-Path $stage $destinationRelative
+                New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+                if ([string]$license.origin -in @('spdx-license', 'spdx-exception')) { Copy-Item -LiteralPath (Join-Path $SpdxRoot ([string]$license.path)) -Destination $destination }
+                elseif ([string]$license.origin -ceq 'pinned-workspace-source') { Copy-Item -LiteralPath (Join-Path $DenoSourceRoot ([string]$license.path)) -Destination $destination }
+                else { throw "deno_license_origin_invalid:$($license.origin)" }
+                Assert-DenoHash $destination ([string]$license.sha256)
+                $outputPaths.Add($destinationRelative)
+                $notice.AppendLine("--- $destinationRelative ---").AppendLine([IO.File]::ReadAllText($destination)).AppendLine() | Out-Null
+            }
+        }
+        foreach ($rootLicense in @(Get-DenoLicenseFiles -Root $RustyV8SourceRoot)) {
+            $relative = $rootLicense.FullName.Substring([IO.Path]::GetFullPath($RustyV8SourceRoot).TrimEnd('\').Length + 1).Replace('\', '/')
+            $destinationRelative = "LICENSES/native/rusty_v8/$relative"
             $destination = Join-Path $stage $destinationRelative
             New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
-            if ([string]$license.origin -in @('spdx-license', 'spdx-exception')) { Copy-Item -LiteralPath (Join-Path $SpdxRoot ([string]$license.path)) -Destination $destination }
-            elseif ([string]$license.origin -ceq 'pinned-workspace-source') { Copy-Item -LiteralPath (Join-Path $DenoSourceRoot ([string]$license.path)) -Destination $destination }
-            else { throw "deno_license_origin_invalid:$($license.origin)" }
-            Assert-DenoHash $destination ([string]$license.sha256)
+            Copy-Item -LiteralPath $rootLicense.FullName -Destination $destination
             $outputPaths.Add($destinationRelative)
-            $notice.AppendLine("--- $destinationRelative ---").AppendLine([IO.File]::ReadAllText($destination)).AppendLine() | Out-Null
         }
-    }
-
-    foreach ($rootLicense in @(Get-DenoLicenseFiles -Root $RustyV8SourceRoot)) {
-        $relative = $rootLicense.FullName.Substring([IO.Path]::GetFullPath($RustyV8SourceRoot).TrimEnd('\').Length + 1).Replace('\', '/')
-        $destinationRelative = "LICENSES/native/rusty_v8/$relative"
-        $destination = Join-Path $stage $destinationRelative
-        New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
-        Copy-Item -LiteralPath $rootLicense.FullName -Destination $destination
-        $outputPaths.Add($destinationRelative)
-    }
-    foreach ($v8License in @(Get-DenoLicenseFiles -Root $V8SourceRoot)) {
-        $relative = $v8License.FullName.Substring([IO.Path]::GetFullPath($V8SourceRoot).TrimEnd('\').Length + 1).Replace('\', '/')
-        $destinationRelative = "LICENSES/native/v8/$relative"
-        $destination = Join-Path $stage $destinationRelative
-        New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
-        Copy-Item -LiteralPath $v8License.FullName -Destination $destination
-        $outputPaths.Add($destinationRelative)
-    }
-    foreach ($component in $native.components | Where-Object { $_.path -ne 'v8' }) {
-        $safeComponent = ([string]$component.path) -replace '[^A-Za-z0-9._+-]', '_'
-        foreach ($entry in @($nativeLicenseMap[[string]$component.path])) {
-            $destinationRelative = "LICENSES/native/$safeComponent/$entry"
+        foreach ($v8License in @(Get-DenoLicenseFiles -Root $V8SourceRoot)) {
+            $relative = $v8License.FullName.Substring([IO.Path]::GetFullPath($V8SourceRoot).TrimEnd('\').Length + 1).Replace('\', '/')
+            $destinationRelative = "LICENSES/native/v8/$relative"
             $destination = Join-Path $stage $destinationRelative
-            Copy-DenoTarEntry -ArchivePath (Join-Path $NativeSourceRoot ([string]$component.archiveFile)) -EntryPath $entry -Destination $destination
+            New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+            Copy-Item -LiteralPath $v8License.FullName -Destination $destination
             $outputPaths.Add($destinationRelative)
         }
+        foreach ($component in $native.components | Where-Object { $_.path -ne 'v8' }) {
+            $safeComponent = ([string]$component.path) -replace '[^A-Za-z0-9._+-]', '_'
+            foreach ($entry in @($nativeLicenseMap[[string]$component.path])) {
+                $destinationRelative = "LICENSES/native/$safeComponent/$entry"
+                $destination = Join-Path $stage $destinationRelative
+                Copy-DenoTarEntry -ArchivePath (Join-Path $NativeSourceRoot ([string]$component.archiveFile)) -EntryPath $entry -Destination $destination
+                $outputPaths.Add($destinationRelative)
+            }
+        }
+        Assert-DenoUniquePaths @($outputPaths) | Out-Null
+        foreach ($artifact in $inputs.sourceArtifacts) {
+            $source = [string]$artifactPaths[[string]$artifact.id]
+            Copy-Item -LiteralPath $source -Destination (Join-Path $sourceRoot ([string]$artifact.fileName))
+        }
+        foreach ($component in $native.components | Where-Object { $_.path -ne 'v8' }) {
+            Copy-Item -LiteralPath (Join-Path $NativeSourceRoot ([string]$component.archiveFile)) -Destination (Join-Path $sourceRoot ([string]$component.archiveFile))
+        }
+        $crateSourceRoot = Join-Path $sourceRoot 'cargo-crates'
+        $upstreamSourceDestination = Join-Path $sourceRoot 'upstream-license-sources'
+        New-Item -ItemType Directory -Path $crateSourceRoot, $upstreamSourceDestination | Out-Null
+        foreach ($record in $crateRecords) { Copy-Item -LiteralPath (Join-Path $CrateArchiveRoot ([string]$record.sourceArchive.fileName)) -Destination (Join-Path $crateSourceRoot ([string]$record.sourceArchive.fileName)) }
+        foreach ($archiveFile in @($fallbacks.registryFallbacks.archiveFile | Sort-Object -Unique)) { Copy-Item -LiteralPath (Join-Path $UpstreamSourceRoot $archiveFile) -Destination (Join-Path $upstreamSourceDestination $archiveFile) }
+        $noticePath = Join-Path $outputRoot 'THIRD-PARTY-NOTICES.txt'
+        Write-DenoUtf8Text $noticePath ($notice.ToString())
+        Copy-Item -LiteralPath $noticePath -Destination (Join-Path $stage 'THIRD-PARTY-NOTICES.txt')
+        Write-DenoUtf8Text (Join-Path $outputRoot 'component-manifest.json') (([ordered]@{ schemaVersion = 'deno-third-party-components/v3'; closureClassification = $inputs.closureClassification; releaseIdentity = $identity; spdxLicenseList = $inputs.spdxLicenseList; counts = $counts; embeddedComponents = @($embeddedRecords); crates = @($crateRecords); workspacePackages = @($workspaceRecords); nativeGitTreeEvidence = $nativeTreeEvidence; nativeComponents = @($native.components); overallReleasePass = $false } | ConvertTo-Json -Depth 30) + "`n")
+        $inventory = foreach ($file in Get-ChildItem -LiteralPath $stage -Recurse -File | Sort-Object FullName) { [ordered]@{ path = $file.FullName.Substring($stage.Length + 1).Replace('\', '/'); length = $file.Length; sha256 = Get-DenoSha256 $file.FullName } }
+        Write-DenoUtf8Text (Join-Path $outputRoot 'source-inventory.json') (([ordered]@{ schemaVersion = 'deno-source-inventory/v1'; files = @($inventory) } | ConvertTo-Json -Depth 10) + "`n")
+        $zipPath = Join-Path $outputRoot 'deno-2.7.14-verified-conservative-superset-sources.zip'
+        $zipSha256 = New-DenoDeterministicZip -SourceRoot $stage -ZipPath $zipPath
+        Complete-DenoAtomicDirectory -Source $outputRoot -Destination $finalOutputRoot
+        $noticePath = Join-Path $finalOutputRoot 'THIRD-PARTY-NOTICES.txt'
+        $zipPath = Join-Path $finalOutputRoot 'deno-2.7.14-verified-conservative-superset-sources.zip'
+        return [pscustomobject]@{ status = 'complete'; closureClassification = $inputs.closureClassification; outputRoot = $finalOutputRoot; noticePath = $noticePath; noticeSha256 = Get-DenoSha256 $noticePath; zipPath = $zipPath; zipSha256 = Get-DenoSha256 $zipPath; counts = $counts; overallReleasePass = $false }
     }
-    Assert-DenoUniquePaths @($outputPaths) | Out-Null
-    foreach ($artifact in $inputs.sourceArtifacts) {
-        $source = [string]$artifactPaths[[string]$artifact.id]
-        Copy-Item -LiteralPath $source -Destination (Join-Path $sourceRoot ([string]$artifact.fileName))
+    finally {
+        if ([IO.Directory]::Exists($workRoot)) {
+            $workFull = [IO.Path]::GetFullPath($workRoot)
+            $scratchPrefix = [IO.Path]::GetFullPath($ScratchRoot).TrimEnd('\') + '\'
+            if (-not $workFull.StartsWith($scratchPrefix, [StringComparison]::OrdinalIgnoreCase) -or (Split-Path $workFull -Leaf) -notlike '.deno-third-party-stage-*') { throw 'deno_process_stage_cleanup_boundary' }
+            [void](Assert-DenoNoReparsePath $workFull)
+            Remove-Item -LiteralPath $workFull -Recurse -Force
+        }
     }
-    foreach ($component in $native.components | Where-Object { $_.path -ne 'v8' }) {
-        Copy-Item -LiteralPath (Join-Path $NativeSourceRoot ([string]$component.archiveFile)) -Destination (Join-Path $sourceRoot ([string]$component.archiveFile))
-    }
-    $crateSourceRoot = Join-Path $sourceRoot 'cargo-crates'
-    $upstreamSourceDestination = Join-Path $sourceRoot 'upstream-license-sources'
-    New-Item -ItemType Directory -Path $crateSourceRoot, $upstreamSourceDestination | Out-Null
-    foreach ($record in $crateRecords) { Copy-Item -LiteralPath (Join-Path $CrateArchiveRoot ([string]$record.sourceArchive.fileName)) -Destination (Join-Path $crateSourceRoot ([string]$record.sourceArchive.fileName)) }
-    foreach ($archiveFile in @($fallbacks.registryFallbacks.archiveFile | Sort-Object -Unique)) { Copy-Item -LiteralPath (Join-Path $UpstreamSourceRoot $archiveFile) -Destination (Join-Path $upstreamSourceDestination $archiveFile) }
-    $noticePath = Join-Path $outputRoot 'THIRD-PARTY-NOTICES.txt'
-    Write-DenoUtf8Text $noticePath ($notice.ToString())
-    Copy-Item -LiteralPath $noticePath -Destination (Join-Path $stage 'THIRD-PARTY-NOTICES.txt')
-    Write-DenoUtf8Text (Join-Path $outputRoot 'component-manifest.json') (([ordered]@{ schemaVersion = 'deno-third-party-components/v2'; closureClassification = $inputs.closureClassification; releaseIdentity = $identity; spdxLicenseList = $inputs.spdxLicenseList; counts = $counts; crates = @($crateRecords); workspacePackages = @($workspaceRecords); nativeComponents = @($native.components); overallReleasePass = $false } | ConvertTo-Json -Depth 30) + "`n")
-    $inventory = foreach ($file in Get-ChildItem -LiteralPath $stage -Recurse -File | Sort-Object FullName) { [ordered]@{ path = $file.FullName.Substring($stage.Length + 1).Replace('\', '/'); length = $file.Length; sha256 = Get-DenoSha256 $file.FullName } }
-    Write-DenoUtf8Text (Join-Path $outputRoot 'source-inventory.json') (([ordered]@{ schemaVersion = 'deno-source-inventory/v1'; files = @($inventory) } | ConvertTo-Json -Depth 10) + "`n")
-    $zipPath = Join-Path $outputRoot 'deno-2.7.14-verified-conservative-superset-sources.zip'
-    $zipSha256 = New-DenoDeterministicZip -SourceRoot $stage -ZipPath $zipPath
-    return [pscustomobject]@{ status = 'complete'; closureClassification = $inputs.closureClassification; outputRoot = $outputRoot; noticePath = $noticePath; noticeSha256 = Get-DenoSha256 $noticePath; zipPath = $zipPath; zipSha256 = $zipSha256; counts = $counts; overallReleasePass = $false }
 }
 
 if ($Run) {
-    $required = @($DenoSourceRoot, $RustyV8SourceRoot, $V8SourceRoot, $VendorRoot, $OfficialMetadataPath,
+    $required = @($DenoSourceRoot, $RustyV8SourceRoot, $RustyV8GitRepositoryPath, $V8SourceRoot, $VendorRoot, $OfficialMetadataPath,
         $SupersetMetadataPath, $DenoExePath, $DenoSourceArchivePath, $RustyV8SourceArchivePath,
         $V8SourceArchivePath, $RustyV8StaticLibArchivePath, $NativeSourceRoot, $CrateArchiveRoot,
         $SpdxRoot, $SpdxArchivePath, $UpstreamSourceRoot, $UpstreamFallbackManifest, $ScratchRoot)
     if (@($required | Where-Object { [string]::IsNullOrWhiteSpace($_) }).Count -gt 0) { throw 'deno_run_parameters_required' }
     Invoke-DenoThirdPartyNoticeCollection -ManifestRoot $ManifestRoot -DenoSourceRoot $DenoSourceRoot `
-        -RustyV8SourceRoot $RustyV8SourceRoot -V8SourceRoot $V8SourceRoot -VendorRoot $VendorRoot `
+        -RustyV8SourceRoot $RustyV8SourceRoot -RustyV8GitRepositoryPath $RustyV8GitRepositoryPath `
+        -V8SourceRoot $V8SourceRoot -VendorRoot $VendorRoot `
         -OfficialMetadataPath $OfficialMetadataPath -SupersetMetadataPath $SupersetMetadataPath `
         -DenoExePath $DenoExePath -DenoSourceArchivePath $DenoSourceArchivePath `
         -RustyV8SourceArchivePath $RustyV8SourceArchivePath -V8SourceArchivePath $V8SourceArchivePath `

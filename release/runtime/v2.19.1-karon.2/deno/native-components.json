@@ -1,6 +1,7 @@
 {
-  "schemaVersion": "deno-native-components/v1",
+  "schemaVersion": "deno-native-components/v2",
   "rustyV8Commit": "348006707529fa4559d931169ad985b3ce518460",
+  "rustyV8Tree": "6c92c73eeacce6956b194cdaba8cfb020f11a960",
   "components": [
     {"path":"v8","repository":"https://github.com/denoland/v8.git","commit":"708fc9b76e540c03e9a7c5e1d4f768b279517589","archiveFile":"v8-source-708fc9b76e540c03e9a7c5e1d4f768b279517589.zip","length":43687550,"sha256":"f0b7e4660c732b081efdae8c93a931a9de1993c569ab2668b684eea9b2904afc","required":true,"licenseRequired":true,"inclusionReason":"rusty_v8-v8-gitlink-runtime-superset"},
     {"path":"build","repository":"https://github.com/denoland/chromium_build.git","commit":"996da150580c40ac4626107c357767acc40d27c6","archiveFile":"build-996da150580c40ac4626107c357767acc40d27c6.tar.gz","length":1757234,"sha256":"e526013e09dcf5fc706f6170fdea7af03d91d8f799317f96370e7f00e7428e99","required":true,"licenseRequired":true,"inclusionReason":"rusty_v8-source-build-support-superset"},

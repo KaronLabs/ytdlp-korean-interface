@@ -19,3 +19,7 @@ is recorded per component; no copyright holder is inferred.
 SPDX 2.3 custom LicenseRef entries preserve non-standard author declarations
 verbatim and provide content-addressed extracted text. A LicenseRef does not
 silently convert legacy separators into SPDX OR or AND semantics.
+
+Embedded non-Cargo assets are listed separately with their exact source path,
+length, SHA-256, Deno commit provenance, build inclusion evidence, copyright,
+and complete resolved license text.

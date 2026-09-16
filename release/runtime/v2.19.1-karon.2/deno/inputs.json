@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "deno-third-party-inputs/v2",
+  "schemaVersion": "deno-third-party-inputs/v3",
   "closureClassification": "verified-conservative-superset",
   "releaseIdentity": {
     "release": "v2.19.1-karon.2",
@@ -23,7 +23,9 @@
   },
   "spdxLicenseList": {
     "version": "3.28.0",
-    "commit": "779ef2e5dff6d4af389c53de5e97116ab0bb52e8",
+    "tag": "v3.28.0",
+    "tagObject": "779ef2e5dff6d4af389c53de5e97116ab0bb52e8",
+    "peeledCommit": "c4a7237ec8f4654e867546f9f409749300f1bf4c",
     "sourceRepository": "https://github.com/spdx/license-list-data.git"
   },
   "observedClosureCounts": {
@@ -33,6 +35,48 @@
     "registryPackages": 1051,
     "nativeGitlinksIncludingV8": 20
   },
+  "embeddedComponents": [
+    {
+      "id": "typescript@5.9.2",
+      "name": "TypeScript",
+      "version": "5.9.2",
+      "denoSourceCommit": "2d674b25625bcc367853d00fe86f6e84390f88cb",
+      "sourceFile": {
+        "path": "cli/tsc/00_typescript.js",
+        "archiveEntry": "deno-2d674b25625bcc367853d00fe86f6e84390f88cb/cli/tsc/00_typescript.js",
+        "bundlePath": "SOURCES/embedded/typescript-5.9.2/cli/tsc/00_typescript.js",
+        "length": 8492282,
+        "sha256": "932f9fd96b20ef8c2496d7f70419c69fa40266a92d81a2b229737fa6dd324ac8",
+        "requiredText": [
+          "version = \"5.9.2\"",
+          "Copyright (c) Microsoft Corporation. All rights reserved."
+        ]
+      },
+      "copyright": "Copyright (c) Microsoft Corporation. All rights reserved.",
+      "license": "Apache-2.0",
+      "licenseFile": {
+        "path": "text/Apache-2.0.txt",
+        "bundlePath": "LICENSES/embedded/typescript-5.9.2/Apache-2.0.txt",
+        "length": 10280,
+        "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff"
+      },
+      "buildInclusionEvidence": [
+        {
+          "role": "compressed-by-cli-build-rs",
+          "path": "cli/build.rs",
+          "archiveEntry": "deno-2d674b25625bcc367853d00fe86f6e84390f88cb/cli/build.rs",
+          "requiredText": "\"./tsc/00_typescript.js\","
+        },
+        {
+          "role": "referenced-by-cli-tsc-module",
+          "path": "cli/tsc/mod.rs",
+          "archiveEntry": "deno-2d674b25625bcc367853d00fe86f6e84390f88cb/cli/tsc/mod.rs",
+          "requiredText": "maybe_compressed_source!(\"tsc/00_typescript.js\");"
+        }
+      ],
+      "inclusionReason": "embedded-compressed-typescript-compiler-source"
+    }
+  ],
   "sourceArtifacts": [
     {
       "id": "denoSource",
@@ -78,6 +122,7 @@
     {"root": "deno", "path": ".github/workflows/promote_to_release.ts", "sha256": "c9246651641eec189b1e23a48e4860c3c7cb319ee0908dda3ccb0eac5ff5405f"},
     {"root": "deno", "path": "rust-toolchain.toml", "sha256": "9084f06a996ac0edec375a19761cfa5f0febfda93a25a40a4f4487fba43bb8ed"},
     {"root": "deno", "path": "LICENSE.md", "sha256": "f62497fffecc0852960c8d3e6934b9db86d16396e9b604072e923892cae3a588"},
+    {"root": "deno", "path": "cli/tsc/00_typescript.js", "sha256": "932f9fd96b20ef8c2496d7f70419c69fa40266a92d81a2b229737fa6dd324ac8"},
     {"root": "rusty_v8", "path": "Cargo.toml", "sha256": "be93be92290aee9572d3a394dc4846a90ec7f239efdd2ed04a1b8d6bf59299e5"},
     {"root": "rusty_v8", "path": "build.rs", "sha256": "503f3a616f13f649672e2df1f6c4afb413d5875b968c2077f5aaed97792e6558"},
     {"root": "rusty_v8", "path": ".gitmodules", "sha256": "64abd45978444b338c5d3816cfbec508f68d6877c0c26ece649b9593d2665054"},

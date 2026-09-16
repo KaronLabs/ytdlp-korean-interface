@@ -25,40 +25,129 @@ function New-TestSpdxCorpus {
     }
 }
 
+function New-TestCrateFixture {
+    param(
+        [Parameter(Mandatory)] [string] $Root,
+        [string] $License = 'MIT',
+        [switch] $IncludeLicense
+    )
+    $packageName = 'fixture'
+    $version = '1.0.0'
+    $packageRoot = Join-Path $Root "$packageName-$version"
+    $vendorRoot = Join-Path $Root 'vendor'
+    New-Item -ItemType Directory -Path $packageRoot, $vendorRoot | Out-Null
+    $manifest = "[package]`nname = `"$packageName`"`nversion = `"$version`"`nlicense = `"$License`"`nrepository = `"https://example.invalid/fixture`"`n"
+    foreach ($name in @('Cargo.toml', 'Cargo.toml.orig')) {
+        [IO.File]::WriteAllText((Join-Path $packageRoot $name), $manifest, [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText((Join-Path $vendorRoot $name), $manifest, [Text.UTF8Encoding]::new($false))
+    }
+    [IO.File]::WriteAllText((Join-Path $packageRoot 'lib.rs'), 'pub fn fixture() {}', [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText((Join-Path $vendorRoot 'lib.rs'), 'pub fn fixture() {}', [Text.UTF8Encoding]::new($false))
+    if ($IncludeLicense) {
+        [IO.File]::WriteAllText((Join-Path $packageRoot 'LICENSE'), "fixture license`n", [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText((Join-Path $vendorRoot 'LICENSE'), "fixture license`n", [Text.UTF8Encoding]::new($false))
+    }
+    $archive = Join-Path $Root "$packageName-$version.crate"
+    & tar.exe -czf $archive -C $Root "$packageName-$version"
+    if ($LASTEXITCODE -ne 0) { throw 'test crate archive creation failed' }
+    $packageHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+    $fileHashes = [ordered]@{}
+    foreach ($file in Get-ChildItem -LiteralPath $vendorRoot -File | Sort-Object Name) {
+        $fileHashes[$file.Name] = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+    $checksum = [ordered]@{ files = $fileHashes; package = $packageHash }
+    [IO.File]::WriteAllText((Join-Path $vendorRoot '.cargo-checksum.json'), ($checksum | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
+    return [pscustomobject]@{
+        archive = $archive
+        vendor = $vendorRoot
+        package = [pscustomobject]@{
+            name = $packageName
+            version = $version
+            source = 'registry+https://github.com/rust-lang/crates.io-index'
+            checksum = $packageHash
+        }
+    }
+}
+
 Describe 'Deno third-party notice fail-closed contracts' {
     It 'uses canonical SPDX text when a crate has no license file' {
         $root = Join-Path $TestDrive 'missing-license'
         $spdx = Join-Path $TestDrive 'spdx-single'
-        New-Item -ItemType Directory -Path $root | Out-Null
         New-TestSpdxCorpus $spdx
-        [IO.File]::WriteAllText((Join-Path $root 'Cargo.toml'), "[package]`nname = `"fixture`"`nversion = `"1.0.0`"`nlicense = `"MIT`"`n", [Text.UTF8Encoding]::new($false))
-        [IO.File]::WriteAllText((Join-Path $root '.cargo-checksum.json'), '{"files":{},"package":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}', [Text.UTF8Encoding]::new($false))
-        $package = [pscustomobject]@{ name = 'fixture'; version = '1.0.0'; source = 'registry+https://github.com/rust-lang/crates.io-index'; checksum = ('a' * 64) }
+        New-Item -ItemType Directory -Path $root | Out-Null
+        $fixture = New-TestCrateFixture -Root $root
 
-        $result = Assert-DenoCratePackage -Package $package -VendorPath $root -SpdxRoot $spdx
+        $result = Assert-DenoCratePackage -Package $fixture.package -VendorPath $fixture.vendor -CrateArchivePath $fixture.archive -SpdxRoot $spdx
 
         $result.resolution | Should Be 'spdx-canonical-fallback'
         @($result.spdxLicenseIds) | Should Be @('MIT')
         @($result.resolvedLicenseFiles).Count | Should Be 1
+        $result.crateManifest.path | Should Be 'fixture-1.0.0/Cargo.toml.orig'
     }
 
     It 'rejects a Cargo package checksum mismatch' {
         $root = Join-Path $TestDrive 'checksum-mismatch'
         New-Item -ItemType Directory -Path $root | Out-Null
-        [IO.File]::WriteAllText((Join-Path $root 'Cargo.toml'), "[package]`nname = `"fixture`"`nversion = `"1.0.0`"`nlicense = `"MIT`"`n", [Text.UTF8Encoding]::new($false))
-        [IO.File]::WriteAllText((Join-Path $root 'LICENSE'), 'fixture license', [Text.UTF8Encoding]::new($false))
-        [IO.File]::WriteAllText((Join-Path $root '.cargo-checksum.json'), '{"files":{},"package":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}', [Text.UTF8Encoding]::new($false))
-        $package = [pscustomobject]@{ name = 'fixture'; version = '1.0.0'; source = 'registry+https://github.com/rust-lang/crates.io-index'; checksum = ('a' * 64) }
+        $fixture = New-TestCrateFixture -Root $root -IncludeLicense
+        $package = $fixture.package.psobject.Copy()
+        $package.checksum = ('a' * 64)
 
-        Get-TestExceptionMessage { Assert-DenoCratePackage -Package $package -VendorPath $root } | Should Be 'deno_cargo_checksum_mismatch:fixture@1.0.0'
+        Get-TestExceptionMessage { Assert-DenoCratePackage -Package $package -VendorPath $fixture.vendor -CrateArchivePath $fixture.archive } | Should Be 'deno_cargo_checksum_mismatch:fixture@1.0.0'
+    }
+
+    It 'rejects coordinated vendor manifest license and checksum tampering against the crate bytes' {
+        $root = Join-Path $TestDrive 'coordinated-vendor-tamper'
+        New-Item -ItemType Directory -Path $root | Out-Null
+        $fixture = New-TestCrateFixture -Root $root -IncludeLicense
+        Add-Content -LiteralPath (Join-Path $fixture.vendor 'Cargo.toml.orig') -Value '# tampered'
+        Add-Content -LiteralPath (Join-Path $fixture.vendor 'LICENSE') -Value 'tampered'
+        $checksumPath = Join-Path $fixture.vendor '.cargo-checksum.json'
+        $checksum = Get-Content -Raw -LiteralPath $checksumPath | ConvertFrom-Json
+        $checksum.files.'Cargo.toml.orig' = (Get-FileHash -LiteralPath (Join-Path $fixture.vendor 'Cargo.toml.orig') -Algorithm SHA256).Hash.ToLowerInvariant()
+        $checksum.files.LICENSE = (Get-FileHash -LiteralPath (Join-Path $fixture.vendor 'LICENSE') -Algorithm SHA256).Hash.ToLowerInvariant()
+        [IO.File]::WriteAllText($checksumPath, ($checksum | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
+
+        Get-TestExceptionMessage { Assert-DenoCratePackage -Package $fixture.package -VendorPath $fixture.vendor -CrateArchivePath $fixture.archive } | Should Be 'deno_vendor_archive_mismatch:fixture@1.0.0:Cargo.toml.orig'
+    }
+
+    It 'takes package metadata and license bytes from the checksum-pinned crate archive' {
+        $root = Join-Path $TestDrive 'archive-authority'
+        New-Item -ItemType Directory -Path $root | Out-Null
+        $fixture = New-TestCrateFixture -Root $root -IncludeLicense
+
+        $result = Assert-DenoCratePackage -Package $fixture.package -VendorPath $fixture.vendor -CrateArchivePath $fixture.archive
+
+        $result.license | Should Be 'MIT'
+        $result.repository | Should Be 'https://example.invalid/fixture'
+        $result.crateManifest.path | Should Be 'fixture-1.0.0/Cargo.toml.orig'
+        @($result.resolvedLicenseFiles)[0].origin | Should Be 'package-archive'
+        @($result.resolvedLicenseFiles)[0].archiveEntry | Should Be 'fixture-1.0.0/LICENSE'
     }
 
     It 'rejects a mutable Git source' {
         Get-TestExceptionMessage { Assert-DenoImmutableCargoSource -Source 'git+https://github.com/example/project?branch=main' } | Should Be 'deno_mutable_git_source'
     }
 
-    It 'rejects an omitted required V8 third-party component' {
-        Get-TestExceptionMessage { Assert-DenoNativeClosure -RequiredComponents @('v8', 'third_party/icu', 'third_party/simdutf') -ObservedComponents @('v8', 'third_party/icu') } | Should Be 'deno_native_component_missing:third_party/simdutf'
+    It 'matches all 20 native paths and commits to the pinned rusty_v8 Git tree' {
+        if ([string]::IsNullOrWhiteSpace($env:DENO_RUSTY_V8_GIT_REPOSITORY)) { throw 'DENO_RUSTY_V8_GIT_REPOSITORY is required for this test' }
+        $nativePath = Join-Path (Split-Path -Parent (Split-Path -Parent $collectorPath)) 'release/runtime/v2.19.1-karon.2/deno/native-components.json'
+        $native = Read-DenoJson $nativePath
+
+        $result = Assert-DenoNativeClosure -Components @($native.components) -RustyV8GitRepositoryPath $env:DENO_RUSTY_V8_GIT_REPOSITORY -ExpectedCommit $native.rustyV8Commit -ExpectedTree $native.rustyV8Tree
+
+        @($result.gitlinks).Count | Should Be 20
+        $result.tree | Should Be '6c92c73eeacce6956b194cdaba8cfb020f11a960'
+    }
+
+    It 'rejects native path omission and commit substitution against the pinned rusty_v8 Git tree' {
+        if ([string]::IsNullOrWhiteSpace($env:DENO_RUSTY_V8_GIT_REPOSITORY)) { throw 'DENO_RUSTY_V8_GIT_REPOSITORY is required for this test' }
+        $nativePath = Join-Path (Split-Path -Parent (Split-Path -Parent $collectorPath)) 'release/runtime/v2.19.1-karon.2/deno/native-components.json'
+        $native = Read-DenoJson $nativePath
+        $withoutSimdutf = @($native.components | Where-Object path -cne 'third_party/simdutf')
+        Get-TestExceptionMessage { Assert-DenoNativeClosure -Components $withoutSimdutf -RustyV8GitRepositoryPath $env:DENO_RUSTY_V8_GIT_REPOSITORY -ExpectedCommit $native.rustyV8Commit -ExpectedTree '6c92c73eeacce6956b194cdaba8cfb020f11a960' } | Should Be 'deno_native_component_missing:third_party/simdutf'
+        $wrongCommit = @($native.components | ConvertTo-Json -Depth 10 | ConvertFrom-Json)
+        @($wrongCommit | Where-Object path -ceq 'build')[0].commit = ('0' * 40)
+        Get-TestExceptionMessage { Assert-DenoNativeClosure -Components $wrongCommit -RustyV8GitRepositoryPath $env:DENO_RUSTY_V8_GIT_REPOSITORY -ExpectedCommit $native.rustyV8Commit -ExpectedTree '6c92c73eeacce6956b194cdaba8cfb020f11a960' } | Should Be 'deno_native_component_commit_mismatch:build'
     }
 
     It 'rejects duplicate paths that collide by case' {
@@ -76,6 +165,67 @@ Describe 'Deno third-party notice fail-closed contracts' {
         $result.version | Should Be '2.7.14'
         $result.target | Should Be 'x86_64-pc-windows-msvc'
         $result.sha256 | Should Be 'b6e83993f1f1ab97075a77043de61118966d719b5450bc631251d47c3a34230b'
+    }
+
+    It 'records the exact embedded TypeScript 5.9.2 source license and build inclusion evidence' {
+        foreach ($variable in @('DENO_SOURCE_ROOT', 'DENO_SOURCE_ARCHIVE', 'DENO_SPDX_ROOT')) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($variable))) { throw "$variable is required for this test" }
+        }
+        $manifestRoot = Join-Path (Split-Path -Parent (Split-Path -Parent $collectorPath)) 'release/runtime/v2.19.1-karon.2/deno'
+        $inputs = Read-DenoJson (Join-Path $manifestRoot 'inputs.json')
+        $component = @($inputs.embeddedComponents | Where-Object id -ceq 'typescript@5.9.2')[0]
+        $stage = Join-Path $TestDrive 'typescript-stage'
+        New-Item -ItemType Directory -Path $stage | Out-Null
+        $notice = [Text.StringBuilder]::new()
+        $outputPaths = [Collections.Generic.List[string]]::new()
+
+        $record = Add-DenoEmbeddedComponent -Component $component -DenoSourceRoot $env:DENO_SOURCE_ROOT -DenoSourceArchivePath $env:DENO_SOURCE_ARCHIVE -SpdxRoot $env:DENO_SPDX_ROOT -StageRoot $stage -Notice $notice -OutputPaths $outputPaths
+
+        $record.version | Should Be '5.9.2'
+        $record.sourceFile.path | Should Be 'cli/tsc/00_typescript.js'
+        $record.sourceFile.length | Should Be 8492282
+        $record.sourceFile.sha256 | Should Be '932f9fd96b20ef8c2496d7f70419c69fa40266a92d81a2b229737fa6dd324ac8'
+        $record.denoSourceCommit | Should Be '2d674b25625bcc367853d00fe86f6e84390f88cb'
+        $record.copyright | Should Be 'Copyright (c) Microsoft Corporation. All rights reserved.'
+        $record.license | Should Be 'Apache-2.0'
+        @($record.buildInclusionEvidence.role) | Should Be @('compressed-by-cli-build-rs', 'referenced-by-cli-tsc-module')
+        $notice.ToString() | Should Match 'Apache License\s+Version 2\.0, January 2004'
+        $stagedSource = Join-Path $stage $record.sourceFile.bundlePath
+        (Get-Item -LiteralPath $stagedSource).Length | Should Be 8492282
+        (Get-FileHash -LiteralPath $stagedSource -Algorithm SHA256).Hash.ToLowerInvariant() | Should Be '932f9fd96b20ef8c2496d7f70419c69fa40266a92d81a2b229737fa6dd324ac8'
+    }
+
+    It 'distinguishes the SPDX annotated tag object from its peeled commit' {
+        $inputsPath = Join-Path (Split-Path -Parent (Split-Path -Parent $collectorPath)) 'release/runtime/v2.19.1-karon.2/deno/inputs.json'
+        $inputs = Read-DenoJson $inputsPath
+
+        $inputs.spdxLicenseList.tagObject | Should Be '779ef2e5dff6d4af389c53de5e97116ab0bb52e8'
+        $inputs.spdxLicenseList.peeledCommit | Should Be 'c4a7237ec8f4654e867546f9f409749300f1bf4c'
+        @($inputs.spdxLicenseList.psobject.Properties.Name) -contains 'commit' | Should Be $false
+    }
+
+    It 'rejects a junction in an input or output ancestor' {
+        $target = Join-Path $TestDrive 'junction-target'
+        $link = Join-Path $TestDrive 'junction-link'
+        New-Item -ItemType Directory -Path $target | Out-Null
+        New-Item -ItemType Junction -Path $link -Target $target | Out-Null
+
+        Get-TestExceptionMessage { Assert-DenoNoReparsePath -Path (Join-Path $link 'missing-child') } | Should Match '^deno_reparse_path_rejected:'
+    }
+
+    It 'uses same-volume process-owned staging and atomically refuses overwrite' {
+        $scratch = Join-Path $TestDrive 'atomic-scratch'
+        New-Item -ItemType Directory -Path $scratch | Out-Null
+        $owned = New-DenoProcessStageRoot -ScratchRoot $scratch
+        [IO.Path]::GetPathRoot($owned) | Should Be ([IO.Path]::GetPathRoot([IO.Path]::GetFullPath($scratch)))
+        $source = Join-Path $owned 'pending-output'
+        $destination = Join-Path $scratch 'final-output'
+        New-Item -ItemType Directory -Path $source, $destination | Out-Null
+        [IO.File]::WriteAllText((Join-Path $source 'new.txt'), 'new', [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText((Join-Path $destination 'sentinel.txt'), 'keep', [Text.UTF8Encoding]::new($false))
+
+        Get-TestExceptionMessage { Complete-DenoAtomicDirectory -Source $source -Destination $destination } | Should Be 'deno_output_already_exists'
+        [IO.File]::ReadAllText((Join-Path $destination 'sentinel.txt')) | Should Be 'keep'
     }
 
     It 'resolves compound SPDX OR AND WITH expressions completely' {
