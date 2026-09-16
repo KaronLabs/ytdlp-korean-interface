@@ -8,7 +8,8 @@
     "jobId": 104378132452,
     "baseImageDigest": "sha256:6ca7e979f8bf9bd54b83c3e5c94c08f251f9c0f73b9398d2d9e5c44e30c88744",
     "configDigestFromLog": "sha256:548c348ebe911aac409043aa274ac43ef7046c4ec53c6b060e271723c40b30ac",
-    "provenanceAttestationEnabled": false
+    "provenanceAttestationEnabled": false,
+    "dockerfileInputStatus": "mutable-upstream-input-retained-not-reproducibly-pinned"
   },
   "crosstool": {
     "commit": "b1a94f65c5187d99037a4e2f57aefbdf995a9677",

@@ -25,6 +25,13 @@ Describe 'FFmpeg corresponding-source collector schema 3' {
             Should Throw 'ffmpeg_source_unknown_enabled_library'
     }
 
+    It 'treats lv2 as an external option that must remain mapped' {
+        $bad = Copy-JsonObject $manifest
+        $bad.enabledExternalLibraries = @($bad.enabledExternalLibraries | Where-Object option -ne '--enable-lv2')
+        { Assert-FfmpegClosureMetadata $bad $graph $crates $toolchain $corpus $options } |
+            Should Throw 'ffmpeg_source_unknown_enabled_library:--enable-lv2'
+    }
+
     It 'rejects a mutable URL' {
         $bad = Copy-JsonObject $toolchain
         $bad.components[0].source.url = 'https://github.com/example/project/archive/main.zip'
@@ -85,12 +92,53 @@ Describe 'FFmpeg corresponding-source collector schema 3' {
             textObjects = @([pscustomobject]@{
                 sha256 = $sha
                 licenseRef = 'LicenseRef-' + $sha.Substring(0, 16).ToLowerInvariant()
+                bytes = (Get-Item -LiteralPath $file).Length
                 bundlePath = 'licenses/extracted/license.txt'
             })
         }
         (Assert-LicenseCorpus $mini $root -VerifyFiles).Count | Should Be 1
         [IO.File]::WriteAllText($file, 'changed')
         { Assert-LicenseCorpus $mini $root -VerifyFiles } | Should Throw 'ffmpeg_source_sha256_mismatch'
+    }
+
+    It 'hashes committed license blobs instead of normalized working-tree bytes' {
+        $repo = Join-Path $TestDrive git-license-gate
+        $manifestRoot = Join-Path $repo 'release\ffmpeg'
+        $licenseRoot = Join-Path $manifestRoot 'licenses\extracted'
+        [IO.Directory]::CreateDirectory($licenseRoot) | Out-Null
+        [IO.File]::WriteAllText((Join-Path $repo '.gitattributes'), "* -text`n", [Text.UTF8Encoding]::new($false))
+        $path = Join-Path $licenseRoot 'license.txt'
+        $lfBytes = [Text.Encoding]::UTF8.GetBytes("line one`nline two`n")
+        $crlfBytes = [Text.Encoding]::UTF8.GetBytes("line one`r`nline two`r`n")
+        [IO.File]::WriteAllBytes($path, $lfBytes)
+        & git -C $repo init -q
+        & git -C $repo config user.email test@example.invalid
+        & git -C $repo config user.name 'Task 6 Test'
+        & git -C $repo add -- .gitattributes release/ffmpeg/licenses/extracted/license.txt
+        & git -C $repo commit -q -m baseline
+        [IO.File]::WriteAllBytes($path, $crlfBytes)
+        $sha = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($crlfBytes))
+        $mini = [pscustomobject]@{
+            textObjectCount = 1
+            textObjects = @([pscustomobject]@{
+                sha256 = $sha
+                licenseRef = 'LicenseRef-' + $sha.Substring(0, 16).ToLowerInvariant()
+                bytes = $crlfBytes.Length
+                bundlePath = 'licenses/extracted/license.txt'
+            })
+        }
+        { Assert-GitLicenseCorpus $mini $manifestRoot HEAD } |
+            Should Throw 'ffmpeg_source_git_license_blob_mismatch'
+    }
+
+    It 'requires every Rav1e license member to use the shared LicenseRef corpus' {
+        $bad = Copy-JsonObject $crates
+        $bad.components[0].licenseFiles = @()
+        { Assert-FfmpegClosureMetadata $manifest $graph $bad $toolchain $corpus $options } |
+            Should Throw 'ffmpeg_source_missing_license'
+        $corpus.rav1eComponents.Count | Should Be 270
+        (@($corpus.rav1eComponents | ForEach-Object { @($_.licenseFiles) }).Count) | Should Be 492
+        $corpus.textObjectCount | Should Be 681
     }
 
     It 'requires exact GCC libgomp and MinGW toolchain sources' {
@@ -114,21 +162,90 @@ Describe 'FFmpeg corresponding-source collector schema 3' {
         [IO.File]::WriteAllText($a, 'alpha')
         [IO.File]::WriteAllText($b, 'beta')
         $items = @(
-            [pscustomobject]@{ SourcePath = $b; EntryPath = 'B.txt' },
-            [pscustomobject]@{ SourcePath = $a; EntryPath = 'a.txt' }
+            New-BundleItem $b B.txt
+            New-BundleItem $a a.txt
         )
         $one = Join-Path $TestDrive one.zip
         $two = Join-Path $TestDrive two.zip
-        New-DeterministicZip $items $one
-        New-DeterministicZip $items $two
+        $first = New-DeterministicZip $items $one @($TestDrive)
+        $second = New-DeterministicZip $items $two @($TestDrive)
         (Get-UpperSha256 $one) | Should Be (Get-UpperSha256 $two)
+        $first.verifiedEntryCount | Should Be 2
+        $second.verifiedEntryCount | Should Be 2
+    }
+
+    It 'rejects rooted traversal ADS device and Windows alias entry paths' {
+        $root = Join-Path $TestDrive path-root
+        [IO.Directory]::CreateDirectory($root) | Out-Null
+        $source = Join-Path $root source.txt
+        [IO.File]::WriteAllText($source, 'safe')
+        $sha = Get-UpperSha256 $source
+        foreach ($entryPath in @(
+            'C:\escape.txt', '/escape.txt', '\\server\share\escape.txt', '\\?\C:\escape.txt',
+            '../escape.txt', 'safe/../escape.txt', 'safe\..\escape.txt', 'safe/file.txt:ads',
+            'safe/name.', 'safe/name ', 'CON/file.txt'
+        )) {
+            $item = [pscustomobject]@{ SourcePath = $source; EntryPath = $entryPath; Sha256 = $sha; Bytes = 4 }
+            { Assert-BundleItems @($item) @($root) } | Should Throw 'ffmpeg_source_unsafe_bundle_path'
+        }
+    }
+
+    It 'rejects exact case-insensitive and Unicode-normalization path collisions' {
+        $root = Join-Path $TestDrive collision-root
+        [IO.Directory]::CreateDirectory($root) | Out-Null
+        $source = Join-Path $root source.txt
+        [IO.File]::WriteAllText($source, 'safe')
+        $sha = Get-UpperSha256 $source
+        foreach ($paths in @(
+            @('same.txt', 'same.txt'),
+            @('Case.txt', 'case.txt'),
+            @(([string][char]0x00E9 + '.txt'), ('e' + [char]0x0301 + '.txt'))
+        )) {
+            $items = @($paths | ForEach-Object { [pscustomobject]@{ SourcePath = $source; EntryPath = $_; Sha256 = $sha; Bytes = 4 } })
+            { Assert-BundleItems $items @($root) } | Should Throw 'ffmpeg_source_duplicate_path'
+        }
+    }
+
+    It 'rejects a source path outside its declared containment root' {
+        $root = Join-Path $TestDrive containment-root
+        [IO.Directory]::CreateDirectory($root) | Out-Null
+        $source = Join-Path $TestDrive outside.txt
+        [IO.File]::WriteAllText($source, 'outside')
+        $item = New-BundleItem $source inside.txt
+        { Assert-BundleItems @($item) @($root) } | Should Throw 'ffmpeg_source_source_root_escape'
+    }
+
+    It 'detects source mutation between item hashing and private snapshot creation' {
+        $root = Join-Path $TestDrive toctou-root
+        [IO.Directory]::CreateDirectory($root) | Out-Null
+        $source = Join-Path $root source.txt
+        [IO.File]::WriteAllText($source, 'before')
+        $item = New-BundleItem $source entry.txt
+        [IO.File]::WriteAllText($source, 'after')
+        $zip = Join-Path $TestDrive toctou.zip
+        { New-DeterministicZip @($item) $zip @($root) } | Should Throw 'ffmpeg_source_staged_sha256_mismatch'
+    }
+
+    It 'reopens the completed ZIP and rejects an inventory mismatch' {
+        $root = Join-Path $TestDrive verify-root
+        [IO.Directory]::CreateDirectory($root) | Out-Null
+        $source = Join-Path $root source.txt
+        [IO.File]::WriteAllText($source, 'verified')
+        $item = New-BundleItem $source entry.txt
+        $zip = Join-Path $TestDrive verified.zip
+        $result = New-DeterministicZip @($item) $zip @($root)
+        $result.verifiedEntryCount | Should Be 1
+        $bad = [pscustomobject]@{ SourcePath = $source; EntryPath = 'entry.txt'; Sha256 = ('0' * 64); Bytes = 8 }
+        { Assert-ZipMatchesItems $zip @($bad) } | Should Throw 'ffmpeg_source_zip_sha256_mismatch'
     }
 
     It 'validates the complete retained conservative closure' {
         { Assert-FfmpegClosureMetadata $manifest $graph $crates $toolchain $corpus $options } | Should Not Throw
         $manifest.closureStatus | Should Be complete
         $manifest.verifiedSourceRecordCount | Should Be 407
-        $corpus.textObjectCount | Should Be 628
+        $corpus.textObjectCount | Should Be 681
+        $manifest.counts.licenseFileReferences | Should Be 1750
+        $toolchain.baseImage.dockerfileInputStatus | Should Be 'mutable-upstream-input-retained-not-reproducibly-pinned'
     }
 }
 

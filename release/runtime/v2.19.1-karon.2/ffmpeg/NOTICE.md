@@ -24,3 +24,10 @@ The collector rejects GPL/nonfree configuration, unknown enabled libraries,
 mutable source URLs, SHA mismatches, missing recipe/patch/license data,
 case-colliding paths or components, missing toolchain sources, and incomplete
 nested-tree closure. NOASSERTION is not used.
+## Rav1e crate license corpus
+
+All 492 license and notice members from the 270 exact Rav1e crate archives are represented by deterministic content-derived LicenseRef records. The corpus contains 681 unique exact license text objects and 1,750 source/member references.
+
+## Crosstool-NG identity limitation
+
+The retained build log and embedded `crosstool-NG 1.29.0.7_b1a94f6` header identify the included full source commit `b1a94f65c5187d99037a4e2f57aefbdf995a9677`. The original Dockerfile input used a mutable upstream reference and is not claimed as reproducibly pinned.

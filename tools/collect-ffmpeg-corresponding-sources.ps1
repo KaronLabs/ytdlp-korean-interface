@@ -42,7 +42,120 @@ function Test-ImmutableSourceUrl {
 function Test-ExternalBuildOption {
     param([string] $Option)
     if ($Option -match '^--enable-lib[a-z0-9-]+$') { return $true }
-    $Option -match '^--enable-(zlib|iconv|gmp|lzma|fontconfig|vulkan|opencl|amf|chromaprint|ffnvcodec|openal|sdl2|vaapi)$'
+    $Option -match '^--enable-(zlib|iconv|gmp|lzma|fontconfig|vulkan|opencl|amf|chromaprint|ffnvcodec|openal|sdl2|vaapi|lv2)$'
+}
+
+function Assert-SafeBundlePath {
+    param([string] $Path)
+    if ([string]::IsNullOrWhiteSpace($Path) -or $Path.IndexOf([char] 0) -ge 0 -or
+        [IO.Path]::IsPathRooted($Path) -or $Path -match '^[A-Za-z]:' -or
+        $Path -match '^[\\/]{2}' -or $Path.Contains(':')) {
+        throw "ffmpeg_source_unsafe_bundle_path:$Path"
+    }
+    $normalized = $Path.Replace('\', '/')
+    $segments = $normalized.Split([char] '/', [StringSplitOptions]::None)
+    foreach ($segment in $segments) {
+        if ([string]::IsNullOrEmpty($segment) -or $segment -ceq '.' -or $segment -ceq '..' -or
+            $segment -match '[ .]$' -or $segment.IndexOfAny([char[]] '<>"|?*') -ge 0 -or
+            $segment -match '(?i)^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)') {
+            throw "ffmpeg_source_unsafe_bundle_path:$Path"
+        }
+    }
+    $normalized.Normalize([Text.NormalizationForm]::FormC)
+}
+
+function Resolve-ContainedSourcePath {
+    param([string] $SourcePath, [string[]] $AllowedSourceRoots)
+    if (-not (Test-Path -LiteralPath $SourcePath -PathType Leaf)) { throw "ffmpeg_source_missing_bundle_input:$SourcePath" }
+    $item = Get-Item -LiteralPath $SourcePath -Force
+    if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "ffmpeg_source_source_root_escape:$SourcePath" }
+    $resolved = [IO.Path]::GetFullPath($item.FullName)
+    foreach ($root in $AllowedSourceRoots) {
+        if (-not (Test-Path -LiteralPath $root -PathType Container)) { continue }
+        $rootPath = [IO.Path]::GetFullPath((Get-Item -LiteralPath $root -Force).FullName).TrimEnd('\', '/')
+        $prefix = $rootPath + [IO.Path]::DirectorySeparatorChar
+        if ($resolved.Equals($rootPath, [StringComparison]::OrdinalIgnoreCase) -or
+            $resolved.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+            return $resolved
+        }
+    }
+    throw "ffmpeg_source_source_root_escape:$SourcePath"
+}
+
+function Assert-BundleItems {
+    param([object[]] $Items, [string[]] $AllowedSourceRoots)
+    $seen = @{}
+    foreach ($item in $Items) {
+        $entryPath = Assert-SafeBundlePath ([string] $item.EntryPath)
+        $key = $entryPath.Normalize([Text.NormalizationForm]::FormC).ToLowerInvariant()
+        if ($seen.ContainsKey($key)) { throw "ffmpeg_source_duplicate_path:$entryPath" }
+        $seen[$key] = $true
+        $sourcePath = Resolve-ContainedSourcePath ([string] $item.SourcePath) $AllowedSourceRoots
+        $sha = ([string] $item.Sha256).ToUpperInvariant()
+        if ($sha -notmatch '^[0-9A-F]{64}$') { throw "ffmpeg_source_missing_sha256:$entryPath" }
+        [pscustomobject][ordered]@{
+            SourcePath = $sourcePath
+            EntryPath = $entryPath
+            Sha256 = $sha
+            Bytes = [int64] $item.Bytes
+        }
+    }
+}
+
+function Get-GitBlobBytes {
+    param([string] $RepositoryRoot, [string] $ObjectSpec)
+    $start = [Diagnostics.ProcessStartInfo]::new()
+    $start.FileName = 'git'
+    $start.UseShellExecute = $false
+    $start.RedirectStandardOutput = $true
+    $start.RedirectStandardError = $true
+    foreach ($argument in @('-C', $RepositoryRoot, 'cat-file', 'blob', $ObjectSpec)) { [void] $start.ArgumentList.Add($argument) }
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $start
+    [void] $process.Start()
+    $buffer = [IO.MemoryStream]::new()
+    try {
+        $process.StandardOutput.BaseStream.CopyTo($buffer)
+        $errorText = $process.StandardError.ReadToEnd()
+        $process.WaitForExit()
+        if ($process.ExitCode -ne 0) { throw "ffmpeg_source_git_license_blob_missing:$ObjectSpec`n$errorText" }
+        return ,$buffer.ToArray()
+    }
+    finally {
+        $buffer.Dispose()
+        $process.Dispose()
+    }
+}
+
+function Assert-GitLicenseCorpus {
+    param($Corpus, [string] $ManifestRoot, [string] $Revision = 'HEAD')
+    $repositoryRoot = @(& git -C $ManifestRoot rev-parse --show-toplevel 2>$null)
+    if ($LASTEXITCODE -ne 0 -or $repositoryRoot.Count -ne 1) { throw 'ffmpeg_source_git_repository_unavailable' }
+    $repositoryRoot = $repositoryRoot[0].Trim()
+    $relativeManifestRoot = [IO.Path]::GetRelativePath($repositoryRoot, [IO.Path]::GetFullPath($ManifestRoot)).Replace('\', '/')
+    if ($relativeManifestRoot -eq '..' -or $relativeManifestRoot.StartsWith('../', [StringComparison]::Ordinal)) {
+        throw 'ffmpeg_source_git_repository_unavailable'
+    }
+    $trackedRoot = "$relativeManifestRoot/licenses/extracted"
+    $tracked = @(& git -C $repositoryRoot ls-tree -r --name-only $Revision -- $trackedRoot)
+    if ($LASTEXITCODE -ne 0) { throw 'ffmpeg_source_git_license_tree_unavailable' }
+    $trackedSet = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($path in $tracked) { [void] $trackedSet.Add($path) }
+    if ($trackedSet.Count -ne [int] $Corpus.textObjectCount) { throw 'ffmpeg_source_git_license_tree_count_mismatch' }
+    foreach ($text in @($Corpus.textObjects)) {
+        $bundlePath = Assert-SafeBundlePath ([string] $text.bundlePath)
+        if (-not $bundlePath.StartsWith('licenses/extracted/', [StringComparison]::Ordinal)) {
+            throw "ffmpeg_source_invalid_license_path:$bundlePath"
+        }
+        $repositoryPath = "$relativeManifestRoot/$bundlePath"
+        if (-not $trackedSet.Contains($repositoryPath)) { throw "ffmpeg_source_git_license_blob_missing:$repositoryPath" }
+        $bytes = Get-GitBlobBytes $repositoryRoot "${Revision}:$repositoryPath"
+        $sha = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes))
+        if ($sha -cne ([string] $text.sha256).ToUpperInvariant() -or $bytes.Length -ne [int64] $text.bytes) {
+            throw "ffmpeg_source_git_license_blob_mismatch:$repositoryPath"
+        }
+    }
+    [pscustomobject][ordered]@{ revision = $Revision; verifiedBlobCount = $trackedSet.Count }
 }
 
 function Assert-LicenseCorpus {
@@ -56,7 +169,11 @@ function Assert-LicenseCorpus {
         }
         if ($refs.ContainsKey($sha)) { throw "ffmpeg_source_duplicate_license_text:$sha" }
         $refs[$sha] = $ref
-        if ($VerifyFiles) { Assert-SourceArchiveHash (Join-Path $ManifestRoot ([string] $text.bundlePath)) $sha $ref }
+        if ($VerifyFiles) {
+            $path = Join-Path $ManifestRoot (Assert-SafeBundlePath ([string] $text.bundlePath))
+            Assert-SourceArchiveHash $path $sha $ref
+            if ((Get-Item -LiteralPath $path).Length -ne [int64] $text.bytes) { throw "ffmpeg_source_license_length_mismatch:$ref" }
+        }
     }
     if ($refs.Count -cne [int] $Corpus.textObjectCount) { throw 'ffmpeg_source_license_corpus_count_mismatch' }
     $refs
@@ -162,9 +279,25 @@ function Assert-FfmpegClosureMetadata {
         if (-not $toolIds.ContainsKey($id)) { throw "ffmpeg_source_missing_toolchain:$id" }
     }
     if ($toolIds.Count -cne 12 -or -not [bool] $Toolchain.crosstool.libgompEnabled) { throw 'ffmpeg_source_toolchain_incomplete' }
+    if ([string] $Toolchain.baseImage.dockerfileInputStatus -cne 'mutable-upstream-input-retained-not-reproducibly-pinned') {
+        throw 'ffmpeg_source_toolchain_provenance_overclaim'
+    }
 
     if (@($Crates.components).Count -cne 270) { throw 'ffmpeg_source_crate_count_mismatch' }
     $crateIds = @{}
+    $rav1eCorpus = @{}
+    $rav1eReferenceCount = 0
+    foreach ($record in @($Corpus.rav1eComponents)) {
+        $recordId = [string] $record.componentId
+        $recordKey = $recordId.ToLowerInvariant()
+        if ([string]::IsNullOrWhiteSpace($recordId) -or $rav1eCorpus.ContainsKey($recordKey)) { throw "ffmpeg_source_duplicate_component:$recordId" }
+        $rav1eCorpus[$recordKey] = $record
+        $rav1eReferenceCount += @($record.licenseFiles).Count
+    }
+    if ($rav1eCorpus.Count -cne 270 -or $rav1eReferenceCount -cne 492 -or
+        [int] $Corpus.textObjectCount -cne 681 -or [int] $Corpus.licenseFileReferenceCount -cne 1750) {
+        throw 'ffmpeg_source_rav1e_license_corpus_incomplete'
+    }
     foreach ($crate in @($Crates.components)) {
         $id = "$($crate.name)@$($crate.version)"
         $key = $id.ToLowerInvariant()
@@ -173,8 +306,31 @@ function Assert-FfmpegClosureMetadata {
         if (-not (Test-ImmutableSourceUrl ([string] $crate.sourceUrl)) -or
             [string] $crate.sha256 -notmatch '^[0-9A-Fa-f]{64}$' -or
             [string]::IsNullOrWhiteSpace([string] $crate.licenseExpression) -or
-            [string] $crate.licenseExpression -match 'NOASSERTION' -or @($crate.licenseTextPaths).Count -eq 0) {
+            [string] $crate.licenseExpression -match 'NOASSERTION' -or @($crate.licenseTextPaths).Count -eq 0 -or
+            -not $rav1eCorpus.ContainsKey($key)) {
             throw "ffmpeg_source_missing_license:$id"
+        }
+        $record = $rav1eCorpus[$key]
+        if ([string] $record.sha256 -cne ([string] $crate.sha256).ToUpperInvariant() -or
+            @($record.licenseFiles).Count -ne @($crate.licenseFiles).Count) { throw "ffmpeg_source_missing_license:$id" }
+        $licenseFiles = @($crate.licenseFiles)
+        if ($licenseFiles.Count -eq 0) {
+            foreach ($textPath in @($crate.licenseTextPaths)) {
+                if ([string] $textPath.kind -cne 'spdx-standard-text' -or
+                    -not ([string] $textPath.path).StartsWith('licenses/spdx/', [StringComparison]::Ordinal) -or
+                    @($Manifest.includedPaths) -cnotcontains [string] $textPath.path) {
+                    throw "ffmpeg_source_missing_license:$id"
+                }
+            }
+        }
+        foreach ($file in $licenseFiles) {
+            $sha = ([string] $file.sha256).ToUpperInvariant()
+            $ref = [string] $file.licenseRef
+            if (-not $refs.ContainsKey($sha) -or $refs[$sha] -cne $ref -or
+                [string] $file.bundlePath -cne "licenses/extracted/$sha.txt" -or
+                [string] $crate.licenseRefExpression -notmatch [regex]::Escape($ref)) {
+                throw "ffmpeg_source_missing_license:$id"
+            }
         }
     }
 
@@ -277,30 +433,139 @@ function New-BundleItem {
     }
 }
 
-function New-DeterministicZip {
-    param([object[]] $Items, [string] $OutputPath)
-    $seen = @{}
-    foreach ($item in $Items) {
-        $key = ([string] $item.EntryPath).Replace('\', '/').ToLowerInvariant()
-        if ($seen.ContainsKey($key)) { throw "ffmpeg_source_duplicate_path:$($item.EntryPath)" }
-        $seen[$key] = $true
+function Assert-OwnedBundleSnapshot {
+    param($Snapshot)
+    $root = [IO.Path]::GetFullPath([string] $Snapshot.Root)
+    $parent = [IO.Path]::GetFullPath([string] $Snapshot.Parent).TrimEnd('\', '/')
+    if ([IO.Path]::GetDirectoryName($root) -cne $parent -or
+        -not [IO.Path]::GetFileName($root).StartsWith('ffmpeg-bundle-stage-', [StringComparison]::Ordinal)) {
+        throw 'ffmpeg_source_snapshot_ownership_mismatch'
     }
-    Add-Type -AssemblyName System.IO.Compression
-    $stream = [IO.File]::Open($OutputPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    $marker = Join-Path $root '.owner'
+    if (-not (Test-Path -LiteralPath $marker -PathType Leaf) -or
+        [IO.File]::ReadAllText($marker, [Text.Encoding]::UTF8) -cne [string] $Snapshot.Token) {
+        throw 'ffmpeg_source_snapshot_ownership_mismatch'
+    }
+    $root
+}
+
+function Remove-VerifiedBundleSnapshot {
+    param($Snapshot)
+    $root = Assert-OwnedBundleSnapshot $Snapshot
+    Remove-Item -LiteralPath $root -Recurse -Force
+}
+
+function New-VerifiedBundleSnapshot {
+    param([object[]] $Items, [string] $StagingParent, [string[]] $AllowedSourceRoots)
+    $validated = @(Assert-BundleItems $Items $AllowedSourceRoots)
+    $parent = [IO.Path]::GetFullPath($StagingParent)
+    [IO.Directory]::CreateDirectory($parent) | Out-Null
+    $token = [Guid]::NewGuid().ToString('N')
+    $root = Join-Path $parent "ffmpeg-bundle-stage-$token"
+    [IO.Directory]::CreateDirectory($root) | Out-Null
+    [IO.File]::WriteAllText((Join-Path $root '.owner'), $token, [Text.UTF8Encoding]::new($false))
+    $snapshot = [pscustomobject][ordered]@{ Root = $root; Parent = $parent; Token = $token; Items = @() }
     try {
-        $archive = [IO.Compression.ZipArchive]::new($stream, [IO.Compression.ZipArchiveMode]::Create, $false)
+        $staged = @()
+        $index = 0
+        foreach ($item in @($validated | Sort-Object @{Expression = { $_.EntryPath.ToLowerInvariant() }}, @{Expression = { $_.EntryPath }})) {
+            $destination = Join-Path $root ('{0:D8}.bin' -f $index)
+            $input = [IO.File]::Open($item.SourcePath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+            $output = [IO.File]::Open($destination, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+            try { $input.CopyTo($output) } finally { $output.Dispose(); $input.Dispose() }
+            $actualBytes = (Get-Item -LiteralPath $destination).Length
+            $actualSha = Get-UpperSha256 $destination
+            if ($actualSha -cne $item.Sha256 -or $actualBytes -ne $item.Bytes) {
+                throw "ffmpeg_source_staged_sha256_mismatch:$($item.EntryPath)"
+            }
+            $staged += [pscustomobject][ordered]@{
+                SourcePath = $destination
+                EntryPath = $item.EntryPath
+                Sha256 = $actualSha
+                Bytes = $actualBytes
+            }
+            $index++
+        }
+        $snapshot.Items = $staged
+        $snapshot
+    }
+    catch {
+        Remove-VerifiedBundleSnapshot $snapshot
+        throw
+    }
+}
+
+function Assert-ZipMatchesItems {
+    param([string] $ZipPath, [object[]] $Items)
+    Add-Type -AssemblyName System.IO.Compression
+    $expected = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+    foreach ($item in $Items) {
+        $path = Assert-SafeBundlePath ([string] $item.EntryPath)
+        if ($expected.ContainsKey($path)) { throw "ffmpeg_source_duplicate_path:$path" }
+        $expected.Add($path, $item)
+    }
+    $stream = [IO.File]::Open($ZipPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    try {
+        $archive = [IO.Compression.ZipArchive]::new($stream, [IO.Compression.ZipArchiveMode]::Read, $false)
         try {
-            foreach ($item in @($Items | Sort-Object @{Expression = { $_.EntryPath.ToLowerInvariant() }}, @{Expression = { $_.EntryPath }})) {
-                $entry = $archive.CreateEntry(([string] $item.EntryPath).Replace('\', '/'), [IO.Compression.CompressionLevel]::NoCompression)
-                $entry.LastWriteTime = [DateTimeOffset]::new(1980, 1, 1, 0, 0, 0, [TimeSpan]::Zero)
-                $input = [IO.File]::OpenRead([string] $item.SourcePath)
-                $output = $entry.Open()
-                try { $input.CopyTo($output) } finally { $output.Dispose(); $input.Dispose() }
+            if ($archive.Entries.Count -ne $expected.Count) { throw 'ffmpeg_source_zip_entry_count_mismatch' }
+            $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+            foreach ($entry in $archive.Entries) {
+                $path = Assert-SafeBundlePath $entry.FullName
+                if (-not $seen.Add($path) -or -not $expected.ContainsKey($path)) { throw "ffmpeg_source_zip_path_mismatch:$path" }
+                $item = $expected[$path]
+                if ($entry.Length -ne [int64] $item.Bytes) { throw "ffmpeg_source_zip_length_mismatch:$path" }
+                $entryStream = $entry.Open()
+                $algorithm = [Security.Cryptography.SHA256]::Create()
+                try { $sha = [Convert]::ToHexString($algorithm.ComputeHash($entryStream)) }
+                finally { $algorithm.Dispose(); $entryStream.Dispose() }
+                if ($sha -cne ([string] $item.Sha256).ToUpperInvariant()) { throw "ffmpeg_source_zip_sha256_mismatch:$path" }
             }
         }
         finally { $archive.Dispose() }
     }
     finally { $stream.Dispose() }
+    [pscustomobject][ordered]@{ verifiedEntryCount = $expected.Count }
+}
+
+function Write-DeterministicZipFromSnapshot {
+    param($Snapshot, [string] $OutputPath)
+    $root = Assert-OwnedBundleSnapshot $Snapshot
+    $items = @(Assert-BundleItems $Snapshot.Items @($root))
+    Add-Type -AssemblyName System.IO.Compression
+    $created = $false
+    try {
+        $stream = [IO.File]::Open($OutputPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        $created = $true
+        try {
+            $archive = [IO.Compression.ZipArchive]::new($stream, [IO.Compression.ZipArchiveMode]::Create, $false)
+            try {
+                foreach ($item in $items) {
+                    $entry = $archive.CreateEntry($item.EntryPath, [IO.Compression.CompressionLevel]::NoCompression)
+                    $entry.LastWriteTime = [DateTimeOffset]::new(1980, 1, 1, 0, 0, 0, [TimeSpan]::Zero)
+                    $input = [IO.File]::Open($item.SourcePath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+                    $output = $entry.Open()
+                    try { $input.CopyTo($output) } finally { $output.Dispose(); $input.Dispose() }
+                }
+            }
+            finally { $archive.Dispose() }
+        }
+        finally { $stream.Dispose() }
+        Assert-ZipMatchesItems $OutputPath $items
+    }
+    catch {
+        if ($created -and (Test-Path -LiteralPath $OutputPath -PathType Leaf)) { Remove-Item -LiteralPath $OutputPath -Force }
+        throw
+    }
+}
+
+function New-DeterministicZip {
+    param([object[]] $Items, [string] $OutputPath, [string[]] $AllowedSourceRoots)
+    $parent = Split-Path -Parent $OutputPath
+    if ([string]::IsNullOrWhiteSpace($parent)) { $parent = (Get-Location).Path }
+    $snapshot = New-VerifiedBundleSnapshot $Items $parent $AllowedSourceRoots
+    try { Write-DeterministicZipFromSnapshot $snapshot $OutputPath }
+    finally { Remove-VerifiedBundleSnapshot $snapshot }
 }
 
 function Invoke-FfmpegSourceCollector {
@@ -320,6 +585,7 @@ function Invoke-FfmpegSourceCollector {
     if (($expected -join ([char]10)) -cne ($evidence.configurationOptions -join ([char]10))) { throw 'ffmpeg_source_build_configuration_mismatch' }
     Assert-FfmpegClosureMetadata $manifest $graph $crates $toolchain $corpus $evidence.configurationOptions
     $null = Assert-LicenseCorpus $corpus $manifestRoot -VerifyFiles
+    $gitLicenseEvidence = Assert-GitLicenseCorpus $corpus $manifestRoot HEAD
     $binaryEvidencePath = Join-Path $OutputRoot binary-evidence.json
     $evidence | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $binaryEvidencePath -Encoding utf8NoBOM
 
@@ -351,9 +617,10 @@ function Invoke-FfmpegSourceCollector {
     $items += New-BundleItem $InputManifestPath manifest.json
     $items += New-BundleItem $binaryEvidencePath evidence/collector-binary-evidence.json
     foreach ($relative in @($manifest.includedPaths)) {
-        $path = Join-Path $manifestRoot ([string] $relative)
+        $relative = Assert-SafeBundlePath ([string] $relative)
+        $path = Join-Path $manifestRoot $relative
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "ffmpeg_source_missing_included_path:$relative" }
-        $items += New-BundleItem $path ([string] $relative)
+        $items += New-BundleItem $path $relative
     }
     foreach ($text in @($corpus.textObjects)) {
         $path = Join-Path $manifestRoot ([string] $text.bundlePath)
@@ -376,7 +643,7 @@ function Invoke-FfmpegSourceCollector {
     } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $inventoryPath -Encoding utf8NoBOM
     $items += New-BundleItem $inventoryPath inventory.json
     $bundle = Join-Path $OutputRoot 'ytdlp-korean-interface-v2.19.1-karon.2-ffmpeg-corresponding-sources.zip'
-    New-DeterministicZip $items $bundle
+    $zipVerification = New-DeterministicZip $items $bundle @($ContentRoot, $manifestRoot, $OutputRoot)
 
     $result = [pscustomobject][ordered]@{
         status = 'complete'
@@ -388,6 +655,8 @@ function Invoke-FfmpegSourceCollector {
         licenseTextObjectCount = $corpus.textObjectCount
         nestedClosureCount = $graph.nestedClosureCount
         inventoryEntryCount = $items.Count
+        verifiedGitLicenseBlobCount = $gitLicenseEvidence.verifiedBlobCount
+        verifiedZipEntryCount = $zipVerification.verifiedEntryCount
         bundlePath = $bundle
         bundleBytes = (Get-Item -LiteralPath $bundle).Length
         bundleSha256 = Get-UpperSha256 $bundle

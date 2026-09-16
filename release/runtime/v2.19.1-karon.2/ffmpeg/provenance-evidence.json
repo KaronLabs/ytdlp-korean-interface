@@ -8,8 +8,15 @@
   "cacheArchiveCount": 122,
   "rav1eCrateCount": 270,
   "toolchainSourceCount": 12,
-  "licenseTextObjectCount": 628,
-  "licenseFileReferenceCount": 1258,
+  "licenseTextObjectCount": 681,
+  "licenseFileReferenceCount": 1750,
   "nestedSubmoduleArchiveCount": 19,
-  "blockers": []
+  "blockers": [],
+  "rav1eLicenseMemberCount": 492,
+  "toolchainIdentityLimitation": {
+    "embeddedCrosstoolRevision": "b1a94f6",
+    "resolvedSourceCommit": "b1a94f65c5187d99037a4e2f57aefbdf995a9677",
+    "dockerfileInputStatus": "mutable-upstream-input-retained-not-reproducibly-pinned",
+    "statement": "The retained build log and embedded ct-ng header identify the crosstool-NG source revision. The original Dockerfile input was a mutable upstream reference and is not claimed as reproducibly pinned."
+  }
 }

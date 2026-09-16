@@ -77,8 +77,8 @@
     "licenseCorpus": {
       "manifestPath": "license-corpus.json",
       "textRoot": "licenses/extracted",
-      "textObjectCount": 628,
-      "licenseFileReferenceCount": 1258
+      "textObjectCount": 681,
+      "licenseFileReferenceCount": 1750
     }
   },
   "includedPaths": [
@@ -359,8 +359,8 @@
     "rav1eCrates": 270,
     "toolchainSourceArchives": 12,
     "totalSourceArchives": 407,
-    "licenseTextObjects": 628,
-    "licenseFileReferences": 1258,
+    "licenseTextObjects": 681,
+    "licenseFileReferences": 1750,
     "nestedSubmoduleArchives": 19
   }
 }
