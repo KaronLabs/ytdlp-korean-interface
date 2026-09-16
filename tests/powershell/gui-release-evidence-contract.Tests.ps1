@@ -463,6 +463,48 @@ function Set-TestPngDimensions {
     [IO.File]::WriteAllBytes($Path, $bytes)
 }
 
+function Set-TestPngColorType {
+    param([string] $Path, [byte] $ColorType)
+    $bytes = [IO.File]::ReadAllBytes($Path)
+    $bytes[25] = $ColorType
+    $ihdrData = [byte[]]::new(13)
+    [Buffer]::BlockCopy($bytes, 16, $ihdrData, 0, 13)
+    $crc = Get-TestPngCrcBytes 'IHDR' $ihdrData
+    [Buffer]::BlockCopy($crc, 0, $bytes, 29, 4)
+    [IO.File]::WriteAllBytes($Path, $bytes)
+}
+
+function Add-TestPngTransparencyBeforeIdat {
+    param(
+        [string] $Path,
+        [byte] $ColorType,
+        [byte[]] $Transparency,
+        [byte[]] $Palette = $null
+    )
+    Set-TestPngColorType $Path $ColorType
+    [byte[]]$paletteChunk = [byte[]]::new(0)
+    if ($null -ne $Palette) { $paletteChunk = New-ValidTestPngChunk 'PLTE' $Palette }
+    $transparencyChunk = New-ValidTestPngChunk 'tRNS' $Transparency
+    $inserted = [byte[]]::new($paletteChunk.Length + $transparencyChunk.Length)
+    if ($paletteChunk.Length -gt 0) { [Buffer]::BlockCopy($paletteChunk, 0, $inserted, 0, $paletteChunk.Length) }
+    [Buffer]::BlockCopy($transparencyChunk, 0, $inserted, $paletteChunk.Length, $transparencyChunk.Length)
+    Insert-TestBytes $Path (Get-TestPngChunkOffset $Path 'IDAT') $inserted
+}
+
+function Get-TestFunctionSource {
+    param([string] $Path, [string] $Name)
+    $tokens = $null
+    $errors = $null
+    $ast = [Management.Automation.Language.Parser]::ParseFile($Path, [ref]$tokens, [ref]$errors)
+    if ($errors.Count -ne 0) { throw 'test_production_script_parse_failed' }
+    $function = $ast.Find({
+        param($node)
+        $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq $Name
+    }, $true)
+    if ($null -eq $function) { throw "test_production_function_missing: $Name" }
+    $function.Extent.Text
+}
+
 Describe 'v2.19.1-karon.2 GUI release evidence contract' {
     BeforeAll { Initialize-TestMedia }
 
@@ -926,7 +968,28 @@ exit 2
         Assert-VerifierRejects $fixture 'gui_screenshot_png_structure_invalid'
     }
 
-    It 'rejects a screenshot exceeding the encoded byte budget before decode' {
+    It 'rejects malformed tRNS data for <Name> before the first IDAT' -TestCases @(
+        @{ Name = 'grayscale length 0'; ColorType = [byte]0; Transparency = [byte[]]@(); Palette = $null },
+        @{ Name = 'grayscale length 1'; ColorType = [byte]0; Transparency = [byte[]]@(1); Palette = $null },
+        @{ Name = 'grayscale length 3'; ColorType = [byte]0; Transparency = [byte[]]@(1, 2, 3); Palette = $null },
+        @{ Name = 'truecolor length 5'; ColorType = [byte]2; Transparency = [byte[]]@(1, 2, 3, 4, 5); Palette = $null },
+        @{ Name = 'truecolor length 7'; ColorType = [byte]2; Transparency = [byte[]]@(1, 2, 3, 4, 5, 6, 7); Palette = $null },
+        @{ Name = 'indexed length 0'; ColorType = [byte]3; Transparency = [byte[]]@(); Palette = [byte[]]@(0, 0, 0, 255, 255, 255) },
+        @{ Name = 'indexed longer than PLTE'; ColorType = [byte]3; Transparency = [byte[]]@(0, 1, 2); Palette = [byte[]]@(0, 0, 0, 255, 255, 255) },
+        @{ Name = 'grayscale alpha'; ColorType = [byte]4; Transparency = [byte[]]@(0, 1); Palette = $null },
+        @{ Name = 'truecolor alpha'; ColorType = [byte]6; Transparency = [byte[]]@(0, 1); Palette = $null }
+    ) {
+        param($Name, $ColorType, $Transparency, $Palette)
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-150'
+        $path = Join-Path $fixture.Evidence (([string]$case.Value.screenshots[0].path).Replace('/', '\'))
+        Add-TestPngTransparencyBeforeIdat $path $ColorType $Transparency $Palette
+        Update-DescriptorForFile $case.Value.screenshots[0] $path
+        Save-TestCase $case
+        Assert-VerifierRejects $fixture 'gui_screenshot_png_structure_invalid'
+    }
+
+    It 'rejects a sparse screenshot above the encoded byte budget before whole-file allocation' {
         $fixture = New-ValidGuiFixture
         $case = Read-TestCase $fixture 'ko-KR-150'
         $path = Join-Path $fixture.Evidence (([string]$case.Value.screenshots[0].path).Replace('/', '\'))
@@ -936,6 +999,11 @@ exit 2
         Update-DescriptorForFile $case.Value.screenshots[0] $path
         Save-TestCase $case
         Assert-VerifierRejects $fixture 'gui_screenshot_resource_limit'
+        $parserSource = Get-TestFunctionSource $script:Verifier 'Assert-PngByteStructure'
+        $parserSource | Should Not Match '\[IO\.File\]::ReadAllBytes'
+        $lengthIndex = $parserSource.IndexOf('$stream.Length', [StringComparison]::Ordinal)
+        $allocationIndex = $parserSource.IndexOf('[byte[]]::new', [StringComparison]::Ordinal)
+        ($lengthIndex -ge 0 -and $allocationIndex -gt $lengthIndex) | Should Be $true
     }
 
     It 'rejects a screenshot dimension beyond the configured maximum before decode' {
@@ -1065,6 +1133,19 @@ exit 2
         $readme = Get-Content -LiteralPath (Join-Path $repoRoot 'release\validation\v2.19.1-karon.2\README.md') -Raw -Encoding UTF8
         $readme | Should Match ([regex]::Escape('gui-validation-output.schema.json'))
         $readme | Should Match 'canonical machine-readable contract'
+    }
+
+    It 'pins the canonical producer schema path identity and root definitions' {
+        $relativePath = 'release/validation/v2.19.1-karon.2/gui-validation-output.schema.json'
+        $schemaPath = Join-Path $script:RepositoryRoot ($relativePath.Replace('/', '\'))
+        (Test-Path -LiteralPath $schemaPath -PathType Leaf) | Should Be $true
+        ([IO.Path]::GetRelativePath($script:RepositoryRoot, (Resolve-Path $schemaPath).Path).Replace('\', '/')) | Should Be $relativePath
+        (Get-TestSha256 $schemaPath) | Should Be 'e49cc70253bd5dd4b4abd8ee00406f5dd8ed39434e309e3e3c74694b85c1b80e'
+        $schema = Get-Content -LiteralPath $schemaPath -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 100 -DateKind String
+        $schema.'$id' | Should Be 'https://github.com/KaronLabs/ytdlp-korean-interface/blob/v2.19.1-karon.2/release/validation/v2.19.1-karon.2/gui-validation-output.schema.json'
+        (@($schema.oneOf | ForEach-Object { $_.'$ref' }) -join ',') | Should Be '#/$defs/summary,#/$defs/evidenceManifest'
+        ($schema.'$defs'.PSObject.Properties.Name -contains 'summary') | Should Be $true
+        ($schema.'$defs'.PSObject.Properties.Name -contains 'evidenceManifest') | Should Be $true
     }
 
     It 'initializes operator case with no preset observations or environment PASS values' {

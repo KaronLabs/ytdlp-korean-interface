@@ -476,8 +476,22 @@ function Get-PngUInt32BigEndian {
 
 function Assert-PngByteStructure {
     param([string] $Path)
-    $bytes = [IO.File]::ReadAllBytes($Path)
-    if ([int64]$bytes.Length -gt $MaximumScreenshotBytes) { throw 'gui_screenshot_resource_limit' }
+    try { $stream = [IO.FileStream]::new($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None) }
+    catch { throw 'gui_input_changed' }
+    try {
+        [int64]$streamLength = $stream.Length
+        if ($streamLength -gt $MaximumScreenshotBytes) { throw 'gui_screenshot_resource_limit' }
+        $bytes = [byte[]]::new([int]$streamLength)
+        $totalRead = 0
+        while ($totalRead -lt $bytes.Length) {
+            $read = $stream.Read($bytes, $totalRead, $bytes.Length - $totalRead)
+            if ($read -eq 0) { throw 'gui_input_changed' }
+            $totalRead += $read
+        }
+        if ($stream.ReadByte() -ne -1 -or $stream.Length -ne $streamLength) { throw 'gui_input_changed' }
+    }
+    catch [IO.IOException] { throw 'gui_input_changed' }
+    finally { $stream.Dispose() }
     $signature = [byte[]](137, 80, 78, 71, 13, 10, 26, 10)
     if ($bytes.Length -lt 20) { throw 'gui_screenshot_decode_failed' }
     for ($i = 0; $i -lt 8; $i++) {
@@ -487,6 +501,7 @@ function Assert-PngByteStructure {
     $index = 0
     $ihdrCount = 0
     $plteCount = 0
+    $plteEntries = 0
     $idatCount = 0
     $iendCount = 0
     $colorType = -1
@@ -542,6 +557,7 @@ function Assert-PngByteStructure {
                     $colorType -in @(0, 4)) {
                     throw 'gui_screenshot_png_structure_invalid'
                 }
+                $plteEntries = [int]($length / 3)
             }
             'IDAT' {
                 if ($idatClosed) { throw 'gui_screenshot_png_structure_invalid' }
@@ -557,7 +573,11 @@ function Assert-PngByteStructure {
                 if ($type -in @('cHRM', 'gAMA', 'sBIT', 'sRGB', 'pHYs', 'tRNS') -and $seenIdat) {
                     throw 'gui_screenshot_png_structure_invalid'
                 }
-                if ($type -ceq 'tRNS' -and ($colorType -in @(4, 6) -or ($colorType -eq 3 -and $plteCount -ne 1))) {
+                if ($type -ceq 'tRNS' -and (
+                    ($colorType -eq 0 -and $length -ne 2) -or
+                    ($colorType -eq 2 -and $length -ne 6) -or
+                    ($colorType -eq 3 -and ($plteCount -ne 1 -or $length -lt 1 -or $length -gt $plteEntries)) -or
+                    $colorType -in @(4, 6))) {
                     throw 'gui_screenshot_png_structure_invalid'
                 }
             }
