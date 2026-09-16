@@ -700,6 +700,45 @@ function Assert-CompletedEvidenceZip {
                 throw ('bundle_entry_identity_mismatch:' + $entry.FullName)
             }
         }
+
+        $inventoryEntries = @($archive.Entries | Where-Object { $_.FullName -ceq 'source-cache-inventory.json' })
+        $candidateEntries = @($archive.Entries | Where-Object { $_.FullName -ceq 'evidence/candidate-manifest.json' })
+        if ($inventoryEntries.Count -ne 1 -or $candidateEntries.Count -ne 1) { throw 'bundle_candidate_inventory_mismatch' }
+
+        try {
+            $inventoryEntry = $inventoryEntries[0]
+            if ($inventoryEntry.Length -le 0 -or $inventoryEntry.Length -gt 1MB -or $inventoryEntry.Length -gt [int]::MaxValue) {
+                throw 'bundle_candidate_inventory_mismatch'
+            }
+            $inventoryBytes = New-Object byte[] ([int]$inventoryEntry.Length)
+            $inventoryStream = $inventoryEntry.Open()
+            try {
+                $offset = 0
+                while ($offset -lt $inventoryBytes.Length) {
+                    $read = $inventoryStream.Read($inventoryBytes, $offset, $inventoryBytes.Length - $offset)
+                    if ($read -le 0) { throw 'bundle_candidate_inventory_mismatch' }
+                    $offset += $read
+                }
+                if ($inventoryStream.ReadByte() -ne -1) { throw 'bundle_candidate_inventory_mismatch' }
+            }
+            finally { $inventoryStream.Dispose() }
+
+            $inventory = (New-Object Text.UTF8Encoding($false, $true)).GetString($inventoryBytes) | ConvertFrom-Json
+            $claimedSha256 = [string]$inventory.candidateManifestSha256
+            $claimedLength = [long]$inventory.candidateManifestLength
+            if ($claimedSha256 -notmatch '^[0-9a-fA-F]{64}$' -or $claimedLength -lt 0) { throw 'bundle_candidate_inventory_mismatch' }
+
+            $candidateStream = $candidateEntries[0].Open()
+            try { $candidateActual = Copy-StreamWithSha256 -Source $candidateStream -Destination $null }
+            finally { $candidateStream.Dispose() }
+            if ($candidateActual.sha256 -cne $claimedSha256.ToUpperInvariant() -or $candidateActual.length -ne $claimedLength) {
+                throw 'bundle_candidate_inventory_mismatch'
+            }
+        }
+        catch {
+            if ($_.Exception.Message -ceq 'bundle_candidate_inventory_mismatch') { throw }
+            throw 'bundle_candidate_inventory_mismatch'
+        }
     }
     finally { $archive.Dispose() }
 }

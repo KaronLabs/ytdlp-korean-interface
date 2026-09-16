@@ -1085,3 +1085,48 @@ Describe 'non-runtime component evidence collector' {
         [System.Text.Encoding]::UTF8.GetString($bundleCandidateBytes) | Should Not Match 'forgedAfterValidation'
     }
 }
+
+Describe 'completed evidence ZIP candidate inventory cross-binding' {
+    It 'rejects independently valid entries whose inventory candidate identity differs from candidate bytes' {
+        $tokens = $null
+        $parseErrors = $null
+        $collectorAst = [Management.Automation.Language.Parser]::ParseFile($collectorPath, [ref]$tokens, [ref]$parseErrors)
+        @($parseErrors).Count | Should Be 0
+        foreach ($functionAst in @($collectorAst.FindAll({
+            param($node)
+            $node -is [Management.Automation.Language.FunctionDefinitionAst]
+        }, $true))) {
+            Invoke-Expression $functionAst.Extent.Text
+        }
+
+        $claimedCandidateBytes = [Text.Encoding]::UTF8.GetBytes('{"candidate":"validated"}')
+        $forgedCandidateBytes = [Text.Encoding]::UTF8.GetBytes('{"candidate":"forged-after-validation"}')
+        $inventoryBytes = [Text.Encoding]::UTF8.GetBytes((([ordered]@{
+            candidateManifestSha256 = Get-TestBytesSha256 $claimedCandidateBytes
+            candidateManifestLength = [long]$claimedCandidateBytes.Length
+        } | ConvertTo-Json -Compress) + "`n"))
+        $zipPath = Join-Path $TestDrive 'candidate-inventory-cross-binding.zip'
+        New-TestZip -Path $zipPath -Entries @{
+            'source-cache-inventory.json' = $inventoryBytes
+            'evidence/candidate-manifest.json' = $forgedCandidateBytes
+        }
+        $callerExpectedEntries = @(
+            [ordered]@{
+                name = 'source-cache-inventory.json'
+                expectedSha256 = Get-TestBytesSha256 $inventoryBytes
+                expectedLength = [long]$inventoryBytes.Length
+            },
+            [ordered]@{
+                name = 'evidence/candidate-manifest.json'
+                expectedSha256 = Get-TestBytesSha256 $forgedCandidateBytes
+                expectedLength = [long]$forgedCandidateBytes.Length
+            }
+        )
+
+        $failureToken = $null
+        try { Assert-CompletedEvidenceZip $zipPath $callerExpectedEntries }
+        catch { $failureToken = $_.Exception.Message }
+
+        $failureToken | Should Be 'bundle_candidate_inventory_mismatch'
+    }
+}
