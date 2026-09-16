@@ -8,8 +8,7 @@ $script:SpdxTool = Join-Path $script:SourceRoot 'tools\generate-release-spdx.ps1
 $script:SourceTool = Join-Path $script:SourceRoot 'tools\build-corresponding-sources.ps1'
 $script:RealLock = Join-Path $script:SourceRoot 'release\dependencies\v2.19.1-karon.2.lock.json'
 $script:OfficialSchema = Join-Path $PSScriptRoot 'fixtures\spdx-2.3-schema-aadf3b0b.json'
-$script:OfficialSchemaSha256 = '3ec6cd5b8ba0c9a3e821da48536fa1b814567dc7e4376efe98d3e7b2a7a8d230'
-$script:OfficialSchemaUpstreamSha256 = '239208b7ac287b3cf5d9a9af23f9d69863971102a5e1587a27a398b43490b89b'
+$script:OfficialSchemaSha256 = '239208b7ac287b3cf5d9a9af23f9d69863971102a5e1587a27a398b43490b89b'
 $script:ExpectedJsonSchemaVersion = '4.26.0'
 $script:FixtureApplicationVerificationCode = 'd5512016a069e03eb10b95146c23f2983433a39a'
 $script:FixtureMetadataVerificationCode = 'd0a102a87ad65fa323c22d95cb63446323c5fb17'
@@ -425,11 +424,8 @@ Describe 'SPDX 2.3 generation semantics' {
     It 'validates positive output against the commit-pinned official SPDX 2.3 JSON schema with pinned jsonschema' {
         (Get-TestSha256 $script:OfficialSchema) | Should Be $script:OfficialSchemaSha256
         $schemaBytes = [IO.File]::ReadAllBytes($script:OfficialSchema)
-        $schemaBytes[-1] | Should Be 10
-        $upstreamBytes = [byte[]]::new($schemaBytes.Length - 1)
-        [Array]::Copy($schemaBytes, $upstreamBytes, $upstreamBytes.Length)
-        $upstreamHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($upstreamBytes)).ToLowerInvariant()
-        $upstreamHash | Should Be $script:OfficialSchemaUpstreamSha256
+        $schemaBytes.Length | Should Be 45312
+        $schemaBytes[-1] | Should Be 125
         $case = New-LicenseBundleCase 'spdx-official-schema'
         $result = Invoke-TestSpdx $case
         if ($result.ExitCode -ne 0) { throw "schema fixture SPDX generation failed: $($result.Output)" }
