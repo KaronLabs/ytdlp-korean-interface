@@ -8,5 +8,52 @@
   "upstreamAsset": "ytdlp-interface.7z",
   "upstreamArchiveSha256": "53b54e3c5c753e8cb2a8b9638c69c95c1449c8185c3145a9f0b06a2000b3702e",
   "shippingPolicy": "basic1080",
-  "validationContract": "quality-release-validation/v1"
+  "validationContract": "quality-release-validation/v1",
+  "runtimeOverlays": [
+    {
+      "id": "ffmpeg",
+      "repository": "BtbN/FFmpeg-Builds",
+      "releaseTag": "autobuild-2026-09-15-13-18",
+      "releaseUrl": "https://github.com/BtbN/FFmpeg-Builds/releases/tag/autobuild-2026-09-15-13-18",
+      "assetUrl": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-15-13-18/ffmpeg-n9.0.1-30-g9258bacca5-win64-lgpl-9.0.zip",
+      "archiveName": "ffmpeg-n9.0.1-30-g9258bacca5-win64-lgpl-9.0.zip",
+      "archiveSha256": "39697D69681A09BD55A0F0224360A9A4285BC12127DF807D7242592B0E144A7B",
+      "archiveFormat": "zip",
+      "expectedVersion": "n9.0.1-30-g9258bacca5",
+      "sourceCommit": "9258bacca50d7ca28bcb6d797e8952123e35105b",
+      "builderCommit": "3e6685eda92f9288c15ac320139622dcedca09a4",
+      "files": [
+        {
+          "archivePath": "ffmpeg-n9.0.1-30-g9258bacca5-win64-lgpl-9.0/bin/ffmpeg.exe",
+          "destination": "ffmpeg.exe",
+          "identity": "ffmpeg"
+        },
+        {
+          "archivePath": "ffmpeg-n9.0.1-30-g9258bacca5-win64-lgpl-9.0/bin/ffprobe.exe",
+          "destination": "ffprobe.exe",
+          "identity": "ffprobe"
+        }
+      ]
+    },
+    {
+      "id": "sevenZip",
+      "repository": "ip7z/7zip",
+      "releaseTag": "26.01",
+      "releaseUrl": "https://github.com/ip7z/7zip/releases/tag/26.01",
+      "assetUrl": "https://github.com/ip7z/7zip/releases/download/26.01/7z2601-extra.7z",
+      "archiveName": "7z2601-extra.7z",
+      "archiveSha256": "05CDA5442075A7C6CE246CA1BBB9B1F1D6F1787A9559156F9B8B2DAD29A86971",
+      "archiveFormat": "7z",
+      "expectedVersion": "26.01",
+      "sourceCommit": "8c63d71ff886bda90c86db28466287f977374237",
+      "shippingPolicy": "7z.dll-only-no-rar-artifacts",
+      "files": [
+        {
+          "archivePath": "x64/7z.dll",
+          "destination": "7z.dll",
+          "identity": "sevenZip"
+        }
+      ]
+    }
+  ]
 }

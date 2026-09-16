@@ -4,6 +4,7 @@ param(
     [string] $ParentRuntime,
     [string] $CandidateBase,
     [string] $DependencyArchiveDirectory,
+    [string] $RuntimeArchiveDirectory,
     [switch] $Run
 )
 
@@ -249,6 +250,110 @@ function Get-ArchiveEntriesFromListing {
     $paths = @($Listing | Where-Object { $_ -match '^Path = ' } | ForEach-Object { $_.Substring(7) })
     if ($paths.Count -lt 2) { throw 'Dependency archive listing has no entries beyond its archive header.' }
     return @($paths | Select-Object -Skip 1)
+}
+
+function Test-RelativeArchivePathSafe {
+    param([string] $Path)
+    return -not [string]::IsNullOrWhiteSpace($Path) -and -not [IO.Path]::IsPathRooted($Path) -and
+        $Path -notmatch '^[A-Za-z]:' -and $Path -notmatch '(^|[/\\])\.\.([/\\]|$)'
+}
+
+function Get-ReleaseRuntimeOverlayDefinitions {
+    param([Parameter(Mandatory = $true)] [string] $SourceRoot)
+    $requestPath = Join-Path $SourceRoot 'release\requests\v2.19.1-karon.2.json'
+    if (-not (Test-Path -LiteralPath $requestPath -PathType Leaf)) { throw 'runtime_overlay_manifest_invalid' }
+    $request = Get-Content -LiteralPath $requestPath -Raw | ConvertFrom-Json
+    if ($request.tag -cne 'v2.19.1-karon.2' -or $null -eq $request.PSObject.Properties['runtimeOverlays']) { throw 'runtime_overlay_manifest_invalid' }
+    return @($request.runtimeOverlays)
+}
+
+function Assert-RuntimeOverlayManifest {
+    param([Parameter(Mandatory = $true)] [object[]] $OverlayDefinitions)
+    if ($OverlayDefinitions.Count -ne 2) { throw 'runtime_overlay_manifest_invalid' }
+    $ids = @($OverlayDefinitions | ForEach-Object { [string]$_.id } | Sort-Object)
+    if (($ids -join ',') -cne 'ffmpeg,sevenZip') { throw 'runtime_overlay_manifest_invalid' }
+    $destinations = @($OverlayDefinitions | ForEach-Object { @($_.files) } | ForEach-Object { [string]$_.destination })
+    if ($destinations.Count -ne 3 -or (@($destinations | Sort-Object) -join ',') -cne '7z.dll,ffmpeg.exe,ffprobe.exe') { throw 'runtime_overlay_manifest_invalid' }
+    foreach ($definition in $OverlayDefinitions) {
+        if ([string]::IsNullOrWhiteSpace([string]$definition.archiveName) -or [IO.Path]::GetFileName([string]$definition.archiveName) -cne [string]$definition.archiveName -or
+            [string]$definition.archiveSha256 -notmatch '^[A-Fa-f0-9]{64}$' -or @('zip', '7z') -cnotcontains [string]$definition.archiveFormat -or
+            [string]::IsNullOrWhiteSpace([string]$definition.expectedVersion)) { throw 'runtime_overlay_manifest_invalid' }
+        foreach ($file in @($definition.files)) {
+            if (-not (Test-RelativeArchivePathSafe -Path ([string]$file.archivePath)) -or [IO.Path]::GetFileName([string]$file.destination) -cne [string]$file.destination -or
+                @('ffmpeg', 'ffprobe', 'sevenZip') -cnotcontains [string]$file.identity) { throw 'runtime_overlay_manifest_invalid' }
+        }
+        if ($definition.id -ceq 'ffmpeg') {
+            $root = [IO.Path]::GetFileNameWithoutExtension([string]$definition.archiveName)
+            $expected = @($definition.files | ForEach-Object { ([string]$_.archivePath).Replace('\', '/') } | Sort-Object)
+            if ($definition.archiveFormat -cne 'zip' -or ($expected -join ',') -cne "$root/bin/ffmpeg.exe,$root/bin/ffprobe.exe") { throw 'runtime_overlay_manifest_invalid' }
+        }
+        elseif ($definition.id -ceq 'sevenZip') {
+            if ($definition.archiveFormat -cne '7z' -or @($definition.files).Count -ne 1 -or ([string]$definition.files[0].archivePath).Replace('\', '/') -cne 'x64/7z.dll') { throw 'runtime_overlay_manifest_invalid' }
+        }
+    }
+}
+
+function Get-RuntimeOverlayIdentity {
+    param([Parameter(Mandatory = $true)] [string] $Identity, [Parameter(Mandatory = $true)] [string] $Path, [scriptblock] $IdentityReader)
+    if ($null -ne $IdentityReader) { return [string](& $IdentityReader $Identity $Path) }
+    if ($Identity -ceq 'sevenZip') { return [string](Get-Item -LiteralPath $Path).VersionInfo.FileVersion }
+    return Invoke-CheckedExecutable -Path $Path -Arguments @('-version') -Name $Identity
+}
+
+function Install-ReviewedRuntimeOverlays {
+    param(
+        [Parameter(Mandatory = $true)] [string] $CandidateRoot,
+        [Parameter(Mandatory = $true)] [string] $RuntimeArchiveDirectory,
+        [Parameter(Mandatory = $true)] [object[]] $OverlayDefinitions,
+        [string] $SevenZipPath,
+        [scriptblock] $IdentityReader,
+        [string] $StagingBase = ([IO.Path]::GetTempPath())
+    )
+    Assert-RuntimeOverlayManifest -OverlayDefinitions $OverlayDefinitions
+    $candidate = [IO.Path]::GetFullPath($CandidateRoot)
+    $archiveDirectory = [IO.Path]::GetFullPath($RuntimeArchiveDirectory)
+    if (-not (Test-Path -LiteralPath $candidate -PathType Container) -or -not (Test-Path -LiteralPath $archiveDirectory -PathType Container)) { throw 'runtime_overlay_layout_invalid' }
+    if ([string]::IsNullOrWhiteSpace($SevenZipPath)) { $SevenZipPath = Get-TrustedSevenZip }
+    if (-not (Test-Path -LiteralPath $SevenZipPath -PathType Leaf)) { throw 'runtime_overlay_layout_invalid' }
+    $staging = Join-Path ([IO.Path]::GetFullPath($StagingBase)) ('runtime-overlays-' + [Guid]::NewGuid().ToString('N'))
+    [IO.Directory]::CreateDirectory($staging) | Out-Null
+    $attestation = @()
+    try {
+        foreach ($definition in $OverlayDefinitions) {
+            $archive = Join-Path $archiveDirectory ([string]$definition.archiveName)
+            if (-not (Test-PathContained -Root $archiveDirectory -Path $archive) -or -not (Test-Path -LiteralPath $archive -PathType Leaf)) { throw 'runtime_overlay_layout_invalid' }
+            $archiveHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToUpperInvariant()
+            if ($archiveHash -cne ([string]$definition.archiveSha256).ToUpperInvariant()) { throw 'runtime_overlay_sha256_mismatch' }
+            $listing = (Invoke-CheckedProcess -FilePath $SevenZipPath -Arguments @('l', '-slt', $archive) -Name 'runtime overlay inspection').StandardOutput -split "`r?`n"
+            $entries = @(Get-ArchiveEntriesFromListing -Listing $listing | ForEach-Object { ([string]$_).Replace('\', '/') })
+            foreach ($entry in $entries) { if (-not (Test-RelativeArchivePathSafe -Path $entry)) { throw 'runtime_overlay_layout_invalid' } }
+            $selectedPaths = @($definition.files | ForEach-Object { ([string]$_.archivePath).Replace('\', '/') })
+            foreach ($selectedPath in $selectedPaths) { if ($entries -cnotcontains $selectedPath) { throw 'runtime_overlay_layout_invalid' } }
+            $overlayStaging = Join-Path $staging ([string]$definition.id)
+            [IO.Directory]::CreateDirectory($overlayStaging) | Out-Null
+            $extractionPaths = @($selectedPaths | ForEach-Object { $_.Replace('/', '\') })
+            $outputArgument = '-o' + $overlayStaging
+            Invoke-CheckedProcess -FilePath $SevenZipPath -Arguments (@('x', $archive) + $extractionPaths + @($outputArgument, '-y')) -Name 'runtime overlay extraction' | Out-Null
+            $extracted = @(Get-ChildItem -LiteralPath $overlayStaging -File -Recurse)
+            $extractedPaths = @($extracted | ForEach-Object { $_.FullName.Substring($overlayStaging.Length).TrimStart('\', '/').Replace('\', '/') } | Sort-Object)
+            if ($extracted.Count -ne $selectedPaths.Count -or ($extractedPaths -join ',') -cne (@($selectedPaths | Sort-Object) -join ',')) { throw 'runtime_overlay_layout_invalid' }
+            $fileAttestation = @()
+            foreach ($file in @($definition.files)) {
+                $source = Join-Path $overlayStaging ([string]$file.archivePath)
+                $destination = Join-Path $candidate ([string]$file.destination)
+                if (-not (Test-PathContained -Root $overlayStaging -Path $source) -or -not (Test-Path -LiteralPath $source -PathType Leaf) -or
+                    -not (Test-PathContained -Root $candidate -Path $destination) -or -not (Test-Path -LiteralPath $destination -PathType Leaf)) { throw 'runtime_overlay_layout_invalid' }
+                $identity = Get-RuntimeOverlayIdentity -Identity ([string]$file.identity) -Path $source -IdentityReader $IdentityReader
+                if ([string]::IsNullOrWhiteSpace($identity) -or $identity -notmatch [regex]::Escape([string]$definition.expectedVersion)) { throw 'runtime_overlay_version_mismatch' }
+                $item = Get-Item -LiteralPath $source
+                $fileAttestation += [ordered]@{ archivePath = ([string]$file.archivePath).Replace('\', '/'); destination = [string]$file.destination; sha256 = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToUpperInvariant(); length = $item.Length; identity = $identity }
+            }
+            foreach ($file in @($definition.files)) { Copy-Item -LiteralPath (Join-Path $overlayStaging ([string]$file.archivePath)) -Destination (Join-Path $candidate ([string]$file.destination)) -Force }
+            $attestation += [ordered]@{ id = [string]$definition.id; archive = [ordered]@{ name = [string]$definition.archiveName; sha256 = $archiveHash }; expectedVersion = [string]$definition.expectedVersion; files = $fileAttestation }
+        }
+        return @($attestation)
+    }
+    finally { if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue } }
 }
 
 function Initialize-OfficialDependencies {
@@ -584,7 +689,7 @@ function Test-CandidateAssembly {
 }
 
 function Invoke-BuildCandidate {
-    param([string] $SourceRoot, [string] $ParentRuntime, [string] $CandidateBase, [string] $DependencyArchiveDirectory)
+    param([string] $SourceRoot, [string] $ParentRuntime, [string] $CandidateBase, [string] $DependencyArchiveDirectory, [string] $RuntimeArchiveDirectory)
     $source = [IO.Path]::GetFullPath($SourceRoot)
     if ([string]::IsNullOrWhiteSpace($ParentRuntime)) { $ParentRuntime = Split-Path -Parent $source }
     $parent = [IO.Path]::GetFullPath($ParentRuntime)
@@ -635,6 +740,8 @@ function Invoke-BuildCandidate {
         try {
         Copy-CandidateFile -Source $product -DestinationDirectory $candidate
         foreach ($name in Get-RequiredRuntimeFiles) { Copy-CandidateFile -Source (Join-Path $parent $name) -DestinationDirectory $candidate }
+        $overlayDefinitions = Get-ReleaseRuntimeOverlayDefinitions -SourceRoot $buildSource
+        $attestation.runtimeOverlays = Install-ReviewedRuntimeOverlays -CandidateRoot $candidate -RuntimeArchiveDirectory $RuntimeArchiveDirectory -OverlayDefinitions $overlayDefinitions -StagingBase $buildWorkspace
         if ((Get-FileHash -LiteralPath (Join-Path $candidate 'yt-dlp.exe') -Algorithm SHA256).Hash.ToUpperInvariant() -cne $verifiedParent.YtDlpHash) { throw 'Candidate yt-dlp copy hash does not match verified parent runtime.' }
         Copy-CandidateFile -Source $settings -DestinationDirectory $candidate
         Import-Module -Name (Join-Path $buildSource 'tools\runtime-maintenance.psm1') -Force
@@ -656,5 +763,5 @@ function Invoke-BuildCandidate {
 
 if ($MyInvocation.InvocationName -ne '.') {
     if (-not $Run) { Write-Output 'No action taken. Re-run with -Run to build and assemble a candidate.' }
-    else { Invoke-BuildCandidate -SourceRoot $SourceRoot -ParentRuntime $ParentRuntime -CandidateBase $CandidateBase -DependencyArchiveDirectory $DependencyArchiveDirectory }
+    else { Invoke-BuildCandidate -SourceRoot $SourceRoot -ParentRuntime $ParentRuntime -CandidateBase $CandidateBase -DependencyArchiveDirectory $DependencyArchiveDirectory -RuntimeArchiveDirectory $RuntimeArchiveDirectory }
 }
