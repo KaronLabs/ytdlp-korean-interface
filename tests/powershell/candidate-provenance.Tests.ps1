@@ -325,8 +325,14 @@ Invoke-Test 'immutable materialization resists a post-attestation source and ind
 }
 
 Invoke-Test 'immutable materialization preserves tracked paths with spaces and UTF-8' {
+    $originalConsoleOutputEncoding = [Console]::OutputEncoding
+    $originalOutputEncoding = $OutputEncoding
     $case = New-TestCase -GitRepository
     try {
+        $cp949 = [Text.Encoding]::GetEncoding(949)
+        [Console]::OutputEncoding = $cp949
+        $OutputEncoding = $cp949
+        Assert-Equal 949 ([Console]::OutputEncoding.CodePage) 'UTF-8 path regression did not force CP949'
         $directoryRelative = 'directory with spaces'
         $fileName = 'utf8-' + [string][char]0xD55C + [string][char]0xAE00 + '.txt'
         $relativePath = $directoryRelative + '/' + $fileName
@@ -345,6 +351,8 @@ Invoke-Test 'immutable materialization preserves tracked paths with spaces and U
         $isolated = Invoke-TestSourceMaterialization -SourceRoot $case.Source -WorkspaceRoot $workspace -Commit $commit -TrackedPaths $trackedPaths
         Assert-Equal $expected ([Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $isolated $relativePath)))) 'The isolated source changed a tracked UTF-8 path blob.'
     } finally {
+        [Console]::OutputEncoding = $originalConsoleOutputEncoding
+        $OutputEncoding = $originalOutputEncoding
         Remove-TestCase $case
     }
 }

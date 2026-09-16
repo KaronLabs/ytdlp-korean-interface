@@ -77,7 +77,8 @@ function Invoke-CheckedProcess {
         [Parameter(Mandatory = $true)] [string] $Name,
         [switch] $NormalizeEnvironment,
         [string] $WorkingDirectory,
-        [Collections.IDictionary] $EnvironmentOverrides
+        [Collections.IDictionary] $EnvironmentOverrides,
+        [Text.Encoding] $StandardOutputEncoding
     )
     $startInfo = New-Object Diagnostics.ProcessStartInfo
     $startInfo.FileName = $FilePath
@@ -86,6 +87,7 @@ function Invoke-CheckedProcess {
     $startInfo.CreateNoWindow = $true
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
+    if ($null -ne $StandardOutputEncoding) { $startInfo.StandardOutputEncoding = $StandardOutputEncoding }
     if (-not [string]::IsNullOrWhiteSpace($WorkingDirectory)) { $startInfo.WorkingDirectory = $WorkingDirectory }
     if ($NormalizeEnvironment) {
         $null = $startInfo.EnvironmentVariables
@@ -272,6 +274,7 @@ function Get-GitTreeEntries {
         $result = Invoke-CheckedProcess `
             -FilePath $GitPath `
             -Arguments @('-c', $safeDirectory, '-c', 'core.quotepath=false', '-C', $source, 'ls-tree', '-r', '-z', '--full-tree', $Commit) `
+            -StandardOutputEncoding ([Text.UTF8Encoding]::new($false, $true)) `
             -Name 'Git source tree inventory'
     } catch {
         throw "source_export_inventory_failed: $($_.Exception.Message)"
