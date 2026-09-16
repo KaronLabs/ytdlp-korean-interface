@@ -1,97 +1,216 @@
-$ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
 
-$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$ArchivePath = Join-Path $RepositoryRoot 'ytdlp-interface dependencies.7z'
-$SevenZip = @(
+$script:RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$script:ArchivePath = Join-Path $script:RepositoryRoot 'ytdlp-interface dependencies.7z'
+$script:ExpectedArchiveSha256 = '41004108B9FC41454A97B97850C4E41D537F226A27255E8213ABD14BFFFFEBD3'
+$script:Bit7zCommit = 'c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742'
+$script:Bit7zSourceUrl = 'https://github.com/rikyoz/bit7z/archive/c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742.zip'
+$script:Bit7zSourceSha256 = '6AF52B2E1B9895E8F1193728880206326161940E7A961E3162EC39752DBB3379'
+$programFilesX86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
+$script:SevenZip = @(
     (Join-Path $env:ProgramFiles '7-Zip\7z.exe'),
-    (Join-Path ${env:ProgramFiles(x86)} '7-Zip\7z.exe')
+    (Join-Path $programFilesX86 '7-Zip\7z.exe')
 ) | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
-$script:Failures = 0
-$script:Tests = 0
 
-function Assert-True { param([bool]$Condition,[string]$Message) if (-not $Condition) { throw $Message } }
-function Assert-Equal { param($Expected,$Actual,[string]$Message='values differ') if ($Expected -cne $Actual) { throw "$Message expected='$Expected' actual='$Actual'" } }
-function Invoke-Test { param([string]$Name,[scriptblock]$Body) $script:Tests++; try { & $Body; Write-Host "PASS: $Name" } catch { $script:Failures++; Write-Host "FAIL: $Name"; Write-Host $_ } }
+. (Join-Path $script:RepositoryRoot 'tools\build-candidate.ps1')
+Import-Module (Join-Path $script:RepositoryRoot 'tools\candidate-manifest.psm1') -Force
 
-Assert-True (-not [string]::IsNullOrWhiteSpace($SevenZip)) '7z.exe must be installed under Program Files.'
-Assert-True (Test-Path -LiteralPath $ArchivePath -PathType Leaf) 'dependency archive is missing.'
+$script:ExpectedRemovedPaths = @(
+    'lib/7zSDK/CPP/7zip/Archive/Rar',
+    'lib/7zSDK/CPP/7zip/Archive/Icons/rar.ico',
+    'lib/7zSDK/CPP/7zip/Archive/Rar/Rar5Handler.cpp',
+    'lib/7zSDK/CPP/7zip/Archive/Rar/Rar5Handler.h',
+    'lib/7zSDK/CPP/7zip/Archive/Rar/RarHandler.cpp',
+    'lib/7zSDK/CPP/7zip/Archive/Rar/RarHandler.h',
+    'lib/7zSDK/CPP/7zip/Archive/Rar/RarHeader.h',
+    'lib/7zSDK/CPP/7zip/Archive/Rar/RarItem.h',
+    'lib/7zSDK/CPP/7zip/Archive/Rar/RarVol.h',
+    'lib/7zSDK/CPP/7zip/Archive/Rar/StdAfx.cpp',
+    'lib/7zSDK/CPP/7zip/Archive/Rar/StdAfx.h',
+    'lib/7zSDK/CPP/7zip/Compress/Rar1Decoder.cpp',
+    'lib/7zSDK/CPP/7zip/Compress/Rar1Decoder.h',
+    'lib/7zSDK/CPP/7zip/Compress/Rar2Decoder.cpp',
+    'lib/7zSDK/CPP/7zip/Compress/Rar2Decoder.h',
+    'lib/7zSDK/CPP/7zip/Compress/Rar3Decoder.cpp',
+    'lib/7zSDK/CPP/7zip/Compress/Rar3Decoder.h',
+    'lib/7zSDK/CPP/7zip/Compress/Rar3Vm.cpp',
+    'lib/7zSDK/CPP/7zip/Compress/Rar3Vm.h',
+    'lib/7zSDK/CPP/7zip/Compress/Rar5Decoder.cpp',
+    'lib/7zSDK/CPP/7zip/Compress/Rar5Decoder.h',
+    'lib/7zSDK/CPP/7zip/Compress/RarCodecsRegister.cpp',
+    'lib/7zSDK/CPP/7zip/Crypto/Rar20Crypto.cpp',
+    'lib/7zSDK/CPP/7zip/Crypto/Rar20Crypto.h',
+    'lib/7zSDK/CPP/7zip/Crypto/Rar5Aes.cpp',
+    'lib/7zSDK/CPP/7zip/Crypto/Rar5Aes.h',
+    'lib/7zSDK/CPP/7zip/Crypto/RarAes.cpp',
+    'lib/7zSDK/CPP/7zip/Crypto/RarAes.h',
+    'lib/7zSDK/DOC/unRarLicense.txt'
+)
 
-$ExtractionRoot = Join-Path ([IO.Path]::GetTempPath()) ('karon-dependency-contract-' + [Guid]::NewGuid().ToString('N'))
-[IO.Directory]::CreateDirectory($ExtractionRoot) | Out-Null
-
-try {
-    & $SevenZip x $ArchivePath ('-o' + $ExtractionRoot) 'bit7z\*' -y | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "7z extraction failed with exit code $LASTEXITCODE." }
-    $Bit7zRoot = Join-Path $ExtractionRoot 'bit7z'
-
-    Invoke-Test 'archive carries bit7z 4.1.0 under MPL-2.0 with the v4 file extractor API' {
-        $Cmake = Get-Content -LiteralPath (Join-Path $Bit7zRoot 'CMakeLists.txt') -Raw
-        $License = Get-Content -LiteralPath (Join-Path $Bit7zRoot 'LICENSE') -Raw
-        Assert-True ($Cmake -match '(?m)^\s*VERSION 4\.1\.0\s*$') 'bit7z CMake project is not version 4.1.0.'
-        Assert-True ($License -match 'Mozilla Public License Version 2\.0') 'bit7z LICENSE is not MPL-2.0.'
-        Assert-True (Test-Path -LiteralPath (Join-Path $Bit7zRoot 'include\bit7z\bitfileextractor.hpp') -PathType Leaf) 'bit7z v4 file extractor header is missing.'
-    }
-
-    Invoke-Test 'archive carries the pinned 7-Zip 26.01 source identity' {
-        $VersionHeader = Get-Content -LiteralPath (Join-Path $Bit7zRoot 'lib\7zSDK\C\7zVersion.h') -Raw
-        Assert-True ($VersionHeader -match '(?m)^#define MY_VER_MAJOR 26\s*$') '7-Zip major version is not 26.'
-        Assert-True ($VersionHeader -match '(?m)^#define MY_VER_MINOR 1\s*$') '7-Zip minor version is not 01.'
-        Assert-True ($VersionHeader -match '(?m)^#define MY_VERSION_NUMBERS "26\.01"\s*$') '7-Zip version string is not 26.01.'
-    }
-
-    Invoke-Test 'archive binds x64 Release artifacts to pinned non-RAR build provenance' {
-        $ProvenancePath = Join-Path $Bit7zRoot 'KARON_DEPENDENCY_PROVENANCE.json'
-        Assert-True (Test-Path -LiteralPath $ProvenancePath -PathType Leaf) 'dependency provenance manifest is missing.'
-        $Provenance = Get-Content -LiteralPath $ProvenancePath -Raw | ConvertFrom-Json
-        Assert-Equal 1 ([int]$Provenance.schemaVersion) 'unexpected provenance schema'
-        Assert-Equal '4.1.0' ([string]$Provenance.bit7z.version) 'unexpected bit7z version'
-        Assert-Equal 'c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742' ([string]$Provenance.bit7z.commit) 'unexpected bit7z commit'
-        Assert-Equal 'MPL-2.0' ([string]$Provenance.bit7z.license) 'unexpected bit7z license'
-        Assert-Equal 'Release' ([string]$Provenance.bit7z.build.configuration) 'unexpected bit7z configuration'
-        Assert-Equal 'x64' ([string]$Provenance.bit7z.build.platform) 'unexpected bit7z platform'
-        Assert-Equal 'v143' ([string]$Provenance.bit7z.build.toolset) 'unexpected bit7z toolset'
-        Assert-Equal 'ON' ([string]$Provenance.bit7z.build.options.BIT7Z_USE_NATIVE_STRING) 'native-string build option is not enabled'
-        Assert-Equal 'ON' ([string]$Provenance.bit7z.build.options.BIT7Z_PATH_SANITIZATION) 'path sanitization is not enabled'
-        Assert-Equal 'ON' ([string]$Provenance.bit7z.build.options.BIT7Z_STATIC_RUNTIME) 'static runtime ABI option is not enabled'
-        Assert-Equal 'ON' ([string]$Provenance.bit7z.build.options.BIT7Z_REGEX_MATCHING) 'regex matching required by update extraction is not enabled'
-        Assert-Equal '26.01' ([string]$Provenance.sevenZip.version) 'unexpected 7-Zip version'
-        Assert-Equal '8c63d71ff886bda90c86db28466287f977374237' ([string]$Provenance.sevenZip.commit) 'unexpected 7-Zip commit'
-        Assert-Equal 'Format7zF' ([string]$Provenance.sevenZip.build.bundle) 'unexpected 7-Zip DLL bundle'
-        Assert-Equal '1' ([string]$Provenance.sevenZip.build.options.DISABLE_RAR) 'RAR code was not disabled at build time'
-
-        foreach ($Artifact in @($Provenance.bit7z.artifact, $Provenance.sevenZip.artifact)) {
-            $ArtifactPath = Join-Path $Bit7zRoot ([string]$Artifact.path)
-            Assert-True (Test-Path -LiteralPath $ArtifactPath -PathType Leaf) "dependency artifact is missing: $($Artifact.path)"
-            Assert-Equal ([string]$Artifact.sha256).ToUpperInvariant() (Get-FileHash -LiteralPath $ArtifactPath -Algorithm SHA256).Hash.ToUpperInvariant() "dependency artifact hash mismatch: $($Artifact.path)"
+function New-TestBuildInputs {
+    param([Parameter(Mandatory = $true)] [string] $Root)
+    $source = Join-Path $Root 'source'
+    $userRoot = 'C:\hermetic-user'
+    [IO.Directory]::CreateDirectory($source) | Out-Null
+    $common = @(
+        '/p:Configuration=Release',
+        '/p:Platform=x64',
+        '/p:PlatformToolset=v143',
+        '/p:ImportDirectoryBuildProps=false',
+        '/p:ImportDirectoryBuildTargets=false',
+        ('/p:UserRootDir=' + $userRoot + '\'),
+        '/p:VCToolsVersion=14.40.1',
+        '/p:WindowsTargetPlatformVersion=10.0.1'
+    )
+    $globals = '-DCMAKE_VS_GLOBALS=ImportDirectoryBuildProps=false;ImportDirectoryBuildTargets=false;UserRootDir=' + $userRoot + '\;VCToolsVersion=14.40.1;WindowsTargetPlatformVersion=10.0.1'
+    $plan = @(Get-ReleaseX64DependencyPlan -SourceRoot $source -MsBuildPath 'C:\Tools\MSBuild.exe' -CmakePath 'C:\Tools\cmake.exe' -CommonMsBuildArguments $common -CmakeVsGlobalsArgument $globals)
+    $source = Split-Path -Parent $plan[0].SourceDirectory
+    $context = [pscustomobject]@{
+        UserRootDirectory = $userRoot
+        AttestedWorkingDirectory = '<source>'
+        EffectiveProperties = [ordered]@{
+            Configuration = 'Release'; Platform = 'x64'; PlatformToolset = 'v143'
+            ImportDirectoryBuildProps = 'false'; ImportDirectoryBuildTargets = 'false'; UserRootDir = '<hermetic-user-root>'
+            VCToolsVersion = '14.40.1'; WindowsTargetPlatformVersion = '10.0.1'
         }
-
-        $RuntimePath = Join-Path $Bit7zRoot ([string]$Provenance.sevenZip.artifact.path)
-        $RuntimeVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($RuntimePath)
-        Assert-Equal 26 $RuntimeVersion.FileMajorPart 'unexpected 7-Zip DLL major version'
-        Assert-Equal 1 $RuntimeVersion.FileMinorPart 'unexpected 7-Zip DLL minor version'
+        AttestedEnvironment = [ordered]@{ PreferredToolArchitecture = 'x64' }
     }
-
-    Invoke-Test 'application consumes the bit7z v4 native-string contract and reports exact licenses' {
-        $Util = Get-Content -LiteralPath (Join-Path $RepositoryRoot 'ytdlp-interface\util.cpp') -Raw
-        [xml]$Project = Get-Content -LiteralPath (Join-Path $RepositoryRoot 'ytdlp-interface\ytdlp-interface.vcxproj') -Raw
-        $Settings = Get-Content -LiteralPath (Join-Path $RepositoryRoot 'ytdlp-interface\forms\form_settings.cpp') -Raw
-        Assert-True ($Util -match '#include <bit7z/bitfileextractor\.hpp>') 'util.cpp does not include the v4 file extractor header.'
-        Assert-True ($Util -match '\bBitFileExtractor\b') 'util.cpp does not use BitFileExtractor.'
-        Assert-True ($Util -notmatch '\bBitExtractor\b') 'util.cpp still uses the v3 BitExtractor API.'
-        $ReleaseX64 = @($Project.Project.ItemDefinitionGroup | Where-Object { $_.Condition -eq "'`$(Configuration)|`$(Platform)'=='Release|x64'" })
-        Assert-Equal 1 $ReleaseX64.Count 'Release x64 project definition is ambiguous'
-        $Definitions = [string]$ReleaseX64[0].ClCompile.PreprocessorDefinitions
-        Assert-True (($Definitions -split ';') -contains 'BIT7Z_USE_NATIVE_STRING') 'Release x64 consumer is missing BIT7Z_USE_NATIVE_STRING.'
-        Assert-True (($Definitions -split ';') -contains 'BIT7Z_PATH_SANITIZATION') 'Release x64 consumer is missing BIT7Z_PATH_SANITIZATION.'
-        Assert-True (($Definitions -split ';') -contains 'BIT7Z_REGEX_MATCHING') 'Release x64 consumer is missing BIT7Z_REGEX_MATCHING.'
-        Assert-True ($Settings -match [regex]::Escape('v4.1.0 (MPL-2.0) / 7-Zip v26.01 (LGPL-2.1-or-later, BSD-2-Clause, BSD-3-Clause; RAR disabled)')) 'About text does not report exact dependency versions and licenses.'
-    }
-}
-finally {
-    Remove-Item -LiteralPath $ExtractionRoot -Recurse -Force -ErrorAction SilentlyContinue
+    $productArguments = @((Join-Path $source 'ytdlp-interface\ytdlp-interface.sln'), '/m', '/t:Build') + $common
+    return [pscustomobject]@{ Source = $source; Plan = $plan; Context = $context; ProductArguments = $productArguments }
 }
 
-if ($script:Failures -gt 0) { throw "$($script:Failures) of $($script:Tests) dependency contract tests failed." }
-Write-Host "All $($script:Tests) dependency contract tests passed."
-exit 0
+function New-TestAttestation {
+    param([Parameter(Mandatory = $true)] [object] $Inputs)
+    $commands = @(Get-BuildCommandAttestation -SourceRoot $Inputs.Source -DependencyPlan $Inputs.Plan -ProductExecutable 'C:\Tools\MSBuild.exe' -ProductArguments $Inputs.ProductArguments -BuildContext $Inputs.Context)
+    return [ordered]@{
+        source = [ordered]@{ commit = ('1' * 40); dirty = $false; treeSha256 = ('2' * 64); trackedFileCount = 1 }
+        dependencyArchive = [ordered]@{
+            name = 'ytdlp-interface dependencies.7z'; sha256 = $script:ExpectedArchiveSha256
+            bit7zSource = [ordered]@{
+                version = '4.1.0'; commit = $script:Bit7zCommit; license = 'MPL-2.0'
+                sourceUrl = $script:Bit7zSourceUrl; sourceSha256 = $script:Bit7zSourceSha256
+                sourceTreeStatus = 'MPL-2.0-permitted modified subset'
+                provenancePath = 'bit7z/KARON_DEPENDENCY_PROVENANCE.json'
+            }
+        }
+        linkerInputs = @(
+            [ordered]@{ name = 'bit7z'; library = 'bit7z.lib'; sha256 = ('4' * 64); length = 1 },
+            [ordered]@{ name = 'Nana'; library = 'nana_v143_Release_x64.lib'; sha256 = ('B' * 64); length = 1 },
+            [ordered]@{ name = 'libpng'; library = 'libpng.lib'; sha256 = ('C' * 64); length = 1 },
+            [ordered]@{ name = 'libjpeg-turbo'; library = 'turbojpeg-static.lib'; sha256 = ('D' * 64); length = 1 }
+        )
+        toolchain = @(
+            [ordered]@{ name = 'msbuild'; sha256 = ('5' * 64); version = '1' },
+            [ordered]@{ name = 'cmake'; sha256 = ('6' * 64); version = '1' },
+            [ordered]@{ name = 'cl'; sha256 = ('7' * 64); version = '1' },
+            [ordered]@{ name = 'link'; sha256 = ('8' * 64); version = '1' },
+            [ordered]@{ name = 'rc'; sha256 = ('9' * 64); version = '1' },
+            [ordered]@{ name = 'windows-sdk'; sha256 = ('A' * 64); version = '10.0.1' }
+        )
+        commands = $commands
+    }
+}
+
+Describe 'bit7z v4 dependency and candidate contracts' {
+    BeforeAll {
+        if ([string]::IsNullOrWhiteSpace($script:SevenZip)) { throw '7z.exe is required.' }
+        $manifest = Get-DependencyArchiveManifest -SourceRoot $script:RepositoryRoot
+        $script:DependencyManifest = $manifest
+        $listing = & $script:SevenZip l -slt $script:ArchivePath
+        if ($LASTEXITCODE -ne 0) { throw 'Dependency archive listing failed.' }
+        $script:ArchiveEntries = @(Get-ArchiveEntriesFromListing -Listing $listing)
+        $script:ExtractionRoot = Join-Path $TestDrive 'dependency-extraction'
+        & $script:SevenZip x $script:ArchivePath ('-o' + $script:ExtractionRoot) 'bit7z\*' -y | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Dependency archive extraction failed.' }
+        $script:Bit7zRoot = Join-Path $script:ExtractionRoot 'bit7z'
+        $script:Provenance = Get-Content -LiteralPath (Join-Path $script:Bit7zRoot 'KARON_DEPENDENCY_PROVENANCE.json') -Raw | ConvertFrom-Json
+    }
+
+    It 'uses the production manifest and archive safety functions for every entry' {
+        $script:DependencyManifest.name | Should Be 'ytdlp-interface dependencies.7z'
+        ([string]$script:DependencyManifest.sha256).ToUpperInvariant() | Should Be $script:ExpectedArchiveSha256
+        (Get-FileHash -LiteralPath $script:ArchivePath -Algorithm SHA256).Hash | Should Be $script:ExpectedArchiveSha256
+        $script:ArchiveEntries.Count | Should BeGreaterThan 0
+        foreach ($entry in $script:ArchiveEntries) {
+            (Test-ArchiveEntrySafe -Entry $entry -ExpectedRoots @($script:DependencyManifest.roots)) | Should Be $true
+        }
+        (Test-ArchiveEntrySafe -Entry '..\escape' -ExpectedRoots @('bit7z')) | Should Be $false
+    }
+
+    It 'contains no RAR or unRAR entries and records the exact modified-subset patch' {
+        $rarEntries = @($script:ArchiveEntries | Where-Object {
+            $segments = $_ -split '[\\/]'
+            $_ -match '(?i)^bit7z[\\/]lib[\\/]7zSDK[\\/]' -and
+                @($segments | Where-Object { $_ -match '^(?i:rar)' -or $_ -match '^(?i:unrarlicense)(?:\..*)?$' }).Count -gt 0
+        })
+        $rarEntries.Count | Should Be 0
+        @($script:ArchiveEntries | Where-Object { (Split-Path -Leaf $_) -ieq 'Rar.dll' }).Count | Should Be 0
+        $script:Provenance.packaging.sourceTreeStatus | Should Be 'MPL-2.0-permitted modified subset'
+        $script:Provenance.packaging.originalUpstream.commit | Should Be $script:Bit7zCommit
+        $script:Provenance.packaging.originalUpstream.sourceUrl | Should Be $script:Bit7zSourceUrl
+        $script:Provenance.packaging.originalUpstream.sourceSha256 | Should Be $script:Bit7zSourceSha256
+        $patch = @($script:Provenance.packaging.patches)[0]
+        $patch.buildOptions.BIT7Z_DISABLE_RAR | Should Be 'ON'
+        $script:Provenance.sevenZip.build.options.BIT7Z_DISABLE_RAR | Should Be 'ON'
+        @($patch.removedPaths).Count | Should Be 29
+        @(Compare-Object -ReferenceObject ($script:ExpectedRemovedPaths | Sort-Object) -DifferenceObject (@($patch.removedPaths) | Sort-Object)).Count | Should Be 0
+        foreach ($path in $script:ExpectedRemovedPaths) {
+            (Test-Path -LiteralPath (Join-Path $script:Bit7zRoot $path)) | Should Be $false
+        }
+    }
+
+    It 'uses the production bit7z v4 CMake configure and build plan' {
+        $inputs = New-TestBuildInputs -Root (Join-Path $TestDrive 'plan')
+        $inputs.Plan.Count | Should Be 4
+        $bit7z = @($inputs.Plan | Where-Object Name -eq 'bit7z')[0]
+        (Split-Path -Leaf $bit7z.FilePath) | Should Be 'cmake.exe'
+        (Split-Path -Leaf $bit7z.LibraryPath) | Should Be 'bit7z.lib'
+        @($bit7z.Arguments).Count | Should Be 18
+        $bit7z.Arguments[0] | Should Be '-S'
+        $bit7z.Arguments[5] | Should Be 'Visual Studio 17 2022'
+        ($bit7z.Arguments -contains '-DBIT7Z_USE_NATIVE_STRING=ON') | Should Be $true
+        ($bit7z.Arguments -contains '-DBIT7Z_PATH_SANITIZATION=ON') | Should Be $true
+        $bit7z.BuildArguments[0] | Should Be '--build'
+        ($bit7z.BuildArguments -contains 'bit7z') | Should Be $true
+        ($bit7z.Arguments -join '|') | Should Not Match 'bit7z\.sln|bit7z64\.lib'
+    }
+
+    It 'attests bit7z configure and build as distinct exact commands' {
+        $inputs = New-TestBuildInputs -Root (Join-Path $TestDrive 'attestation')
+        $commands = @(Get-BuildCommandAttestation -SourceRoot $inputs.Source -DependencyPlan $inputs.Plan -ProductExecutable 'C:\Tools\MSBuild.exe' -ProductArguments $inputs.ProductArguments -BuildContext $inputs.Context)
+        $commands.Count | Should Be 7
+        @($commands.name | Sort-Object -Unique).Count | Should Be 7
+        $configure = @($commands | Where-Object name -eq 'bit7z Release x64 configure')[0]
+        $build = @($commands | Where-Object name -eq 'bit7z Release x64 build')[0]
+        $configure.executable | Should Be 'cmake.exe'
+        @($configure.arguments).Count | Should Be 18
+        $configure.arguments[1] | Should Be '<source>\bit7z'
+        ($configure.arguments -contains '-DBIT7Z_CUSTOM_7ZIP_PATH=<source>\bit7z\lib\7zSDK') | Should Be $true
+        $build.executable | Should Be 'cmake.exe'
+        @($build.arguments).Count | Should Be 9
+        $build.arguments[1] | Should Be '<source>\bit7z\out\build\x64-Release'
+        $build.arguments[5] | Should Be 'bit7z'
+    }
+
+    It 'seals only the exact v4 source identity command and linker contract' {
+        $inputs = New-TestBuildInputs -Root (Join-Path $TestDrive 'seal-inputs')
+        $candidate = Join-Path $TestDrive 'candidate'
+        [IO.Directory]::CreateDirectory($candidate) | Out-Null
+        $payload = Join-Path $candidate 'payload.bin'
+        [IO.File]::WriteAllText($payload, 'payload', [Text.Encoding]::ASCII)
+        $item = Get-Item -LiteralPath $payload
+        $manifest = [ordered]@{
+            schemaVersion = 1
+            createdAtUtc = '2026-09-16T00:00:00.0000000Z'
+            attestation = New-TestAttestation -Inputs $inputs
+            versions = [ordered]@{ product = '2.19.1.0'; ytdlp = 'fixture'; ffmpeg = 'fixture'; ffprobe = 'fixture'; deno = 'fixture' }
+            files = @([ordered]@{ path = 'payload.bin'; sha256 = (Get-FileHash -LiteralPath $payload -Algorithm SHA256).Hash; length = $item.Length })
+        }
+        $accepted = try { Assert-CandidateManifestSeal -CandidateRoot $candidate -Manifest $manifest; 'accepted' } catch { $_.Exception.Message }
+        $accepted | Should Be 'accepted'
+        $manifest.attestation.dependencyArchive.bit7zSource.commit = ('0' * 40)
+        $rejected = try { Assert-CandidateManifestSeal -CandidateRoot $candidate -Manifest $manifest; 'accepted' } catch { $_.Exception.Message }
+        $rejected | Should Be 'candidate_manifest_invalid'
+    }
+}

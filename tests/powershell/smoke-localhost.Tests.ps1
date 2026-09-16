@@ -14,9 +14,17 @@ function New-FixtureRoot { $path = Join-Path ([IO.Path]::GetTempPath()) ('localh
 function New-FixtureBuildAttestation {
     return [ordered]@{
         source = [ordered]@{ commit = ('1' * 40); dirty = $false; treeSha256 = ('2' * 64); trackedFileCount = 1 }
-        dependencyArchive = [ordered]@{ name = 'dependencies.7z'; sha256 = ('3' * 64) }
+        dependencyArchive = [ordered]@{
+            name = 'ytdlp-interface dependencies.7z'; sha256 = '41004108B9FC41454A97B97850C4E41D537F226A27255E8213ABD14BFFFFEBD3'
+            bit7zSource = [ordered]@{
+                version = '4.1.0'; commit = 'c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742'; license = 'MPL-2.0'
+                sourceUrl = 'https://github.com/rikyoz/bit7z/archive/c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742.zip'
+                sourceSha256 = '6AF52B2E1B9895E8F1193728880206326161940E7A961E3162EC39752DBB3379'
+                sourceTreeStatus = 'MPL-2.0-permitted modified subset'; provenancePath = 'bit7z/KARON_DEPENDENCY_PROVENANCE.json'
+            }
+        }
         linkerInputs = @(
-            [ordered]@{ name = 'bit7z'; library = 'bit7z64.lib'; sha256 = ('4' * 64); length = 1 },
+            [ordered]@{ name = 'bit7z'; library = 'bit7z.lib'; sha256 = ('4' * 64); length = 1 },
             [ordered]@{ name = 'Nana'; library = 'nana_v143_Release_x64.lib'; sha256 = ('B' * 64); length = 1 },
             [ordered]@{ name = 'libpng'; library = 'libpng.lib'; sha256 = ('C' * 64); length = 1 },
             [ordered]@{ name = 'libjpeg-turbo'; library = 'turbojpeg-static.lib'; sha256 = ('D' * 64); length = 1 }
@@ -30,13 +38,14 @@ function New-FixtureBuildAttestation {
             [ordered]@{ name = 'windows-sdk'; sha256 = ('A' * 64); version = '10.0.1' }
         )
         commands = @(
-            'bit7z Release x64 build', 'Nana Release x64 build', 'libpng Release x64 build',
+            'bit7z Release x64 configure', 'bit7z Release x64 build', 'Nana Release x64 build', 'libpng Release x64 build',
             'libjpeg-turbo Release x64 configure', 'libjpeg-turbo Release x64 build', 'Release x64 MSBuild'
         ) | ForEach-Object {
-            $executable = if ($_ -like 'libjpeg-turbo*') { 'cmake.exe' } else { 'MSBuild.exe' }
+            $executable = if ($_ -like 'libjpeg-turbo*' -or $_ -like 'bit7z*') { 'cmake.exe' } else { 'MSBuild.exe' }
             $msbuild = @('/m', '/t:Build', '/p:Configuration=Release', '/p:Platform=x64', '/p:PlatformToolset=v143', '/p:ImportDirectoryBuildProps=false', '/p:ImportDirectoryBuildTargets=false', '/p:UserRootDir=<hermetic-user-root>\', '/p:VCToolsVersion=14.40.1', '/p:WindowsTargetPlatformVersion=10.0.1')
             $arguments = switch ($_) {
-                'bit7z Release x64 build' { @('<source>\bit7z\bit7z.sln') + $msbuild }
+                'bit7z Release x64 configure' { @('-S', '<source>\bit7z', '-B', '<source>\bit7z\out\build\x64-Release', '-G', 'Visual Studio 17 2022', '-A', 'x64', '-T', 'v143', '-DCMAKE_VS_GLOBALS=ImportDirectoryBuildProps=false;ImportDirectoryBuildTargets=false;UserRootDir=<hermetic-user-root>\;VCToolsVersion=14.40.1;WindowsTargetPlatformVersion=10.0.1', '-DBIT7Z_CUSTOM_7ZIP_PATH=<source>\bit7z\lib\7zSDK', '-DBIT7Z_USE_NATIVE_STRING=ON', '-DBIT7Z_PATH_SANITIZATION=ON', '-DBIT7Z_REGEX_MATCHING=ON', '-DBIT7Z_STATIC_RUNTIME=ON', '-DCMAKE_CXX_FLAGS=/utf-8', '-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE=<source>\bit7z\bin\x64') }
+                'bit7z Release x64 build' { @('--build', '<source>\bit7z\out\build\x64-Release', '--config', 'Release', '--target', 'bit7z', '--', '/m', '/p:PlatformToolset=v143') }
                 'Nana Release x64 build' { @('<source>\nana\build\vc2022\nana.sln') + $msbuild }
                 'libpng Release x64 build' { @('<source>\libpng\libpng.sln') + $msbuild + @('/p:OutDir=<source>\libpng\x64\Release\') }
                 'libjpeg-turbo Release x64 configure' { @('-S', '<source>\libjpeg-turbo-3.1.2', '-B', '<source>\libjpeg-turbo-3.1.2\out\build\x64-Release', '-G', 'Visual Studio 17 2022', '-A', 'x64', '-T', 'v143', '-DCMAKE_VS_GLOBALS=ImportDirectoryBuildProps=false;ImportDirectoryBuildTargets=false;UserRootDir=<hermetic-user-root>\;VCToolsVersion=14.40.1;WindowsTargetPlatformVersion=10.0.1', '-DENABLE_SHARED=OFF', '-DENABLE_STATIC=ON', '-DWITH_TURBOJPEG=ON', '-DWITH_CRT_DLL=OFF', '-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE=<source>\libjpeg-turbo-3.1.2\out\build\x64-Release') }
@@ -326,7 +335,7 @@ function Test-SmokeWorkspaceUsesDownloadsContainedRunRoot {
 function Test-DependencyArchiveAndRuntimeVerificationBoundaries {
     $manifest = Get-Content -LiteralPath (Join-Path $repositoryRoot 'tools/dependency-archives.json') -Raw | ConvertFrom-Json
     Assert-Equal 'ytdlp-interface dependencies.7z' $manifest.archives[0].name 'The reviewed dependency archive name must be fixed.'
-    Assert-Equal '6D50D1F74978CFAB8E40439487D67EF21A4B43E31CFB00EE95D23AEDFC791BAE' $manifest.archives[0].sha256 'The reviewed dependency archive hash must be fixed.'
+    Assert-Equal '41004108B9FC41454A97B97850C4E41D537F226A27255E8213ABD14BFFFFEBD3' $manifest.archives[0].sha256 'The reviewed dependency archive hash must be fixed.'
     Assert-True (Test-ArchiveEntrySafe -Entry 'nana/include/nana/gui.hpp' -ExpectedRoots @('bit7z', 'nana', 'libpng', 'libjpeg-turbo-3.1.2')) 'Expected dependency paths must be accepted.'
     Assert-False (Test-ArchiveEntrySafe -Entry '..\parent\overwrite' -ExpectedRoots @('bit7z')) 'Archive traversal must be rejected.'
     Assert-False (Test-ArchiveEntrySafe -Entry 'C:\absolute\overwrite' -ExpectedRoots @('bit7z')) 'Absolute archive paths must be rejected.'
@@ -435,14 +444,14 @@ function Test-SourceAttestationBindsGitRevisionAndWorktreeState {
 function Test-DependencyLibraryAttestationBindsLinkerInputs {
     $root = New-FixtureRoot
     try {
-        $library = Join-Path $root 'bit7z64.lib'
+        $library = Join-Path $root 'bit7z.lib'
         [IO.File]::WriteAllText($library, 'fixture-library', [Text.Encoding]::ASCII)
         $command = Get-Command -Name Get-DependencyLibraryAttestation -ErrorAction SilentlyContinue
         Assert-True ($null -ne $command) 'Candidate build must provide dependency library attestation.'
         if ($null -ne $command) {
             $attestation = @(Get-DependencyLibraryAttestation -Plan @([pscustomobject]@{ Name = 'bit7z'; LibraryPath = $library }))
             Assert-Equal 1 $attestation.Count 'Each linker input must produce one attestation entry.'
-            Assert-Equal 'bit7z64.lib' $attestation[0].library 'The attestation must retain the actual linker input name.'
+            Assert-Equal 'bit7z.lib' $attestation[0].library 'The attestation must retain the actual linker input name.'
             Assert-Equal (Get-FileHash -LiteralPath $library -Algorithm SHA256).Hash $attestation[0].sha256 'The attestation must retain the actual linker input hash.'
             Assert-Equal 15 $attestation[0].length 'The attestation must retain the actual linker input length.'
         }
@@ -457,12 +466,13 @@ function Test-BuildCommandAttestationIncludesDependenciesWithoutAbsoluteSourcePa
         Assert-True ($null -ne $command) 'Candidate build must attest every dependency and product build command.'
         if ($null -ne $command) {
             $plan = @(
-                [pscustomobject]@{ Name = 'bit7z'; FilePath = 'C:\tools\MSBuild.exe'; Arguments = @((Join-Path $root 'bit7z\bit7z.sln')); BuildArguments = @() },
+                [pscustomobject]@{ Name = 'bit7z'; FilePath = 'C:\tools\cmake.exe'; Arguments = @('-S', (Join-Path $root 'bit7z')); BuildArguments = @('--build', (Join-Path $root 'bit7z\out\build\x64-Release')) },
                 [pscustomobject]@{ Name = 'libjpeg-turbo'; FilePath = 'C:\tools\cmake.exe'; Arguments = @('-S', (Join-Path $root 'libjpeg-turbo')); BuildArguments = @('--build', (Join-Path $root 'out')) }
             )
             $entries = @(Get-BuildCommandAttestation -SourceRoot $root -DependencyPlan $plan -ProductExecutable 'C:\tools\MSBuild.exe' -ProductArguments @((Join-Path $root 'product.sln')))
-            Assert-Equal 4 $entries.Count 'Each configure/build dependency command plus product build must be attested.'
-            Assert-True ($entries.name -contains 'bit7z Release x64 build') 'Dependency command inventory must identify bit7z.'
+            Assert-Equal 5 $entries.Count 'Each configure/build dependency command plus product build must be attested.'
+            Assert-True ($entries.name -contains 'bit7z Release x64 configure') 'Dependency command inventory must identify bit7z configure.'
+            Assert-True ($entries.name -contains 'bit7z Release x64 build') 'Dependency command inventory must identify bit7z build.'
             Assert-True ($entries.name -contains 'libjpeg-turbo Release x64 build') 'Dependency build phase must be retained separately.'
             Assert-True ($entries.name -contains 'Release x64 MSBuild') 'Product build command must remain attested.'
             Assert-False (($entries | ConvertTo-Json -Depth 5) -match [regex]::Escape($root)) 'Build command attestation must normalize source-root paths.'
@@ -507,7 +517,7 @@ function Test-ReleaseX64DependencyPlanBuildsAndValidatesProductLibraries {
 
         $plan = Get-ReleaseX64DependencyPlan -SourceRoot $root
         Assert-Equal 4 $plan.Count 'The Release x64 plan must build all four source dependencies.'
-        Assert-Equal 'bit7z64.lib' (Split-Path -Leaf $plan[0].LibraryPath) 'bit7z must produce the product linker library name.'
+        Assert-Equal 'bit7z.lib' (Split-Path -Leaf $plan[0].LibraryPath) 'bit7z must produce the product linker library name.'
         Assert-Equal 'nana_v143_Release_x64.lib' (Split-Path -Leaf $plan[1].LibraryPath) 'Nana must be built with the v143 linker library name.'
         Assert-Equal 'libpng.lib' (Split-Path -Leaf $plan[2].LibraryPath) 'libpng must produce the product linker library name.'
         Assert-Equal 'turbojpeg-static.lib' (Split-Path -Leaf $plan[3].LibraryPath) 'libjpeg-turbo must produce the product linker library name.'
@@ -517,7 +527,8 @@ function Test-ReleaseX64DependencyPlanBuildsAndValidatesProductLibraries {
             [IO.File]::WriteAllText($dependency.LibraryPath, 'fixture', [Text.Encoding]::ASCII)
         }
         Assert-True (Test-ReleaseX64DependencyLibraries -Plan $plan) 'All four expected Release x64 libraries must satisfy the pre-product gate.'
-        Assert-True ($plan[0].Arguments -contains '/p:PlatformToolset=v143') 'bit7z must be built with the installed v143 toolset.'
+        Assert-True ($plan[0].Arguments -contains '-T' -and $plan[0].Arguments -contains 'v143') 'bit7z CMake generation must select v143.'
+        Assert-True ($plan[0].BuildArguments -contains '/p:PlatformToolset=v143') 'bit7z build must retain the v143 toolset.'
         Assert-True ($plan[1].Arguments -contains '/p:PlatformToolset=v143') 'Nana must be built with the installed v143 toolset.'
         Assert-True ($plan[2].Arguments -contains '/p:PlatformToolset=v143') 'libpng must be built with the installed v143 toolset.'
         Assert-True ($plan[3].Arguments -contains '-T') 'libjpeg-turbo CMake generation must select a toolset.'
@@ -1092,10 +1103,12 @@ function Test-HermeticBuildContextDisablesExternalPropsAndBindsEffectiveContext 
         Assert-Equal '<source>' $context.AttestedWorkingDirectory 'Build command attestation must bind its normalized working directory.'
         Assert-Equal 'x64' $context.AttestedEnvironment.PreferredToolArchitecture 'Build command attestation must bind the relevant architecture environment.'
         $plan = Get-ReleaseX64DependencyPlan -SourceRoot $source -CommonMsBuildArguments $context.MsBuildArguments -CmakeVsGlobalsArgument $context.CmakeVsGlobalsArgument
-        foreach ($dependency in @($plan | Select-Object -First 3)) {
+        foreach ($dependency in @($plan | Select-Object -Skip 1 -First 2)) {
             Assert-True ($dependency.Arguments -contains '/p:ImportDirectoryBuildProps=false') "$($dependency.Name) MSBuild must disable Directory.Build.props."
             Assert-True (@($dependency.Arguments | Where-Object { $_ -like '/p:UserRootDir=*' }).Count -eq 1) "$($dependency.Name) MSBuild must redirect user props."
         }
+        $bit7zGlobals = @($plan[0].Arguments | Where-Object { $_ -like '-DCMAKE_VS_GLOBALS=*' })
+        Assert-Equal 1 $bit7zGlobals.Count 'bit7z CMake configure must receive exactly one sealed Visual Studio globals definition.'
         Assert-Equal '/m' $plan[3].BuildArguments[7] 'CMake-generated MSBuild must use the sealed parallel build switch.'
         Assert-Equal '/t:Build' $plan[3].BuildArguments[8] 'CMake-generated MSBuild must use the sealed Build target.'
         Assert-True ($plan[3].BuildArguments -contains '/p:ImportDirectoryBuildProps=false') 'CMake-generated MSBuild must disable Directory.Build.props.'
@@ -1213,17 +1226,17 @@ function Test-CandidateManifestAttestationInventoriesAreExactSets {
 function Test-CandidateManifestCommandsRequireExactSemantics {
     $root = New-FixtureRoot
     try {
-        foreach ($case in @('wrong-executable', 'missing-release', 'missing-solution', 'configure-globals-missing', 'configure-globals-duplicate', 'configure-globals-incomplete', 'build-shape', 'product-shape')) {
+        foreach ($case in @('wrong-executable', 'missing-native-string', 'wrong-source', 'configure-globals-missing', 'configure-globals-duplicate', 'configure-globals-incomplete', 'build-shape', 'product-shape')) {
             $fixture = New-MinimalSealedCandidate -Root (Join-Path $root $case)
             $commands = $fixture.Manifest.attestation.commands
-            $bit7z = $commands | Where-Object name -eq 'bit7z Release x64 build'
+            $bit7z = $commands | Where-Object name -eq 'bit7z Release x64 configure'
             $configure = $commands | Where-Object name -eq 'libjpeg-turbo Release x64 configure'
             $jpegBuild = $commands | Where-Object name -eq 'libjpeg-turbo Release x64 build'
             $product = $commands | Where-Object name -eq 'Release x64 MSBuild'
             switch ($case) {
                 'wrong-executable' { $bit7z.executable = 'cmd.exe' }
-                'missing-release' { $bit7z.arguments = @('<source>\bit7z\bit7z.sln', '/t:Build', '/p:Platform=x64') }
-                'missing-solution' { $bit7z.arguments = @('/t:Build', '/p:Configuration=Release', '/p:Platform=x64') }
+                'missing-native-string' { $bit7z.arguments = @($bit7z.arguments | Where-Object { $_ -cne '-DBIT7Z_USE_NATIVE_STRING=ON' }) }
+                'wrong-source' { $bit7z.arguments[1] = '<source>\rogue-bit7z' }
                 'configure-globals-missing' { $configure.arguments = @($configure.arguments | Where-Object { $_ -notlike '-DCMAKE_VS_GLOBALS=*' }) }
                 'configure-globals-duplicate' { $configure.arguments += @($configure.arguments | Where-Object { $_ -like '-DCMAKE_VS_GLOBALS=*' })[0] }
                 'configure-globals-incomplete' { $configure.arguments[-1] = '-DCMAKE_VS_GLOBALS=ImportDirectoryBuildProps=false' }
@@ -1240,11 +1253,11 @@ function Test-CandidateManifestCommandsRequireExactSemantics {
 function Test-CandidateManifestCommandsRejectRogueOperands {
     $root = New-FixtureRoot
     try {
-        foreach ($name in @('bit7z Release x64 build', 'Nana Release x64 build', 'libpng Release x64 build', 'libjpeg-turbo Release x64 configure', 'libjpeg-turbo Release x64 build', 'Release x64 MSBuild')) {
+        foreach ($name in @('bit7z Release x64 configure', 'bit7z Release x64 build', 'Nana Release x64 build', 'libpng Release x64 build', 'libjpeg-turbo Release x64 configure', 'libjpeg-turbo Release x64 build', 'Release x64 MSBuild')) {
             $fixture = New-MinimalSealedCandidate -Root (Join-Path $root ([Guid]::NewGuid().ToString('N')))
             $command = $fixture.Manifest.attestation.commands | Where-Object name -eq $name
-            $rogue = if ($name -like 'libjpeg-turbo Release x64 configure') { '-S=<source>\rogue' }
-                elseif ($name -like 'libjpeg-turbo Release x64 build') { '<source>\rogue-build-dir' }
+            $rogue = if ($name -like '* Release x64 configure') { '-S=<source>\rogue' }
+                elseif ($name -like 'bit7z Release x64 build' -or $name -like 'libjpeg-turbo Release x64 build') { '<source>\rogue-build-dir' }
                 else { '<source>\rogue\rogue.sln' }
             $command.arguments += $rogue
             try { Assert-CandidateManifestSeal -CandidateRoot $fixture.Root -Manifest $fixture.Manifest; $actual = 'no_failure' } catch { $actual = $_.Exception.Message }
@@ -1260,17 +1273,17 @@ function Test-CandidateManifestCommandsBindHermeticValues {
         foreach ($case in @('user-root-suffix', 'msvc-version-mismatch', 'sdk-version-mismatch', 'configure-global-mismatch')) {
             $fixture = New-MinimalSealedCandidate -Root (Join-Path $root ([Guid]::NewGuid().ToString('N')))
             $commands = $fixture.Manifest.attestation.commands
-            $bit7z = $commands | Where-Object name -eq 'bit7z Release x64 build'
+            $bit7z = $commands | Where-Object name -eq 'bit7z Release x64 configure'
             $configure = $commands | Where-Object name -eq 'libjpeg-turbo Release x64 configure'
             switch ($case) {
                 'user-root-suffix' {
-                    $bit7z.arguments[7] = '/p:UserRootDir=<hermetic-user-root>\rogue'
+                    $bit7z.arguments[10] = $bit7z.arguments[10].Replace('UserRootDir=<hermetic-user-root>\', 'UserRootDir=<hermetic-user-root>\rogue')
                 }
                 'msvc-version-mismatch' {
-                    $bit7z.arguments[8] = '/p:VCToolsVersion=99.99.99'
+                    $bit7z.arguments[10] = $bit7z.arguments[10].Replace('VCToolsVersion=14.40.1', 'VCToolsVersion=99.99.99')
                 }
                 'sdk-version-mismatch' {
-                    $bit7z.arguments[9] = '/p:WindowsTargetPlatformVersion=99.99.99'
+                    $bit7z.arguments[10] = $bit7z.arguments[10].Replace('WindowsTargetPlatformVersion=10.0.1', 'WindowsTargetPlatformVersion=99.99.99')
                 }
                 'configure-global-mismatch' {
                     $configure.arguments[10] = $configure.arguments[10].Replace('VCToolsVersion=14.40.1', 'VCToolsVersion=99.99.99')

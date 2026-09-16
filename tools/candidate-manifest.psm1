@@ -46,6 +46,22 @@ function Test-NormalizedArgumentPath {
     return $Actual.Replace('\', '/') -ceq $Expected.Replace('\', '/')
 }
 
+function Assert-Bit7zSourceIdentity {
+    param([Parameter(Mandatory = $true)] [object] $Source)
+    $expected = [ordered]@{
+        version = '4.1.0'
+        commit = 'c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742'
+        license = 'MPL-2.0'
+        sourceUrl = 'https://github.com/rikyoz/bit7z/archive/c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742.zip'
+        sourceSha256 = '6AF52B2E1B9895E8F1193728880206326161940E7A961E3162EC39752DBB3379'
+        sourceTreeStatus = 'MPL-2.0-permitted modified subset'
+        provenancePath = 'bit7z/KARON_DEPENDENCY_PROVENANCE.json'
+    }
+    foreach ($name in $expected.Keys) {
+        if ([string](Get-ManifestField -Value $Source -Name $name) -cne $expected[$name]) { throw 'candidate_manifest_invalid' }
+    }
+}
+
 function Assert-HermeticMsBuildTail {
     param([string[]] $Arguments, [int] $Offset, [string] $OutDirectory, [string] $VCToolsVersion, [string] $WindowsSdkVersion)
     $expectedCount = $Offset + 10 + $(if ([string]::IsNullOrWhiteSpace($OutDirectory)) { 0 } else { 1 })
@@ -69,6 +85,35 @@ function Assert-CommandSemantics {
     $windowsSdkVersion = [string](Get-ManifestField -Value $properties -Name 'WindowsTargetPlatformVersion')
     if ($userRoot -cne '<hermetic-user-root>' -or $vcToolsVersion -notmatch '^[0-9]+(?:\.[0-9]+)+$' -or
         $windowsSdkVersion -notmatch '^[0-9]+(?:\.[0-9]+)+$') { throw 'candidate_manifest_invalid' }
+    if ($name -eq 'bit7z Release x64 configure') {
+        if ($executable -ine 'cmake.exe' -or $arguments.Count -ne 18 -or $arguments[0] -cne '-S' -or
+            -not (Test-NormalizedArgumentPath $arguments[1] '<source>/bit7z') -or $arguments[2] -cne '-B' -or
+            -not (Test-NormalizedArgumentPath $arguments[3] '<source>/bit7z/out/build/x64-Release') -or
+            $arguments[4] -cne '-G' -or $arguments[5] -cne 'Visual Studio 17 2022' -or $arguments[6] -cne '-A' -or
+            $arguments[7] -cne 'x64' -or $arguments[8] -cne '-T' -or $arguments[9] -cne 'v143') { throw 'candidate_manifest_invalid' }
+        $expectedGlobals = '-DCMAKE_VS_GLOBALS=' + (@(
+            'ImportDirectoryBuildProps=false',
+            'ImportDirectoryBuildTargets=false',
+            'UserRootDir=<hermetic-user-root>\',
+            ('VCToolsVersion=' + $vcToolsVersion),
+            ('WindowsTargetPlatformVersion=' + $windowsSdkVersion)
+        ) -join ';')
+        if ($arguments[10] -cne $expectedGlobals -or
+            -not (Test-NormalizedArgumentPath $arguments[11] '-DBIT7Z_CUSTOM_7ZIP_PATH=<source>/bit7z/lib/7zSDK') -or
+            $arguments[12] -cne '-DBIT7Z_USE_NATIVE_STRING=ON' -or $arguments[13] -cne '-DBIT7Z_PATH_SANITIZATION=ON' -or
+            $arguments[14] -cne '-DBIT7Z_REGEX_MATCHING=ON' -or $arguments[15] -cne '-DBIT7Z_STATIC_RUNTIME=ON' -or
+            $arguments[16] -cne '-DCMAKE_CXX_FLAGS=/utf-8' -or
+            -not (Test-NormalizedArgumentPath $arguments[17] '-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE=<source>/bit7z/bin/x64')) { throw 'candidate_manifest_invalid' }
+        return
+    }
+    if ($name -eq 'bit7z Release x64 build') {
+        if ($executable -ine 'cmake.exe' -or $arguments.Count -ne 9 -or $arguments[0] -cne '--build' -or
+            -not (Test-NormalizedArgumentPath $arguments[1] '<source>/bit7z/out/build/x64-Release') -or
+            $arguments[2] -cne '--config' -or $arguments[3] -cne 'Release' -or $arguments[4] -cne '--target' -or
+            $arguments[5] -cne 'bit7z' -or $arguments[6] -cne '--' -or $arguments[7] -cne '/m' -or
+            $arguments[8] -cne '/p:PlatformToolset=v143') { throw 'candidate_manifest_invalid' }
+        return
+    }
     if ($name -eq 'libjpeg-turbo Release x64 configure') {
         if ($executable -ine 'cmake.exe' -or $arguments.Count -ne 16 -or $arguments[0] -cne '-S' -or
             -not (Test-NormalizedArgumentPath $arguments[1] '<source>/libjpeg-turbo-3.1.2') -or $arguments[2] -cne '-B' -or
@@ -100,7 +145,6 @@ function Assert-CommandSemantics {
     }
     if ($executable -ine 'MSBuild.exe') { throw 'candidate_manifest_invalid' }
     $requiredSuffix = switch ($name) {
-        'bit7z Release x64 build' { 'bit7z/bit7z.sln' }
         'Nana Release x64 build' { 'nana/build/vc2022/nana.sln' }
         'libpng Release x64 build' { 'libpng/libpng.sln' }
         'Release x64 MSBuild' { 'ytdlp-interface/ytdlp-interface.sln' }
@@ -126,11 +170,12 @@ function Assert-AttestationShape {
         -not [int]::TryParse([string]$trackedFileCount, [ref]$count) -or $count -le 0 -or [bool]$dirty) { throw 'candidate_manifest_invalid' }
 
     $archive = Get-ManifestField -Value $Attestation -Name 'dependencyArchive'
-    if ([string]::IsNullOrWhiteSpace([string](Get-ManifestField -Value $archive -Name 'name')) -or
-        [string](Get-ManifestField -Value $archive -Name 'sha256') -notmatch '^[A-Fa-f0-9]{64}$') { throw 'candidate_manifest_invalid' }
+    if ([string](Get-ManifestField -Value $archive -Name 'name') -cne 'ytdlp-interface dependencies.7z' -or
+        [string](Get-ManifestField -Value $archive -Name 'sha256') -cne '41004108B9FC41454A97B97850C4E41D537F226A27255E8213ABD14BFFFFEBD3') { throw 'candidate_manifest_invalid' }
+    Assert-Bit7zSourceIdentity -Source (Get-ManifestField -Value $archive -Name 'bit7zSource')
 
     $linkerInputs = @(Get-ManifestField -Value $Attestation -Name 'linkerInputs')
-    Assert-ExactUniqueSet -Actual @($linkerInputs | ForEach-Object { [string](Get-ManifestField -Value $_ -Name 'library') }) -Expected @('bit7z64.lib', 'nana_v143_Release_x64.lib', 'libpng.lib', 'turbojpeg-static.lib')
+    Assert-ExactUniqueSet -Actual @($linkerInputs | ForEach-Object { [string](Get-ManifestField -Value $_ -Name 'library') }) -Expected @('bit7z.lib', 'nana_v143_Release_x64.lib', 'libpng.lib', 'turbojpeg-static.lib')
     foreach ($entry in $linkerInputs) {
         $length = 0L
         if ([string]::IsNullOrWhiteSpace([string](Get-ManifestField -Value $entry -Name 'name')) -or
@@ -149,7 +194,7 @@ function Assert-AttestationShape {
 
     $commands = @(Get-ManifestField -Value $Attestation -Name 'commands')
     Assert-ExactUniqueSet -Actual @($commands | ForEach-Object { [string](Get-ManifestField -Value $_ -Name 'name') }) -Expected @(
-        'bit7z Release x64 build', 'Nana Release x64 build', 'libpng Release x64 build',
+        'bit7z Release x64 configure', 'bit7z Release x64 build', 'Nana Release x64 build', 'libpng Release x64 build',
         'libjpeg-turbo Release x64 configure', 'libjpeg-turbo Release x64 build', 'Release x64 MSBuild'
     )
     foreach ($entry in $commands) {

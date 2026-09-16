@@ -185,6 +185,32 @@ function Get-DependencyArchiveManifest {
     return $manifest.archives[0]
 }
 
+function Get-Bit7zSourceAttestation {
+    param([Parameter(Mandatory = $true)] [string] $SourceRoot)
+    $relativePath = 'bit7z\KARON_DEPENDENCY_PROVENANCE.json'
+    $path = Join-Path $SourceRoot $relativePath
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'bit7z dependency provenance is missing.' }
+    $provenance = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+    $patches = @($provenance.packaging.patches)
+    if ($provenance.schemaVersion -ne 1 -or $provenance.bit7z.version -cne '4.1.0' -or
+        $provenance.bit7z.commit -cne 'c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742' -or
+        $provenance.bit7z.license -cne 'MPL-2.0' -or
+        $provenance.bit7z.sourceUrl -cne 'https://github.com/rikyoz/bit7z/archive/c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742.zip' -or
+        $provenance.bit7z.sourceSha256 -cne '6AF52B2E1B9895E8F1193728880206326161940E7A961E3162EC39752DBB3379' -or
+        $provenance.packaging.sourceTreeStatus -cne 'MPL-2.0-permitted modified subset' -or $patches.Count -ne 1 -or
+        $patches[0].buildOptions.BIT7Z_DISABLE_RAR -cne 'ON' -or @($patches[0].removedPaths).Count -ne 29 -or
+        $provenance.sevenZip.build.options.BIT7Z_DISABLE_RAR -cne 'ON') { throw 'bit7z dependency provenance is invalid.' }
+    return [ordered]@{
+        version = $provenance.bit7z.version
+        commit = $provenance.bit7z.commit
+        license = $provenance.bit7z.license
+        sourceUrl = $provenance.bit7z.sourceUrl
+        sourceSha256 = $provenance.bit7z.sourceSha256
+        sourceTreeStatus = $provenance.packaging.sourceTreeStatus
+        provenancePath = $relativePath.Replace('\', '/')
+    }
+}
+
 function Get-GitTrackedPaths {
     param([Parameter(Mandatory = $true)] [string] $SourceRoot, [Parameter(Mandatory = $true)] [string] $GitPath)
     $source = [IO.Path]::GetFullPath($SourceRoot)
@@ -717,7 +743,7 @@ function Get-BuildCommandAttestation {
     $environment = if ($null -eq $BuildContext) { [ordered]@{} } else { $BuildContext.AttestedEnvironment }
     $commands = @()
     foreach ($dependency in $DependencyPlan) {
-        $phase = if ($dependency.Name -eq 'libjpeg-turbo') { 'configure' } else { 'build' }
+        $phase = if ($dependency.BuildArguments.Count -eq 0) { 'build' } else { 'configure' }
         $commands += [ordered]@{ name = "$($dependency.Name) Release x64 $phase"; executable = (Split-Path -Leaf $dependency.FilePath); arguments = @($dependency.Arguments | ForEach-Object { Get-NormalizedBuildArgument -Argument ([string]$_) -SourceRoot $SourceRoot -HermeticUserRoot $userRoot }); workingDirectory = $workingDirectory; effectiveProperties = $properties; environment = $environment }
         if ($dependency.BuildArguments.Count -ne 0) {
             $commands += [ordered]@{ name = "$($dependency.Name) Release x64 build"; executable = (Split-Path -Leaf $dependency.FilePath); arguments = @($dependency.BuildArguments | ForEach-Object { Get-NormalizedBuildArgument -Argument ([string]$_) -SourceRoot $SourceRoot -HermeticUserRoot $userRoot }); workingDirectory = $workingDirectory; effectiveProperties = $properties; environment = $environment }
@@ -866,6 +892,7 @@ function Invoke-BuildCandidate {
         $dependencyArchivePath = Join-Path $buildWorkspace $dependencyManifest.name
         Copy-Item -LiteralPath $dependencyArchiveSourcePath -Destination $dependencyArchivePath
         Initialize-OfficialDependencies -SourceRoot $buildSource -DependencyArchiveDirectory $buildWorkspace
+        $bit7zSourceAttestation = Get-Bit7zSourceAttestation -SourceRoot $buildSource
         $tools = Get-VsBuildTools
         $cmake = Get-CmakeExecutable -VisualStudioInstallation $tools.InstallationPath
         $buildContext = New-HermeticBuildContext -SourceRoot $buildSource -WorkspaceRoot $buildWorkspace -VCToolsVersion $tools.VCToolsVersion -WindowsSdkVersion $tools.WindowsSdkVersion
@@ -877,7 +904,11 @@ function Invoke-BuildCandidate {
         Assert-DependencyLibraryAttestationUnchanged -Plan $dependencyPlan -Before $linkerInputs | Out-Null
         $attestation = [ordered]@{
             source = $sourceAttestation
-            dependencyArchive = [ordered]@{ name = $dependencyManifest.name; sha256 = (Get-FileHash -LiteralPath $dependencyArchivePath -Algorithm SHA256).Hash.ToUpperInvariant() }
+            dependencyArchive = [ordered]@{
+                name = $dependencyManifest.name
+                sha256 = (Get-FileHash -LiteralPath $dependencyArchivePath -Algorithm SHA256).Hash.ToUpperInvariant()
+                bit7zSource = $bit7zSourceAttestation
+            }
             linkerInputs = $linkerInputs
             toolchain = Get-BuildToolchainAttestation -Tools $tools -CmakePath $cmake
             commands = Get-BuildCommandAttestation -SourceRoot $buildSource -DependencyPlan $dependencyPlan -ProductExecutable $tools.MsBuildPath -ProductArguments $productBuildArguments -BuildContext $buildContext
