@@ -27,65 +27,741 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Assert-DenoNoReparsePath {
+if (-not ('DenoPathSafety' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Text;
+using Microsoft.Win32.SafeHandles;
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct DenoFileIdInfo
+{
+    public ulong VolumeSerialNumber;
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
+    public byte[] FileId;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct DenoByHandleFileInformation
+{
+    public uint FileAttributes;
+    public System.Runtime.InteropServices.ComTypes.FILETIME CreationTime;
+    public System.Runtime.InteropServices.ComTypes.FILETIME LastAccessTime;
+    public System.Runtime.InteropServices.ComTypes.FILETIME LastWriteTime;
+    public uint VolumeSerialNumber;
+    public uint FileSizeHigh;
+    public uint FileSizeLow;
+    public uint NumberOfLinks;
+    public uint FileIndexHigh;
+    public uint FileIndexLow;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct DenoFileDispositionInfo
+{
+    [MarshalAs(UnmanagedType.Bool)]
+    public bool DeleteFile;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct DenoIoStatusBlock
+{
+    public IntPtr Status;
+    public IntPtr Information;
+}
+
+public sealed class DenoPathIdentity
+{
+    public string FinalPath { get; internal set; }
+    public ulong VolumeSerialNumber { get; internal set; }
+    public string FileId { get; internal set; }
+    public uint FileAttributes { get; internal set; }
+}
+
+public sealed class DenoPathHandle : IDisposable
+{
+    public SafeFileHandle Handle { get; private set; }
+    internal DenoPathHandle(SafeFileHandle handle) { Handle = handle; }
+    public DenoPathIdentity Refresh() { return DenoPathSafety.ReadIdentity(Handle); }
+    public void Dispose() { if (Handle != null) Handle.Dispose(); }
+}
+
+public static class DenoPathSafety
+{
+    private const uint GenericRead = 0x80000000;
+    private const uint DeleteAccess = 0x00010000;
+    private const uint FileReadAttributes = 0x00000080;
+    private const uint FileShareRead = 0x00000001;
+    private const uint FileShareWrite = 0x00000002;
+    private const uint FileShareDelete = 0x00000004;
+    private const uint OpenExisting = 3;
+    private const uint FileFlagBackupSemantics = 0x02000000;
+    private const uint FileFlagOpenReparsePoint = 0x00200000;
+    private const int FileDispositionInfo = 4;
+    private const int FileIdInfo = 0x12;
+    private const int NtFileRenameInformation = 10;
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern SafeFileHandle CreateFileW(
+        string fileName, uint desiredAccess, uint shareMode, IntPtr securityAttributes,
+        uint creationDisposition, uint flagsAndAttributes, IntPtr templateFile);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetFileInformationByHandleEx(
+        SafeFileHandle file, int informationClass, out DenoFileIdInfo information, uint bufferSize);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetFileInformationByHandle(
+        SafeFileHandle file, out DenoByHandleFileInformation information);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern uint GetFinalPathNameByHandleW(
+        SafeFileHandle file, StringBuilder path, uint pathLength, uint flags);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetFileInformationByHandle(
+        SafeFileHandle file, int informationClass, ref DenoFileDispositionInfo information, uint bufferSize);
+
+    [DllImport("ntdll.dll")]
+    private static extern int NtSetInformationFile(
+        SafeFileHandle file, out DenoIoStatusBlock ioStatusBlock,
+        IntPtr information, uint bufferSize, int informationClass);
+
+    [DllImport("ntdll.dll")]
+    private static extern uint RtlNtStatusToDosError(int status);
+
+    private static string ToExtendedPath(string path)
+    {
+        if (path.StartsWith(@"\\?\", StringComparison.Ordinal)) return path;
+        if (path.StartsWith(@"\\", StringComparison.Ordinal))
+            return @"\\?\UNC\" + path.Substring(2);
+        return @"\\?\" + path;
+    }
+
+    public static DenoPathHandle Open(
+        string path, bool readData, bool openReparsePoint, bool deleteAccess, bool shareDelete)
+    {
+        uint access = readData ? GenericRead : FileReadAttributes;
+        if (deleteAccess) access |= DeleteAccess;
+        uint share = readData ? FileShareRead : FileShareRead | FileShareWrite;
+        if (shareDelete) share |= FileShareDelete;
+        uint flags = FileFlagBackupSemantics | (openReparsePoint ? FileFlagOpenReparsePoint : 0);
+        SafeFileHandle handle = CreateFileW(
+            ToExtendedPath(path), access, share, IntPtr.Zero, OpenExisting, flags, IntPtr.Zero);
+        if (handle.IsInvalid)
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "CreateFileW failed: " + path);
+        return new DenoPathHandle(handle);
+    }
+
+    public static void MarkDelete(DenoPathHandle path)
+    {
+        DenoFileDispositionInfo information = new DenoFileDispositionInfo { DeleteFile = true };
+        if (!SetFileInformationByHandle(path.Handle, FileDispositionInfo, ref information,
+                (uint)Marshal.SizeOf(typeof(DenoFileDispositionInfo))))
+            throw new Win32Exception(
+                Marshal.GetLastWin32Error(),
+                "SetFileInformationByHandle(FileDispositionInfo) failed");
+    }
+
+    public static void Rename(
+        DenoPathHandle source, DenoPathHandle destinationParent, string destinationName)
+    {
+        if (String.IsNullOrEmpty(destinationName) ||
+            destinationName.IndexOfAny(new char[] { '\\', '/', ':' }) >= 0)
+            throw new ArgumentException("Destination must be one leaf name.", "destinationName");
+
+        byte[] name = Encoding.Unicode.GetBytes(destinationName);
+        int rootOffset = IntPtr.Size == 8 ? 8 : 4;
+        int lengthOffset = rootOffset + IntPtr.Size;
+        int nameOffset = lengthOffset + 4;
+        int size = nameOffset + name.Length;
+        IntPtr buffer = Marshal.AllocHGlobal(size);
+        try
+        {
+            for (int index = 0; index < size; index++) Marshal.WriteByte(buffer, index, 0);
+            Marshal.WriteInt32(buffer, 0, 0);
+            Marshal.WriteIntPtr(buffer, rootOffset, destinationParent.Handle.DangerousGetHandle());
+            Marshal.WriteInt32(buffer, lengthOffset, name.Length);
+            Marshal.Copy(name, 0, IntPtr.Add(buffer, nameOffset), name.Length);
+            DenoIoStatusBlock ioStatusBlock;
+            int status = NtSetInformationFile(
+                source.Handle, out ioStatusBlock, buffer, (uint)size, NtFileRenameInformation);
+            if (status != 0)
+                throw new Win32Exception(
+                    unchecked((int)RtlNtStatusToDosError(status)),
+                    "NtSetInformationFile(FileRenameInformation) failed");
+        }
+        finally { Marshal.FreeHGlobal(buffer); }
+    }
+
+    public static DenoPathIdentity ReadIdentity(SafeFileHandle handle)
+    {
+        DenoFileIdInfo id;
+        if (!GetFileInformationByHandleEx(
+                handle, FileIdInfo, out id, (uint)Marshal.SizeOf(typeof(DenoFileIdInfo))))
+            throw new Win32Exception(
+                Marshal.GetLastWin32Error(),
+                "GetFileInformationByHandleEx(FileIdInfo) failed");
+        DenoByHandleFileInformation basic;
+        if (!GetFileInformationByHandle(handle, out basic))
+            throw new Win32Exception(
+                Marshal.GetLastWin32Error(),
+                "GetFileInformationByHandle failed");
+        StringBuilder path = new StringBuilder(1024);
+        uint length = GetFinalPathNameByHandleW(handle, path, (uint)path.Capacity, 0);
+        if (length == 0)
+            throw new Win32Exception(
+                Marshal.GetLastWin32Error(),
+                "GetFinalPathNameByHandleW failed");
+        if (length >= path.Capacity)
+        {
+            path = new StringBuilder((int)length + 1);
+            length = GetFinalPathNameByHandleW(handle, path, (uint)path.Capacity, 0);
+            if (length == 0 || length >= path.Capacity)
+                throw new Win32Exception(
+                    Marshal.GetLastWin32Error(),
+                    "GetFinalPathNameByHandleW failed");
+        }
+        return new DenoPathIdentity {
+            FinalPath = path.ToString(),
+            VolumeSerialNumber = id.VolumeSerialNumber,
+            FileId = BitConverter.ToString(id.FileId).Replace("-", ""),
+            FileAttributes = basic.FileAttributes
+        };
+    }
+}
+'@
+}
+
+function ConvertTo-DenoFinalPath {
+    param([Parameter(Mandatory)] [string] $Path)
+    if ($Path.StartsWith('\\?\UNC\', [StringComparison]::OrdinalIgnoreCase)) {
+        $Path = '\\' + $Path.Substring(8)
+    }
+    elseif ($Path.StartsWith('\\?\', [StringComparison]::OrdinalIgnoreCase)) {
+        $Path = $Path.Substring(4)
+    }
+    $full = [IO.Path]::GetFullPath($Path)
+    $volumeRoot = [IO.Path]::GetPathRoot($full)
+    if ($full.Length -gt $volumeRoot.Length) { return $full.TrimEnd([char[]] @('\', '/')) }
+    return $full
+}
+
+function ConvertTo-DenoPathIdentity {
+    param([Parameter(Mandatory)] $Handle)
+    if ($Handle -is [DenoPathHandle]) {
+        $identity = $Handle.Refresh()
+    }
+    elseif ($Handle -is [Microsoft.Win32.SafeHandles.SafeFileHandle]) {
+        $identity = [DenoPathSafety]::ReadIdentity($Handle)
+    }
+    else {
+        throw 'deno_invalid_path_handle'
+    }
+    return [pscustomobject][ordered]@{
+        FinalPath = ConvertTo-DenoFinalPath ([string]$identity.FinalPath)
+        VolumeSerialNumber = [uint64]$identity.VolumeSerialNumber
+        FileId = ([string]$identity.FileId).ToUpperInvariant()
+        FileAttributes = [uint32]$identity.FileAttributes
+    }
+}
+
+function Assert-DenoPathIdentity {
+    param(
+        [Parameter(Mandatory)] $Expected,
+        [Parameter(Mandatory)] $Actual,
+        [Parameter(Mandatory)] [string] $ErrorCode,
+        [Parameter(Mandatory)] [string] $Label
+    )
+    if (-not ([string]$Expected.FinalPath).Equals([string]$Actual.FinalPath, [StringComparison]::OrdinalIgnoreCase) -or
+        [uint64]$Expected.VolumeSerialNumber -ne [uint64]$Actual.VolumeSerialNumber -or
+        -not ([string]$Expected.FileId).Equals([string]$Actual.FileId, [StringComparison]::Ordinal) -or
+        [uint32]$Expected.FileAttributes -ne [uint32]$Actual.FileAttributes) {
+        throw ('{0}:{1}' -f $ErrorCode, $Label)
+    }
+}
+
+function Get-DenoLexicalPathNodes {
     param([Parameter(Mandatory)] [string] $Path)
     $full = [IO.Path]::GetFullPath($Path)
-    $root = [IO.Path]::GetPathRoot($full)
-    $current = $root
-    if ([IO.Directory]::Exists($root)) {
-        $rootItem = Get-Item -LiteralPath $root -Force
-        if (($rootItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "deno_reparse_path_rejected:$full" }
-    }
-    foreach ($segment in $full.Substring($root.Length).Split([char[]]@('\', '/'), [StringSplitOptions]::RemoveEmptyEntries)) {
+    $volumeRoot = [IO.Path]::GetPathRoot($full)
+    if ([string]::IsNullOrWhiteSpace($volumeRoot)) { throw ('deno_path_invalid:{0}' -f $Path) }
+    $nodes = [Collections.Generic.List[string]]::new()
+    $nodes.Add($volumeRoot) | Out-Null
+    $current = $volumeRoot
+    foreach ($segment in @($full.Substring($volumeRoot.Length) -split '[\\/]' | Where-Object { $_.Length -gt 0 })) {
         $current = Join-Path $current $segment
-        if ([IO.File]::Exists($current) -or [IO.Directory]::Exists($current)) {
-            $item = Get-Item -LiteralPath $current -Force
-            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "deno_reparse_path_rejected:$full" }
+        $nodes.Add([IO.Path]::GetFullPath($current)) | Out-Null
+    }
+    return $nodes.ToArray()
+}
+
+function Close-DenoPathChain {
+    param($Chain)
+    if ($null -eq $Chain) { return }
+    for ($index = $Chain.Nodes.Count - 1; $index -ge 0; $index--) {
+        $Chain.Nodes[$index].Handle.Dispose()
+    }
+}
+
+function Open-DenoPathChain {
+    param(
+        [Parameter(Mandatory)] [string] $Path,
+        [switch] $ReadFinal,
+        [switch] $DeleteFinal,
+        [switch] $ShareDeleteFinal,
+        [string] $ReparseError = 'deno_reparse_path_rejected'
+    )
+    $lexicalNodes = @(Get-DenoLexicalPathNodes $Path)
+    $openedNodes = [Collections.Generic.List[object]]::new()
+    try {
+        for ($index = 0; $index -lt $lexicalNodes.Count; $index++) {
+            $isFinal = $index -eq ($lexicalNodes.Count - 1)
+            $handle = [DenoPathSafety]::Open(
+                $lexicalNodes[$index],
+                [bool]($isFinal -and $ReadFinal),
+                $true,
+                [bool]($isFinal -and $DeleteFinal),
+                [bool]($isFinal -and $ShareDeleteFinal)
+            )
+            try {
+                $identity = ConvertTo-DenoPathIdentity $handle
+                if (($identity.FileAttributes -band [uint32][IO.FileAttributes]::ReparsePoint) -ne 0 -or
+                    -not $identity.FinalPath.Equals((ConvertTo-DenoFinalPath $lexicalNodes[$index]), [StringComparison]::OrdinalIgnoreCase)) {
+                    throw ('{0}:{1}' -f $ReparseError, $lexicalNodes[$index])
+                }
+                $openedNodes.Add([pscustomobject][ordered]@{
+                    LexicalPath = ConvertTo-DenoFinalPath $lexicalNodes[$index]
+                    Handle = $handle
+                    Identity = $identity
+                }) | Out-Null
+                $handle = $null
+            }
+            finally {
+                if ($null -ne $handle) { $handle.Dispose() }
+            }
         }
+        return [pscustomobject][ordered]@{
+            Path = ConvertTo-DenoFinalPath $Path
+            Nodes = @($openedNodes)
+            Final = $openedNodes[$openedNodes.Count - 1]
+        }
+    }
+    catch {
+        for ($index = $openedNodes.Count - 1; $index -ge 0; $index--) {
+            $openedNodes[$index].Handle.Dispose()
+        }
+        throw
+    }
+}
+
+function Assert-DenoPathChainUnchanged {
+    param([Parameter(Mandatory)] $Chain, [string] $ErrorCode = 'deno_path_identity_changed')
+    foreach ($node in $Chain.Nodes) {
+        Assert-DenoPathIdentity $node.Identity (ConvertTo-DenoPathIdentity $node.Handle) $ErrorCode $node.LexicalPath
+    }
+    return $true
+}
+
+function Assert-DenoPhysicalContainment {
+    param(
+        [Parameter(Mandatory)] $RootIdentity,
+        [Parameter(Mandatory)] $ChildIdentity,
+        [Parameter(Mandatory)] [string] $ErrorCode
+    )
+    $root = ConvertTo-DenoFinalPath ([string]$RootIdentity.FinalPath)
+    $child = ConvertTo-DenoFinalPath ([string]$ChildIdentity.FinalPath)
+    $prefix = $root + [IO.Path]::DirectorySeparatorChar
+    if ([uint64]$RootIdentity.VolumeSerialNumber -ne [uint64]$ChildIdentity.VolumeSerialNumber -or
+        (-not $child.Equals($root, [StringComparison]::OrdinalIgnoreCase) -and
+         -not $child.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase))) {
+        throw $ErrorCode
+    }
+}
+
+function Assert-DenoDirectChild {
+    param(
+        [Parameter(Mandatory)] $ParentIdentity,
+        [Parameter(Mandatory)] $ChildIdentity,
+        [Parameter(Mandatory)] [string] $ErrorCode
+    )
+    if ([uint64]$ParentIdentity.VolumeSerialNumber -ne [uint64]$ChildIdentity.VolumeSerialNumber -or
+        -not ([IO.Path]::GetDirectoryName([string]$ChildIdentity.FinalPath)).Equals(
+            [string]$ParentIdentity.FinalPath, [StringComparison]::OrdinalIgnoreCase)) {
+        throw $ErrorCode
+    }
+}
+
+function Assert-DenoExistingAncestors {
+    param([Parameter(Mandatory)] [string] $Path)
+    foreach ($node in @(Get-DenoLexicalPathNodes $Path)) {
+        $handle = $null
+        try {
+            $handle = [DenoPathSafety]::Open($node, $false, $true, $false, $false)
+            $identity = ConvertTo-DenoPathIdentity $handle
+            if (($identity.FileAttributes -band [uint32][IO.FileAttributes]::ReparsePoint) -ne 0 -or
+                -not $identity.FinalPath.Equals((ConvertTo-DenoFinalPath $node), [StringComparison]::OrdinalIgnoreCase)) {
+                throw ('deno_reparse_path_rejected:{0}' -f $node)
+            }
+        }
+        catch [ComponentModel.Win32Exception] {
+            if ($_.Exception.NativeErrorCode -in @(2, 3)) { break }
+            throw
+        }
+        finally {
+            if ($null -ne $handle) { $handle.Dispose() }
+        }
+    }
+}
+
+function Open-DenoVerifiedReadFile {
+    param([Parameter(Mandatory)] [string] $Path)
+    $chain = $null
+    $borrowed = $null
+    $stream = $null
+    try {
+        $chain = Open-DenoPathChain -Path $Path -ReadFinal
+        $borrowed = [Microsoft.Win32.SafeHandles.SafeFileHandle]::new(
+            $chain.Final.Handle.Handle.DangerousGetHandle(), $false)
+        $stream = [IO.FileStream]::new($borrowed, [IO.FileAccess]::Read, 131072, $false)
+        return [pscustomobject][ordered]@{
+            Path = $chain.Path
+            Chain = $chain
+            BorrowedHandle = $borrowed
+            Stream = $stream
+        }
+    }
+    catch {
+        if ($null -ne $stream) { $stream.Dispose() }
+        elseif ($null -ne $borrowed) { $borrowed.Dispose() }
+        Close-DenoPathChain $chain
+        throw
+    }
+}
+
+function Close-DenoVerifiedReadFile {
+    param($VerifiedFile)
+    if ($null -eq $VerifiedFile) { return }
+    if ($null -ne $VerifiedFile.Stream) { $VerifiedFile.Stream.Dispose() }
+    if ($null -ne $VerifiedFile.BorrowedHandle) { $VerifiedFile.BorrowedHandle.Dispose() }
+    Close-DenoPathChain $VerifiedFile.Chain
+}
+
+function Assert-DenoVerifiedReadFileUnchanged {
+    param([Parameter(Mandatory)] $VerifiedFile)
+    return Assert-DenoPathChainUnchanged -Chain $VerifiedFile.Chain -ErrorCode 'deno_input_path_identity_changed'
+}
+
+function Get-DenoStreamDigest {
+    param([Parameter(Mandatory)] [IO.Stream] $Stream)
+    [void]$Stream.Seek(0, [IO.SeekOrigin]::Begin)
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    try {
+        $sha256 = ([Convert]::ToHexString($algorithm.ComputeHash($Stream))).ToLowerInvariant()
+    }
+    finally {
+        $algorithm.Dispose()
+        [void]$Stream.Seek(0, [IO.SeekOrigin]::Begin)
+    }
+    return [pscustomobject][ordered]@{ length = [long]$Stream.Length; sha256 = $sha256 }
+}
+
+function Read-DenoUtf8Text {
+    param([Parameter(Mandatory)] [string] $Path)
+    $verified = Open-DenoVerifiedReadFile -Path $Path
+    try {
+        $reader = [IO.StreamReader]::new(
+            $verified.Stream, [Text.UTF8Encoding]::new($false, $true), $true, 65536, $true)
+        try { return $reader.ReadToEnd() }
+        finally { $reader.Dispose() }
+    }
+    finally {
+        [void](Assert-DenoVerifiedReadFileUnchanged -VerifiedFile $verified)
+        Close-DenoVerifiedReadFile -VerifiedFile $verified
+    }
+}
+
+function Write-DenoBytes {
+    param(
+        [Parameter(Mandatory)] [string] $Path,
+        [Parameter(Mandatory)] [byte[]] $Bytes
+    )
+    $full = [IO.Path]::GetFullPath($Path)
+    $parent = Split-Path -Parent $full
+    $leaf = Split-Path -Leaf $full
+    Assert-DenoUniquePaths @($leaf) | Out-Null
+    $parentChain = Open-DenoPathChain -Path $parent
+    $stream = $null
+    try {
+        if ([IO.File]::Exists($full) -or [IO.Directory]::Exists($full)) {
+            throw 'deno_output_already_exists'
+        }
+        $stream = [IO.File]::Open($full, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        $identity = ConvertTo-DenoPathIdentity $stream.SafeFileHandle
+        if (($identity.FileAttributes -band [uint32][IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw ('deno_reparse_path_rejected:{0}' -f $full)
+        }
+        Assert-DenoDirectChild $parentChain.Final.Identity $identity 'deno_output_parent_escape'
+        $stream.Write($Bytes, 0, $Bytes.Length)
+        $stream.Flush($true)
+        Assert-DenoPathIdentity $identity (ConvertTo-DenoPathIdentity $stream.SafeFileHandle) 'deno_output_path_identity_changed' $full
+        [void](Assert-DenoPathChainUnchanged -Chain $parentChain -ErrorCode 'deno_output_parent_identity_changed')
+    }
+    finally {
+        if ($null -ne $stream) { $stream.Dispose() }
+        Close-DenoPathChain $parentChain
+    }
+}
+
+function Copy-DenoVerifiedFile {
+    param(
+        [Parameter(Mandatory)] [string] $SourcePath,
+        [Parameter(Mandatory)] [string] $DestinationPath,
+        [string] $ExpectedSha256,
+        [long] $ExpectedLength = -1
+    )
+    $source = Open-DenoVerifiedReadFile -Path $SourcePath
+    $parentChain = $null
+    $output = $null
+    try {
+        if ($ExpectedLength -ge 0 -and $source.Stream.Length -ne $ExpectedLength) {
+            throw ('deno_input_length_mismatch:{0}' -f $SourcePath)
+        }
+        if (-not [string]::IsNullOrWhiteSpace($ExpectedSha256)) {
+            $digest = Get-DenoStreamDigest -Stream $source.Stream
+            if ($ExpectedSha256 -notmatch '^[0-9a-f]{64}$' -or $digest.sha256 -cne $ExpectedSha256) {
+                throw ('deno_input_hash_mismatch:{0}' -f $SourcePath)
+            }
+        }
+        $destination = [IO.Path]::GetFullPath($DestinationPath)
+        $parent = Split-Path -Parent $destination
+        Assert-DenoUniquePaths @((Split-Path -Leaf $destination)) | Out-Null
+        $parentChain = Open-DenoPathChain -Path $parent
+        if ([IO.File]::Exists($destination) -or [IO.Directory]::Exists($destination)) {
+            throw 'deno_output_already_exists'
+        }
+        $output = [IO.File]::Open(
+            $destination, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        $outputIdentity = ConvertTo-DenoPathIdentity $output.SafeFileHandle
+        Assert-DenoDirectChild $parentChain.Final.Identity $outputIdentity 'deno_output_parent_escape'
+        [void]$source.Stream.Seek(0, [IO.SeekOrigin]::Begin)
+        $source.Stream.CopyTo($output)
+        $output.Flush($true)
+        Assert-DenoPathIdentity $outputIdentity (ConvertTo-DenoPathIdentity $output.SafeFileHandle) 'deno_output_path_identity_changed' $destination
+        [void](Assert-DenoVerifiedReadFileUnchanged -VerifiedFile $source)
+        [void](Assert-DenoPathChainUnchanged -Chain $parentChain -ErrorCode 'deno_output_parent_identity_changed')
+    }
+    finally {
+        if ($null -ne $output) { $output.Dispose() }
+        Close-DenoPathChain $parentChain
+        Close-DenoVerifiedReadFile -VerifiedFile $source
+    }
+}
+
+function Assert-DenoNoReparsePath {
+    param([Parameter(Mandatory)] [string] $Path)
+    $full = ConvertTo-DenoFinalPath $Path
+    $chain = $null
+    try {
+        $chain = Open-DenoPathChain -Path $full
+    }
+    catch [ComponentModel.Win32Exception] {
+        if ($_.Exception.NativeErrorCode -notin @(2, 3)) { throw }
+        Assert-DenoExistingAncestors -Path $full
+    }
+    finally {
+        Close-DenoPathChain $chain
     }
     return $full
 }
+
+$script:DenoOwnedStages = @{}
 
 function New-DenoProcessStageRoot {
     param([Parameter(Mandatory)] [string] $ScratchRoot)
     $scratch = Assert-DenoNoReparsePath $ScratchRoot
     if (-not [IO.Directory]::Exists($scratch)) { [void][IO.Directory]::CreateDirectory($scratch) }
-    $scratch = Assert-DenoNoReparsePath $scratch
-    $stage = Join-Path $scratch ('.deno-third-party-stage-' + $PID + '-' + [guid]::NewGuid().ToString('N'))
-    if ([IO.Directory]::Exists($stage) -or [IO.File]::Exists($stage)) { throw 'deno_process_stage_collision' }
-    [void][IO.Directory]::CreateDirectory($stage)
-    $stage = Assert-DenoNoReparsePath $stage
-    if ([IO.Path]::GetPathRoot($stage) -cne [IO.Path]::GetPathRoot($scratch)) { throw 'deno_process_stage_volume_mismatch' }
-    return $stage
+    $scratchChain = $null
+    $stageChain = $null
+    $ownerChain = $null
+    try {
+        $scratchChain = Open-DenoPathChain -Path $scratch
+        $stageName = '.deno-third-party-stage-' + $PID + '-' + [guid]::NewGuid().ToString('N')
+        Assert-DenoUniquePaths @($stageName) | Out-Null
+        $stage = Join-Path $scratch $stageName
+        if ([IO.Directory]::Exists($stage) -or [IO.File]::Exists($stage)) {
+            throw 'deno_process_stage_collision'
+        }
+        [void][IO.Directory]::CreateDirectory($stage)
+        $stageChain = Open-DenoPathChain -Path $stage -DeleteFinal
+        Assert-DenoDirectChild $scratchChain.Final.Identity $stageChain.Final.Identity 'deno_process_stage_parent_escape'
+        $token = [guid]::NewGuid().ToString('N')
+        $ownerPath = Join-Path $stage ('.deno-stage-owner-' + $token)
+        Write-DenoUtf8Text -Path $ownerPath -Text $token
+        $ownerChain = Open-DenoPathChain -Path $ownerPath -DeleteFinal
+        Assert-DenoDirectChild $stageChain.Final.Identity $ownerChain.Final.Identity 'deno_process_stage_owner_escape'
+        $key = (ConvertTo-DenoFinalPath $stage).ToLowerInvariant()
+        $script:DenoOwnedStages[$key] = [pscustomobject][ordered]@{
+            Path = ConvertTo-DenoFinalPath $stage
+            ScratchChain = $scratchChain
+            StageChain = $stageChain
+            OwnerPath = ConvertTo-DenoFinalPath $ownerPath
+            OwnerChain = $ownerChain
+        }
+        $scratchChain = $null
+        $stageChain = $null
+        $ownerChain = $null
+        return ConvertTo-DenoFinalPath $stage
+    }
+    catch {
+        Close-DenoPathChain $ownerChain
+        Close-DenoPathChain $stageChain
+        Close-DenoPathChain $scratchChain
+        throw
+    }
+}
+
+function Remove-DenoProcessStageRoot {
+    param([Parameter(Mandatory)] [string] $Path)
+    $key = (ConvertTo-DenoFinalPath $Path).ToLowerInvariant()
+    if (-not $script:DenoOwnedStages.ContainsKey($key)) { throw 'deno_process_stage_not_owned' }
+    $owned = $script:DenoOwnedStages[$key]
+    $deleted = $false
+    try {
+        [void](Assert-DenoPathChainUnchanged -Chain $owned.ScratchChain -ErrorCode 'deno_process_stage_parent_identity_changed')
+        [void](Assert-DenoPathChainUnchanged -Chain $owned.StageChain -ErrorCode 'deno_process_stage_identity_changed')
+        [void](Assert-DenoPathChainUnchanged -Chain $owned.OwnerChain -ErrorCode 'deno_process_stage_owner_identity_changed')
+        $entries = @([IO.Directory]::EnumerateFileSystemEntries($owned.Path))
+        if ($entries.Count -eq 1 -and
+            (ConvertTo-DenoFinalPath $entries[0]).Equals($owned.OwnerPath, [StringComparison]::OrdinalIgnoreCase)) {
+            [DenoPathSafety]::MarkDelete($owned.OwnerChain.Final.Handle)
+            Close-DenoPathChain $owned.OwnerChain
+            $owned.OwnerChain = $null
+            if (@([IO.Directory]::EnumerateFileSystemEntries($owned.Path)).Count -ne 0) {
+                throw 'deno_process_stage_cleanup_not_empty'
+            }
+            [DenoPathSafety]::MarkDelete($owned.StageChain.Final.Handle)
+            $deleted = $true
+        }
+    }
+    finally {
+        Close-DenoPathChain $owned.OwnerChain
+        Close-DenoPathChain $owned.StageChain
+        Close-DenoPathChain $owned.ScratchChain
+        [void]$script:DenoOwnedStages.Remove($key)
+    }
+    return $deleted
+}
+
+function Close-DenoProcessStageOwnership {
+    param([Parameter(Mandatory)] [string] $Key)
+    if (-not $script:DenoOwnedStages.ContainsKey($Key)) { return }
+    $owned = $script:DenoOwnedStages[$Key]
+    Close-DenoPathChain $owned.OwnerChain
+    Close-DenoPathChain $owned.StageChain
+    Close-DenoPathChain $owned.ScratchChain
+    [void]$script:DenoOwnedStages.Remove($Key)
 }
 
 function Complete-DenoAtomicDirectory {
-    param([Parameter(Mandatory)] [string] $Source, [Parameter(Mandatory)] [string] $Destination)
-    $sourceFull = Assert-DenoNoReparsePath $Source
-    $destinationFull = Assert-DenoNoReparsePath $Destination
+    param(
+        [Parameter(Mandatory)] [string] $Source,
+        [Parameter(Mandatory)] [string] $Destination,
+        [scriptblock] $BeforeFinalizeAction
+    )
+    $sourceFull = ConvertTo-DenoFinalPath $Source
+    $destinationFull = ConvertTo-DenoFinalPath $Destination
     if (-not [IO.Directory]::Exists($sourceFull)) { throw 'deno_process_stage_missing' }
-    if ([IO.Directory]::Exists($destinationFull) -or [IO.File]::Exists($destinationFull)) { throw 'deno_output_already_exists' }
-    if ([IO.Path]::GetPathRoot($sourceFull) -cne [IO.Path]::GetPathRoot($destinationFull)) { throw 'deno_process_stage_volume_mismatch' }
-    [IO.Directory]::Move($sourceFull, $destinationFull)
+    $destinationParent = Split-Path -Parent $destinationFull
+    $destinationLeaf = Split-Path -Leaf $destinationFull
+    Assert-DenoUniquePaths @($destinationLeaf) | Out-Null
+    $ownedStageKey = $null
+    foreach ($candidate in @($script:DenoOwnedStages.Keys)) {
+        $prefix = ([string]$script:DenoOwnedStages[$candidate].Path).TrimEnd('\') + '\'
+        if ($sourceFull.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+            $ownedStageKey = [string]$candidate
+            break
+        }
+    }
+    $sourceChain = $null
+    $destinationParentChain = $null
+    try {
+        $destinationParentChain = Open-DenoPathChain -Path $destinationParent
+        $sourceChain = Open-DenoPathChain -Path $sourceFull -DeleteFinal -ShareDeleteFinal
+        $sourceParent = $sourceChain.Nodes[$sourceChain.Nodes.Count - 2]
+        Assert-DenoDirectChild $sourceParent.Identity $sourceChain.Final.Identity 'deno_process_stage_source_escape'
+        if ([uint64]$sourceChain.Final.Identity.VolumeSerialNumber -ne
+            [uint64]$destinationParentChain.Final.Identity.VolumeSerialNumber) {
+            throw 'deno_process_stage_volume_mismatch'
+        }
+        if ([IO.Directory]::Exists($destinationFull) -or [IO.File]::Exists($destinationFull)) {
+            throw 'deno_output_already_exists'
+        }
+        if ($null -ne $BeforeFinalizeAction) { & $BeforeFinalizeAction }
+        [void](Assert-DenoPathChainUnchanged -Chain $sourceChain -ErrorCode 'deno_process_stage_identity_changed')
+        [void](Assert-DenoPathChainUnchanged -Chain $destinationParentChain -ErrorCode 'deno_output_parent_identity_changed')
+        if ([IO.Directory]::Exists($destinationFull) -or [IO.File]::Exists($destinationFull)) {
+            throw 'deno_output_already_exists'
+        }
+        $before = $sourceChain.Final.Identity
+        [DenoPathSafety]::Rename(
+            $sourceChain.Final.Handle,
+            $destinationParentChain.Final.Handle,
+            $destinationLeaf)
+        $after = ConvertTo-DenoPathIdentity $sourceChain.Final.Handle
+        if ([uint64]$before.VolumeSerialNumber -ne [uint64]$after.VolumeSerialNumber -or
+            -not ([string]$before.FileId).Equals([string]$after.FileId, [StringComparison]::Ordinal) -or
+            [uint32]$before.FileAttributes -ne [uint32]$after.FileAttributes -or
+            -not $after.FinalPath.Equals($destinationFull, [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'deno_output_finalize_identity_changed'
+        }
+        return $true
+    }
+    catch {
+        if ($null -ne $ownedStageKey) {
+            Close-DenoProcessStageOwnership -Key $ownedStageKey
+        }
+        throw
+    }
+    finally {
+        Close-DenoPathChain $sourceChain
+        Close-DenoPathChain $destinationParentChain
+    }
 }
 
 function Get-DenoSha256 {
     param([Parameter(Mandatory)] [string] $Path)
-    $full = Assert-DenoNoReparsePath $Path
-    return (Get-FileHash -LiteralPath $full -Algorithm SHA256).Hash.ToLowerInvariant()
+    $verified = Open-DenoVerifiedReadFile -Path $Path
+    try {
+        return (Get-DenoStreamDigest -Stream $verified.Stream).sha256
+    }
+    finally {
+        [void](Assert-DenoVerifiedReadFileUnchanged -VerifiedFile $verified)
+        Close-DenoVerifiedReadFile -VerifiedFile $verified
+    }
+}
+
+function Get-DenoFileLength {
+    param([Parameter(Mandatory)] [string] $Path)
+    $verified = Open-DenoVerifiedReadFile -Path $Path
+    try { return [long]$verified.Stream.Length }
+    finally {
+        [void](Assert-DenoVerifiedReadFileUnchanged -VerifiedFile $verified)
+        Close-DenoVerifiedReadFile -VerifiedFile $verified
+    }
 }
 
 function Write-DenoUtf8Text {
     param([Parameter(Mandatory)] [string] $Path, [Parameter(Mandatory)] [string] $Text)
-    $Path = Assert-DenoNoReparsePath $Path
-    $normalized = $Text.Replace("`r`n", "`n").Replace("`r", "`n")
-    [IO.File]::WriteAllText($Path, $normalized, [Text.UTF8Encoding]::new($false))
+    $normalized = $Text.Replace([string][char]13 + [char]10, [string][char]10).Replace([string][char]13, [string][char]10)
+    Write-DenoBytes -Path $Path -Bytes ([Text.UTF8Encoding]::new($false).GetBytes($normalized))
 }
 
 function Read-DenoJson {
     param([Parameter(Mandatory)] [string] $Path)
-    $Path = Assert-DenoNoReparsePath $Path
-    $raw = [IO.File]::ReadAllText($Path, [Text.UTF8Encoding]::new($false, $true))
+    $raw = Read-DenoUtf8Text -Path $Path
     return ConvertFrom-Json -InputObject $raw -Depth 100
 }
 
@@ -94,6 +770,57 @@ function Assert-DenoHash {
     if ($ExpectedSha256 -notmatch '^[0-9a-f]{64}$' -or (Get-DenoSha256 $Path) -cne $ExpectedSha256) {
         throw "deno_input_hash_mismatch:$Path"
     }
+}
+
+function Assert-DenoEmbeddedProfile {
+    param([Parameter(Mandatory)] [object] $Inputs)
+    if (@($Inputs.embeddedComponents).Count -ne 1) {
+        throw 'deno_embedded_profile_invalid'
+    }
+    $expected = [ordered]@{
+        id = 'typescript@5.9.2'
+        name = 'TypeScript'
+        version = '5.9.2'
+        denoSourceCommit = '2d674b25625bcc367853d00fe86f6e84390f88cb'
+        sourceFile = [ordered]@{
+            path = 'cli/tsc/00_typescript.js'
+            archiveEntry = 'deno-2d674b25625bcc367853d00fe86f6e84390f88cb/cli/tsc/00_typescript.js'
+            bundlePath = 'SOURCES/embedded/typescript-5.9.2/cli/tsc/00_typescript.js'
+            length = [long]8492282
+            sha256 = '932f9fd96b20ef8c2496d7f70419c69fa40266a92d81a2b229737fa6dd324ac8'
+            requiredText = @(
+                'version = "5.9.2"',
+                'Copyright (c) Microsoft Corporation. All rights reserved.'
+            )
+        }
+        copyright = 'Copyright (c) Microsoft Corporation. All rights reserved.'
+        license = 'Apache-2.0'
+        licenseFile = [ordered]@{
+            path = 'text/Apache-2.0.txt'
+            bundlePath = 'LICENSES/embedded/typescript-5.9.2/Apache-2.0.txt'
+            length = [long]10280
+            sha256 = '074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff'
+        }
+        buildInclusionEvidence = @(
+            [ordered]@{
+                role = 'compressed-by-cli-build-rs'
+                path = 'cli/build.rs'
+                archiveEntry = 'deno-2d674b25625bcc367853d00fe86f6e84390f88cb/cli/build.rs'
+                requiredText = '"./tsc/00_typescript.js",'
+            },
+            [ordered]@{
+                role = 'referenced-by-cli-tsc-module'
+                path = 'cli/tsc/mod.rs'
+                archiveEntry = 'deno-2d674b25625bcc367853d00fe86f6e84390f88cb/cli/tsc/mod.rs'
+                requiredText = 'maybe_compressed_source!("tsc/00_typescript.js");'
+            }
+        )
+        inclusionReason = 'embedded-compressed-typescript-compiler-source'
+    }
+    $actualJson = $Inputs.embeddedComponents[0] | ConvertTo-Json -Depth 20 -Compress
+    $expectedJson = $expected | ConvertTo-Json -Depth 20 -Compress
+    if ($actualJson -cne $expectedJson) { throw 'deno_embedded_profile_invalid' }
+    return $true
 }
 
 function Assert-DenoImmutableCargoSource {
@@ -116,11 +843,24 @@ function Assert-DenoUniquePaths {
     foreach ($inputPath in $Paths) {
         $path = $inputPath.Replace('\', '/')
         if ([string]::IsNullOrWhiteSpace($path) -or $path.StartsWith('/') -or
-            $path -match '^[A-Za-z]:' -or $path.Contains([char]0) -or
-            @($path.Split('/') | Where-Object { $_ -in @('', '.', '..') }).Count -gt 0) {
+            $path -match '^[A-Za-z]:' -or
+            -not $path.Equals($path.Normalize([Text.NormalizationForm]::FormC), [StringComparison]::Ordinal)) {
             throw "deno_path_invalid:$path"
         }
-        if (-not $seen.Add($path)) { throw "deno_path_case_collision:$($path.ToLowerInvariant())" }
+        $segments = $path.Split([char]'/', [StringSplitOptions]::None)
+        foreach ($segment in $segments) {
+            if ([string]::IsNullOrEmpty($segment) -or
+                $segment -ceq '.' -or $segment -ceq '..' -or
+                $segment -match '[\x00-\x1F]' -or
+                $segment -match '[ .]$' -or
+                $segment.IndexOfAny([char[]]'<>:"|?*') -ge 0 -or
+                $segment -match '(?i)^(CON|PRN|AUX|NUL|COM(?:[1-9]|[¹²³])|LPT(?:[1-9]|[¹²³]))(?:\.|$)') {
+                throw "deno_path_invalid:$path"
+            }
+        }
+        if (-not $seen.Add($path)) {
+            throw "deno_path_case_collision:$($path.ToLowerInvariant())"
+        }
     }
     return $true
 }
@@ -344,7 +1084,7 @@ function Resolve-DenoExplicitLicenseRef {
         $path = Join-Path $SpdxRoot ([string]$textRecord.path)
         $item = Get-Item -LiteralPath $path
         if ($item.Length -ne [long]$textRecord.length -or (Get-DenoSha256 $path) -cne [string]$textRecord.sha256) { throw "deno_license_ref_canonical_text_mismatch:$id`:$($textRecord.id)" }
-        $text = [IO.File]::ReadAllText($path, [Text.UTF8Encoding]::new($false, $true))
+        $text = Read-DenoUtf8Text -Path $path
         $builder.AppendLine("Canonical text named by the literal declaration: $($textRecord.id)").AppendLine('--- BEGIN CANONICAL TEXT ---').Append($text) | Out-Null
         if (-not $text.EndsWith("`n", [StringComparison]::Ordinal)) { $builder.AppendLine() | Out-Null }
         $builder.AppendLine('--- END CANONICAL TEXT ---').AppendLine() | Out-Null
@@ -371,10 +1111,13 @@ function Get-DenoTomlString {
 }
 
 function Get-DenoCrateArchiveEvidence {
-    param([Parameter(Mandatory)] [object] $Package, [Parameter(Mandatory)] [string] $CrateArchivePath)
+    param(
+        [Parameter(Mandatory)] [object] $Package,
+        [Parameter(Mandatory)] [string] $CrateArchivePath,
+        [scriptblock] $AfterHashAction
+    )
     $id = ([string]$Package.name) + '@' + ([string]$Package.version)
     if ([string]$Package.checksum -notmatch '^[0-9a-f]{64}$') { throw "deno_cargo_checksum_missing:$id" }
-    Assert-DenoHash $CrateArchivePath ([string]$Package.checksum)
     $prefix = ([string]$Package.name) + '-' + ([string]$Package.version) + '/'
     $files = [Collections.Generic.List[object]]::new()
     $fileMap = [Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
@@ -383,10 +1126,16 @@ function Get-DenoCrateArchiveEvidence {
     $manifestText = $null
     $metadataManifest = $null
     $metadataManifestText = $null
-    $archive = Assert-DenoNoReparsePath $CrateArchivePath
-    $fileStream = [IO.File]::Open($archive, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    $verified = Open-DenoVerifiedReadFile -Path $CrateArchivePath
     try {
-        $gzip = [IO.Compression.GZipStream]::new($fileStream, [IO.Compression.CompressionMode]::Decompress, $true)
+        $digest = Get-DenoStreamDigest -Stream $verified.Stream
+        if ($digest.sha256 -cne [string]$Package.checksum) {
+            throw ('deno_input_hash_mismatch:{0}' -f $CrateArchivePath)
+        }
+        if ($null -ne $AfterHashAction) { & $AfterHashAction }
+        [void](Assert-DenoVerifiedReadFileUnchanged -VerifiedFile $verified)
+        [void]$verified.Stream.Seek(0, [IO.SeekOrigin]::Begin)
+        $gzip = [IO.Compression.GZipStream]::new($verified.Stream, [IO.Compression.CompressionMode]::Decompress, $true)
         try {
             $reader = [System.Formats.Tar.TarReader]::new($gzip, $true)
             try {
@@ -439,7 +1188,10 @@ function Get-DenoCrateArchiveEvidence {
         }
         finally { $gzip.Dispose() }
     }
-    finally { $fileStream.Dispose() }
+    finally {
+        try { [void](Assert-DenoVerifiedReadFileUnchanged -VerifiedFile $verified) }
+        finally { Close-DenoVerifiedReadFile -VerifiedFile $verified }
+    }
     if ($null -eq $metadataManifest -or [string]::IsNullOrWhiteSpace($metadataManifestText)) { throw "deno_crate_manifest_missing:$id" }
     if ($null -eq $manifest) {
         $manifest = $metadataManifest
@@ -488,51 +1240,48 @@ function Assert-DenoVendorAgainstCrate {
 
 function Get-DenoZipEntrySha256 {
     param([Parameter(Mandatory)] [string] $ArchivePath, [Parameter(Mandatory)] [string] $EntryPath)
-    $zip = [IO.Compression.ZipFile]::OpenRead($ArchivePath)
-    try {
-        $entries = @($zip.Entries | Where-Object { $_.FullName -ceq $EntryPath })
-        if ($entries.Count -ne 1) { throw "deno_upstream_license_entry_missing:$EntryPath" }
-        $stream = $entries[0].Open()
-        try { $hash = [Security.Cryptography.SHA256]::Create(); try { return ([Convert]::ToHexString($hash.ComputeHash($stream))).ToLowerInvariant() } finally { $hash.Dispose() } } finally { $stream.Dispose() }
-    }
-    finally { $zip.Dispose() }
+    return Get-DenoSha256Bytes (Get-DenoZipEntryBytes -ArchivePath $ArchivePath -EntryPath $EntryPath)
 }
 
 function Get-DenoZipEntryBytes {
     param([Parameter(Mandatory)] [string] $ArchivePath, [Parameter(Mandatory)] [string] $EntryPath)
-    $ArchivePath = Assert-DenoNoReparsePath $ArchivePath
-    $zip = [IO.Compression.ZipFile]::OpenRead($ArchivePath)
+    Assert-DenoUniquePaths @($EntryPath) | Out-Null
+    $verified = Open-DenoVerifiedReadFile -Path $ArchivePath
     try {
-        $entries = @($zip.Entries | Where-Object { $_.FullName -ceq $EntryPath })
-        if ($entries.Count -ne 1) { throw "deno_upstream_license_entry_missing:$EntryPath" }
-        $stream = $entries[0].Open()
+        $zip = [IO.Compression.ZipArchive]::new(
+            $verified.Stream, [IO.Compression.ZipArchiveMode]::Read, $true)
         try {
-            $memory = [IO.MemoryStream]::new()
-            try { $stream.CopyTo($memory); return ,$memory.ToArray() } finally { $memory.Dispose() }
+            Assert-DenoUniquePaths @($zip.Entries | Where-Object { -not $_.FullName.EndsWith('/') } | ForEach-Object FullName) | Out-Null
+            $entries = @($zip.Entries | Where-Object { $_.FullName -ceq $EntryPath })
+            if ($entries.Count -ne 1) { throw "deno_upstream_license_entry_missing:$EntryPath" }
+            $stream = $entries[0].Open()
+            try {
+                $memory = [IO.MemoryStream]::new()
+                try { $stream.CopyTo($memory); return ,$memory.ToArray() }
+                finally { $memory.Dispose() }
+            }
+            finally { $stream.Dispose() }
         }
-        finally { $stream.Dispose() }
+        finally { $zip.Dispose() }
     }
-    finally { $zip.Dispose() }
+    finally {
+        [void](Assert-DenoVerifiedReadFileUnchanged -VerifiedFile $verified)
+        Close-DenoVerifiedReadFile -VerifiedFile $verified
+    }
 }
 
 function Copy-DenoZipEntry {
     param([Parameter(Mandatory)] [string] $ArchivePath, [Parameter(Mandatory)] [string] $EntryPath, [Parameter(Mandatory)] [string] $Destination)
-    $zip = [IO.Compression.ZipFile]::OpenRead($ArchivePath)
-    try {
-        $entries = @($zip.Entries | Where-Object { $_.FullName -ceq $EntryPath })
-        if ($entries.Count -ne 1) { throw "deno_upstream_license_entry_missing:$EntryPath" }
-        New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
-        [IO.Compression.ZipFileExtensions]::ExtractToFile($entries[0], $Destination, $false)
-    }
-    finally { $zip.Dispose() }
+    New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
+    Write-DenoBytes -Path $Destination -Bytes (Get-DenoZipEntryBytes -ArchivePath $ArchivePath -EntryPath $EntryPath)
 }
 
 function Get-DenoTarEntryBytes {
     param([Parameter(Mandatory)] [string] $ArchivePath, [Parameter(Mandatory)] [string] $EntryPath)
-    $ArchivePath = Assert-DenoNoReparsePath $ArchivePath
-    $fileStream = [IO.File]::Open($ArchivePath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    Assert-DenoUniquePaths @($EntryPath) | Out-Null
+    $verified = Open-DenoVerifiedReadFile -Path $ArchivePath
     try {
-        $gzip = [IO.Compression.GZipStream]::new($fileStream, [IO.Compression.CompressionMode]::Decompress, $true)
+        $gzip = [IO.Compression.GZipStream]::new($verified.Stream, [IO.Compression.CompressionMode]::Decompress, $true)
         try {
             $reader = [System.Formats.Tar.TarReader]::new($gzip, $true)
             try {
@@ -551,14 +1300,52 @@ function Get-DenoTarEntryBytes {
         }
         finally { $gzip.Dispose() }
     }
-    finally { $fileStream.Dispose() }
+    finally {
+        [void](Assert-DenoVerifiedReadFileUnchanged -VerifiedFile $verified)
+        Close-DenoVerifiedReadFile -VerifiedFile $verified
+    }
 }
 
 function Copy-DenoTarEntry {
     param([Parameter(Mandatory)] [string] $ArchivePath, [Parameter(Mandatory)] [string] $EntryPath, [Parameter(Mandatory)] [string] $Destination)
     New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
-    $Destination = Assert-DenoNoReparsePath $Destination
-    [IO.File]::WriteAllBytes($Destination, (Get-DenoTarEntryBytes -ArchivePath $ArchivePath -EntryPath $EntryPath))
+    Write-DenoBytes -Path $Destination -Bytes (Get-DenoTarEntryBytes -ArchivePath $ArchivePath -EntryPath $EntryPath)
+}
+
+function Get-DenoTarArchiveEntries {
+    param(
+        [Parameter(Mandatory)] [string] $ArchivePath,
+        [Parameter(Mandatory)] [string] $ExpectedSha256,
+        [Parameter(Mandatory)] [long] $ExpectedLength
+    )
+    $verified = Open-DenoVerifiedReadFile -Path $ArchivePath
+    try {
+        $digest = Get-DenoStreamDigest -Stream $verified.Stream
+        if ($digest.length -ne $ExpectedLength) { throw ('deno_native_archive_length_mismatch:{0}' -f $ArchivePath) }
+        if ($ExpectedSha256 -notmatch '^[0-9a-f]{64}$' -or $digest.sha256 -cne $ExpectedSha256) {
+            throw ('deno_input_hash_mismatch:{0}' -f $ArchivePath)
+        }
+        $gzip = [IO.Compression.GZipStream]::new($verified.Stream, [IO.Compression.CompressionMode]::Decompress, $true)
+        try {
+            $reader = [System.Formats.Tar.TarReader]::new($gzip, $true)
+            try {
+                $entries = [Collections.Generic.List[string]]::new()
+                while ($null -ne ($entry = $reader.GetNextEntry())) {
+                    if ($entry.EntryType -eq [System.Formats.Tar.TarEntryType]::Directory) { continue }
+                    $entries.Add($entry.Name.Replace('\', '/')) | Out-Null
+                }
+            }
+            finally { $reader.Dispose() }
+        }
+        finally { $gzip.Dispose() }
+        if ($entries.Count -eq 0) { throw ('deno_native_archive_invalid:{0}' -f $ArchivePath) }
+        Assert-DenoUniquePaths @($entries) | Out-Null
+        return @($entries)
+    }
+    finally {
+        [void](Assert-DenoVerifiedReadFileUnchanged -VerifiedFile $verified)
+        Close-DenoVerifiedReadFile -VerifiedFile $verified
+    }
 }
 
 function Add-DenoEmbeddedComponent {
@@ -595,14 +1382,13 @@ function Add-DenoEmbeddedComponent {
     }
     $license = $Component.licenseFile
     $licensePath = Join-Path $SpdxRoot ([string]$license.path)
-    $licenseItem = Get-Item -LiteralPath (Assert-DenoNoReparsePath $licensePath)
-    if ($licenseItem.Length -ne [long]$license.length -or (Get-DenoSha256 $licensePath) -cne [string]$license.sha256) { throw "deno_embedded_license_mismatch:$($Component.id)" }
+    if ((Get-DenoFileLength $licensePath) -ne [long]$license.length -or (Get-DenoSha256 $licensePath) -cne [string]$license.sha256) { throw "deno_embedded_license_mismatch:$($Component.id)" }
     $sourceDestination = Join-Path $StageRoot ([string]$source.bundlePath)
     New-Item -ItemType Directory -Path (Split-Path -Parent $sourceDestination) -Force | Out-Null
     [IO.File]::WriteAllBytes((Assert-DenoNoReparsePath $sourceDestination), $sourceBytes)
     $licenseDestination = Join-Path $StageRoot ([string]$license.bundlePath)
     New-Item -ItemType Directory -Path (Split-Path -Parent $licenseDestination) -Force | Out-Null
-    Copy-Item -LiteralPath $licensePath -Destination (Assert-DenoNoReparsePath $licenseDestination)
+    Copy-DenoVerifiedFile -SourcePath $licensePath -DestinationPath (Assert-DenoNoReparsePath $licenseDestination) -ExpectedSha256 ([string]$license.sha256) -ExpectedLength ([long]$license.length)
     $OutputPaths.Add([string]$source.bundlePath)
     $OutputPaths.Add([string]$license.bundlePath)
     $licenseText = [IO.File]::ReadAllText($licensePath, [Text.UTF8Encoding]::new($false, $true))
@@ -780,8 +1566,14 @@ function New-DenoDeterministicZip {
             for ($index = 0; $index -lt $files.Count; $index++) {
                 $entry = $zip.CreateEntry($relative[$index], [IO.Compression.CompressionLevel]::Optimal)
                 $entry.LastWriteTime = [DateTimeOffset]::new(1980, 1, 1, 0, 0, 0, [TimeSpan]::Zero)
-                $input = [IO.File]::OpenRead($files[$index].FullName)
-                try { $output = $entry.Open(); try { $input.CopyTo($output) } finally { $output.Dispose() } } finally { $input.Dispose() }
+                $input = Open-DenoVerifiedReadFile -Path $files[$index].FullName
+                try {
+                    $output = $entry.Open()
+                    try { $input.Stream.CopyTo($output) }
+                    finally { $output.Dispose() }
+                    [void](Assert-DenoVerifiedReadFileUnchanged -VerifiedFile $input)
+                }
+                finally { Close-DenoVerifiedReadFile -VerifiedFile $input }
             }
         }
         finally { $zip.Dispose() }
@@ -814,20 +1606,25 @@ function Invoke-DenoThirdPartyNoticeCollection {
         [Parameter(Mandatory)] [string] $UpstreamFallbackManifest,
         [Parameter(Mandatory)] [string] $ScratchRoot
     )
-    foreach ($inputPath in @($ManifestRoot, $DenoSourceRoot, $RustyV8SourceRoot, $RustyV8GitRepositoryPath,
-            $V8SourceRoot, $VendorRoot, $OfficialMetadataPath, $SupersetMetadataPath, $DenoExePath,
-            $DenoSourceArchivePath, $RustyV8SourceArchivePath, $V8SourceArchivePath,
-            $RustyV8StaticLibArchivePath, $NativeSourceRoot, $CrateArchiveRoot, $SpdxRoot,
-            $SpdxArchivePath, $UpstreamSourceRoot, $UpstreamFallbackManifest)) {
-        [void](Assert-DenoNoReparsePath $inputPath)
-    }
-    $ScratchRoot = Assert-DenoNoReparsePath $ScratchRoot
-    if (-not [IO.Directory]::Exists($ScratchRoot)) { [void][IO.Directory]::CreateDirectory($ScratchRoot) }
-    $ScratchRoot = Assert-DenoNoReparsePath $ScratchRoot
-    $finalOutputRoot = Join-Path $ScratchRoot 'deno-third-party-output'
-    [void](Assert-DenoNoReparsePath $finalOutputRoot)
-    if ([IO.Directory]::Exists($finalOutputRoot) -or [IO.File]::Exists($finalOutputRoot)) { throw 'deno_output_already_exists' }
+    $mainGuards = [Collections.Generic.List[object]]::new()
+    try {
+        foreach ($inputPath in @($ManifestRoot, $DenoSourceRoot, $RustyV8SourceRoot, $RustyV8GitRepositoryPath,
+                $V8SourceRoot, $VendorRoot, $OfficialMetadataPath, $SupersetMetadataPath, $DenoExePath,
+                $DenoSourceArchivePath, $RustyV8SourceArchivePath, $V8SourceArchivePath,
+                $RustyV8StaticLibArchivePath, $NativeSourceRoot, $CrateArchiveRoot, $SpdxRoot,
+                $SpdxArchivePath, $UpstreamSourceRoot, $UpstreamFallbackManifest)) {
+            $guard = Open-DenoPathChain -Path $inputPath -ReadFinal:([IO.File]::Exists($inputPath))
+            $mainGuards.Add($guard) | Out-Null
+        }
+        $ScratchRoot = Assert-DenoNoReparsePath $ScratchRoot
+        if (-not [IO.Directory]::Exists($ScratchRoot)) { [void][IO.Directory]::CreateDirectory($ScratchRoot) }
+        $scratchGuard = Open-DenoPathChain -Path $ScratchRoot
+        $mainGuards.Add($scratchGuard) | Out-Null
+        $finalOutputRoot = Join-Path $ScratchRoot 'deno-third-party-output'
+        [void](Assert-DenoNoReparsePath $finalOutputRoot)
+        if ([IO.Directory]::Exists($finalOutputRoot) -or [IO.File]::Exists($finalOutputRoot)) { throw 'deno_output_already_exists' }
     $inputs = Read-DenoJson (Join-Path $ManifestRoot 'inputs.json')
+    Assert-DenoEmbeddedProfile -Inputs $inputs | Out-Null
     $native = Read-DenoJson (Join-Path $ManifestRoot 'native-components.json')
     $fallbacks = Read-DenoJson $UpstreamFallbackManifest
     if ($inputs.schemaVersion -cne 'deno-third-party-inputs/v3' -or
@@ -908,12 +1705,7 @@ function Invoke-DenoThirdPartyNoticeCollection {
     $nativeLicenseMap = @{}
     foreach ($component in $native.components | Where-Object { $_.path -ne 'v8' }) {
         $archive = Join-Path $NativeSourceRoot ([string]$component.archiveFile)
-        $item = Get-Item -LiteralPath $archive
-        if ($item.Length -ne [long]$component.length) { throw "deno_native_archive_length_mismatch:$($component.path)" }
-        Assert-DenoHash $archive ([string]$component.sha256)
-        $entries = @(& tar.exe -tzf $archive)
-        if ($LASTEXITCODE -ne 0 -or $entries.Count -eq 0) { throw "deno_native_archive_invalid:$($component.path)" }
-        Assert-DenoUniquePaths @($entries | Where-Object { -not $_.EndsWith('/') }) | Out-Null
+        $entries = @(Get-DenoTarArchiveEntries -ArchivePath $archive -ExpectedSha256 ([string]$component.sha256) -ExpectedLength ([long]$component.length))
         $licenses = @($entries | Where-Object { (Split-Path $_ -Leaf) -match '^(?i:LICENSE|LICENCE|COPYING|NOTICE|PATENTS|COPYRIGHT)(?:[._-].*)?$' })
         if ($component.licenseRequired -and $licenses.Count -eq 0) { throw "deno_native_license_file_missing:$($component.path)" }
         $nativeLicenseMap[[string]$component.path] = @($licenses | Sort-Object -Unique)
@@ -932,7 +1724,7 @@ function Invoke-DenoThirdPartyNoticeCollection {
             $licenseRefMapping = if ($licenseRefMap.ContainsKey($id)) { $licenseRefMap[$id] } else { $null }
             $record = Assert-DenoCratePackage -Package $package -VendorPath $vendorMap[$key] -CrateArchivePath $crateArchive -SpdxRoot $SpdxRoot -LicenseRefMapping $licenseRefMapping -UpstreamFallback $fallback -UpstreamSourceRoot $UpstreamSourceRoot
             $reason = if ($officialSet.Contains($id)) { 'official-workflow-profile' } elseif ($supersetSet.Contains($id)) { 'all-features-conservative-superset' } else { 'cargo-lock-conservative-superset' }
-            $crateRecords.Add([ordered]@{ name = $package.name; version = $package.version; source = $package.source; sourceArchive = [ordered]@{ fileName = (Split-Path $crateArchive -Leaf); length = (Get-Item $crateArchive).Length; sha256 = $package.checksum; url = "https://static.crates.io/crates/$($package.name)/$($package.name)-$($package.version).crate" }; checksum = $package.checksum; crateManifest = $record.crateManifest; license = $record.license; licenseFile = $record.licenseFile; repository = $record.repository; resolution = $record.resolution; resolvedLicenseFiles = $record.resolvedLicenseFiles; spdxLicenseIds = $record.spdxLicenseIds; spdxExceptionIds = $record.spdxExceptionIds; licenseRefId = $record.licenseRefId; extractedTextSha256 = $record.extractedTextSha256; licenseComments = $record.licenseComments; canonicalTexts = $record.canonicalTexts; provenance = $record.provenance; inclusionReason = $reason })
+            $crateRecords.Add([ordered]@{ name = $package.name; version = $package.version; source = $package.source; sourceArchive = [ordered]@{ fileName = (Split-Path $crateArchive -Leaf); length = (Get-DenoFileLength $crateArchive); sha256 = $package.checksum; url = "https://static.crates.io/crates/$($package.name)/$($package.name)-$($package.version).crate" }; checksum = $package.checksum; crateManifest = $record.crateManifest; license = $record.license; licenseFile = $record.licenseFile; repository = $record.repository; resolution = $record.resolution; resolvedLicenseFiles = $record.resolvedLicenseFiles; spdxLicenseIds = $record.spdxLicenseIds; spdxExceptionIds = $record.spdxExceptionIds; licenseRefId = $record.licenseRefId; extractedTextSha256 = $record.extractedTextSha256; licenseComments = $record.licenseComments; canonicalTexts = $record.canonicalTexts; provenance = $record.provenance; inclusionReason = $reason })
         }
         catch {
             if ($unresolvedMap.ContainsKey($id)) { $blockers.Add("deno_upstream_license_unresolved:$id") }
@@ -974,7 +1766,7 @@ function Invoke-DenoThirdPartyNoticeCollection {
             }
             else { throw "deno_workspace_license_ambiguous:$id" }
             $reason = if ($officialSet.Contains($id)) { 'official-workflow-profile' } else { 'all-features-conservative-superset' }
-            $workspaceRecords.Add([ordered]@{ name = [string]$package.name; version = [string]$package.version; source = "https://github.com/denoland/deno/tree/$($inputs.releaseIdentity.denoSourceCommit)/$($relativeManifest.Substring(0, $relativeManifest.LastIndexOf('/')))"; sourceManifest = [ordered]@{ path = $relativeManifest; length = (Get-Item $manifestPath).Length; sha256 = Get-DenoSha256 $manifestPath }; license = $license; licenseFile = [string]$package.license_file; repository = [string]$package.repository; resolution = $resolution; resolvedLicenseFiles = $resolvedFiles; spdxLicenseIds = $spdxLicenseIds; spdxExceptionIds = $spdxExceptionIds; provenance = $provenance; inclusionReason = $reason })
+            $workspaceRecords.Add([ordered]@{ name = [string]$package.name; version = [string]$package.version; source = "https://github.com/denoland/deno/tree/$($inputs.releaseIdentity.denoSourceCommit)/$($relativeManifest.Substring(0, $relativeManifest.LastIndexOf('/')))"; sourceManifest = [ordered]@{ path = $relativeManifest; length = (Get-DenoFileLength $manifestPath); sha256 = Get-DenoSha256 $manifestPath }; license = $license; licenseFile = [string]$package.license_file; repository = [string]$package.repository; resolution = $resolution; resolvedLicenseFiles = $resolvedFiles; spdxLicenseIds = $spdxLicenseIds; spdxExceptionIds = $spdxExceptionIds; provenance = $provenance; inclusionReason = $reason })
         }
         catch { $blockers.Add($_.Exception.Message) }
     }
@@ -1008,7 +1800,7 @@ function Invoke-DenoThirdPartyNoticeCollection {
         $nativeLicenseRoot = Join-Path $stage 'LICENSES/native'
         $sourceRoot = Join-Path $stage 'SOURCES'
         New-Item -ItemType Directory -Path $licenseRoot, $workspaceLicenseRoot, $nativeLicenseRoot, $sourceRoot | Out-Null
-        $notice = [Text.StringBuilder]::new([IO.File]::ReadAllText((Assert-DenoNoReparsePath (Join-Path $ManifestRoot 'THIRD-PARTY-NOTICES.template.txt'))))
+        $notice = [Text.StringBuilder]::new((Read-DenoUtf8Text -Path (Join-Path $ManifestRoot 'THIRD-PARTY-NOTICES.template.txt')))
         $notice.Append("`n") | Out-Null
         $outputPaths = [Collections.Generic.List[string]]::new()
         $embeddedRecords = [Collections.Generic.List[object]]::new()
@@ -1023,15 +1815,15 @@ function Invoke-DenoThirdPartyNoticeCollection {
                 $destination = Join-Path $stage $destinationRelative
                 switch ([string]$license.origin) {
                     'package-archive' { Copy-DenoTarEntry -ArchivePath (Join-Path $CrateArchiveRoot ([string]$record.sourceArchive.fileName)) -EntryPath ([string]$license.archiveEntry) -Destination $destination }
-                    'spdx-license' { New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null; Copy-Item -LiteralPath (Join-Path $SpdxRoot ([string]$license.path)) -Destination $destination }
-                    'spdx-exception' { New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null; Copy-Item -LiteralPath (Join-Path $SpdxRoot ([string]$license.path)) -Destination $destination }
+                    'spdx-license' { New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null; Copy-DenoVerifiedFile -SourcePath (Join-Path $SpdxRoot ([string]$license.path)) -DestinationPath $destination -ExpectedSha256 ([string]$license.sha256) -ExpectedLength ([long]$license.length) }
+                    'spdx-exception' { New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null; Copy-DenoVerifiedFile -SourcePath (Join-Path $SpdxRoot ([string]$license.path)) -DestinationPath $destination -ExpectedSha256 ([string]$license.sha256) -ExpectedLength ([long]$license.length) }
                     'upstream-commit' { Copy-DenoZipEntry -ArchivePath (Join-Path $UpstreamSourceRoot ([string]$license.archiveFile)) -EntryPath ([string]$license.path) -Destination $destination }
                     'license-ref-extracted' { New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null; Write-DenoUtf8Text -Path $destination -Text ([string]$license.text) }
                     default { throw "deno_license_origin_invalid:$($license.origin)" }
                 }
                 Assert-DenoHash $destination ([string]$license.sha256)
                 $outputPaths.Add($destinationRelative)
-                $notice.AppendLine("--- $destinationRelative ---").AppendLine([IO.File]::ReadAllText($destination)).AppendLine() | Out-Null
+                $notice.AppendLine("--- $destinationRelative ---").AppendLine((Read-DenoUtf8Text -Path $destination)).AppendLine() | Out-Null
             }
         }
         foreach ($record in $workspaceRecords) {
@@ -1041,12 +1833,12 @@ function Invoke-DenoThirdPartyNoticeCollection {
                 $destinationRelative = "LICENSES/workspace/$safeId/$($license.origin)/$($license.path)"
                 $destination = Join-Path $stage $destinationRelative
                 New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
-                if ([string]$license.origin -in @('spdx-license', 'spdx-exception')) { Copy-Item -LiteralPath (Join-Path $SpdxRoot ([string]$license.path)) -Destination $destination }
-                elseif ([string]$license.origin -ceq 'pinned-workspace-source') { Copy-Item -LiteralPath (Join-Path $DenoSourceRoot ([string]$license.path)) -Destination $destination }
+                if ([string]$license.origin -in @('spdx-license', 'spdx-exception')) { Copy-DenoVerifiedFile -SourcePath (Join-Path $SpdxRoot ([string]$license.path)) -DestinationPath $destination -ExpectedSha256 ([string]$license.sha256) -ExpectedLength ([long]$license.length) }
+                elseif ([string]$license.origin -ceq 'pinned-workspace-source') { Copy-DenoVerifiedFile -SourcePath (Join-Path $DenoSourceRoot ([string]$license.path)) -DestinationPath $destination -ExpectedSha256 ([string]$license.sha256) -ExpectedLength ([long]$license.length) }
                 else { throw "deno_license_origin_invalid:$($license.origin)" }
                 Assert-DenoHash $destination ([string]$license.sha256)
                 $outputPaths.Add($destinationRelative)
-                $notice.AppendLine("--- $destinationRelative ---").AppendLine([IO.File]::ReadAllText($destination)).AppendLine() | Out-Null
+                $notice.AppendLine("--- $destinationRelative ---").AppendLine((Read-DenoUtf8Text -Path $destination)).AppendLine() | Out-Null
             }
         }
         foreach ($rootLicense in @(Get-DenoLicenseFiles -Root $RustyV8SourceRoot)) {
@@ -1054,7 +1846,7 @@ function Invoke-DenoThirdPartyNoticeCollection {
             $destinationRelative = "LICENSES/native/rusty_v8/$relative"
             $destination = Join-Path $stage $destinationRelative
             New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
-            Copy-Item -LiteralPath $rootLicense.FullName -Destination $destination
+            Copy-DenoVerifiedFile -SourcePath $rootLicense.FullName -DestinationPath $destination
             $outputPaths.Add($destinationRelative)
         }
         foreach ($v8License in @(Get-DenoLicenseFiles -Root $V8SourceRoot)) {
@@ -1062,7 +1854,7 @@ function Invoke-DenoThirdPartyNoticeCollection {
             $destinationRelative = "LICENSES/native/v8/$relative"
             $destination = Join-Path $stage $destinationRelative
             New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
-            Copy-Item -LiteralPath $v8License.FullName -Destination $destination
+            Copy-DenoVerifiedFile -SourcePath $v8License.FullName -DestinationPath $destination
             $outputPaths.Add($destinationRelative)
         }
         foreach ($component in $native.components | Where-Object { $_.path -ne 'v8' }) {
@@ -1077,36 +1869,39 @@ function Invoke-DenoThirdPartyNoticeCollection {
         Assert-DenoUniquePaths @($outputPaths) | Out-Null
         foreach ($artifact in $inputs.sourceArtifacts) {
             $source = [string]$artifactPaths[[string]$artifact.id]
-            Copy-Item -LiteralPath $source -Destination (Join-Path $sourceRoot ([string]$artifact.fileName))
+            Copy-DenoVerifiedFile -SourcePath $source -DestinationPath (Join-Path $sourceRoot ([string]$artifact.fileName)) -ExpectedSha256 ([string]$artifact.sha256) -ExpectedLength ([long]$artifact.length)
         }
         foreach ($component in $native.components | Where-Object { $_.path -ne 'v8' }) {
-            Copy-Item -LiteralPath (Join-Path $NativeSourceRoot ([string]$component.archiveFile)) -Destination (Join-Path $sourceRoot ([string]$component.archiveFile))
+            Copy-DenoVerifiedFile -SourcePath (Join-Path $NativeSourceRoot ([string]$component.archiveFile)) -DestinationPath (Join-Path $sourceRoot ([string]$component.archiveFile)) -ExpectedSha256 ([string]$component.sha256) -ExpectedLength ([long]$component.length)
         }
         $crateSourceRoot = Join-Path $sourceRoot 'cargo-crates'
         $upstreamSourceDestination = Join-Path $sourceRoot 'upstream-license-sources'
         New-Item -ItemType Directory -Path $crateSourceRoot, $upstreamSourceDestination | Out-Null
-        foreach ($record in $crateRecords) { Copy-Item -LiteralPath (Join-Path $CrateArchiveRoot ([string]$record.sourceArchive.fileName)) -Destination (Join-Path $crateSourceRoot ([string]$record.sourceArchive.fileName)) }
-        foreach ($archiveFile in @($fallbacks.registryFallbacks.archiveFile | Sort-Object -Unique)) { Copy-Item -LiteralPath (Join-Path $UpstreamSourceRoot $archiveFile) -Destination (Join-Path $upstreamSourceDestination $archiveFile) }
+        foreach ($record in $crateRecords) { Copy-DenoVerifiedFile -SourcePath (Join-Path $CrateArchiveRoot ([string]$record.sourceArchive.fileName)) -DestinationPath (Join-Path $crateSourceRoot ([string]$record.sourceArchive.fileName)) -ExpectedSha256 ([string]$record.sourceArchive.sha256) -ExpectedLength ([long]$record.sourceArchive.length) }
+        foreach ($archiveFile in @($fallbacks.registryFallbacks.archiveFile | Sort-Object -Unique)) { Copy-DenoVerifiedFile -SourcePath (Join-Path $UpstreamSourceRoot $archiveFile) -DestinationPath (Join-Path $upstreamSourceDestination $archiveFile) }
         $noticePath = Join-Path $outputRoot 'THIRD-PARTY-NOTICES.txt'
         Write-DenoUtf8Text $noticePath ($notice.ToString())
-        Copy-Item -LiteralPath $noticePath -Destination (Join-Path $stage 'THIRD-PARTY-NOTICES.txt')
+        Copy-DenoVerifiedFile -SourcePath $noticePath -DestinationPath (Join-Path $stage 'THIRD-PARTY-NOTICES.txt')
         Write-DenoUtf8Text (Join-Path $outputRoot 'component-manifest.json') (([ordered]@{ schemaVersion = 'deno-third-party-components/v3'; closureClassification = $inputs.closureClassification; releaseIdentity = $identity; spdxLicenseList = $inputs.spdxLicenseList; counts = $counts; embeddedComponents = @($embeddedRecords); crates = @($crateRecords); workspacePackages = @($workspaceRecords); nativeGitTreeEvidence = $nativeTreeEvidence; nativeComponents = @($native.components); overallReleasePass = $false } | ConvertTo-Json -Depth 30) + "`n")
         $inventory = foreach ($file in Get-ChildItem -LiteralPath $stage -Recurse -File | Sort-Object FullName) { [ordered]@{ path = $file.FullName.Substring($stage.Length + 1).Replace('\', '/'); length = $file.Length; sha256 = Get-DenoSha256 $file.FullName } }
         Write-DenoUtf8Text (Join-Path $outputRoot 'source-inventory.json') (([ordered]@{ schemaVersion = 'deno-source-inventory/v1'; files = @($inventory) } | ConvertTo-Json -Depth 10) + "`n")
         $zipPath = Join-Path $outputRoot 'deno-2.7.14-verified-conservative-superset-sources.zip'
         $zipSha256 = New-DenoDeterministicZip -SourceRoot $stage -ZipPath $zipPath
-        Complete-DenoAtomicDirectory -Source $outputRoot -Destination $finalOutputRoot
+        Complete-DenoAtomicDirectory -Source $outputRoot -Destination $finalOutputRoot | Out-Null
         $noticePath = Join-Path $finalOutputRoot 'THIRD-PARTY-NOTICES.txt'
         $zipPath = Join-Path $finalOutputRoot 'deno-2.7.14-verified-conservative-superset-sources.zip'
         return [pscustomobject]@{ status = 'complete'; closureClassification = $inputs.closureClassification; outputRoot = $finalOutputRoot; noticePath = $noticePath; noticeSha256 = Get-DenoSha256 $noticePath; zipPath = $zipPath; zipSha256 = Get-DenoSha256 $zipPath; counts = $counts; overallReleasePass = $false }
     }
     finally {
-        if ([IO.Directory]::Exists($workRoot)) {
-            $workFull = [IO.Path]::GetFullPath($workRoot)
-            $scratchPrefix = [IO.Path]::GetFullPath($ScratchRoot).TrimEnd('\') + '\'
-            if (-not $workFull.StartsWith($scratchPrefix, [StringComparison]::OrdinalIgnoreCase) -or (Split-Path $workFull -Leaf) -notlike '.deno-third-party-stage-*') { throw 'deno_process_stage_cleanup_boundary' }
-            [void](Assert-DenoNoReparsePath $workFull)
-            Remove-Item -LiteralPath $workFull -Recurse -Force
+        $ownedKey = (ConvertTo-DenoFinalPath $workRoot).ToLowerInvariant()
+        if ($script:DenoOwnedStages.ContainsKey($ownedKey)) {
+            [void](Remove-DenoProcessStageRoot -Path $workRoot)
+        }
+    }
+    }
+    finally {
+        for ($index = $mainGuards.Count - 1; $index -ge 0; $index--) {
+            Close-DenoPathChain $mainGuards[$index]
         }
     }
 }

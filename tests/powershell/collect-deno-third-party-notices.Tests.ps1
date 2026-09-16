@@ -288,3 +288,229 @@ Describe 'Deno third-party notice fail-closed contracts' {
         $firstHash | Should Be $secondHash
     }
 }
+
+Describe 'Deno collector trust-boundary regressions' -Tag 'TrustBoundaryRed' {
+    BeforeAll {
+        $collectorPath = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'tools/collect-deno-third-party-notices.ps1'
+        . $collectorPath
+
+        function Get-TrustError([scriptblock] $Action) {
+            try { $null = & $Action; return '' } catch { return $_.Exception.Message }
+        }
+
+        function New-CanonicalEmbeddedInputs {
+            $json = @"
+{
+  "embeddedComponents": [
+    {
+      "id": "typescript@5.9.2",
+      "name": "TypeScript",
+      "version": "5.9.2",
+      "denoSourceCommit": "2d674b25625bcc367853d00fe86f6e84390f88cb",
+      "sourceFile": {
+        "path": "cli/tsc/00_typescript.js",
+        "archiveEntry": "deno-2d674b25625bcc367853d00fe86f6e84390f88cb/cli/tsc/00_typescript.js",
+        "bundlePath": "SOURCES/embedded/typescript-5.9.2/cli/tsc/00_typescript.js",
+        "length": 8492282,
+        "sha256": "932f9fd96b20ef8c2496d7f70419c69fa40266a92d81a2b229737fa6dd324ac8",
+        "requiredText": [
+          "version = \"5.9.2\"",
+          "Copyright (c) Microsoft Corporation. All rights reserved."
+        ]
+      },
+      "copyright": "Copyright (c) Microsoft Corporation. All rights reserved.",
+      "license": "Apache-2.0",
+      "licenseFile": {
+        "path": "text/Apache-2.0.txt",
+        "bundlePath": "LICENSES/embedded/typescript-5.9.2/Apache-2.0.txt",
+        "length": 10280,
+        "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff"
+      },
+      "buildInclusionEvidence": [
+        {
+          "role": "compressed-by-cli-build-rs",
+          "path": "cli/build.rs",
+          "archiveEntry": "deno-2d674b25625bcc367853d00fe86f6e84390f88cb/cli/build.rs",
+          "requiredText": "\"./tsc/00_typescript.js\","
+        },
+        {
+          "role": "referenced-by-cli-tsc-module",
+          "path": "cli/tsc/mod.rs",
+          "archiveEntry": "deno-2d674b25625bcc367853d00fe86f6e84390f88cb/cli/tsc/mod.rs",
+          "requiredText": "maybe_compressed_source!(\"tsc/00_typescript.js\");"
+        }
+      ],
+      "inclusionReason": "embedded-compressed-typescript-compiler-source"
+    }
+  ]
+}
+"@
+            return ConvertFrom-Json $json -Depth 20
+        }
+
+        function New-CrateArchive([string] $Root, [string] $LicenseText, [string] $FileName) {
+            $container = Join-Path $Root ([guid]::NewGuid().ToString('N'))
+            $crateRoot = Join-Path $container 'fixture-1.0.0'
+            [void][IO.Directory]::CreateDirectory($crateRoot)
+            $manifest = "[package]`nname = `"fixture`"`nversion = `"1.0.0`"`nlicense = `"MIT`"`n"
+            [IO.File]::WriteAllText((Join-Path $crateRoot 'Cargo.toml'), $manifest, [Text.UTF8Encoding]::new($false))
+            [IO.File]::WriteAllText((Join-Path $crateRoot 'Cargo.toml.orig'), $manifest, [Text.UTF8Encoding]::new($false))
+            [IO.File]::WriteAllText((Join-Path $crateRoot 'LICENSE'), $LicenseText, [Text.UTF8Encoding]::new($false))
+            $tarPath = Join-Path $Root ($FileName + '.tar')
+            $cratePath = Join-Path $Root $FileName
+            [System.Formats.Tar.TarFile]::CreateFromDirectory($container, $tarPath, $false)
+            $input = [IO.File]::OpenRead($tarPath)
+            try {
+                $output = [IO.File]::Create($cratePath)
+                try {
+                    $gzip = [IO.Compression.GZipStream]::new($output, [IO.Compression.CompressionLevel]::SmallestSize, $true)
+                    try { $input.CopyTo($gzip) } finally { $gzip.Dispose() }
+                }
+                finally { $output.Dispose() }
+            }
+            finally { $input.Dispose() }
+            return $cratePath
+        }
+    }
+
+    It 'accepts only the exact canonical TypeScript embedded profile' {
+        Assert-DenoEmbeddedProfile -Inputs (New-CanonicalEmbeddedInputs) | Should Be $true
+    }
+
+    It 'rejects an empty embedded profile' {
+        $inputs = New-CanonicalEmbeddedInputs
+        $inputs.embeddedComponents = @()
+        Get-TrustError { Assert-DenoEmbeddedProfile -Inputs $inputs } | Should Be 'deno_embedded_profile_invalid'
+    }
+
+    It 'rejects a duplicate embedded profile' {
+        $inputs = New-CanonicalEmbeddedInputs
+        $inputs.embeddedComponents = @($inputs.embeddedComponents[0], $inputs.embeddedComponents[0])
+        Get-TrustError { Assert-DenoEmbeddedProfile -Inputs $inputs } | Should Be 'deno_embedded_profile_invalid'
+    }
+
+    It 'rejects an altered TypeScript profile field' {
+        $inputs = New-CanonicalEmbeddedInputs
+        $inputs.embeddedComponents[0].sourceFile.sha256 = ('0' * 64)
+        Get-TrustError { Assert-DenoEmbeddedProfile -Inputs $inputs } | Should Be 'deno_embedded_profile_invalid'
+    }
+
+    It 'rejects missing TypeScript build evidence' {
+        $inputs = New-CanonicalEmbeddedInputs
+        $inputs.embeddedComponents[0].buildInclusionEvidence = @($inputs.embeddedComponents[0].buildInclusionEvidence[0])
+        Get-TrustError { Assert-DenoEmbeddedProfile -Inputs $inputs } | Should Be 'deno_embedded_profile_invalid'
+    }
+
+    It 'hashes and parses one exclusively held crate stream during a swap attempt' {
+        $original = New-CrateArchive -Root $TestDrive -LicenseText 'ORIGINAL LICENSE' -FileName 'fixture-1.0.0.crate'
+        $tampered = New-CrateArchive -Root $TestDrive -LicenseText 'TAMPERED LICENSE' -FileName 'tampered.crate'
+        $checksum = (Get-FileHash -LiteralPath $original -Algorithm SHA256).Hash.ToLowerInvariant()
+        $originalLicense = ([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes('ORIGINAL LICENSE')))).ToLowerInvariant()
+        $script:crateSwapFailure = $null
+        $probe = {
+            try {
+                Move-Item -LiteralPath $original -Destination ($original + '.old') -ErrorAction Stop
+                Move-Item -LiteralPath $tampered -Destination $original -ErrorAction Stop
+            }
+            catch { $script:crateSwapFailure = $_.Exception.Message }
+        }
+        $result = Get-DenoCrateArchiveEvidence -Package ([pscustomobject]@{ name = 'fixture'; version = '1.0.0'; checksum = $checksum }) -CrateArchivePath $original -AfterHashAction $probe
+        $script:crateSwapFailure | Should Not BeNullOrEmpty
+        $result.fileMap['LICENSE'].sha256 | Should Be $originalLicense
+    }
+
+    It 'holds every input ancestor and rejects an existing junction' {
+        $parent = Join-Path $TestDrive 'held-parent'
+        $outside = Join-Path $TestDrive 'outside'
+        [void][IO.Directory]::CreateDirectory($parent)
+        [void][IO.Directory]::CreateDirectory($outside)
+        $file = Join-Path $parent 'input.json'
+        [IO.File]::WriteAllText($file, '{"trusted":true}')
+        $held = Open-DenoVerifiedReadFile -Path $file
+        try {
+            $renameFailure = Get-TrustError {
+                Rename-Item -LiteralPath $parent -NewName 'held-parent-old' -ErrorAction Stop
+            }
+            if ([string]::IsNullOrEmpty($renameFailure)) {
+                [void](New-Item -ItemType Junction -Path $parent -Target $outside -ErrorAction Stop)
+                Get-TrustError {
+                    Assert-DenoVerifiedReadFileUnchanged -VerifiedFile $held
+                } | Should Match '^deno_input_path_identity_changed:'
+            }
+            else {
+                Assert-DenoVerifiedReadFileUnchanged -VerifiedFile $held | Should Be $true
+            }
+            $held.Stream.Position = 0
+            $reader = [IO.StreamReader]::new($held.Stream, [Text.UTF8Encoding]::new($false, $true), $true, 1024, $true)
+            try { $reader.ReadToEnd() | Should Be '{"trusted":true}' } finally { $reader.Dispose() }
+        }
+        finally { Close-DenoVerifiedReadFile -VerifiedFile $held }
+        $link = Join-Path $TestDrive 'input-link'
+        [void](New-Item -ItemType Junction -Path $link -Target $outside)
+        Get-TrustError { Open-DenoVerifiedReadFile -Path (Join-Path $link 'missing.json') } | Should Match '^deno_reparse_path_rejected:'
+    }
+
+    It 'blocks substitution of an exclusively held input file' {
+        $file = Join-Path $TestDrive 'identity.txt'
+        $replacement = Join-Path $TestDrive 'replacement.txt'
+        [IO.File]::WriteAllText($file, 'trusted')
+        [IO.File]::WriteAllText($replacement, 'tampered')
+        $held = Open-DenoVerifiedReadFile -Path $file
+        try {
+            $moveFailure = Get-TrustError {
+                Move-Item -LiteralPath $file -Destination ($file + '.old') -ErrorAction Stop
+            }
+            if ([string]::IsNullOrEmpty($moveFailure)) {
+                Copy-Item -LiteralPath $replacement -Destination $file
+                Get-TrustError {
+                    Assert-DenoVerifiedReadFileUnchanged -VerifiedFile $held
+                } | Should Match '^deno_input_path_identity_changed:'
+            }
+            else {
+                Assert-DenoVerifiedReadFileUnchanged -VerifiedFile $held | Should Be $true
+            }
+        }
+        finally { Close-DenoVerifiedReadFile -VerifiedFile $held }
+    }
+
+    It 'prevents output-parent escape during atomic finalization' {
+        $scratch = Join-Path $TestDrive 'publish'
+        $outside = Join-Path $TestDrive 'publish-outside'
+        $sourceParent = Join-Path $scratch 'stage'
+        $source = Join-Path $sourceParent 'result'
+        [void][IO.Directory]::CreateDirectory($source)
+        [void][IO.Directory]::CreateDirectory($outside)
+        [IO.File]::WriteAllText((Join-Path $source 'proof.txt'), 'trusted')
+        $script:publishSwapFailure = $null
+        $probe = {
+            try {
+                Rename-Item -LiteralPath $scratch -NewName 'publish-old' -ErrorAction Stop
+                [void](New-Item -ItemType Junction -Path $scratch -Target $outside -ErrorAction Stop)
+            }
+            catch { $script:publishSwapFailure = $_.Exception.Message }
+        }
+        $destination = Join-Path $scratch 'final'
+        Complete-DenoAtomicDirectory -Source $source -Destination $destination -BeforeFinalizeAction $probe
+        $script:publishSwapFailure | Should Not BeNullOrEmpty
+        [IO.File]::ReadAllText((Join-Path $destination 'proof.txt')) | Should Be 'trusted'
+        [IO.File]::Exists((Join-Path $outside 'final\proof.txt')) | Should Be $false
+    }
+
+    It 'rejects Win32 aliases devices non-NFC and traversal forms' {
+        $bad = @('LICENSE.', 'LICENSE ', 'CON', 'con.txt', 'COM1', "COM$([char]0x00B9).txt", 'LPT9.log', 'a//b', 'a/../b', 'a\.\b', 'a:b', 'a<b', 'a>b', 'a"b', 'a|b', 'a?b', 'a*b')
+        foreach ($path in $bad) {
+            Get-TrustError { Assert-DenoUniquePaths @($path) } | Should Match '^deno_path_invalid:'
+        }
+        $nfc = "caf$([char]0x00E9).txt"
+        $nfd = $nfc.Normalize([Text.NormalizationForm]::FormD)
+        Get-TrustError { Assert-DenoUniquePaths @($nfc, $nfd) } | Should Match '^deno_path_(invalid|case_collision):'
+    }
+
+    It 'rejects every C0 control in a path segment' {
+        foreach ($value in 0..31) {
+            $path = 'a' + [char]$value + 'b'
+            Get-TrustError { Assert-DenoUniquePaths @($path) } | Should Match '^deno_path_invalid:'
+        }
+    }
+}
+
