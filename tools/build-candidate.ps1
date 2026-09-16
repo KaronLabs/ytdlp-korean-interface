@@ -258,6 +258,93 @@ function Test-RelativeArchivePathSafe {
         $Path -notmatch '^[A-Za-z]:' -and $Path -notmatch '(^|[/\\])\.\.([/\\]|$)'
 }
 
+function ConvertTo-NormalizedRuntimeArchivePath {
+    param([Parameter(Mandatory = $true)] [string] $Path)
+    if (-not (Test-RelativeArchivePathSafe -Path $Path)) { throw 'runtime_overlay_layout_invalid' }
+    $normalized = $Path.Replace('\', '/').TrimEnd('/')
+    $segments = @($normalized -split '/')
+    if ([string]::IsNullOrWhiteSpace($normalized) -or @($segments | Where-Object { [string]::IsNullOrWhiteSpace($_) -or $_ -ceq '.' }).Count -ne 0) { throw 'runtime_overlay_layout_invalid' }
+    return $normalized
+}
+
+function Get-RuntimeArchiveEntryRecords {
+    param([Parameter(Mandatory = $true)] [AllowEmptyString()] [string[]] $Listing)
+    $records = @()
+    $current = $null
+    foreach ($line in $Listing) {
+        if ($line -match '^Path = (.*)$') {
+            if ($null -ne $current) { $records += [pscustomobject]$current }
+            $current = [ordered]@{ Path = $Matches[1]; IsDirectory = $false; IsLink = $false }
+            continue
+        }
+        if ($null -eq $current) { continue }
+        if ($line -ceq 'Folder = +' -or $line -match '^Attributes = .*D') { $current.IsDirectory = $true }
+        if ($line -match '^(Symbolic Link|Hard Link) = ') { $current.IsLink = $true }
+    }
+    if ($null -ne $current) { $records += [pscustomobject]$current }
+    if ($records.Count -lt 2) { throw 'runtime_overlay_layout_invalid' }
+    return @($records | Select-Object -Skip 1)
+}
+
+function Assert-RuntimeArchiveEntryRecords {
+    param([Parameter(Mandatory = $true)] [object[]] $Entries)
+    if ($Entries.Count -eq 0) { throw 'runtime_overlay_layout_invalid' }
+    $seen = New-Object 'Collections.Generic.Dictionary[string,object]' ([StringComparer]::OrdinalIgnoreCase)
+    $normalizedEntries = @()
+    foreach ($entry in $Entries) {
+        $path = ConvertTo-NormalizedRuntimeArchivePath -Path ([string]$entry.Path)
+        if ([bool]$entry.IsLink -or $seen.ContainsKey($path)) { throw 'runtime_overlay_layout_invalid' }
+        $record = [pscustomobject]@{ Path = $path; IsDirectory = [bool]$entry.IsDirectory }
+        $seen.Add($path, $record)
+        $normalizedEntries += $record
+    }
+    foreach ($entry in $normalizedEntries) {
+        $segments = @($entry.Path -split '/')
+        for ($index = 1; $index -lt $segments.Count; $index++) {
+            $ancestor = ($segments[0..($index - 1)] -join '/')
+            if ($seen.ContainsKey($ancestor) -and -not [bool]$seen[$ancestor].IsDirectory) { throw 'runtime_overlay_layout_invalid' }
+        }
+    }
+    return @($normalizedEntries)
+}
+
+function Assert-NoRuntimeOverlayReparsePoints {
+    param([Parameter(Mandatory = $true)] [string] $Root)
+    $items = @((Get-Item -LiteralPath $Root -Force)) + @(Get-ChildItem -LiteralPath $Root -Force -Recurse)
+    foreach ($item in $items) {
+        if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'runtime_overlay_layout_invalid' }
+    }
+}
+
+function Get-RuntimeFileAttestation {
+    param([Parameter(Mandatory = $true)] [string] $Root, [Parameter(Mandatory = $true)] [string[]] $Names)
+    $rootFull = [IO.Path]::GetFullPath($Root)
+    $uniqueNames = @($Names | Sort-Object -Unique)
+    $records = @()
+    foreach ($name in $uniqueNames) {
+        if ([IO.Path]::GetFileName($name) -cne $name) { throw 'runtime_parent_copy_mismatch' }
+        $path = Join-Path $rootFull $name
+        if (-not (Test-PathContained -Root $rootFull -Path $path) -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'runtime_parent_copy_mismatch' }
+        $item = Get-Item -LiteralPath $path -Force
+        if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'runtime_parent_copy_mismatch' }
+        $records += [ordered]@{ name = $name; sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToUpperInvariant(); length = $item.Length }
+    }
+    if ($records.Count -ne $uniqueNames.Count) { throw 'runtime_parent_copy_mismatch' }
+    return @($records)
+}
+
+function Assert-CandidateRuntimePreserved {
+    param([Parameter(Mandatory = $true)] [string] $CandidateRoot, [Parameter(Mandatory = $true)] [object[]] $ParentFiles)
+    $candidate = [IO.Path]::GetFullPath($CandidateRoot)
+    foreach ($expected in $ParentFiles) {
+        $path = Join-Path $candidate ([string]$expected.name)
+        if (-not (Test-PathContained -Root $candidate -Path $path) -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'runtime_parent_copy_mismatch' }
+        $item = Get-Item -LiteralPath $path -Force
+        if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $item.Length -ne [long]$expected.length -or
+            (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToUpperInvariant() -cne ([string]$expected.sha256).ToUpperInvariant()) { throw 'runtime_parent_copy_mismatch' }
+    }
+}
+
 function Get-ReleaseRuntimeOverlayDefinitions {
     param([Parameter(Mandatory = $true)] [string] $SourceRoot)
     $requestPath = Join-Path $SourceRoot 'release\requests\v2.19.1-karon.2.json'
@@ -284,20 +371,37 @@ function Assert-RuntimeOverlayManifest {
         }
         if ($definition.id -ceq 'ffmpeg') {
             $root = [IO.Path]::GetFileNameWithoutExtension([string]$definition.archiveName)
-            $expected = @($definition.files | ForEach-Object { ([string]$_.archivePath).Replace('\', '/') } | Sort-Object)
-            if ($definition.archiveFormat -cne 'zip' -or ($expected -join ',') -cne "$root/bin/ffmpeg.exe,$root/bin/ffprobe.exe") { throw 'runtime_overlay_manifest_invalid' }
+            $mapping = @($definition.files | ForEach-Object { (([string]$_.archivePath).Replace('\', '/')) + '|' + [string]$_.destination + '|' + [string]$_.identity } | Sort-Object)
+            if ($definition.archiveFormat -cne 'zip' -or [string]$definition.expectedVersion -cne 'n9.0.1-30-g9258bacca5' -or
+                ($mapping -join ',') -cne "$root/bin/ffmpeg.exe|ffmpeg.exe|ffmpeg,$root/bin/ffprobe.exe|ffprobe.exe|ffprobe") { throw 'runtime_overlay_manifest_invalid' }
         }
         elseif ($definition.id -ceq 'sevenZip') {
-            if ($definition.archiveFormat -cne '7z' -or @($definition.files).Count -ne 1 -or ([string]$definition.files[0].archivePath).Replace('\', '/') -cne 'x64/7z.dll') { throw 'runtime_overlay_manifest_invalid' }
+            $file = @($definition.files)[0]
+            if ($definition.archiveFormat -cne '7z' -or [string]$definition.expectedVersion -cne '26.01' -or @($definition.files).Count -ne 1 -or
+                (([string]$file.archivePath).Replace('\', '/') + '|' + [string]$file.destination + '|' + [string]$file.identity) -cne 'x64/7z.dll|7z.dll|sevenZip') { throw 'runtime_overlay_manifest_invalid' }
         }
     }
 }
 
 function Get-RuntimeOverlayIdentity {
-    param([Parameter(Mandatory = $true)] [string] $Identity, [Parameter(Mandatory = $true)] [string] $Path, [scriptblock] $IdentityReader)
-    if ($null -ne $IdentityReader) { return [string](& $IdentityReader $Identity $Path) }
-    if ($Identity -ceq 'sevenZip') { return [string](Get-Item -LiteralPath $Path).VersionInfo.FileVersion }
-    return Invoke-CheckedExecutable -Path $Path -Arguments @('-version') -Name $Identity
+    param(
+        [Parameter(Mandatory = $true)] [string] $Identity,
+        [Parameter(Mandatory = $true)] [string] $Path,
+        [Parameter(Mandatory = $true)] [string] $ExpectedVersion,
+        [scriptblock] $IdentityReader
+    )
+    $observed = if ($null -ne $IdentityReader) { [string](& $IdentityReader $Identity $Path) }
+        elseif ($Identity -ceq 'sevenZip') { [string](Get-Item -LiteralPath $Path).VersionInfo.FileVersion }
+        else { Invoke-CheckedExecutable -Path $Path -Arguments @('-version') -Name $Identity }
+    if ($Identity -ceq 'sevenZip') {
+        if ($observed -cne $ExpectedVersion) { throw 'runtime_overlay_version_mismatch' }
+        return $observed
+    }
+    if (@('ffmpeg', 'ffprobe') -cnotcontains $Identity) { throw 'runtime_overlay_version_mismatch' }
+    $firstLine = @($observed -split "`r?`n", 2)[0]
+    $pattern = '^' + [regex]::Escape($Identity + ' version ' + $ExpectedVersion) + '(?: .*)?$'
+    if ($firstLine -cnotmatch $pattern) { throw 'runtime_overlay_version_mismatch' }
+    return $firstLine
 }
 
 function Install-ReviewedRuntimeOverlays {
@@ -307,6 +411,8 @@ function Install-ReviewedRuntimeOverlays {
         [Parameter(Mandatory = $true)] [object[]] $OverlayDefinitions,
         [string] $SevenZipPath,
         [scriptblock] $IdentityReader,
+        [scriptblock] $ArchiveCopier,
+        [scriptblock] $OverlayCopier,
         [string] $StagingBase = ([IO.Path]::GetTempPath())
     )
     Assert-RuntimeOverlayManifest -OverlayDefinitions $OverlayDefinitions
@@ -320,20 +426,27 @@ function Install-ReviewedRuntimeOverlays {
     $attestation = @()
     try {
         foreach ($definition in $OverlayDefinitions) {
-            $archive = Join-Path $archiveDirectory ([string]$definition.archiveName)
-            if (-not (Test-PathContained -Root $archiveDirectory -Path $archive) -or -not (Test-Path -LiteralPath $archive -PathType Leaf)) { throw 'runtime_overlay_layout_invalid' }
+            $externalArchive = Join-Path $archiveDirectory ([string]$definition.archiveName)
+            if (-not (Test-PathContained -Root $archiveDirectory -Path $externalArchive) -or -not (Test-Path -LiteralPath $externalArchive -PathType Leaf)) { throw 'runtime_overlay_layout_invalid' }
+            $overlayRoot = Join-Path $staging ([string]$definition.id)
+            $archiveStaging = Join-Path $overlayRoot 'archive'
+            [IO.Directory]::CreateDirectory($archiveStaging) | Out-Null
+            $archive = Join-Path $archiveStaging ([string]$definition.archiveName)
+            if ($null -ne $ArchiveCopier) { & $ArchiveCopier $externalArchive $archive } else { Copy-Item -LiteralPath $externalArchive -Destination $archive }
+            if (-not (Test-Path -LiteralPath $archive -PathType Leaf) -or ((Get-Item -LiteralPath $archive -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'runtime_overlay_layout_invalid' }
             $archiveHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToUpperInvariant()
             if ($archiveHash -cne ([string]$definition.archiveSha256).ToUpperInvariant()) { throw 'runtime_overlay_sha256_mismatch' }
             $listing = (Invoke-CheckedProcess -FilePath $SevenZipPath -Arguments @('l', '-slt', $archive) -Name 'runtime overlay inspection').StandardOutput -split "`r?`n"
-            $entries = @(Get-ArchiveEntriesFromListing -Listing $listing | ForEach-Object { ([string]$_).Replace('\', '/') })
-            foreach ($entry in $entries) { if (-not (Test-RelativeArchivePathSafe -Path $entry)) { throw 'runtime_overlay_layout_invalid' } }
-            $selectedPaths = @($definition.files | ForEach-Object { ([string]$_.archivePath).Replace('\', '/') })
-            foreach ($selectedPath in $selectedPaths) { if ($entries -cnotcontains $selectedPath) { throw 'runtime_overlay_layout_invalid' } }
-            $overlayStaging = Join-Path $staging ([string]$definition.id)
+            $entries = @(Assert-RuntimeArchiveEntryRecords -Entries (Get-RuntimeArchiveEntryRecords -Listing $listing))
+            $entryPaths = @($entries | ForEach-Object { [string]$_.Path })
+            $selectedPaths = @($definition.files | ForEach-Object { ConvertTo-NormalizedRuntimeArchivePath -Path ([string]$_.archivePath) })
+            foreach ($selectedPath in $selectedPaths) { if ($entryPaths -cnotcontains $selectedPath) { throw 'runtime_overlay_layout_invalid' } }
+            $overlayStaging = Join-Path $overlayRoot 'extracted'
             [IO.Directory]::CreateDirectory($overlayStaging) | Out-Null
             $extractionPaths = @($selectedPaths | ForEach-Object { $_.Replace('/', '\') })
             $outputArgument = '-o' + $overlayStaging
             Invoke-CheckedProcess -FilePath $SevenZipPath -Arguments (@('x', $archive) + $extractionPaths + @($outputArgument, '-y')) -Name 'runtime overlay extraction' | Out-Null
+            Assert-NoRuntimeOverlayReparsePoints -Root $overlayStaging
             $extracted = @(Get-ChildItem -LiteralPath $overlayStaging -File -Recurse)
             $extractedPaths = @($extracted | ForEach-Object { $_.FullName.Substring($overlayStaging.Length).TrimStart('\', '/').Replace('\', '/') } | Sort-Object)
             if ($extracted.Count -ne $selectedPaths.Count -or ($extractedPaths -join ',') -cne (@($selectedPaths | Sort-Object) -join ',')) { throw 'runtime_overlay_layout_invalid' }
@@ -343,12 +456,26 @@ function Install-ReviewedRuntimeOverlays {
                 $destination = Join-Path $candidate ([string]$file.destination)
                 if (-not (Test-PathContained -Root $overlayStaging -Path $source) -or -not (Test-Path -LiteralPath $source -PathType Leaf) -or
                     -not (Test-PathContained -Root $candidate -Path $destination) -or -not (Test-Path -LiteralPath $destination -PathType Leaf)) { throw 'runtime_overlay_layout_invalid' }
-                $identity = Get-RuntimeOverlayIdentity -Identity ([string]$file.identity) -Path $source -IdentityReader $IdentityReader
-                if ([string]::IsNullOrWhiteSpace($identity) -or $identity -notmatch [regex]::Escape([string]$definition.expectedVersion)) { throw 'runtime_overlay_version_mismatch' }
-                $item = Get-Item -LiteralPath $source
-                $fileAttestation += [ordered]@{ archivePath = ([string]$file.archivePath).Replace('\', '/'); destination = [string]$file.destination; sha256 = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToUpperInvariant(); length = $item.Length; identity = $identity }
+                $identity = Get-RuntimeOverlayIdentity -Identity ([string]$file.identity) -Path $source -ExpectedVersion ([string]$definition.expectedVersion) -IdentityReader $IdentityReader
+                $item = Get-Item -LiteralPath $source -Force
+                if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'runtime_overlay_layout_invalid' }
+                $sourceRecord = [ordered]@{
+                    sourceArchivePath = ConvertTo-NormalizedRuntimeArchivePath -Path ([string]$file.archivePath)
+                    destination = [string]$file.destination
+                    productIdentity = [string]$file.identity
+                    sha256 = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToUpperInvariant()
+                    length = $item.Length
+                    identity = $identity
+                }
+                if ($null -ne $OverlayCopier) { & $OverlayCopier $source $destination } else { Copy-Item -LiteralPath $source -Destination $destination -Force }
+                if (-not (Test-Path -LiteralPath $destination -PathType Leaf)) { throw 'runtime_overlay_destination_mismatch' }
+                $destinationItem = Get-Item -LiteralPath $destination -Force
+                if (($destinationItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $destinationItem.Length -ne [long]$sourceRecord.length -or
+                    (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash.ToUpperInvariant() -cne [string]$sourceRecord.sha256) { throw 'runtime_overlay_destination_mismatch' }
+                $destinationIdentity = Get-RuntimeOverlayIdentity -Identity ([string]$file.identity) -Path $destination -ExpectedVersion ([string]$definition.expectedVersion) -IdentityReader $IdentityReader
+                if ($destinationIdentity -cne [string]$sourceRecord.identity) { throw 'runtime_overlay_destination_mismatch' }
+                $fileAttestation += $sourceRecord
             }
-            foreach ($file in @($definition.files)) { Copy-Item -LiteralPath (Join-Path $overlayStaging ([string]$file.archivePath)) -Destination (Join-Path $candidate ([string]$file.destination)) -Force }
             $attestation += [ordered]@{ id = [string]$definition.id; archive = [ordered]@{ name = [string]$definition.archiveName; sha256 = $archiveHash }; expectedVersion = [string]$definition.expectedVersion; files = $fileAttestation }
         }
         return @($attestation)
@@ -673,7 +800,8 @@ function Get-VerifiedParentRuntime {
     foreach ($check in @(@('ffmpeg.exe', '-version', 'ffmpeg'), @('ffprobe.exe', '-version', 'ffprobe'), @('deno.exe', '--version', 'deno'))) {
         Invoke-CheckedExecutable -Path (Join-Path $parent $check[0]) -Arguments @($check[1]) -Name $check[2] | Out-Null
     }
-    return [pscustomobject]@{ Path = $parent; YtDlpHash = $hash; YtDlpVersion = $version.Trim(); Provenance = $provenance }
+    $runtimeFiles = Get-RuntimeFileAttestation -Root $parent -Names @('yt-dlp.exe', 'deno.exe')
+    return [pscustomobject]@{ Path = $parent; YtDlpHash = $hash; YtDlpVersion = $version.Trim(); Provenance = $provenance; RuntimeFiles = $runtimeFiles }
 }
 
 function Get-CandidateManifest {
@@ -762,7 +890,7 @@ function Invoke-BuildCandidate {
         foreach ($name in Get-RequiredRuntimeFiles) { Copy-CandidateFile -Source (Join-Path $parent $name) -DestinationDirectory $candidate }
         $overlayDefinitions = Get-ReleaseRuntimeOverlayDefinitions -SourceRoot $buildSource
         $attestation.runtimeOverlays = Install-ReviewedRuntimeOverlays -CandidateRoot $candidate -RuntimeArchiveDirectory $RuntimeArchiveDirectory -OverlayDefinitions $overlayDefinitions -StagingBase $buildWorkspace
-        if ((Get-FileHash -LiteralPath (Join-Path $candidate 'yt-dlp.exe') -Algorithm SHA256).Hash.ToUpperInvariant() -cne $verifiedParent.YtDlpHash) { throw 'Candidate yt-dlp copy hash does not match verified parent runtime.' }
+        Assert-CandidateRuntimePreserved -CandidateRoot $candidate -ParentFiles $verifiedParent.RuntimeFiles
         Copy-CandidateFile -Source $settings -DestinationDirectory $candidate
         Import-Module -Name (Join-Path $buildSource 'tools\runtime-maintenance.psm1') -Force
         RepairSettings -SettingsPath (Join-Path $candidate 'ytdlp-interface.json') -Confirm:$false | Out-Null
