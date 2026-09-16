@@ -51,6 +51,10 @@ Screenshots must be fully decodable PNG files at least 640x480. Their recorded S
 
 All referenced evidence files must be direct descendants of the evidence directory and form its exact file allowlist. Any extra file, including an unknown binary, causes rejection. Candidate and evidence paths are rejected when any path component is a reparse point or junction.
 
+Candidate, evidence, manifest, and output paths must be local filesystem paths. UNC, device, and extended UNC paths are rejected; remote evidence cannot satisfy the immutable local snapshot contract.
+
+The verifier snapshots the candidate executable, candidate ffprobe, optional candidate manifest, and complete evidence tree into a process-private local directory. Validation, hashing, ffprobe execution, and output generation use only those snapshot bytes. Immediately before atomic publication, the original candidate files and complete evidence tree are re-enumerated and re-hashed. A new, removed, renamed, resized, or changed file aborts publication.
+
 Decoded JSON strings are recursively checked for cookies, tokens, authorization values, signed URLs, and query-bearing URLs. Evidence must not contain secrets or expiring media URLs.
 
 ## Operator workflow
@@ -103,8 +107,11 @@ candidate:
   ffprobe: { fileName, sha256, length }
   manifest: null | { fileName, sha256, length }
 cases: [{ caseId, language, dpi, evidenceFile, evidenceSha256 } x 6]
-videoLifecycleCases: ["ko-KR-100", "en-US-200"]
-representativeCoverage: { mp3Conversion, settingsRestartRestore, legacySettingsTransition }
+fullVideoLifecycleCases: ["ko-KR-100", "en-US-200"]
+representativeChecks:
+  mp3Conversion: [caseId, ...]
+  settingsSaveRestartRestore: [caseId, ...]
+  legacySettingsTransition: [caseId, ...]
 generatedProbes: [{ caseId, kind, sourceEvidencePath, path, sha256, length }]
 evidenceFileCount: integer
 evidenceManifestFile: "gui-validation-evidence-manifest.json"
@@ -117,7 +124,7 @@ schemaVersion: 2
 releaseVersion: "v2.19.1-karon.2"
 candidate: <exact same object as summary.candidate>
 evidenceFiles: [{ path, sha256, length }]
-generatedProbeFiles: [{ path, sha256, length }]
+generatedProbeFiles: [{ caseId, kind, sourceEvidencePath, path, sha256, length }]
 ```
 
 The packaging gate must consume both files, require `status == "PASS"`, require the exact six cases, require byte-for-byte-equivalent candidate objects, and bind `candidate.executable` and `candidate.ffprobe` to the packaged files. If `candidate.manifest` is non-null, the packaging gate must also bind its hash and length and verify that its file table contains matching root entries for both binaries. Packaging integration is intentionally outside this change.

@@ -26,6 +26,33 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $ReleaseVersion = 'v2.19.1-karon.2'
 $ObservationNames = @('launch', 'downloadType', 'quality1080p', 'quality720p', 'qualityBest', 'expectedResolution', 'queueRegistration', 'progress', 'completion', 'advancedNavigation', 'noClipping')
+$ExpectedCaseIds = @('ko-KR-100', 'ko-KR-150', 'ko-KR-200', 'en-US-100', 'en-US-150', 'en-US-200')
+$CurrentCasePath = $null
+$CurrentEvidenceRoot = $null
+
+function Get-OperatorLocalFullPath {
+    param([string] $Path, [string] $ErrorId)
+    if ([string]::IsNullOrWhiteSpace($Path)) { throw $ErrorId }
+    if ($Path.StartsWith('\\') -or $Path.StartsWith('//')) { throw 'operator_remote_path_not_allowed' }
+    try { $full = [IO.Path]::GetFullPath($Path) }
+    catch { throw $ErrorId }
+    if ($full.StartsWith('\\') -or $full.StartsWith('//')) { throw 'operator_remote_path_not_allowed' }
+    $full
+}
+
+function Assert-OperatorNoReparseChain {
+    param([string] $Path)
+    $current = [IO.Path]::GetFullPath($Path)
+    while ($true) {
+        if (Test-Path -LiteralPath $current) {
+            $item = Get-Item -LiteralPath $current -Force -ErrorAction Stop
+            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'operator_path_reparse_point' }
+        }
+        $parent = [IO.Directory]::GetParent($current)
+        if ($null -eq $parent) { break }
+        $current = $parent.FullName
+    }
+}
 
 function Get-UtcText {
     [DateTimeOffset]::UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", [Globalization.CultureInfo]::InvariantCulture)
@@ -38,6 +65,8 @@ function Get-Sha256 {
 
 function Write-JsonAtomic {
     param([string] $Path, [object] $Value, [bool] $Overwrite)
+    $Path = Get-OperatorLocalFullPath $Path 'operator_case_path_invalid'
+    Assert-OperatorNoReparseChain $Path
     $directory = Split-Path -Parent $Path
     if (-not (Test-Path -LiteralPath $directory)) { New-Item -ItemType Directory -Path $directory | Out-Null }
     $partial = Join-Path $directory ('.' + [IO.Path]::GetFileName($Path) + '.partial.' + $PID + '.' + [Guid]::NewGuid().ToString('N'))
@@ -58,21 +87,36 @@ function Write-JsonAtomic {
 }
 
 function Read-Case {
-    if ([string]::IsNullOrWhiteSpace($CasePath) -or -not (Test-Path -LiteralPath $CasePath -PathType Leaf)) { throw 'operator_case_missing' }
-    Get-Content -LiteralPath $CasePath -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 64 -DateKind String
+    $full = Get-OperatorLocalFullPath $CasePath 'operator_case_missing'
+    Assert-OperatorNoReparseChain $full
+    if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { throw 'operator_case_missing' }
+    $value = Get-Content -LiteralPath $full -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 64 -DateKind String
+    if ($null -eq $value.PSObject.Properties['caseId'] -or $value.caseId -isnot [string] -or $value.caseId -cnotin $ExpectedCaseIds) {
+        throw 'operator_case_id_invalid'
+    }
+    $caseDirectory = Split-Path -Parent $full
+    if ([IO.Path]::GetFileName($caseDirectory) -cne 'cases') { throw 'operator_case_path_invalid' }
+    $root = Split-Path -Parent $caseDirectory
+    $expected = [IO.Path]::GetFullPath((Join-Path (Join-Path $root 'cases') ($value.caseId + '.json')))
+    if ($full -cne $expected) { throw 'operator_case_path_invalid' }
+    Assert-OperatorNoReparseChain $root
+    $script:CurrentCasePath = $full
+    $script:CurrentEvidenceRoot = $root
+    $value
 }
 
 function Get-CaseEvidenceRoot {
-    $caseDirectory = Split-Path -Parent ([IO.Path]::GetFullPath($CasePath))
-    if ([IO.Path]::GetFileName($caseDirectory) -cne 'cases') { throw 'operator_case_path_invalid' }
-    Split-Path -Parent $caseDirectory
+    if ([string]::IsNullOrWhiteSpace($script:CurrentEvidenceRoot)) { throw 'operator_case_path_invalid' }
+    $script:CurrentEvidenceRoot
 }
 
 function Assert-SourceFile {
     param([string] $Path, [string] $ErrorId)
-    if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw $ErrorId }
-    $item = Get-Item -LiteralPath $Path
-    if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $item.Length -le 0) { throw $ErrorId }
+    $full = Get-OperatorLocalFullPath $Path $ErrorId
+    Assert-OperatorNoReparseChain $full
+    if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { throw $ErrorId }
+    $item = Get-Item -LiteralPath $full
+    if ($item.Length -le 0) { throw $ErrorId }
     $item
 }
 
@@ -111,9 +155,15 @@ function Get-PngDimensions {
 function Copy-EvidenceFile {
     param([string] $Source, [string] $Subdirectory, [string] $Name)
     $root = Get-CaseEvidenceRoot
+    Assert-OperatorNoReparseChain $root
     $destinationDirectory = Join-Path $root $Subdirectory
     if (-not (Test-Path -LiteralPath $destinationDirectory)) { New-Item -ItemType Directory -Path $destinationDirectory | Out-Null }
     $destination = Join-Path $destinationDirectory $Name
+    $destination = [IO.Path]::GetFullPath($destination)
+    if (-not $destination.StartsWith($root.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'operator_evidence_destination_invalid'
+    }
+    Assert-OperatorNoReparseChain $destination
     if (Test-Path -LiteralPath $destination) { throw 'operator_evidence_output_exists' }
     [IO.File]::Copy((Assert-SourceFile $Source 'operator_evidence_source_invalid').FullName, $destination, $false)
     $item = Get-Item -LiteralPath $destination
@@ -138,10 +188,16 @@ try {
         }
         $exe = Assert-SourceFile $CandidateExePath 'operator_candidate_executable_invalid'
         if ($exe.Name -cne 'ytdlp-interface.exe') { throw 'operator_candidate_executable_invalid' }
+        $evidenceFull = Get-OperatorLocalFullPath $EvidenceRoot 'operator_initialize_arguments_invalid'
+        Assert-OperatorNoReparseChain $evidenceFull
+        if (-not (Test-Path -LiteralPath $evidenceFull)) { New-Item -ItemType Directory -Path $evidenceFull | Out-Null }
+        Assert-OperatorNoReparseChain $evidenceFull
         $caseId = "$Language-$DpiPercent"
-        $caseDirectory = Join-Path ([IO.Path]::GetFullPath($EvidenceRoot)) 'cases'
-        foreach ($directory in @($caseDirectory, (Join-Path $EvidenceRoot 'screenshots'), (Join-Path $EvidenceRoot 'artifacts'))) {
+        if ($caseId -cnotin $ExpectedCaseIds) { throw 'operator_case_id_invalid' }
+        $caseDirectory = Join-Path $evidenceFull 'cases'
+        foreach ($directory in @($caseDirectory, (Join-Path $evidenceFull 'screenshots'), (Join-Path $evidenceFull 'artifacts'))) {
             if (-not (Test-Path -LiteralPath $directory)) { New-Item -ItemType Directory -Path $directory | Out-Null }
+            Assert-OperatorNoReparseChain $directory
         }
         $path = Join-Path $caseDirectory "$caseId.json"
         if (Test-Path -LiteralPath $path) { throw 'operator_case_exists' }
@@ -187,7 +243,7 @@ try {
     elseif ($Action -ceq 'AddScreenshot') {
         if ([string]::IsNullOrWhiteSpace($Label) -or $Label -notmatch '^[a-z0-9][a-z0-9-]{0,39}$') { throw 'operator_screenshot_label_invalid' }
         $source = Assert-SourceFile $EvidenceFilePath 'operator_screenshot_missing'
-        if ($source.Extension -cne '.png') { throw 'operator_screenshot_invalid' }
+        if (-not $source.Extension.Equals('.png', [StringComparison]::OrdinalIgnoreCase)) { throw 'operator_screenshot_invalid' }
         $dimensions = Get-PngDimensions $source.FullName
         $copy = Copy-EvidenceFile $source.FullName 'screenshots' ($case.caseId + '-' + $Label + '.png')
         $record = [ordered]@{
@@ -242,8 +298,8 @@ try {
     }
     else { throw 'operator_action_not_implemented' }
 
-    Write-JsonAtomic ([IO.Path]::GetFullPath($CasePath)) $case $true
-    Write-Host ([IO.Path]::GetFullPath($CasePath))
+    Write-JsonAtomic $script:CurrentCasePath $case $true
+    Write-Host $script:CurrentCasePath
     exit 0
 }
 catch {

@@ -38,6 +38,7 @@ $RepresentativeNames = @('mp3Conversion', 'settingsSaveRestartRestore', 'legacyS
 $NowUtc = [DateTimeOffset]::UtcNow
 $OldestUtc = $NowUtc.AddHours(-$MaximumEvidenceAgeHours)
 $FutureLimitUtc = $NowUtc.AddMinutes(5)
+$PngCrcTable = $null
 
 function Test-Property {
     param([object] $Value, [string] $Name)
@@ -124,6 +125,16 @@ function Get-Sha256 {
     (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
+function Get-LocalFullPath {
+    param([string] $Path, [string] $ErrorId)
+    if ([string]::IsNullOrWhiteSpace($Path)) { throw $ErrorId }
+    if ($Path.StartsWith('\\') -or $Path.StartsWith('//')) { throw 'gui_remote_path_not_allowed' }
+    try { $full = [IO.Path]::GetFullPath($Path) }
+    catch { throw $ErrorId }
+    if ($full.StartsWith('\\') -or $full.StartsWith('//')) { throw 'gui_remote_path_not_allowed' }
+    $full
+}
+
 function Test-IntegerValue {
     param([object] $Value)
     $Value -is [byte] -or $Value -is [sbyte] -or $Value -is [int16] -or $Value -is [uint16] -or
@@ -165,6 +176,186 @@ function Assert-NoReparseChain {
         if ($null -eq $parent) { break }
         $current = $parent.FullName
     }
+}
+
+function Get-DirectoryTreeState {
+    param([string] $Root)
+    $entries = [Collections.Generic.List[object]]::new()
+    $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($item in @(Get-ChildItem -LiteralPath $Root -Recurse -Force | Sort-Object FullName)) {
+        Assert-NoReparseChain $item.FullName
+        $relative = [IO.Path]::GetRelativePath($Root, $item.FullName).Replace('\', '/')
+        if (-not $seen.Add($relative)) { throw 'gui_input_path_collision' }
+        if ($item.PSIsContainer) {
+            $entries.Add([pscustomobject]@{ path = $relative; kind = 'directory'; length = 0L; sha256 = '' })
+        }
+        else {
+            $entries.Add([pscustomobject]@{ path = $relative; kind = 'file'; length = [long]$item.Length; sha256 = Get-Sha256 $item.FullName })
+        }
+    }
+    @($entries)
+}
+
+function ConvertTo-StateText {
+    param([object[]] $Entries)
+    (@($Entries | Sort-Object path | ForEach-Object { '{0}|{1}|{2}|{3}' -f $_.path, $_.kind, $_.length, $_.sha256 }) -join "`n")
+}
+
+function Test-StateEqual {
+    param([object[]] $Expected, [object[]] $Actual)
+    (ConvertTo-StateText $Expected) -ceq (ConvertTo-StateText $Actual)
+}
+
+function Copy-SnapshotFile {
+    param([string] $Source, [string] $Destination, [long] $Length, [string] $Sha256)
+    $parent = Split-Path -Parent $Destination
+    if (-not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent | Out-Null }
+    Assert-NoReparseChain $parent
+    $input = [IO.File]::Open($Source, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    try {
+        $output = [IO.File]::Open($Destination, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        try {
+            $input.CopyTo($output)
+            $output.Flush($true)
+        }
+        finally { $output.Dispose() }
+    }
+    finally { $input.Dispose() }
+    $item = Get-Item -LiteralPath $Destination
+    if ($item.Length -ne $Length -or (Get-Sha256 $Destination) -cne $Sha256) { throw 'gui_input_changed' }
+}
+
+function Assert-OriginalInputsUnchanged {
+    param([object] $Snapshot)
+    try {
+        $candidateNow = [Collections.Generic.List[object]]::new()
+        foreach ($entry in $Snapshot.CandidateState) {
+            Assert-NoReparseChain $entry.originalPath
+            $item = Get-Item -LiteralPath $entry.originalPath -Force -ErrorAction Stop
+            if ($item.PSIsContainer) { throw 'candidate_not_file' }
+            $candidateNow.Add([pscustomobject]@{
+                path = $entry.path
+                kind = 'file'
+                length = [long]$item.Length
+                sha256 = Get-Sha256 $item.FullName
+            })
+        }
+        $evidenceNow = @(Get-DirectoryTreeState $Snapshot.OriginalEvidenceRoot)
+        if (-not (Test-StateEqual @($Snapshot.CandidateState) @($candidateNow)) -or
+            -not (Test-StateEqual @($Snapshot.EvidenceState) $evidenceNow)) {
+            throw 'state_mismatch'
+        }
+    }
+    catch { throw 'gui_input_changed' }
+}
+
+function New-ImmutableInputSnapshot {
+    param([string] $OriginalEvidenceRoot, [string] $OriginalExePath, [string] $OriginalManifestPath, [string] $OutputRoot)
+    $evidence = Get-LocalFullPath $OriginalEvidenceRoot 'gui_evidence_root_missing'
+    $exe = Get-LocalFullPath $OriginalExePath 'gui_candidate_executable_invalid'
+    $output = Get-LocalFullPath $OutputRoot 'gui_output_directory_invalid'
+    Assert-NoReparseChain $evidence
+    Assert-NoReparseChain $exe
+    Assert-NoReparseChain $output
+    if (-not (Test-Path -LiteralPath $evidence -PathType Container)) { throw 'gui_evidence_root_missing' }
+    if (-not (Test-Path -LiteralPath $exe -PathType Leaf) -or [IO.Path]::GetFileName($exe) -cne 'ytdlp-interface.exe') {
+        throw 'gui_candidate_executable_invalid'
+    }
+    $candidateDirectory = Split-Path -Parent $exe
+    $ffprobe = Join-Path $candidateDirectory 'ffprobe.exe'
+    Assert-NoReparseChain $candidateDirectory
+    Assert-NoReparseChain $ffprobe
+    if (-not (Test-Path -LiteralPath $ffprobe -PathType Leaf)) { throw 'gui_candidate_ffprobe_missing' }
+
+    $manifest = $null
+    if (-not [string]::IsNullOrWhiteSpace($OriginalManifestPath)) {
+        $manifest = Get-LocalFullPath $OriginalManifestPath 'gui_candidate_manifest_invalid'
+        Assert-NoReparseChain $manifest
+        if (-not (Test-Path -LiteralPath $manifest -PathType Leaf) -or
+            [IO.Path]::GetFileName($manifest) -cne 'candidate-manifest.json' -or
+            -not (Split-Path -Parent $manifest).Equals($candidateDirectory, [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'gui_candidate_manifest_invalid'
+        }
+    }
+
+    $evidencePrefix = $evidence.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+    if ($output.Equals($evidence, [StringComparison]::OrdinalIgnoreCase) -or
+        $output.StartsWith($evidencePrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'gui_output_inside_evidence_root'
+    }
+    if (-not (Test-Path -LiteralPath $output)) { New-Item -ItemType Directory -Path $output | Out-Null }
+    Assert-NoReparseChain $output
+    if (-not (Test-Path -LiteralPath $output -PathType Container)) { throw 'gui_output_directory_invalid' }
+
+    $candidateState = [Collections.Generic.List[object]]::new()
+    foreach ($source in @(
+        [pscustomobject]@{ path = 'ytdlp-interface.exe'; originalPath = $exe },
+        [pscustomobject]@{ path = 'ffprobe.exe'; originalPath = $ffprobe }
+    )) {
+        $item = Get-Item -LiteralPath $source.originalPath
+        $candidateState.Add([pscustomobject]@{
+            path = $source.path
+            kind = 'file'
+            length = [long]$item.Length
+            sha256 = Get-Sha256 $item.FullName
+            originalPath = $item.FullName
+        })
+    }
+    if ($null -ne $manifest) {
+        $item = Get-Item -LiteralPath $manifest
+        $candidateState.Add([pscustomobject]@{
+            path = 'candidate-manifest.json'
+            kind = 'file'
+            length = [long]$item.Length
+            sha256 = Get-Sha256 $item.FullName
+            originalPath = $item.FullName
+        })
+    }
+    $evidenceState = @(Get-DirectoryTreeState $evidence)
+    $snapshotRoot = Join-Path $output ('.gui-input-snapshot.' + $PID + '.' + [Guid]::NewGuid().ToString('N'))
+    [IO.Directory]::CreateDirectory($snapshotRoot) | Out-Null
+    Assert-NoReparseChain $snapshotRoot
+    $snapshotCandidate = Join-Path $snapshotRoot 'candidate'
+    $snapshotEvidence = Join-Path $snapshotRoot 'evidence'
+    [IO.Directory]::CreateDirectory($snapshotCandidate) | Out-Null
+    [IO.Directory]::CreateDirectory($snapshotEvidence) | Out-Null
+
+    foreach ($entry in $candidateState) {
+        Copy-SnapshotFile $entry.originalPath (Join-Path $snapshotCandidate $entry.path) $entry.length $entry.sha256
+    }
+    foreach ($entry in @($evidenceState | Where-Object kind -eq 'directory' | Sort-Object { $_.path.Length })) {
+        [IO.Directory]::CreateDirectory((Join-Path $snapshotEvidence ($entry.path.Replace('/', '\')))) | Out-Null
+    }
+    foreach ($entry in @($evidenceState | Where-Object kind -eq 'file')) {
+        $source = Join-Path $evidence ($entry.path.Replace('/', '\'))
+        $destination = Join-Path $snapshotEvidence ($entry.path.Replace('/', '\'))
+        Copy-SnapshotFile $source $destination $entry.length $entry.sha256
+    }
+
+    $result = [pscustomobject]@{
+        Root = $snapshotRoot
+        OutputRoot = $output
+        OriginalEvidenceRoot = $evidence
+        CandidateState = @($candidateState)
+        EvidenceState = $evidenceState
+        EvidenceRoot = $snapshotEvidence
+        CandidateExePath = Join-Path $snapshotCandidate 'ytdlp-interface.exe'
+        CandidateManifestPath = if ($null -eq $manifest) { '' } else { Join-Path $snapshotCandidate 'candidate-manifest.json' }
+    }
+    Assert-OriginalInputsUnchanged $result
+    $result
+}
+
+function Remove-ImmutableInputSnapshot {
+    param([object] $Snapshot)
+    if ($null -eq $Snapshot -or -not (Test-Path -LiteralPath $Snapshot.Root)) { return }
+    $root = [IO.Path]::GetFullPath($Snapshot.Root)
+    $output = [IO.Path]::GetFullPath($Snapshot.OutputRoot).TrimEnd('\', '/')
+    if (-not $root.StartsWith($output + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or
+        -not [IO.Path]::GetFileName($root).StartsWith('.gui-input-snapshot.', [StringComparison]::Ordinal)) {
+        throw 'gui_snapshot_cleanup_path_invalid'
+    }
+    Remove-Item -LiteralPath $root -Recurse -Force
 }
 
 function Resolve-EvidencePath {
@@ -239,6 +430,78 @@ function Get-DecodedPngDimensions {
         if ($null -ne $image) { $image.Dispose() }
         if ($null -ne $stream) { $stream.Dispose() }
     }
+}
+
+function Get-PngCrc32 {
+    param([byte[]] $Bytes, [int] $Offset, [int] $Count)
+    if ($null -eq $script:PngCrcTable) {
+        $script:PngCrcTable = [uint32[]]::new(256)
+        for ($i = 0; $i -lt 256; $i++) {
+            [uint32]$value = $i
+            for ($bit = 0; $bit -lt 8; $bit++) {
+                if (($value -band 1) -ne 0) { $value = [uint32](3988292384 -bxor ($value -shr 1)) }
+                else { $value = [uint32]($value -shr 1) }
+            }
+            $script:PngCrcTable[$i] = $value
+        }
+    }
+    [uint32]$crc = 4294967295
+    for ($i = 0; $i -lt $Count; $i++) {
+        $index = [int](($crc -bxor $Bytes[$Offset + $i]) -band 255)
+        $crc = [uint32]($script:PngCrcTable[$index] -bxor ($crc -shr 8))
+    }
+    [uint32]($crc -bxor 4294967295)
+}
+
+function Assert-PngByteStructure {
+    param([string] $Path)
+    $bytes = [IO.File]::ReadAllBytes($Path)
+    $signature = [byte[]](137, 80, 78, 71, 13, 10, 26, 10)
+    if ($bytes.Length -lt 20) { throw 'gui_screenshot_decode_failed' }
+    for ($i = 0; $i -lt 8; $i++) {
+        if ($bytes[$i] -ne $signature[$i]) { throw 'gui_screenshot_decode_failed' }
+    }
+    $offset = 8
+    $index = 0
+    $ihdrCount = 0
+    $plteCount = 0
+    $idatCount = 0
+    $iendCount = 0
+    while ($offset -lt $bytes.Length) {
+        if ($bytes.Length - $offset -lt 12) { throw 'gui_screenshot_decode_failed' }
+        [uint64]$length = ([uint64]$bytes[$offset] -shl 24) -bor ([uint64]$bytes[$offset + 1] -shl 16) -bor
+            ([uint64]$bytes[$offset + 2] -shl 8) -bor [uint64]$bytes[$offset + 3]
+        if ($length -gt 2147483647 -or ([uint64]$offset + 12 + $length) -gt [uint64]$bytes.Length) {
+            throw 'gui_screenshot_decode_failed'
+        }
+        $type = [Text.Encoding]::ASCII.GetString($bytes, $offset + 4, 4)
+        if ($type -notmatch '^[A-Za-z]{4}$') { throw 'gui_screenshot_png_structure_invalid' }
+        $crcOffset = [int]($offset + 8 + $length)
+        [uint32]$expectedCrc = ([uint32]$bytes[$crcOffset] -shl 24) -bor ([uint32]$bytes[$crcOffset + 1] -shl 16) -bor
+            ([uint32]$bytes[$crcOffset + 2] -shl 8) -bor [uint32]$bytes[$crcOffset + 3]
+        $actualCrc = Get-PngCrc32 $bytes ($offset + 4) ([int](4 + $length))
+        if ($actualCrc -ne $expectedCrc) { throw 'gui_screenshot_png_crc_invalid' }
+        if ($index -eq 0 -and ($type -cne 'IHDR' -or $length -ne 13)) { throw 'gui_screenshot_png_structure_invalid' }
+        if ([char]::IsUpper($type[0]) -and $type -notin @('IHDR', 'PLTE', 'IDAT', 'IEND')) {
+            throw 'gui_screenshot_png_structure_invalid'
+        }
+        switch -CaseSensitive ($type) {
+            'IHDR' { $ihdrCount++; if ($ihdrCount -ne 1 -or $index -ne 0) { throw 'gui_screenshot_png_structure_invalid' } }
+            'PLTE' { $plteCount++; if ($plteCount -gt 1) { throw 'gui_screenshot_png_structure_invalid' } }
+            'IDAT' { $idatCount++ }
+            'IEND' {
+                $iendCount++
+                if ($iendCount -ne 1 -or $length -ne 0) { throw 'gui_screenshot_png_structure_invalid' }
+            }
+        }
+        $offset = [int]($offset + 12 + $length)
+        $index++
+        if ($type -ceq 'IEND') {
+            if ($offset -ne $bytes.Length) { throw 'gui_screenshot_png_trailing_data' }
+            break
+        }
+    }
+    if ($ihdrCount -ne 1 -or $idatCount -lt 1 -or $iendCount -ne 1) { throw 'gui_screenshot_decode_failed' }
 }
 
 function Assert-BooleanTrue {
@@ -542,9 +805,10 @@ function Invoke-GuiEvidenceVerification {
                 sha256 = $screenshot.sha256
                 length = $screenshot.length
             }) $referenced
-            if ([IO.Path]::GetExtension($file.RelativePath) -cne '.png') { throw 'gui_screenshot_not_png' }
+            if (-not [IO.Path]::GetExtension($file.RelativePath).Equals('.png', [StringComparison]::OrdinalIgnoreCase)) { throw 'gui_screenshot_not_png' }
             if (-not $seenScreenshotPaths.Add($file.RelativePath)) { throw 'gui_screenshot_reused_between_cases' }
             $null = $caseScreenshotPaths.Add($file.RelativePath)
+            Assert-PngByteStructure $file.FullPath
             $dimensions = Get-DecodedPngDimensions $file.FullPath
             if ($dimensions.Width -lt 640 -or $dimensions.Height -lt 480) { throw 'gui_screenshot_too_small' }
             if (-not (Test-IntegerValue $screenshot.width) -or -not (Test-IntegerValue $screenshot.height) -or
@@ -626,6 +890,7 @@ function Invoke-GuiEvidenceVerification {
             $generatedProbes.Add([ordered]@{
                 caseId = $request.CaseId
                 kind = $request.Kind
+                sourceEvidencePath = $request.Media.RelativePath
                 path = $relativeProbe
                 sha256 = Get-Sha256 $probePath
                 length = $probeItem.Length
@@ -633,12 +898,24 @@ function Invoke-GuiEvidenceVerification {
         }
 
         $evidenceFiles = Get-InputEvidenceManifest $referenced
+        $summaryCases = [Collections.Generic.List[object]]::new()
+        foreach ($caseId in $ExpectedCases.Keys) {
+            $relativeCasePath = "cases/$caseId.json"
+            $casePath = Resolve-EvidencePath $relativeCasePath
+            $summaryCases.Add([ordered]@{
+                caseId = $caseId
+                language = $ExpectedCases[$caseId].language
+                dpi = $ExpectedCases[$caseId].dpi
+                evidenceFile = $relativeCasePath
+                evidenceSha256 = Get-Sha256 $casePath
+            })
+        }
         $summary = [ordered]@{
             schemaVersion = 2
             releaseVersion = $ReleaseVersion
             status = 'PASS'
             candidate = $candidate.Public
-            cases = @($ExpectedCases.Keys)
+            cases = @($summaryCases)
             fullVideoLifecycleCases = @('ko-KR-100', 'en-US-200')
             representativeChecks = [ordered]@{
                 mp3Conversion = @($representativeCoverage.mp3Conversion)
@@ -658,6 +935,7 @@ function Invoke-GuiEvidenceVerification {
         }
         [IO.File]::WriteAllText((Join-Path $partialPath 'gui-validation-summary.json'), (ConvertTo-DeterministicJsonText $summary), [Text.UTF8Encoding]::new($false))
         [IO.File]::WriteAllText((Join-Path $partialPath 'gui-validation-evidence-manifest.json'), (ConvertTo-DeterministicJsonText $manifest), [Text.UTF8Encoding]::new($false))
+        Assert-OriginalInputsUnchanged $script:InputSnapshot
         try { [IO.Directory]::Move($partialPath, $finalPath) }
         catch { throw [InvalidOperationException]::new('gui_validation_output_race', $_.Exception) }
     }
@@ -667,11 +945,20 @@ function Invoke-GuiEvidenceVerification {
     Write-Host "PASS: GUI release evidence sealed at $finalPath"
 }
 
+$inputSnapshot = $null
 try {
+    $inputSnapshot = New-ImmutableInputSnapshot $EvidenceRoot $CandidateExePath $CandidateManifestPath $OutputDirectory
+    $script:InputSnapshot = $inputSnapshot
+    $script:EvidenceRoot = $inputSnapshot.EvidenceRoot
+    $script:CandidateExePath = $inputSnapshot.CandidateExePath
+    $script:CandidateManifestPath = $inputSnapshot.CandidateManifestPath
     Invoke-GuiEvidenceVerification
     exit 0
 }
 catch {
     [Console]::Error.WriteLine($_.Exception.Message)
     exit 1
+}
+finally {
+    Remove-ImmutableInputSnapshot $inputSnapshot
 }

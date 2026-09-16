@@ -336,6 +336,62 @@ function Assert-VerifierRejects {
     (Test-Path -LiteralPath (Join-Path $Fixture.Output 'gui-validation-v2.19.1-karon.2')) | Should Be $false
 }
 
+function Start-TestInputMutation {
+    param(
+        [string] $OutputRoot,
+        [string] $TargetPath,
+        [ValidateSet('AppendText', 'CreateBinary')] [string] $Mutation
+    )
+    $watcherPath = Join-Path (Split-Path -Parent $OutputRoot) ('input-mutation-' + [Guid]::NewGuid().ToString('N') + '.ps1')
+    $watcherText = @'
+param([string]$OutputRoot,[string]$TargetPath,[string]$Mutation)
+$deadline = [DateTime]::UtcNow.AddSeconds(20)
+while ([DateTime]::UtcNow -lt $deadline) {
+    if (@(Get-ChildItem -LiteralPath $OutputRoot -Directory -Filter '.gui-validation-v2.19.1-karon.2.partial.*' -ErrorAction SilentlyContinue).Count -gt 0) {
+        if ($Mutation -ceq 'AppendText') {
+            [IO.File]::AppendAllText($TargetPath, 'mutated-after-snapshot', [Text.UTF8Encoding]::new($false))
+        }
+        else {
+            [IO.File]::WriteAllBytes($TargetPath, [byte[]](0, 1, 2, 3, 255))
+        }
+        exit 0
+    }
+    Start-Sleep -Milliseconds 1
+}
+exit 2
+'@
+    [IO.File]::WriteAllText($watcherPath, $watcherText, [Text.UTF8Encoding]::new($false))
+    Start-Process -FilePath $script:Pwsh -ArgumentList @(
+        '-NoProfile', '-File', $watcherPath, $OutputRoot, $TargetPath, $Mutation
+    ) -PassThru -WindowStyle Hidden
+}
+
+function Add-TestPngChunkBeforeIend {
+    param([string] $Path, [byte[]] $Chunk)
+    $bytes = [IO.File]::ReadAllBytes($Path)
+    if ($bytes.Length -lt 12) { throw 'test_png_too_short' }
+    $result = [byte[]]::new($bytes.Length + $Chunk.Length)
+    [Buffer]::BlockCopy($bytes, 0, $result, 0, $bytes.Length - 12)
+    [Buffer]::BlockCopy($Chunk, 0, $result, $bytes.Length - 12, $Chunk.Length)
+    [Buffer]::BlockCopy($bytes, $bytes.Length - 12, $result, $bytes.Length - 12 + $Chunk.Length, 12)
+    [IO.File]::WriteAllBytes($Path, $result)
+}
+
+function New-TestPngChunk {
+    param([string] $Type, [byte[]] $Data, [byte[]] $Crc)
+    $typeBytes = [Text.Encoding]::ASCII.GetBytes($Type)
+    $chunk = [byte[]]::new(12 + $Data.Length)
+    $length = [uint32]$Data.Length
+    $chunk[0] = [byte](($length -shr 24) -band 0xff)
+    $chunk[1] = [byte](($length -shr 16) -band 0xff)
+    $chunk[2] = [byte](($length -shr 8) -band 0xff)
+    $chunk[3] = [byte]($length -band 0xff)
+    [Buffer]::BlockCopy($typeBytes, 0, $chunk, 4, 4)
+    if ($Data.Length -gt 0) { [Buffer]::BlockCopy($Data, 0, $chunk, 8, $Data.Length) }
+    [Buffer]::BlockCopy($Crc, 0, $chunk, 8 + $Data.Length, 4)
+    $chunk
+}
+
 Describe 'v2.19.1-karon.2 GUI release evidence contract' {
     BeforeAll { Initialize-TestMedia }
 
@@ -672,6 +728,152 @@ exit 2
         (Get-TestSha256 (Join-Path $raceFinal 'gui-validation-summary.json')) | Should Be (Get-TestSha256 (Join-Path $seedFinal 'gui-validation-summary.json'))
         (Get-TestSha256 (Join-Path $raceFinal 'gui-validation-evidence-manifest.json')) | Should Be (Get-TestSha256 (Join-Path $seedFinal 'gui-validation-evidence-manifest.json'))
         @(Get-ChildItem -LiteralPath $raceOutput -Directory -Filter '.gui-validation-v2.19.1-karon.2.partial.*').Count | Should Be 0
+    }
+
+    It 'rejects a candidate executable changed after its initial hash' {
+        $fixture = New-ValidGuiFixture
+        $watcher = Start-TestInputMutation $fixture.Output $fixture.Exe 'AppendText'
+        $result = Invoke-GuiVerifier $fixture
+        $watcher.WaitForExit()
+        $watcher.ExitCode | Should Be 0
+        $result.ExitCode | Should Not Be 0
+        $result.Combined | Should Match 'gui_input_changed'
+    }
+
+    It 'rejects a candidate manifest changed after its initial hash' {
+        $fixture = New-ValidGuiFixture
+        $watcher = Start-TestInputMutation $fixture.Output $fixture.Candidate.Manifest 'AppendText'
+        $result = Invoke-GuiVerifier $fixture
+        $watcher.WaitForExit()
+        $watcher.ExitCode | Should Be 0
+        $result.ExitCode | Should Not Be 0
+        $result.Combined | Should Match 'gui_input_changed'
+    }
+
+    It 'rejects an evidence file added after the allowlist scan' {
+        $fixture = New-ValidGuiFixture
+        $secret = Join-Path $fixture.Evidence 'secret.bin'
+        $watcher = Start-TestInputMutation $fixture.Output $secret 'CreateBinary'
+        $result = Invoke-GuiVerifier $fixture
+        $watcher.WaitForExit()
+        $watcher.ExitCode | Should Be 0
+        $result.ExitCode | Should Not Be 0
+        $result.Combined | Should Match 'gui_input_changed'
+    }
+
+    It 'rejects PNG bytes appended after the terminal IEND chunk' {
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-150'
+        $path = Join-Path $fixture.Evidence (([string]$case.Value.screenshots[0].path).Replace('/', '\'))
+        [IO.File]::AppendAllText($path, 'polyglot-tail', [Text.UTF8Encoding]::new($false))
+        Update-DescriptorForFile $case.Value.screenshots[0] $path
+        Save-TestCase $case
+        Assert-VerifierRejects $fixture 'gui_screenshot_png_trailing_data'
+    }
+
+    It 'rejects a PNG ancillary chunk with an invalid CRC' {
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-150'
+        $path = Join-Path $fixture.Evidence (([string]$case.Value.screenshots[0].path).Replace('/', '\'))
+        $chunk = New-TestPngChunk 'tEXt' ([byte[]](97, 0, 98)) ([byte[]](0, 0, 0, 0))
+        Add-TestPngChunkBeforeIend $path $chunk
+        Update-DescriptorForFile $case.Value.screenshots[0] $path
+        Save-TestCase $case
+        Assert-VerifierRejects $fixture 'gui_screenshot_png_crc_invalid'
+    }
+
+    It 'rejects a duplicate forbidden PNG critical chunk' {
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-150'
+        $path = Join-Path $fixture.Evidence (([string]$case.Value.screenshots[0].path).Replace('/', '\'))
+        $bytes = [IO.File]::ReadAllBytes($path)
+        $duplicateIhdr = [byte[]]::new(25)
+        [Buffer]::BlockCopy($bytes, 8, $duplicateIhdr, 0, 25)
+        Add-TestPngChunkBeforeIend $path $duplicateIhdr
+        Update-DescriptorForFile $case.Value.screenshots[0] $path
+        Save-TestCase $case
+        Assert-VerifierRejects $fixture 'gui_screenshot_png_structure_invalid'
+    }
+
+    It 'accepts a canonical unique screenshot with an uppercase PNG extension' {
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-150'
+        $oldRelative = [string]$case.Value.screenshots[0].path
+        $oldPath = Join-Path $fixture.Evidence ($oldRelative.Replace('/', '\'))
+        $temporaryPath = $oldPath + '.rename'
+        $newRelative = $oldRelative.Substring(0, $oldRelative.Length - 4) + '.PNG'
+        $newPath = Join-Path $fixture.Evidence ($newRelative.Replace('/', '\'))
+        Move-Item -LiteralPath $oldPath -Destination $temporaryPath
+        Move-Item -LiteralPath $temporaryPath -Destination $newPath
+        $case.Value.screenshots[0].path = $newRelative
+        Update-DescriptorForFile $case.Value.screenshots[0] $newPath
+        Save-TestCase $case
+        (Invoke-GuiVerifier $fixture).ExitCode | Should Be 0
+    }
+
+    It 'rejects recorder case identifiers outside the exact fixed matrix' {
+        $fixture = New-ValidGuiFixture
+        $casePath = Join-Path $fixture.Cases 'ko-KR-100.json'
+        $originalText = Get-Content -LiteralPath $casePath -Raw -Encoding UTF8
+        foreach ($invalidId in @('../escape', 'ko-KR-100/child', 'C:stream', '.', '/rooted', '\\server\share\case', '\\?\C:\case')) {
+            $case = $originalText | ConvertFrom-Json -Depth 64 -DateKind String
+            $case.caseId = $invalidId
+            Write-TestJson $casePath $case
+            $result = Invoke-TestScript $script:Recorder @('-Action', 'Finalize', '-CasePath', $casePath)
+            $result.ExitCode | Should Not Be 0
+            $result.Combined | Should Match 'operator_case_id_invalid'
+        }
+    }
+
+    It 'rejects a recorder case whose fixed ID does not match its canonical filename' {
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-100'
+        $case.Value.caseId = 'en-US-100'
+        Save-TestCase $case
+        $result = Invoke-TestScript $script:Recorder @('-Action', 'Finalize', '-CasePath', $case.Path)
+        $result.ExitCode | Should Not Be 0
+        $result.Combined | Should Match 'operator_case_path_invalid'
+    }
+
+    It 'rejects recorder evidence reached through a parent junction' {
+        $fixture = New-ValidGuiFixture
+        $junction = Join-Path $fixture.Root 'operator-junction'
+        New-Item -ItemType Junction -Path $junction -Target $fixture.Evidence | Out-Null
+        $casePath = Join-Path $junction 'cases\ko-KR-100.json'
+        $result = Invoke-TestScript $script:Recorder @('-Action', 'Finalize', '-CasePath', $casePath)
+        $result.ExitCode | Should Not Be 0
+        $result.Combined | Should Match 'operator_path_reparse_point'
+    }
+
+    It 'rejects device and UNC style input paths for local immutable evidence' {
+        $fixture = New-ValidGuiFixture
+        $deviceExe = '\\?\' + $fixture.Exe
+        $result = Invoke-TestScript $script:Verifier @(
+            '-EvidenceRoot', $fixture.Evidence,
+            '-CandidateExePath', $deviceExe,
+            '-OutputDirectory', $fixture.Output,
+            '-MaximumEvidenceAgeHours', '24'
+        )
+        $result.ExitCode | Should Not Be 0
+        $result.Combined | Should Match 'gui_remote_path_not_allowed'
+    }
+
+    It 'emits the exact packaging consumer summary schema documented by the producer' {
+        $fixture = New-ValidGuiFixture
+        $result = Invoke-GuiVerifier $fixture
+        $result.ExitCode | Should Be 0
+        $final = Join-Path $fixture.Output 'gui-validation-v2.19.1-karon.2'
+        $summary = Get-Content -LiteralPath (Join-Path $final 'gui-validation-summary.json') -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 64 -DateKind String
+        ($summary.PSObject.Properties.Name -join ',') | Should Be 'schemaVersion,releaseVersion,status,candidate,cases,fullVideoLifecycleCases,representativeChecks,generatedProbes,evidenceFileCount,evidenceManifestFile'
+        ($summary.representativeChecks.PSObject.Properties.Name -join ',') | Should Be 'mp3Conversion,settingsSaveRestartRestore,legacySettingsTransition'
+        ($summary.cases[0].PSObject.Properties.Name -join ',') | Should Be 'caseId,language,dpi,evidenceFile,evidenceSha256'
+        ($summary.generatedProbes[0].PSObject.Properties.Name -join ',') | Should Be 'caseId,kind,sourceEvidencePath,path,sha256,length'
+        $repoRoot = Split-Path -Parent (Split-Path -Parent $script:Verifier)
+        $readme = Get-Content -LiteralPath (Join-Path $repoRoot 'release\validation\v2.19.1-karon.2\README.md') -Raw -Encoding UTF8
+        $readme | Should Match 'fullVideoLifecycleCases'
+        $readme | Should Match 'representativeChecks'
+        $readme | Should Match 'settingsSaveRestartRestore'
+        $readme | Should Not Match '\b(?:videoLifecycleCases|representativeCoverage|settingsRestartRestore)\b'
     }
 
     It 'initializes operator case with no preset observations or environment PASS values' {
