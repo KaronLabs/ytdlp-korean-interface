@@ -12,6 +12,148 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+
+if (-not ('KaronPathSafety' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Text;
+using Microsoft.Win32.SafeHandles;
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct KaronFileIdInfo
+{
+    public ulong VolumeSerialNumber;
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
+    public byte[] FileId;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct KaronByHandleFileInformation
+{
+    public uint FileAttributes;
+    public System.Runtime.InteropServices.ComTypes.FILETIME CreationTime;
+    public System.Runtime.InteropServices.ComTypes.FILETIME LastAccessTime;
+    public System.Runtime.InteropServices.ComTypes.FILETIME LastWriteTime;
+    public uint VolumeSerialNumber;
+    public uint FileSizeHigh;
+    public uint FileSizeLow;
+    public uint NumberOfLinks;
+    public uint FileIndexHigh;
+    public uint FileIndexLow;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct KaronFileDispositionInfo
+{
+    [MarshalAs(UnmanagedType.Bool)]
+    public bool DeleteFile;
+}
+
+public sealed class KaronPathIdentity
+{
+    public string FinalPath { get; internal set; }
+    public ulong VolumeSerialNumber { get; internal set; }
+    public string FileId { get; internal set; }
+    public uint FileAttributes { get; internal set; }
+}
+
+public sealed class KaronPathHandle : IDisposable
+{
+    public SafeFileHandle Handle { get; private set; }
+    internal KaronPathHandle(SafeFileHandle handle) { Handle = handle; }
+    public KaronPathIdentity Refresh() { return KaronPathSafety.ReadIdentity(Handle); }
+    public void Dispose() { if (Handle != null) Handle.Dispose(); }
+}
+
+public static class KaronPathSafety
+{
+    private const uint GenericRead = 0x80000000;
+    private const uint DeleteAccess = 0x00010000;
+    private const uint FileReadAttributes = 0x00000080;
+    private const uint FileShareRead = 0x00000001;
+    private const uint FileShareWrite = 0x00000002;
+    private const uint OpenExisting = 3;
+    private const uint FileFlagBackupSemantics = 0x02000000;
+    private const uint FileFlagOpenReparsePoint = 0x00200000;
+    private const int FileIdInfo = 0x12;
+    private const int FileDispositionInfo = 4;
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern SafeFileHandle CreateFileW(
+        string fileName, uint desiredAccess, uint shareMode, IntPtr securityAttributes,
+        uint creationDisposition, uint flagsAndAttributes, IntPtr templateFile);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetFileInformationByHandleEx(
+        SafeFileHandle file, int informationClass, out KaronFileIdInfo information, uint bufferSize);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetFileInformationByHandle(
+        SafeFileHandle file, out KaronByHandleFileInformation information);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern uint GetFinalPathNameByHandleW(
+        SafeFileHandle file, StringBuilder path, uint pathLength, uint flags);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetFileInformationByHandle(
+        SafeFileHandle file, int informationClass, ref KaronFileDispositionInfo information, uint bufferSize);
+
+    public static KaronPathHandle Open(string path, bool readData, bool openReparsePoint)
+    {
+        return Open(path, readData, openReparsePoint, false);
+    }
+
+    public static KaronPathHandle Open(string path, bool readData, bool openReparsePoint, bool deleteAccess)
+    {
+        uint access = readData ? GenericRead : FileReadAttributes;
+        if (deleteAccess) access |= DeleteAccess;
+        uint share = readData ? FileShareRead : FileShareRead | FileShareWrite;
+        uint flags = FileFlagBackupSemantics | (openReparsePoint ? FileFlagOpenReparsePoint : 0);
+        SafeFileHandle handle = CreateFileW(path, access, share, IntPtr.Zero, OpenExisting, flags, IntPtr.Zero);
+        if (handle.IsInvalid) throw new Win32Exception(Marshal.GetLastWin32Error(), "CreateFileW failed: " + path);
+        return new KaronPathHandle(handle);
+    }
+
+    public static void MarkDelete(KaronPathHandle path)
+    {
+        KaronFileDispositionInfo information = new KaronFileDispositionInfo { DeleteFile = true };
+        if (!SetFileInformationByHandle(path.Handle, FileDispositionInfo, ref information,
+                (uint)Marshal.SizeOf(typeof(KaronFileDispositionInfo))))
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "SetFileInformationByHandle(FileDispositionInfo) failed");
+    }
+
+    public static KaronPathIdentity ReadIdentity(SafeFileHandle handle)
+    {
+        KaronFileIdInfo id;
+        if (!GetFileInformationByHandleEx(handle, FileIdInfo, out id, (uint)Marshal.SizeOf(typeof(KaronFileIdInfo))))
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "GetFileInformationByHandleEx(FileIdInfo) failed");
+        KaronByHandleFileInformation basic;
+        if (!GetFileInformationByHandle(handle, out basic))
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "GetFileInformationByHandle failed");
+        StringBuilder path = new StringBuilder(1024);
+        uint length = GetFinalPathNameByHandleW(handle, path, (uint)path.Capacity, 0);
+        if (length == 0) throw new Win32Exception(Marshal.GetLastWin32Error(), "GetFinalPathNameByHandleW failed");
+        if (length >= path.Capacity)
+        {
+            path = new StringBuilder((int)length + 1);
+            length = GetFinalPathNameByHandleW(handle, path, (uint)path.Capacity, 0);
+            if (length == 0 || length >= path.Capacity)
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "GetFinalPathNameByHandleW failed");
+        }
+        return new KaronPathIdentity {
+            FinalPath = path.ToString(),
+            VolumeSerialNumber = id.VolumeSerialNumber,
+            FileId = BitConverter.ToString(id.FileId).Replace("-", ""),
+            FileAttributes = basic.FileAttributes
+        };
+    }
+}
+'@
+}
+
 if ([string]::IsNullOrWhiteSpace($ManifestPath)) {
     $ManifestPath = Join-Path $PSScriptRoot '..\release\runtime\v2.19.1-karon.2\ffmpeg\manifest.json'
 }
@@ -55,28 +197,268 @@ function Assert-SafeBundlePath {
     $normalized = $Path.Replace('\', '/')
     $segments = $normalized.Split([char] '/', [StringSplitOptions]::None)
     foreach ($segment in $segments) {
-        if ([string]::IsNullOrEmpty($segment) -or $segment -ceq '.' -or $segment -ceq '..' -or
+        if ([string]::IsNullOrEmpty($segment) -or $segment -match '[\x00-\x1F]' -or
+            $segment -ceq '.' -or $segment -ceq '..' -or
             $segment -match '[ .]$' -or $segment.IndexOfAny([char[]] '<>"|?*') -ge 0 -or
-            $segment -match '(?i)^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)') {
+            $segment -match '(?i)^(CON|PRN|AUX|NUL|COM(?:[1-9]|[¹²³])|LPT(?:[1-9]|[¹²³]))(?:\.|$)') {
             throw "ffmpeg_source_unsafe_bundle_path:$Path"
         }
     }
     $normalized.Normalize([Text.NormalizationForm]::FormC)
 }
 
+function ConvertTo-KaronFinalPath {
+    param([string] $Path)
+    if ($Path.StartsWith('\\?\UNC\', [StringComparison]::OrdinalIgnoreCase)) {
+        $Path = '\\' + $Path.Substring(8)
+    }
+    elseif ($Path.StartsWith('\\?\', [StringComparison]::OrdinalIgnoreCase)) {
+        $Path = $Path.Substring(4)
+    }
+    $full = [IO.Path]::GetFullPath($Path)
+    $volumeRoot = [IO.Path]::GetPathRoot($full)
+    if ($full.Length -gt $volumeRoot.Length) { return $full.TrimEnd([char[]] @('\', '/')) }
+    $full
+}
+
+function ConvertTo-KaronPathIdentity {
+    param([KaronPathHandle] $Handle)
+    $identity = $Handle.Refresh()
+    [pscustomobject][ordered]@{
+        FinalPath = ConvertTo-KaronFinalPath $identity.FinalPath
+        VolumeSerialNumber = [uint64] $identity.VolumeSerialNumber
+        FileId = ([string] $identity.FileId).ToUpperInvariant()
+        FileAttributes = [uint32] $identity.FileAttributes
+    }
+}
+
+function Assert-KaronPathIdentity {
+    param($Expected, $Actual, [string] $ErrorCode, [string] $Label)
+    if (-not ([string] $Expected.FinalPath).Equals([string] $Actual.FinalPath, [StringComparison]::OrdinalIgnoreCase) -or
+        [uint64] $Expected.VolumeSerialNumber -ne [uint64] $Actual.VolumeSerialNumber -or
+        -not ([string] $Expected.FileId).Equals([string] $Actual.FileId, [StringComparison]::Ordinal) -or
+        [uint32] $Expected.FileAttributes -ne [uint32] $Actual.FileAttributes) {
+        throw "${ErrorCode}:$Label"
+    }
+}
+
+function Get-KaronLexicalPathNodes {
+    param([string] $Path)
+    $full = [IO.Path]::GetFullPath($Path)
+    $volumeRoot = [IO.Path]::GetPathRoot($full)
+    if ([string]::IsNullOrWhiteSpace($volumeRoot)) { throw "ffmpeg_source_unsafe_filesystem_path:$Path" }
+    $nodes = [Collections.Generic.List[string]]::new()
+    $nodes.Add($volumeRoot) | Out-Null
+    $current = $volumeRoot
+    $relative = $full.Substring($volumeRoot.Length)
+    foreach ($segment in @($relative -split '[\\/]' | Where-Object { $_.Length -gt 0 })) {
+        $current = Join-Path $current $segment
+        $nodes.Add([IO.Path]::GetFullPath($current)) | Out-Null
+    }
+    $nodes.ToArray()
+}
+
+function Close-KaronPathChain {
+    param($Chain)
+    if ($null -eq $Chain) { return }
+    for ($index = $Chain.Nodes.Count - 1; $index -ge 0; $index--) {
+        $Chain.Nodes[$index].Handle.Dispose()
+    }
+}
+
+function Open-KaronPathChain {
+    param(
+        [string] $Path,
+        [switch] $ReadFinal,
+        [switch] $DeleteFinal,
+        [string] $ReparseError = 'ffmpeg_source_source_root_escape'
+    )
+    $lexicalNodes = @(Get-KaronLexicalPathNodes $Path)
+    $openedNodes = [Collections.Generic.List[object]]::new()
+    try {
+        for ($index = 0; $index -lt $lexicalNodes.Count; $index++) {
+            $isFinal = $index -eq ($lexicalNodes.Count - 1)
+            $handle = [KaronPathSafety]::Open(
+                $lexicalNodes[$index],
+                [bool] ($isFinal -and $ReadFinal),
+                $true,
+                [bool] ($isFinal -and $DeleteFinal)
+            )
+            try {
+                $identity = ConvertTo-KaronPathIdentity $handle
+                if (($identity.FileAttributes -band [uint32] [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                    throw "$ReparseError`:$($lexicalNodes[$index])"
+                }
+                $lexical = ConvertTo-KaronFinalPath $lexicalNodes[$index]
+                if (-not $identity.FinalPath.Equals($lexical, [StringComparison]::OrdinalIgnoreCase)) {
+                    throw "$ReparseError`:$($lexicalNodes[$index])"
+                }
+                $openedNodes.Add([pscustomobject][ordered]@{
+                    LexicalPath = $lexical
+                    Handle = $handle
+                    Identity = $identity
+                }) | Out-Null
+                $handle = $null
+            }
+            finally {
+                if ($null -ne $handle) { $handle.Dispose() }
+            }
+        }
+        [pscustomobject][ordered]@{
+            Path = ConvertTo-KaronFinalPath $Path
+            Nodes = @($openedNodes)
+            Final = $openedNodes[$openedNodes.Count - 1]
+        }
+    }
+    catch {
+        for ($index = $openedNodes.Count - 1; $index -ge 0; $index--) { $openedNodes[$index].Handle.Dispose() }
+        throw
+    }
+}
+
+function Assert-KaronPathChainUnchanged {
+    param($Chain, [string] $ErrorCode)
+    foreach ($node in $Chain.Nodes) {
+        $actual = ConvertTo-KaronPathIdentity $node.Handle
+        Assert-KaronPathIdentity $node.Identity $actual $ErrorCode $node.LexicalPath
+    }
+}
+
+function Assert-KaronPhysicalContainment {
+    param($RootIdentity, $ChildIdentity, [string] $ErrorCode)
+    $root = ConvertTo-KaronFinalPath ([string] $RootIdentity.FinalPath)
+    $child = ConvertTo-KaronFinalPath ([string] $ChildIdentity.FinalPath)
+    $prefix = $root + [IO.Path]::DirectorySeparatorChar
+    if ([uint64] $RootIdentity.VolumeSerialNumber -ne [uint64] $ChildIdentity.VolumeSerialNumber -or
+        (-not $child.Equals($root, [StringComparison]::OrdinalIgnoreCase) -and
+         -not $child.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase))) {
+        throw $ErrorCode
+    }
+}
+
+function Assert-KaronDirectChild {
+    param($ParentIdentity, $ChildIdentity, [string] $ErrorCode)
+    if ([uint64] $ParentIdentity.VolumeSerialNumber -ne [uint64] $ChildIdentity.VolumeSerialNumber -or
+        -not ([IO.Path]::GetDirectoryName([string] $ChildIdentity.FinalPath)).Equals(
+            [string] $ParentIdentity.FinalPath, [StringComparison]::OrdinalIgnoreCase)) {
+        throw $ErrorCode
+    }
+}
+
+function Assert-ExistingKaronAncestors {
+    param([string] $Path, [string] $ReparseError)
+    foreach ($node in @(Get-KaronLexicalPathNodes $Path)) {
+        $handle = $null
+        try {
+            $handle = [KaronPathSafety]::Open($node, $false, $true)
+            $identity = ConvertTo-KaronPathIdentity $handle
+            if (($identity.FileAttributes -band [uint32] [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+                -not $identity.FinalPath.Equals((ConvertTo-KaronFinalPath $node), [StringComparison]::OrdinalIgnoreCase)) {
+                throw "$ReparseError`:$node"
+            }
+        }
+        catch [ComponentModel.Win32Exception] {
+            if ($_.Exception.NativeErrorCode -in @(2, 3)) { break }
+            throw
+        }
+        finally {
+            if ($null -ne $handle) { $handle.Dispose() }
+        }
+    }
+}
+
+function Open-VerifiedBundleSource {
+    param($Item)
+    $rootChain = $null
+    $sourceChain = $null
+    try {
+        $rootChain = Open-KaronPathChain ([string] $Item.SourceRootPath) -ReparseError 'ffmpeg_source_source_root_escape'
+        $sourceChain = Open-KaronPathChain ([string] $Item.SourcePath) -ReadFinal -ReparseError 'ffmpeg_source_source_root_escape'
+        Assert-KaronPathIdentity $Item.RootIdentity $rootChain.Final.Identity 'ffmpeg_source_path_identity_changed' $Item.SourceRootPath
+        Assert-KaronPathIdentity $Item.SourceIdentity $sourceChain.Final.Identity 'ffmpeg_source_path_identity_changed' $Item.SourcePath
+        Assert-KaronPhysicalContainment $rootChain.Final.Identity $sourceChain.Final.Identity 'ffmpeg_source_source_root_escape'
+        return [pscustomobject][ordered]@{ RootChain = $rootChain; SourceChain = $sourceChain }
+    }
+    catch {
+        Close-KaronPathChain $sourceChain
+        Close-KaronPathChain $rootChain
+        throw
+    }
+}
+
+function Close-VerifiedBundleSource {
+    param($Opened)
+    if ($null -eq $Opened) { return }
+    Close-KaronPathChain $Opened.SourceChain
+    Close-KaronPathChain $Opened.RootChain
+}
+
+function Copy-KaronHandleToStream {
+    param([KaronPathHandle] $Handle, [IO.Stream] $Output)
+    $borrowed = [Microsoft.Win32.SafeHandles.SafeFileHandle]::new($Handle.Handle.DangerousGetHandle(), $false)
+    $input = [IO.FileStream]::new($borrowed, [IO.FileAccess]::Read, 65536, $false)
+    try {
+        [void] $input.Seek(0, [IO.SeekOrigin]::Begin)
+        $input.CopyTo($Output)
+    }
+    finally { $input.Dispose(); $borrowed.Dispose() }
+}
+
+function Get-KaronHandleDigest {
+    param([KaronPathHandle] $Handle)
+    $borrowed = [Microsoft.Win32.SafeHandles.SafeFileHandle]::new($Handle.Handle.DangerousGetHandle(), $false)
+    $input = [IO.FileStream]::new($borrowed, [IO.FileAccess]::Read, 65536, $false)
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    try {
+        [void] $input.Seek(0, [IO.SeekOrigin]::Begin)
+        $bytes = $input.Length
+        $sha = [Convert]::ToHexString($algorithm.ComputeHash($input))
+        [pscustomobject][ordered]@{ Sha256 = $sha; Bytes = [int64] $bytes }
+    }
+    finally { $algorithm.Dispose(); $input.Dispose(); $borrowed.Dispose() }
+}
+
+function Read-KaronHandleUtf8 {
+    param([KaronPathHandle] $Handle)
+    $memory = [IO.MemoryStream]::new()
+    try {
+        Copy-KaronHandleToStream $Handle $memory
+        [Text.UTF8Encoding]::new($false, $true).GetString($memory.ToArray())
+    }
+    finally { $memory.Dispose() }
+}
+
 function Resolve-ContainedSourcePath {
     param([string] $SourcePath, [string[]] $AllowedSourceRoots)
-    if (-not (Test-Path -LiteralPath $SourcePath -PathType Leaf)) { throw "ffmpeg_source_missing_bundle_input:$SourcePath" }
-    $item = Get-Item -LiteralPath $SourcePath -Force
-    if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "ffmpeg_source_source_root_escape:$SourcePath" }
-    $resolved = [IO.Path]::GetFullPath($item.FullName)
+    if (-not [IO.File]::Exists($SourcePath)) { throw "ffmpeg_source_missing_bundle_input:$SourcePath" }
+    $resolved = ConvertTo-KaronFinalPath $SourcePath
     foreach ($root in $AllowedSourceRoots) {
-        if (-not (Test-Path -LiteralPath $root -PathType Container)) { continue }
-        $rootPath = [IO.Path]::GetFullPath((Get-Item -LiteralPath $root -Force).FullName).TrimEnd('\', '/')
+        if (-not [IO.Directory]::Exists($root)) { continue }
+        $rootPath = ConvertTo-KaronFinalPath $root
         $prefix = $rootPath + [IO.Path]::DirectorySeparatorChar
         if ($resolved.Equals($rootPath, [StringComparison]::OrdinalIgnoreCase) -or
             $resolved.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
-            return $resolved
+            $rootChain = $null
+            $sourceChain = $null
+            try {
+                $rootChain = Open-KaronPathChain $rootPath -ReparseError 'ffmpeg_source_source_root_escape'
+                $sourceChain = Open-KaronPathChain $resolved -ReadFinal -ReparseError 'ffmpeg_source_source_root_escape'
+                if (($rootChain.Final.Identity.FileAttributes -band [uint32] [IO.FileAttributes]::Directory) -eq 0 -or
+                    ($sourceChain.Final.Identity.FileAttributes -band [uint32] [IO.FileAttributes]::Directory) -ne 0) {
+                    throw "ffmpeg_source_source_root_escape:$SourcePath"
+                }
+                Assert-KaronPhysicalContainment $rootChain.Final.Identity $sourceChain.Final.Identity "ffmpeg_source_source_root_escape:$SourcePath"
+                return [pscustomobject][ordered]@{
+                    SourcePath = $sourceChain.Final.Identity.FinalPath
+                    SourceRootPath = $rootChain.Final.Identity.FinalPath
+                    SourceIdentity = $sourceChain.Final.Identity
+                    RootIdentity = $rootChain.Final.Identity
+                }
+            }
+            finally {
+                Close-KaronPathChain $sourceChain
+                Close-KaronPathChain $rootChain
+            }
         }
     }
     throw "ffmpeg_source_source_root_escape:$SourcePath"
@@ -90,11 +472,20 @@ function Assert-BundleItems {
         $key = $entryPath.Normalize([Text.NormalizationForm]::FormC).ToLowerInvariant()
         if ($seen.ContainsKey($key)) { throw "ffmpeg_source_duplicate_path:$entryPath" }
         $seen[$key] = $true
-        $sourcePath = Resolve-ContainedSourcePath ([string] $item.SourcePath) $AllowedSourceRoots
+        $location = Resolve-ContainedSourcePath ([string] $item.SourcePath) $AllowedSourceRoots
+        if ($null -ne $item.PSObject.Properties['SourceIdentity']) {
+            Assert-KaronPathIdentity $item.SourceIdentity $location.SourceIdentity 'ffmpeg_source_path_identity_changed' $entryPath
+        }
+        if ($null -ne $item.PSObject.Properties['RootIdentity']) {
+            Assert-KaronPathIdentity $item.RootIdentity $location.RootIdentity 'ffmpeg_source_path_identity_changed' $entryPath
+        }
         $sha = ([string] $item.Sha256).ToUpperInvariant()
         if ($sha -notmatch '^[0-9A-F]{64}$') { throw "ffmpeg_source_missing_sha256:$entryPath" }
         [pscustomobject][ordered]@{
-            SourcePath = $sourcePath
+            SourcePath = $location.SourcePath
+            SourceRootPath = $location.SourceRootPath
+            SourceIdentity = $location.SourceIdentity
+            RootIdentity = $location.RootIdentity
             EntryPath = $entryPath
             Sha256 = $sha
             Bytes = [int64] $item.Bytes
@@ -441,58 +832,249 @@ function Assert-OwnedBundleSnapshot {
         -not [IO.Path]::GetFileName($root).StartsWith('ffmpeg-bundle-stage-', [StringComparison]::Ordinal)) {
         throw 'ffmpeg_source_snapshot_ownership_mismatch'
     }
-    $marker = Join-Path $root '.owner'
-    if (-not (Test-Path -LiteralPath $marker -PathType Leaf) -or
-        [IO.File]::ReadAllText($marker, [Text.Encoding]::UTF8) -cne [string] $Snapshot.Token) {
+    $access = Open-VerifiedBundleSnapshot $Snapshot
+    try { $root }
+    finally { Close-VerifiedBundleSnapshot $access }
+}
+
+function Close-VerifiedBundleSnapshot {
+    param($Access)
+    if ($null -eq $Access) { return }
+    if ($null -ne $Access.OwnerHandle) { $Access.OwnerHandle.Dispose() }
+    Close-KaronPathChain $Access.RootChain
+    Close-KaronPathChain $Access.ParentChain
+}
+
+function Open-VerifiedBundleSnapshot {
+    param($Snapshot, [switch] $ForCleanup)
+    $root = [IO.Path]::GetFullPath([string] $Snapshot.Root)
+    $parent = [IO.Path]::GetFullPath([string] $Snapshot.Parent).TrimEnd('\', '/')
+    if ([IO.Path]::GetDirectoryName($root) -cne $parent -or
+        -not [IO.Path]::GetFileName($root).StartsWith('ffmpeg-bundle-stage-', [StringComparison]::Ordinal)) {
         throw 'ffmpeg_source_snapshot_ownership_mismatch'
     }
-    $root
+    $parentChain = $null
+    $rootChain = $null
+    $ownerHandle = $null
+    try {
+        $parentChain = Open-KaronPathChain $parent -ReparseError 'ffmpeg_source_snapshot_reparse_point'
+        $rootChain = Open-KaronPathChain $root -DeleteFinal:$ForCleanup -ReparseError 'ffmpeg_source_snapshot_reparse_point'
+        $marker = Join-Path $root '.owner'
+        $ownerHandle = [KaronPathSafety]::Open($marker, $true, $true, [bool] $ForCleanup)
+        $ownerIdentity = ConvertTo-KaronPathIdentity $ownerHandle
+        if (($ownerIdentity.FileAttributes -band [uint32] [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+            -not $ownerIdentity.FinalPath.Equals((ConvertTo-KaronFinalPath $marker), [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'ffmpeg_source_snapshot_reparse_point'
+        }
+        if (($parentChain.Final.Identity.FileAttributes -band [uint32] [IO.FileAttributes]::Directory) -eq 0 -or
+            ($rootChain.Final.Identity.FileAttributes -band [uint32] [IO.FileAttributes]::Directory) -eq 0 -or
+            ($ownerIdentity.FileAttributes -band [uint32] [IO.FileAttributes]::Directory) -ne 0) {
+            throw 'ffmpeg_source_snapshot_ownership_mismatch'
+        }
+        Assert-KaronDirectChild $parentChain.Final.Identity $rootChain.Final.Identity 'ffmpeg_source_snapshot_ownership_mismatch'
+        Assert-KaronDirectChild $rootChain.Final.Identity $ownerIdentity 'ffmpeg_source_snapshot_ownership_mismatch'
+        foreach ($property in @('ParentIdentity', 'RootIdentity', 'OwnerIdentity')) {
+            if ($null -eq $Snapshot.PSObject.Properties[$property]) { throw 'ffmpeg_source_snapshot_ownership_mismatch' }
+        }
+        Assert-KaronPathIdentity $Snapshot.ParentIdentity $parentChain.Final.Identity 'ffmpeg_source_snapshot_identity_changed' $parent
+        Assert-KaronPathIdentity $Snapshot.RootIdentity $rootChain.Final.Identity 'ffmpeg_source_snapshot_identity_changed' $root
+        Assert-KaronPathIdentity $Snapshot.OwnerIdentity $ownerIdentity 'ffmpeg_source_snapshot_identity_changed' $marker
+        if ((Read-KaronHandleUtf8 $ownerHandle) -cne [string] $Snapshot.Token) {
+            throw 'ffmpeg_source_snapshot_ownership_mismatch'
+        }
+        Assert-KaronPathChainUnchanged $parentChain 'ffmpeg_source_snapshot_identity_changed'
+        Assert-KaronPathChainUnchanged $rootChain 'ffmpeg_source_snapshot_identity_changed'
+        Assert-KaronPathIdentity $ownerIdentity (ConvertTo-KaronPathIdentity $ownerHandle) 'ffmpeg_source_snapshot_identity_changed' $marker
+        return [pscustomobject][ordered]@{
+            Root = $root
+            Parent = $parent
+            Marker = $marker
+            ParentChain = $parentChain
+            RootChain = $rootChain
+            OwnerHandle = $ownerHandle
+            OwnerIdentity = $ownerIdentity
+        }
+    }
+    catch {
+        if ($null -ne $ownerHandle) { $ownerHandle.Dispose() }
+        Close-KaronPathChain $rootChain
+        Close-KaronPathChain $parentChain
+        throw
+    }
 }
 
 function Remove-VerifiedBundleSnapshot {
     param($Snapshot)
-    $root = Assert-OwnedBundleSnapshot $Snapshot
-    Remove-Item -LiteralPath $root -Recurse -Force
+    $access = Open-VerifiedBundleSnapshot $Snapshot -ForCleanup
+    $childHandles = [Collections.Generic.List[object]]::new()
+    try {
+        if ($null -eq $Snapshot.PSObject.Properties['OwnedLeafNames']) {
+            throw 'ffmpeg_source_snapshot_ownership_mismatch'
+        }
+        $expected = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+        $expected.Add('.owner') | Out-Null
+        foreach ($name in @($Snapshot.OwnedLeafNames)) {
+            if (-not $expected.Add([string] $name)) { throw 'ffmpeg_source_snapshot_ownership_mismatch' }
+        }
+        $actual = @([IO.Directory]::EnumerateFileSystemEntries($access.Root))
+        if ($actual.Count -ne $expected.Count) { throw 'ffmpeg_source_snapshot_ownership_mismatch' }
+        foreach ($path in $actual) {
+            if (-not $expected.Contains([IO.Path]::GetFileName($path))) { throw 'ffmpeg_source_snapshot_ownership_mismatch' }
+        }
+
+        $itemsByLeaf = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+        foreach ($item in @($Snapshot.Items)) {
+            $itemsByLeaf.Add([IO.Path]::GetFileName([string] $item.SourcePath), $item)
+        }
+        foreach ($name in @($Snapshot.OwnedLeafNames)) {
+            if (-not $itemsByLeaf.ContainsKey([string] $name)) { throw 'ffmpeg_source_snapshot_ownership_mismatch' }
+            $path = Join-Path $access.Root ([string] $name)
+            $handle = [KaronPathSafety]::Open($path, $true, $true, $true)
+            try {
+                $identity = ConvertTo-KaronPathIdentity $handle
+                if (($identity.FileAttributes -band [uint32] [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+                    ($identity.FileAttributes -band [uint32] [IO.FileAttributes]::Directory) -ne 0) {
+                    throw 'ffmpeg_source_snapshot_reparse_point'
+                }
+                Assert-KaronDirectChild $access.RootChain.Final.Identity $identity 'ffmpeg_source_snapshot_ownership_mismatch'
+                Assert-KaronPathIdentity $itemsByLeaf[[string] $name].SourceIdentity $identity 'ffmpeg_source_snapshot_identity_changed' $path
+                $childHandles.Add([pscustomobject]@{ Handle = $handle; Identity = $identity; Path = $path }) | Out-Null
+                $handle = $null
+            }
+            finally { if ($null -ne $handle) { $handle.Dispose() } }
+        }
+
+        Assert-KaronPathChainUnchanged $access.ParentChain 'ffmpeg_source_snapshot_identity_changed'
+        Assert-KaronPathChainUnchanged $access.RootChain 'ffmpeg_source_snapshot_identity_changed'
+        Assert-KaronPathIdentity $access.OwnerIdentity (ConvertTo-KaronPathIdentity $access.OwnerHandle) 'ffmpeg_source_snapshot_identity_changed' $access.Marker
+        foreach ($child in $childHandles) {
+            Assert-KaronPathIdentity $child.Identity (ConvertTo-KaronPathIdentity $child.Handle) 'ffmpeg_source_snapshot_identity_changed' $child.Path
+        }
+
+        foreach ($child in $childHandles) { [KaronPathSafety]::MarkDelete($child.Handle) }
+        for ($index = $childHandles.Count - 1; $index -ge 0; $index--) { $childHandles[$index].Handle.Dispose() }
+        $childHandles.Clear()
+        [KaronPathSafety]::MarkDelete($access.OwnerHandle)
+        $access.OwnerHandle.Dispose()
+        $access.OwnerHandle = $null
+        if (@([IO.Directory]::EnumerateFileSystemEntries($access.Root)).Count -ne 0) {
+            throw 'ffmpeg_source_snapshot_ownership_mismatch'
+        }
+        Assert-KaronPathChainUnchanged $access.ParentChain 'ffmpeg_source_snapshot_identity_changed'
+        Assert-KaronPathChainUnchanged $access.RootChain 'ffmpeg_source_snapshot_identity_changed'
+        [KaronPathSafety]::MarkDelete($access.RootChain.Final.Handle)
+        Close-KaronPathChain $access.RootChain
+        $access.RootChain = $null
+        Assert-KaronPathChainUnchanged $access.ParentChain 'ffmpeg_source_snapshot_identity_changed'
+    }
+    finally {
+        for ($index = $childHandles.Count - 1; $index -ge 0; $index--) { $childHandles[$index].Handle.Dispose() }
+        Close-VerifiedBundleSnapshot $access
+    }
 }
 
 function New-VerifiedBundleSnapshot {
     param([object[]] $Items, [string] $StagingParent, [string[]] $AllowedSourceRoots)
     $validated = @(Assert-BundleItems $Items $AllowedSourceRoots)
     $parent = [IO.Path]::GetFullPath($StagingParent)
+    Assert-ExistingKaronAncestors $parent 'ffmpeg_source_snapshot_reparse_point'
     [IO.Directory]::CreateDirectory($parent) | Out-Null
-    $token = [Guid]::NewGuid().ToString('N')
-    $root = Join-Path $parent "ffmpeg-bundle-stage-$token"
-    [IO.Directory]::CreateDirectory($root) | Out-Null
-    [IO.File]::WriteAllText((Join-Path $root '.owner'), $token, [Text.UTF8Encoding]::new($false))
-    $snapshot = [pscustomobject][ordered]@{ Root = $root; Parent = $parent; Token = $token; Items = @() }
+    $parentChain = $null
+    $rootChain = $null
+    $ownerHandle = $null
+    $snapshot = $null
+    $failure = $null
     try {
-        $staged = @()
+        $parentChain = Open-KaronPathChain $parent -ReparseError 'ffmpeg_source_snapshot_reparse_point'
+        $token = [Guid]::NewGuid().ToString('N')
+        $root = Join-Path $parent "ffmpeg-bundle-stage-$token"
+        [IO.Directory]::CreateDirectory($root) | Out-Null
+        $rootChain = Open-KaronPathChain $root -ReparseError 'ffmpeg_source_snapshot_reparse_point'
+        Assert-KaronDirectChild $parentChain.Final.Identity $rootChain.Final.Identity 'ffmpeg_source_snapshot_ownership_mismatch'
+        $marker = Join-Path $root '.owner'
+        [IO.File]::WriteAllText($marker, $token, [Text.UTF8Encoding]::new($false))
+        $ownerHandle = [KaronPathSafety]::Open($marker, $true, $true)
+        $ownerIdentity = ConvertTo-KaronPathIdentity $ownerHandle
+        if (($ownerIdentity.FileAttributes -band [uint32] [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw 'ffmpeg_source_snapshot_reparse_point'
+        }
+        Assert-KaronDirectChild $rootChain.Final.Identity $ownerIdentity 'ffmpeg_source_snapshot_ownership_mismatch'
+        $snapshot = [pscustomobject][ordered]@{
+            Root = $root
+            Parent = $parent
+            Token = $token
+            ParentIdentity = $parentChain.Final.Identity
+            RootIdentity = $rootChain.Final.Identity
+            OwnerIdentity = $ownerIdentity
+            OwnedLeafNames = @()
+            Items = @()
+        }
+
         $index = 0
         foreach ($item in @($validated | Sort-Object @{Expression = { $_.EntryPath.ToLowerInvariant() }}, @{Expression = { $_.EntryPath }})) {
             $destination = Join-Path $root ('{0:D8}.bin' -f $index)
-            $input = [IO.File]::Open($item.SourcePath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
-            $output = [IO.File]::Open($destination, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
-            try { $input.CopyTo($output) } finally { $output.Dispose(); $input.Dispose() }
-            $actualBytes = (Get-Item -LiteralPath $destination).Length
-            $actualSha = Get-UpperSha256 $destination
-            if ($actualSha -cne $item.Sha256 -or $actualBytes -ne $item.Bytes) {
-                throw "ffmpeg_source_staged_sha256_mismatch:$($item.EntryPath)"
+            $openedSource = $null
+            $output = $null
+            try {
+                $openedSource = Open-VerifiedBundleSource $item
+                $output = [IO.File]::Open($destination, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+                Copy-KaronHandleToStream $openedSource.SourceChain.Final.Handle $output
             }
-            $staged += [pscustomobject][ordered]@{
-                SourcePath = $destination
-                EntryPath = $item.EntryPath
-                Sha256 = $actualSha
-                Bytes = $actualBytes
+            finally {
+                if ($null -ne $output) { $output.Dispose() }
             }
+            try {
+                Assert-KaronPathChainUnchanged $openedSource.RootChain 'ffmpeg_source_path_identity_changed'
+                Assert-KaronPathChainUnchanged $openedSource.SourceChain 'ffmpeg_source_path_identity_changed'
+                Assert-KaronPathIdentity $item.RootIdentity $openedSource.RootChain.Final.Identity 'ffmpeg_source_path_identity_changed' $item.SourceRootPath
+                Assert-KaronPathIdentity $item.SourceIdentity $openedSource.SourceChain.Final.Identity 'ffmpeg_source_path_identity_changed' $item.SourcePath
+            }
+            finally { Close-VerifiedBundleSource $openedSource }
+
+            $stagedHandle = [KaronPathSafety]::Open($destination, $true, $true)
+            try {
+                $stagedIdentity = ConvertTo-KaronPathIdentity $stagedHandle
+                if (($stagedIdentity.FileAttributes -band [uint32] [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                    throw 'ffmpeg_source_snapshot_reparse_point'
+                }
+                Assert-KaronDirectChild $rootChain.Final.Identity $stagedIdentity 'ffmpeg_source_snapshot_ownership_mismatch'
+                $digest = Get-KaronHandleDigest $stagedHandle
+                if ($digest.Sha256 -cne $item.Sha256 -or $digest.Bytes -ne $item.Bytes) {
+                    throw "ffmpeg_source_staged_sha256_mismatch:$($item.EntryPath)"
+                }
+                $stagedItem = [pscustomobject][ordered]@{
+                    SourcePath = $stagedIdentity.FinalPath
+                    SourceRootPath = $rootChain.Final.Identity.FinalPath
+                    SourceIdentity = $stagedIdentity
+                    RootIdentity = $rootChain.Final.Identity
+                    EntryPath = $item.EntryPath
+                    Sha256 = $digest.Sha256
+                    Bytes = $digest.Bytes
+                }
+            }
+            finally { $stagedHandle.Dispose() }
+            $snapshot.OwnedLeafNames = @($snapshot.OwnedLeafNames) + [IO.Path]::GetFileName($destination)
+            $snapshot.Items = @($snapshot.Items) + $stagedItem
             $index++
         }
-        $snapshot.Items = $staged
-        $snapshot
+        Assert-KaronPathChainUnchanged $parentChain 'ffmpeg_source_snapshot_identity_changed'
+        Assert-KaronPathChainUnchanged $rootChain 'ffmpeg_source_snapshot_identity_changed'
+        Assert-KaronPathIdentity $ownerIdentity (ConvertTo-KaronPathIdentity $ownerHandle) 'ffmpeg_source_snapshot_identity_changed' $marker
+        if ((Read-KaronHandleUtf8 $ownerHandle) -cne $token) { throw 'ffmpeg_source_snapshot_ownership_mismatch' }
     }
-    catch {
-        Remove-VerifiedBundleSnapshot $snapshot
-        throw
+    catch { $failure = $_ }
+    finally {
+        if ($null -ne $ownerHandle) { $ownerHandle.Dispose() }
+        Close-KaronPathChain $rootChain
+        Close-KaronPathChain $parentChain
     }
+    if ($null -ne $failure) {
+        if ($null -ne $snapshot) {
+            try { Remove-VerifiedBundleSnapshot $snapshot } catch { }
+        }
+        throw $failure
+    }
+    $snapshot
 }
 
 function Assert-ZipMatchesItems {
@@ -530,11 +1112,12 @@ function Assert-ZipMatchesItems {
 
 function Write-DeterministicZipFromSnapshot {
     param($Snapshot, [string] $OutputPath)
-    $root = Assert-OwnedBundleSnapshot $Snapshot
-    $items = @(Assert-BundleItems $Snapshot.Items @($root))
+    $access = Open-VerifiedBundleSnapshot $Snapshot
+    $items = @()
     Add-Type -AssemblyName System.IO.Compression
     $created = $false
     try {
+        $items = @(Assert-BundleItems $Snapshot.Items @($access.Root))
         $stream = [IO.File]::Open($OutputPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
         $created = $true
         try {
@@ -543,20 +1126,32 @@ function Write-DeterministicZipFromSnapshot {
                 foreach ($item in $items) {
                     $entry = $archive.CreateEntry($item.EntryPath, [IO.Compression.CompressionLevel]::NoCompression)
                     $entry.LastWriteTime = [DateTimeOffset]::new(1980, 1, 1, 0, 0, 0, [TimeSpan]::Zero)
-                    $input = [IO.File]::Open($item.SourcePath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+                    $openedSource = Open-VerifiedBundleSource $item
                     $output = $entry.Open()
-                    try { $input.CopyTo($output) } finally { $output.Dispose(); $input.Dispose() }
+                    try { Copy-KaronHandleToStream $openedSource.SourceChain.Final.Handle $output }
+                    finally { $output.Dispose() }
+                    try {
+                        Assert-KaronPathChainUnchanged $openedSource.RootChain 'ffmpeg_source_path_identity_changed'
+                        Assert-KaronPathChainUnchanged $openedSource.SourceChain 'ffmpeg_source_path_identity_changed'
+                        Assert-KaronPathIdentity $item.RootIdentity $openedSource.RootChain.Final.Identity 'ffmpeg_source_path_identity_changed' $item.SourceRootPath
+                        Assert-KaronPathIdentity $item.SourceIdentity $openedSource.SourceChain.Final.Identity 'ffmpeg_source_path_identity_changed' $item.SourcePath
+                    }
+                    finally { Close-VerifiedBundleSource $openedSource }
                 }
             }
             finally { $archive.Dispose() }
         }
         finally { $stream.Dispose() }
+        Assert-KaronPathChainUnchanged $access.ParentChain 'ffmpeg_source_snapshot_identity_changed'
+        Assert-KaronPathChainUnchanged $access.RootChain 'ffmpeg_source_snapshot_identity_changed'
+        Assert-KaronPathIdentity $access.OwnerIdentity (ConvertTo-KaronPathIdentity $access.OwnerHandle) 'ffmpeg_source_snapshot_identity_changed' $access.Marker
         Assert-ZipMatchesItems $OutputPath $items
     }
     catch {
         if ($created -and (Test-Path -LiteralPath $OutputPath -PathType Leaf)) { Remove-Item -LiteralPath $OutputPath -Force }
         throw
     }
+    finally { Close-VerifiedBundleSnapshot $access }
 }
 
 function New-DeterministicZip {

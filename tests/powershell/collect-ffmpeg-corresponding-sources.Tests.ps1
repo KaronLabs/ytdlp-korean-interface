@@ -190,6 +190,90 @@ Describe 'FFmpeg corresponding-source collector schema 3' {
         }
     }
 
+    It 'rejects every C0 control character in an entry path segment' {
+        $root = Join-Path $TestDrive control-root
+        [IO.Directory]::CreateDirectory($root) | Out-Null
+        $source = Join-Path $root source.txt
+        [IO.File]::WriteAllText($source, 'safe')
+        $sha = Get-UpperSha256 $source
+        foreach ($codePoint in 0..31) {
+            $entryPath = 'safe/name' + [char] $codePoint + '.txt'
+            $item = [pscustomobject]@{ SourcePath = $source; EntryPath = $entryPath; Sha256 = $sha; Bytes = 4 }
+            { Assert-BundleItems @($item) @($root) } | Should Throw 'ffmpeg_source_unsafe_bundle_path'
+        }
+    }
+
+    It 'rejects superscript DOS device aliases with extensions case-insensitively' {
+        $root = Join-Path $TestDrive superscript-device-root
+        [IO.Directory]::CreateDirectory($root) | Out-Null
+        $source = Join-Path $root source.txt
+        [IO.File]::WriteAllText($source, 'safe')
+        $sha = Get-UpperSha256 $source
+        foreach ($entryPath in @(
+            ('COM' + [char] 0x00B9 + '.txt'), ('com' + [char] 0x00B2 + '.log'), ('CoM' + [char] 0x00B3 + '.bin'),
+            ('LPT' + [char] 0x00B9 + '.txt'), ('lpt' + [char] 0x00B2 + '.log'), ('LpT' + [char] 0x00B3 + '.bin')
+        )) {
+            $item = [pscustomobject]@{ SourcePath = $source; EntryPath = $entryPath; Sha256 = $sha; Bytes = 4 }
+            { Assert-BundleItems @($item) @($root) } | Should Throw 'ffmpeg_source_unsafe_bundle_path'
+        }
+    }
+
+    It 'rejects a source reached through a parent junction inside an allowed root' {
+        $root = Join-Path $TestDrive junction-source-root
+        $outside = Join-Path $TestDrive junction-source-outside
+        [IO.Directory]::CreateDirectory($root) | Out-Null
+        [IO.Directory]::CreateDirectory($outside) | Out-Null
+        $outsideSource = Join-Path $outside source.txt
+        [IO.File]::WriteAllText($outsideSource, 'outside')
+        $junction = Join-Path $root linked-parent
+        New-Item -ItemType Junction -Path $junction -Target $outside | Out-Null
+        try {
+            $item = New-BundleItem (Join-Path $junction source.txt) entry.txt
+            { Assert-BundleItems @($item) @($root) } | Should Throw 'ffmpeg_source_source_root_escape'
+        }
+        finally {
+            if (Test-Path -LiteralPath $junction) { Remove-Item -LiteralPath $junction -Force }
+        }
+    }
+
+    It 'rejects a snapshot root junction even when its owner token is valid' {
+        $parent = Join-Path $TestDrive snapshot-junction-parent
+        $target = Join-Path $TestDrive snapshot-junction-target
+        [IO.Directory]::CreateDirectory($parent) | Out-Null
+        [IO.Directory]::CreateDirectory($target) | Out-Null
+        $token = '0123456789abcdef0123456789abcdef'
+        [IO.File]::WriteAllText((Join-Path $target '.owner'), $token, [Text.UTF8Encoding]::new($false))
+        $root = Join-Path $parent "ffmpeg-bundle-stage-$token"
+        New-Item -ItemType Junction -Path $root -Target $target | Out-Null
+        try {
+            $snapshot = [pscustomobject]@{ Root = $root; Parent = $parent; Token = $token }
+            { Assert-OwnedBundleSnapshot $snapshot } | Should Throw 'ffmpeg_source_snapshot_reparse_point'
+        }
+        finally {
+            if (Test-Path -LiteralPath $root) { Remove-Item -LiteralPath $root -Force }
+        }
+    }
+
+    It 'rejects a junction in an ancestor of the snapshot root' {
+        $anchor = Join-Path $TestDrive snapshot-ancestor-anchor
+        $targetParent = Join-Path $TestDrive snapshot-ancestor-target
+        [IO.Directory]::CreateDirectory($anchor) | Out-Null
+        [IO.Directory]::CreateDirectory($targetParent) | Out-Null
+        $linkedParent = Join-Path $anchor linked-parent
+        New-Item -ItemType Junction -Path $linkedParent -Target $targetParent | Out-Null
+        $token = 'fedcba9876543210fedcba9876543210'
+        $root = Join-Path $linkedParent "ffmpeg-bundle-stage-$token"
+        [IO.Directory]::CreateDirectory($root) | Out-Null
+        [IO.File]::WriteAllText((Join-Path $root '.owner'), $token, [Text.UTF8Encoding]::new($false))
+        try {
+            $snapshot = [pscustomobject]@{ Root = $root; Parent = $linkedParent; Token = $token }
+            { Assert-OwnedBundleSnapshot $snapshot } | Should Throw 'ffmpeg_source_snapshot_reparse_point'
+        }
+        finally {
+            if (Test-Path -LiteralPath $linkedParent) { Remove-Item -LiteralPath $linkedParent -Force }
+        }
+    }
+
     It 'rejects exact case-insensitive and Unicode-normalization path collisions' {
         $root = Join-Path $TestDrive collision-root
         [IO.Directory]::CreateDirectory($root) | Out-Null
@@ -224,6 +308,41 @@ Describe 'FFmpeg corresponding-source collector schema 3' {
         [IO.File]::WriteAllText($source, 'after')
         $zip = Join-Path $TestDrive toctou.zip
         { New-DeterministicZip @($item) $zip @($root) } | Should Throw 'ffmpeg_source_staged_sha256_mismatch'
+    }
+
+    It 'rejects a same-byte source identity replacement after validation' {
+        $root = Join-Path $TestDrive identity-source-root
+        $stageParent = Join-Path $TestDrive identity-source-stage
+        [IO.Directory]::CreateDirectory($root) | Out-Null
+        [IO.Directory]::CreateDirectory($stageParent) | Out-Null
+        $source = Join-Path $root source.txt
+        [IO.File]::WriteAllText($source, 'same bytes')
+        $validated = @(Assert-BundleItems @((New-BundleItem $source entry.txt)) @($root))[0]
+        Move-Item -LiteralPath $source -Destination (Join-Path $root original.txt)
+        [IO.File]::WriteAllText($source, 'same bytes')
+        {
+            $snapshot = New-VerifiedBundleSnapshot @($validated) $stageParent @($root)
+            if ($snapshot) { Remove-VerifiedBundleSnapshot $snapshot }
+        } | Should Throw 'ffmpeg_source_path_identity_changed'
+    }
+
+    It 'refuses cleanup after the owner marker is replaced with the same token' {
+        $root = Join-Path $TestDrive identity-owner-root
+        $stageParent = Join-Path $TestDrive identity-owner-stage
+        [IO.Directory]::CreateDirectory($root) | Out-Null
+        [IO.Directory]::CreateDirectory($stageParent) | Out-Null
+        $source = Join-Path $root source.txt
+        [IO.File]::WriteAllText($source, 'owner identity')
+        $snapshot = New-VerifiedBundleSnapshot @((New-BundleItem $source entry.txt)) $stageParent @($root)
+        $marker = Join-Path $snapshot.Root '.owner'
+        Remove-Item -LiteralPath $marker -Force
+        [IO.File]::WriteAllText($marker, $snapshot.Token, [Text.UTF8Encoding]::new($false))
+        try {
+            { Remove-VerifiedBundleSnapshot $snapshot } | Should Throw 'ffmpeg_source_snapshot_identity_changed'
+        }
+        finally {
+            if (Test-Path -LiteralPath $snapshot.Root) { Remove-Item -LiteralPath $snapshot.Root -Recurse -Force }
+        }
     }
 
     It 'reopens the completed ZIP and rejects an inventory mismatch' {
