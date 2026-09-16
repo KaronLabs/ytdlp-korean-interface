@@ -49,7 +49,11 @@ The verifier probes every referenced MP3 with the sealed candidate's `ffprobe.ex
 
 Screenshots must be fully decodable PNG files at least 640x480. Their recorded SHA-256, byte length, width, height, and capture timestamp must match the actual file. Truncated images, header-only images, and 1x1 placeholders are rejected.
 
-All referenced evidence files must be direct descendants of the evidence directory and form its exact file allowlist. Any extra file, including an unknown binary, causes rejection. Candidate and evidence paths are rejected when any path component is a reparse point or junction.
+PNG processing is fail-closed. The only permitted ancillary chunks are `cHRM`, `gAMA`, `sBIT`, `sRGB`, `pHYs`, and `tRNS`. Text or metadata-bearing `tEXt`, `zTXt`, `iTXt`, and `eXIf` chunks and every other unlisted ancillary chunk are rejected. `IHDR` must be first, `PLTE` must precede `IDAT`, all `IDAT` chunks must be contiguous, and one terminal `IEND` must be the final byte sequence.
+
+Decode-time resource limits are 32 MiB encoded bytes, 8192 pixels on either axis, 8,388,608 total pixels, and 16 MiB cumulative `IDAT` data. These limits are checked with overflow-safe arithmetic before full image decoding.
+
+All referenced evidence files must be direct descendants of the evidence directory and form its exact file allowlist. Every relative path and component must already be Unicode Normalization Form C. Uniqueness and containment keys use NFC plus ordinal case-insensitive comparison. Any extra file, including an unknown binary, causes rejection. Candidate and evidence paths are rejected when any path component is a reparse point or junction.
 
 Candidate, evidence, manifest, and output paths must be local filesystem paths. UNC, device, and extended UNC paths are rejected; remote evidence cannot satisfy the immutable local snapshot contract.
 
@@ -96,36 +100,7 @@ Run the verifier only after all six case files and their referenced evidence are
 
 Output is created only after all six cases pass. The verifier writes to a unique partial directory and performs a no-overwrite atomic directory move. If another producer wins the race, its final directory is preserved and the loser removes only its own partial directory.
 
-`gui-validation-summary.json` has this exact schema:
-
-```text
-schemaVersion: 2
-releaseVersion: "v2.19.1-karon.2"
-status: "PASS"
-candidate:
-  executable: { fileName, sha256, length }
-  ffprobe: { fileName, sha256, length }
-  manifest: null | { fileName, sha256, length }
-cases: [{ caseId, language, dpi, evidenceFile, evidenceSha256 } x 6]
-fullVideoLifecycleCases: ["ko-KR-100", "en-US-200"]
-representativeChecks:
-  mp3Conversion: [caseId, ...]
-  settingsSaveRestartRestore: [caseId, ...]
-  legacySettingsTransition: [caseId, ...]
-generatedProbes: [{ caseId, kind, sourceEvidencePath, path, sha256, length }]
-evidenceFileCount: integer
-evidenceManifestFile: "gui-validation-evidence-manifest.json"
-```
-
-`gui-validation-evidence-manifest.json` has this exact schema:
-
-```text
-schemaVersion: 2
-releaseVersion: "v2.19.1-karon.2"
-candidate: <exact same object as summary.candidate>
-evidenceFiles: [{ path, sha256, length }]
-generatedProbeFiles: [{ caseId, kind, sourceEvidencePath, path, sha256, length }]
-```
+The [GUI validation output schema](gui-validation-output.schema.json) is the canonical machine-readable contract for both `gui-validation-summary.json` and `gui-validation-evidence-manifest.json`. It fixes numeric `schemaVersion` to `2`, `releaseVersion` to `v2.19.1-karon.2`, rejects additional properties, and defines the exact nested candidate, six cases, full-video lifecycle cases, representative checks, generated probes, and evidence-file records. The verifier validates both generated JSON documents against this tracked schema before publication. This README intentionally does not duplicate the field grammar.
 
 The packaging gate must consume both files, require `status == "PASS"`, require the exact six cases, require byte-for-byte-equivalent candidate objects, and bind `candidate.executable` and `candidate.ffprobe` to the packaged files. If `candidate.manifest` is non-null, the packaging gate must also bind its hash and length and verify that its file table contains matching root entries for both binaries. Packaging integration is intentionally outside this change.
 

@@ -39,6 +39,15 @@ $NowUtc = [DateTimeOffset]::UtcNow
 $OldestUtc = $NowUtc.AddHours(-$MaximumEvidenceAgeHours)
 $FutureLimitUtc = $NowUtc.AddMinutes(5)
 $PngCrcTable = $null
+$MaximumScreenshotBytes = 33554432L
+$MaximumPngDimension = 8192L
+$MaximumPngPixels = 8388608L
+$MaximumPngIdatBytes = 16777216L
+$AllowedPngAncillaryChunks = [Collections.Generic.HashSet[string]]::new(
+    [string[]]@('cHRM', 'gAMA', 'sBIT', 'sRGB', 'pHYs', 'tRNS'),
+    [StringComparer]::Ordinal
+)
+$OutputSchemaPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'release\validation\v2.19.1-karon.2\gui-validation-output.schema.json'
 
 function Test-Property {
     param([object] $Value, [string] $Name)
@@ -364,14 +373,18 @@ function Resolve-EvidencePath {
         $RelativePath -match '[\\:\x00-\x1f<>"|?*]' -or $RelativePath.StartsWith('/')) {
         throw 'gui_evidence_path_invalid'
     }
+    if (-not $RelativePath.IsNormalized([Text.NormalizationForm]::FormC)) { throw 'gui_evidence_path_not_nfc' }
     foreach ($part in $RelativePath.Split('/')) {
+        if (-not $part.IsNormalized([Text.NormalizationForm]::FormC)) { throw 'gui_evidence_path_not_nfc' }
         if ($part -in @('', '.', '..') -or $part -match '[. ]$|^(?i:CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9])(?:\.|$)') {
             throw 'gui_evidence_path_invalid'
         }
     }
     $root = [IO.Path]::GetFullPath($EvidenceRoot).TrimEnd('\', '/')
     $path = [IO.Path]::GetFullPath((Join-Path $root $RelativePath))
-    if (-not $path.StartsWith($root + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+    $rootKey = $root.Normalize([Text.NormalizationForm]::FormC)
+    $pathKey = $path.Normalize([Text.NormalizationForm]::FormC)
+    if (-not $pathKey.StartsWith($rootKey + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
         throw 'gui_evidence_path_invalid'
     }
     $path
@@ -379,7 +392,9 @@ function Resolve-EvidencePath {
 
 function Register-EvidencePath {
     param([string] $RelativePath, [Collections.Generic.HashSet[string]] $Referenced)
-    if (-not $Referenced.Add($RelativePath)) { throw "gui_evidence_file_reused: $RelativePath" }
+    if (-not $RelativePath.IsNormalized([Text.NormalizationForm]::FormC)) { throw 'gui_evidence_path_not_nfc' }
+    $key = $RelativePath.Normalize([Text.NormalizationForm]::FormC)
+    if (-not $Referenced.Add($key)) { throw "gui_evidence_file_reused: $RelativePath" }
 }
 
 function Assert-EvidenceFile {
@@ -453,9 +468,16 @@ function Get-PngCrc32 {
     [uint32]($crc -bxor 4294967295)
 }
 
+function Get-PngUInt32BigEndian {
+    param([byte[]] $Bytes, [int] $Offset)
+    ([uint64]$Bytes[$Offset] -shl 24) -bor ([uint64]$Bytes[$Offset + 1] -shl 16) -bor
+        ([uint64]$Bytes[$Offset + 2] -shl 8) -bor [uint64]$Bytes[$Offset + 3]
+}
+
 function Assert-PngByteStructure {
     param([string] $Path)
     $bytes = [IO.File]::ReadAllBytes($Path)
+    if ([int64]$bytes.Length -gt $MaximumScreenshotBytes) { throw 'gui_screenshot_resource_limit' }
     $signature = [byte[]](137, 80, 78, 71, 13, 10, 26, 10)
     if ($bytes.Length -lt 20) { throw 'gui_screenshot_decode_failed' }
     for ($i = 0; $i -lt 8; $i++) {
@@ -467,31 +489,77 @@ function Assert-PngByteStructure {
     $plteCount = 0
     $idatCount = 0
     $iendCount = 0
+    $colorType = -1
+    $seenIdat = $false
+    $idatClosed = $false
+    [uint64]$cumulativeIdat = 0
+    $seenAncillary = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     while ($offset -lt $bytes.Length) {
         if ($bytes.Length - $offset -lt 12) { throw 'gui_screenshot_decode_failed' }
-        [uint64]$length = ([uint64]$bytes[$offset] -shl 24) -bor ([uint64]$bytes[$offset + 1] -shl 16) -bor
-            ([uint64]$bytes[$offset + 2] -shl 8) -bor [uint64]$bytes[$offset + 3]
+        [uint64]$length = Get-PngUInt32BigEndian $bytes $offset
+        $type = [Text.Encoding]::ASCII.GetString($bytes, $offset + 4, 4)
+        if ($type -notmatch '^[A-Za-z]{4}$') { throw 'gui_screenshot_png_structure_invalid' }
+        if ($type -ceq 'IDAT') {
+            if ($length -gt ([uint64]$MaximumPngIdatBytes - $cumulativeIdat)) { throw 'gui_screenshot_resource_limit' }
+            $cumulativeIdat += $length
+        }
         if ($length -gt 2147483647 -or ([uint64]$offset + 12 + $length) -gt [uint64]$bytes.Length) {
             throw 'gui_screenshot_decode_failed'
         }
-        $type = [Text.Encoding]::ASCII.GetString($bytes, $offset + 4, 4)
-        if ($type -notmatch '^[A-Za-z]{4}$') { throw 'gui_screenshot_png_structure_invalid' }
         $crcOffset = [int]($offset + 8 + $length)
-        [uint32]$expectedCrc = ([uint32]$bytes[$crcOffset] -shl 24) -bor ([uint32]$bytes[$crcOffset + 1] -shl 16) -bor
-            ([uint32]$bytes[$crcOffset + 2] -shl 8) -bor [uint32]$bytes[$crcOffset + 3]
+        [uint32]$expectedCrc = Get-PngUInt32BigEndian $bytes $crcOffset
         $actualCrc = Get-PngCrc32 $bytes ($offset + 4) ([int](4 + $length))
         if ($actualCrc -ne $expectedCrc) { throw 'gui_screenshot_png_crc_invalid' }
         if ($index -eq 0 -and ($type -cne 'IHDR' -or $length -ne 13)) { throw 'gui_screenshot_png_structure_invalid' }
         if ([char]::IsUpper($type[0]) -and $type -notin @('IHDR', 'PLTE', 'IDAT', 'IEND')) {
             throw 'gui_screenshot_png_structure_invalid'
         }
+        if ([char]::IsLower($type[0]) -and -not $AllowedPngAncillaryChunks.Contains($type)) {
+            throw 'gui_screenshot_png_chunk_not_allowed'
+        }
+        if ([char]::IsLower($type[0]) -and -not $seenAncillary.Add($type)) {
+            throw 'gui_screenshot_png_structure_invalid'
+        }
         switch -CaseSensitive ($type) {
-            'IHDR' { $ihdrCount++; if ($ihdrCount -ne 1 -or $index -ne 0) { throw 'gui_screenshot_png_structure_invalid' } }
-            'PLTE' { $plteCount++; if ($plteCount -gt 1) { throw 'gui_screenshot_png_structure_invalid' } }
-            'IDAT' { $idatCount++ }
+            'IHDR' {
+                $ihdrCount++
+                if ($ihdrCount -ne 1 -or $index -ne 0) { throw 'gui_screenshot_png_structure_invalid' }
+                [uint64]$width = Get-PngUInt32BigEndian $bytes ($offset + 8)
+                [uint64]$height = Get-PngUInt32BigEndian $bytes ($offset + 12)
+                if ($width -eq 0 -or $height -eq 0 -or $width -gt $MaximumPngDimension -or $height -gt $MaximumPngDimension -or
+                    $width -gt ([uint64]$MaximumPngPixels / $height)) {
+                    throw 'gui_screenshot_resource_limit'
+                }
+                $colorType = [int]$bytes[$offset + 17]
+                if ($colorType -notin @(0, 2, 3, 4, 6) -or $bytes[$offset + 18] -ne 0 -or
+                    $bytes[$offset + 19] -ne 0 -or $bytes[$offset + 20] -notin @(0, 1)) {
+                    throw 'gui_screenshot_png_structure_invalid'
+                }
+            }
+            'PLTE' {
+                $plteCount++
+                if ($plteCount -gt 1 -or $seenIdat -or $length -eq 0 -or ($length % 3) -ne 0 -or $length -gt 768 -or
+                    $colorType -in @(0, 4)) {
+                    throw 'gui_screenshot_png_structure_invalid'
+                }
+            }
+            'IDAT' {
+                if ($idatClosed) { throw 'gui_screenshot_png_structure_invalid' }
+                $seenIdat = $true
+                $idatCount++
+            }
             'IEND' {
                 $iendCount++
                 if ($iendCount -ne 1 -or $length -ne 0) { throw 'gui_screenshot_png_structure_invalid' }
+            }
+            default {
+                if ($seenIdat) { $idatClosed = $true }
+                if ($type -in @('cHRM', 'gAMA', 'sBIT', 'sRGB', 'pHYs', 'tRNS') -and $seenIdat) {
+                    throw 'gui_screenshot_png_structure_invalid'
+                }
+                if ($type -ceq 'tRNS' -and ($colorType -in @(4, 6) -or ($colorType -eq 3 -and $plteCount -ne 1))) {
+                    throw 'gui_screenshot_png_structure_invalid'
+                }
             }
         }
         $offset = [int]($offset + 12 + $length)
@@ -501,7 +569,17 @@ function Assert-PngByteStructure {
             break
         }
     }
-    if ($ihdrCount -ne 1 -or $idatCount -lt 1 -or $iendCount -ne 1) { throw 'gui_screenshot_decode_failed' }
+    if ($ihdrCount -ne 1 -or $idatCount -lt 1 -or $iendCount -ne 1 -or ($colorType -eq 3 -and $plteCount -ne 1)) {
+        throw 'gui_screenshot_decode_failed'
+    }
+}
+
+function Assert-GeneratedOutputSchema {
+    param([string] $Json, [string] $Kind)
+    if (-not (Test-Path -LiteralPath $OutputSchemaPath -PathType Leaf)) { throw 'gui_output_schema_missing' }
+    try { $valid = $Json | Test-Json -SchemaFile $OutputSchemaPath -ErrorAction SilentlyContinue }
+    catch { throw "gui_output_schema_invalid: $Kind" }
+    if (-not $valid) { throw "gui_output_schema_invalid: $Kind" }
 }
 
 function Assert-BooleanTrue {
@@ -664,7 +742,8 @@ function Assert-ExactEvidenceFileSet {
         Assert-NoReparseChain $entry.FullName
         if (-not $entry.PSIsContainer) {
             $relative = [IO.Path]::GetRelativePath($EvidenceRoot, $entry.FullName).Replace('\', '/')
-            $null = $actual.Add($relative)
+            if (-not $relative.IsNormalized([Text.NormalizationForm]::FormC)) { throw 'gui_evidence_path_not_nfc' }
+            $null = $actual.Add($relative.Normalize([Text.NormalizationForm]::FormC))
         }
     }
     foreach ($path in $actual) {
@@ -933,8 +1012,12 @@ function Invoke-GuiEvidenceVerification {
             evidenceFiles = @($evidenceFiles)
             generatedProbeFiles = @($generatedProbes)
         }
-        [IO.File]::WriteAllText((Join-Path $partialPath 'gui-validation-summary.json'), (ConvertTo-DeterministicJsonText $summary), [Text.UTF8Encoding]::new($false))
-        [IO.File]::WriteAllText((Join-Path $partialPath 'gui-validation-evidence-manifest.json'), (ConvertTo-DeterministicJsonText $manifest), [Text.UTF8Encoding]::new($false))
+        $summaryJson = ConvertTo-DeterministicJsonText $summary
+        $manifestJson = ConvertTo-DeterministicJsonText $manifest
+        Assert-GeneratedOutputSchema $summaryJson 'summary'
+        Assert-GeneratedOutputSchema $manifestJson 'evidence-manifest'
+        [IO.File]::WriteAllText((Join-Path $partialPath 'gui-validation-summary.json'), $summaryJson, [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText((Join-Path $partialPath 'gui-validation-evidence-manifest.json'), $manifestJson, [Text.UTF8Encoding]::new($false))
         Assert-OriginalInputsUnchanged $script:InputSnapshot
         try { [IO.Directory]::Move($partialPath, $finalPath) }
         catch { throw [InvalidOperationException]::new('gui_validation_output_race', $_.Exception) }

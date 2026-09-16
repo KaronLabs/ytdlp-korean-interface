@@ -389,7 +389,78 @@ function New-TestPngChunk {
     [Buffer]::BlockCopy($typeBytes, 0, $chunk, 4, 4)
     if ($Data.Length -gt 0) { [Buffer]::BlockCopy($Data, 0, $chunk, 8, $Data.Length) }
     [Buffer]::BlockCopy($Crc, 0, $chunk, 8 + $Data.Length, 4)
-    $chunk
+    Write-Output -NoEnumerate $chunk
+}
+
+function Get-TestPngCrcBytes {
+    param([string] $Type, [byte[]] $Data)
+    $input = [byte[]]::new(4 + $Data.Length)
+    [Buffer]::BlockCopy([Text.Encoding]::ASCII.GetBytes($Type), 0, $input, 0, 4)
+    if ($Data.Length -gt 0) { [Buffer]::BlockCopy($Data, 0, $input, 4, $Data.Length) }
+    [uint32]$crc = 4294967295
+    foreach ($byte in $input) {
+        $crc = [uint32]($crc -bxor $byte)
+        for ($bit = 0; $bit -lt 8; $bit++) {
+            if (($crc -band 1) -ne 0) { $crc = [uint32](3988292384 -bxor ($crc -shr 1)) }
+            else { $crc = [uint32]($crc -shr 1) }
+        }
+    }
+    $crc = [uint32]($crc -bxor 4294967295)
+    Write-Output -NoEnumerate ([byte[]](
+        [byte](($crc -shr 24) -band 255),
+        [byte](($crc -shr 16) -band 255),
+        [byte](($crc -shr 8) -band 255),
+        [byte]($crc -band 255)
+    ))
+}
+
+function New-ValidTestPngChunk {
+    param([string] $Type, [byte[]] $Data)
+    $chunk = New-TestPngChunk $Type $Data (Get-TestPngCrcBytes $Type $Data)
+    Write-Output -NoEnumerate $chunk
+}
+
+function Insert-TestBytes {
+    param([string] $Path, [int] $Offset, [byte[]] $Inserted)
+    $bytes = [IO.File]::ReadAllBytes($Path)
+    $result = [byte[]]::new($bytes.Length + $Inserted.Length)
+    [Buffer]::BlockCopy($bytes, 0, $result, 0, $Offset)
+    [Buffer]::BlockCopy($Inserted, 0, $result, $Offset, $Inserted.Length)
+    [Buffer]::BlockCopy($bytes, $Offset, $result, $Offset + $Inserted.Length, $bytes.Length - $Offset)
+    [IO.File]::WriteAllBytes($Path, $result)
+}
+
+function Get-TestPngChunkOffset {
+    param([string] $Path, [string] $Type)
+    $bytes = [IO.File]::ReadAllBytes($Path)
+    $offset = 8
+    while ($offset + 12 -le $bytes.Length) {
+        $length = ([int64]$bytes[$offset] -shl 24) -bor ([int64]$bytes[$offset + 1] -shl 16) -bor
+            ([int64]$bytes[$offset + 2] -shl 8) -bor [int64]$bytes[$offset + 3]
+        $currentType = [Text.Encoding]::ASCII.GetString($bytes, $offset + 4, 4)
+        if ($currentType -ceq $Type) { return $offset }
+        $offset = [int]($offset + 12 + $length)
+    }
+    throw "test_png_chunk_missing: $Type"
+}
+
+function Set-TestPngDimensions {
+    param([string] $Path, [uint32] $Width, [uint32] $Height)
+    $bytes = [IO.File]::ReadAllBytes($Path)
+    foreach ($value in @(
+        [pscustomobject]@{ offset = 16; number = $Width },
+        [pscustomobject]@{ offset = 20; number = $Height }
+    )) {
+        $bytes[$value.offset] = [byte](($value.number -shr 24) -band 255)
+        $bytes[$value.offset + 1] = [byte](($value.number -shr 16) -band 255)
+        $bytes[$value.offset + 2] = [byte](($value.number -shr 8) -band 255)
+        $bytes[$value.offset + 3] = [byte]($value.number -band 255)
+    }
+    $ihdrData = [byte[]]::new(13)
+    [Buffer]::BlockCopy($bytes, 16, $ihdrData, 0, 13)
+    $crc = Get-TestPngCrcBytes 'IHDR' $ihdrData
+    [Buffer]::BlockCopy($crc, 0, $bytes, 29, 4)
+    [IO.File]::WriteAllBytes($Path, $bytes)
 }
 
 Describe 'v2.19.1-karon.2 GUI release evidence contract' {
@@ -795,6 +866,114 @@ exit 2
         Assert-VerifierRejects $fixture 'gui_screenshot_png_structure_invalid'
     }
 
+    It 'rejects a valid PNG tEXt chunk containing a signed URL' {
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-150'
+        $path = Join-Path $fixture.Evidence (([string]$case.Value.screenshots[0].path).Replace('/', '\'))
+        $text = [Text.Encoding]::UTF8.GetBytes("Comment`0https://media.example.invalid/file?signature=secret")
+        Add-TestPngChunkBeforeIend $path (New-ValidTestPngChunk 'tEXt' $text)
+        Update-DescriptorForFile $case.Value.screenshots[0] $path
+        Save-TestCase $case
+        Assert-VerifierRejects $fixture 'gui_screenshot_png_chunk_not_allowed'
+    }
+
+    It 'rejects NFC and NFD evidence names before case-folded uniqueness checks' {
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-150'
+        $oldRelative = [string]$case.Value.screenshots[0].path
+        $oldPath = Join-Path $fixture.Evidence ($oldRelative.Replace('/', '\'))
+        $nfcRelative = 'screenshots/ko-KR-150-' + [char]0x00e9 + '.png'
+        $nfdRelative = 'screenshots/ko-KR-150-e' + [char]0x0301 + '.png'
+        $nfcPath = Join-Path $fixture.Evidence ($nfcRelative.Replace('/', '\'))
+        $nfdPath = Join-Path $fixture.Evidence ($nfdRelative.Replace('/', '\'))
+        Move-Item -LiteralPath $oldPath -Destination $nfcPath
+        Copy-Item -LiteralPath $nfcPath -Destination $nfdPath
+        $first = $case.Value.screenshots[0]
+        $first.path = $nfcRelative
+        Update-DescriptorForFile $first $nfcPath
+        $second = ($first | ConvertTo-Json -Depth 16) | ConvertFrom-Json -Depth 16 -DateKind String
+        $second.path = $nfdRelative
+        Update-DescriptorForFile $second $nfdPath
+        $case.Value.screenshots = @($first, $second)
+        Save-TestCase $case
+        Assert-VerifierRejects $fixture 'gui_evidence_path_not_nfc'
+    }
+
+    It 'rejects PLTE placed after the first IDAT chunk' {
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-150'
+        $path = Join-Path $fixture.Evidence (([string]$case.Value.screenshots[0].path).Replace('/', '\'))
+        Add-TestPngChunkBeforeIend $path (New-ValidTestPngChunk 'PLTE' ([byte[]](0, 0, 0)))
+        Update-DescriptorForFile $case.Value.screenshots[0] $path
+        Save-TestCase $case
+        Assert-VerifierRejects $fixture 'gui_screenshot_png_structure_invalid'
+    }
+
+    It 'rejects nonconsecutive IDAT chunks' {
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-150'
+        $path = Join-Path $fixture.Evidence (([string]$case.Value.screenshots[0].path).Replace('/', '\'))
+        $firstIdat = New-ValidTestPngChunk 'IDAT' ([byte[]]@())
+        $physical = New-ValidTestPngChunk 'pHYs' ([byte[]](0, 0, 0, 1, 0, 0, 0, 1, 0))
+        $secondIdat = New-ValidTestPngChunk 'IDAT' ([byte[]]@())
+        $inserted = [byte[]]::new($firstIdat.Length + $physical.Length + $secondIdat.Length)
+        [Buffer]::BlockCopy($firstIdat, 0, $inserted, 0, $firstIdat.Length)
+        [Buffer]::BlockCopy($physical, 0, $inserted, $firstIdat.Length, $physical.Length)
+        [Buffer]::BlockCopy($secondIdat, 0, $inserted, $firstIdat.Length + $physical.Length, $secondIdat.Length)
+        Insert-TestBytes $path (Get-TestPngChunkOffset $path 'IDAT') $inserted
+        Update-DescriptorForFile $case.Value.screenshots[0] $path
+        Save-TestCase $case
+        Assert-VerifierRejects $fixture 'gui_screenshot_png_structure_invalid'
+    }
+
+    It 'rejects a screenshot exceeding the encoded byte budget before decode' {
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-150'
+        $path = Join-Path $fixture.Evidence (([string]$case.Value.screenshots[0].path).Replace('/', '\'))
+        $stream = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        try { $stream.SetLength(33554433) }
+        finally { $stream.Dispose() }
+        Update-DescriptorForFile $case.Value.screenshots[0] $path
+        Save-TestCase $case
+        Assert-VerifierRejects $fixture 'gui_screenshot_resource_limit'
+    }
+
+    It 'rejects a screenshot dimension beyond the configured maximum before decode' {
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-150'
+        $path = Join-Path $fixture.Evidence (([string]$case.Value.screenshots[0].path).Replace('/', '\'))
+        Set-TestPngDimensions $path 8193 480
+        Update-DescriptorForFile $case.Value.screenshots[0] $path
+        Save-TestCase $case
+        Assert-VerifierRejects $fixture 'gui_screenshot_resource_limit'
+    }
+
+    It 'rejects a screenshot exceeding the total pixel budget before decode' {
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-150'
+        $path = Join-Path $fixture.Evidence (([string]$case.Value.screenshots[0].path).Replace('/', '\'))
+        Set-TestPngDimensions $path 4096 2049
+        Update-DescriptorForFile $case.Value.screenshots[0] $path
+        Save-TestCase $case
+        Assert-VerifierRejects $fixture 'gui_screenshot_resource_limit'
+    }
+
+    It 'rejects a declared cumulative IDAT budget overflow before decode' {
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-150'
+        $path = Join-Path $fixture.Evidence (([string]$case.Value.screenshots[0].path).Replace('/', '\'))
+        $bytes = [IO.File]::ReadAllBytes($path)
+        $idatOffset = Get-TestPngChunkOffset $path 'IDAT'
+        $bytes[$idatOffset] = 2
+        $bytes[$idatOffset + 1] = 0
+        $bytes[$idatOffset + 2] = 0
+        $bytes[$idatOffset + 3] = 0
+        [IO.File]::WriteAllBytes($path, $bytes[0..($idatOffset + 11)])
+        Update-DescriptorForFile $case.Value.screenshots[0] $path
+        Save-TestCase $case
+        Assert-VerifierRejects $fixture 'gui_screenshot_resource_limit'
+    }
+
     It 'accepts a canonical unique screenshot with an uppercase PNG extension' {
         $fixture = New-ValidGuiFixture
         $case = Read-TestCase $fixture 'ko-KR-150'
@@ -863,17 +1042,29 @@ exit 2
         $result = Invoke-GuiVerifier $fixture
         $result.ExitCode | Should Be 0
         $final = Join-Path $fixture.Output 'gui-validation-v2.19.1-karon.2'
-        $summary = Get-Content -LiteralPath (Join-Path $final 'gui-validation-summary.json') -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 64 -DateKind String
+        $summaryPath = Join-Path $final 'gui-validation-summary.json'
+        $manifestPath = Join-Path $final 'gui-validation-evidence-manifest.json'
+        $summaryText = Get-Content -LiteralPath $summaryPath -Raw -Encoding UTF8
+        $manifestText = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8
+        $summary = $summaryText | ConvertFrom-Json -Depth 64 -DateKind String
         ($summary.PSObject.Properties.Name -join ',') | Should Be 'schemaVersion,releaseVersion,status,candidate,cases,fullVideoLifecycleCases,representativeChecks,generatedProbes,evidenceFileCount,evidenceManifestFile'
         ($summary.representativeChecks.PSObject.Properties.Name -join ',') | Should Be 'mp3Conversion,settingsSaveRestartRestore,legacySettingsTransition'
         ($summary.cases[0].PSObject.Properties.Name -join ',') | Should Be 'caseId,language,dpi,evidenceFile,evidenceSha256'
         ($summary.generatedProbes[0].PSObject.Properties.Name -join ',') | Should Be 'caseId,kind,sourceEvidencePath,path,sha256,length'
         $repoRoot = Split-Path -Parent (Split-Path -Parent $script:Verifier)
+        $schemaPath = Join-Path $repoRoot 'release\validation\v2.19.1-karon.2\gui-validation-output.schema.json'
+        (Test-Path -LiteralPath $schemaPath -PathType Leaf) | Should Be $true
+        ($summaryText | Test-Json -SchemaFile $schemaPath -ErrorAction SilentlyContinue) | Should Be $true
+        ($manifestText | Test-Json -SchemaFile $schemaPath -ErrorAction SilentlyContinue) | Should Be $true
+        $invalidSummary = $summaryText | ConvertFrom-Json -Depth 64 -DateKind String
+        $invalidSummary | Add-Member -NotePropertyName ignoredExecutablePath -NotePropertyValue 'other.exe'
+        (($invalidSummary | ConvertTo-Json -Depth 64) | Test-Json -SchemaFile $schemaPath -ErrorAction SilentlyContinue) | Should Be $false
+        $wrongVersion = $summaryText | ConvertFrom-Json -Depth 64 -DateKind String
+        $wrongVersion.schemaVersion = '2'
+        (($wrongVersion | ConvertTo-Json -Depth 64) | Test-Json -SchemaFile $schemaPath -ErrorAction SilentlyContinue) | Should Be $false
         $readme = Get-Content -LiteralPath (Join-Path $repoRoot 'release\validation\v2.19.1-karon.2\README.md') -Raw -Encoding UTF8
-        $readme | Should Match 'fullVideoLifecycleCases'
-        $readme | Should Match 'representativeChecks'
-        $readme | Should Match 'settingsSaveRestartRestore'
-        $readme | Should Not Match '\b(?:videoLifecycleCases|representativeCoverage|settingsRestartRestore)\b'
+        $readme | Should Match ([regex]::Escape('gui-validation-output.schema.json'))
+        $readme | Should Match 'canonical machine-readable contract'
     }
 
     It 'initializes operator case with no preset observations or environment PASS values' {
