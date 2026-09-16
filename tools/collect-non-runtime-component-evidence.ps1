@@ -682,6 +682,184 @@ function Copy-StreamWithSha256 {
     finally { $sha.Dispose() }
 }
 
+function Skip-EvidenceJsonWhitespace {
+    param([string] $Text, [ref] $Index)
+
+    while ($Index.Value -lt $Text.Length) {
+        $character = $Text[$Index.Value]
+        if ($character -ne ' ' -and $character -ne "`t" -and $character -ne "`r" -and $character -ne "`n") { return }
+        $Index.Value++
+    }
+}
+
+function Read-EvidenceJsonString {
+    param([string] $Text, [ref] $Index)
+
+    if ($Index.Value -ge $Text.Length -or $Text[$Index.Value] -ne '"') { throw 'bundle_candidate_inventory_mismatch' }
+    $Index.Value++
+    $builder = New-Object Text.StringBuilder
+    while ($Index.Value -lt $Text.Length) {
+        $character = $Text[$Index.Value]
+        $Index.Value++
+        if ($character -eq '"') { return $builder.ToString() }
+        if ([int][char]$character -lt 0x20) { throw 'bundle_candidate_inventory_mismatch' }
+        if ($character -ne '\') {
+            [void]$builder.Append($character)
+            continue
+        }
+        if ($Index.Value -ge $Text.Length) { throw 'bundle_candidate_inventory_mismatch' }
+        $escape = $Text[$Index.Value]
+        $Index.Value++
+        switch ($escape) {
+            '"' { [void]$builder.Append([char]0x22); continue }
+            '\' { [void]$builder.Append([char]0x5C); continue }
+            '/' { [void]$builder.Append([char]0x2F); continue }
+            'b' { [void]$builder.Append([char]0x08); continue }
+            'f' { [void]$builder.Append([char]0x0C); continue }
+            'n' { [void]$builder.Append([char]0x0A); continue }
+            'r' { [void]$builder.Append([char]0x0D); continue }
+            't' { [void]$builder.Append([char]0x09); continue }
+            'u' {
+                if ($Index.Value + 4 -gt $Text.Length) { throw 'bundle_candidate_inventory_mismatch' }
+                $codeUnit = 0
+                if (-not [int]::TryParse(
+                    $Text.Substring($Index.Value, 4),
+                    [Globalization.NumberStyles]::HexNumber,
+                    [Globalization.CultureInfo]::InvariantCulture,
+                    [ref]$codeUnit
+                )) { throw 'bundle_candidate_inventory_mismatch' }
+                $Index.Value += 4
+                $decoded = [char]$codeUnit
+                if ([char]::IsHighSurrogate($decoded)) {
+                    if ($Index.Value + 6 -gt $Text.Length -or
+                        $Text[$Index.Value] -ne '\' -or $Text[$Index.Value + 1] -ne 'u') {
+                        throw 'bundle_candidate_inventory_mismatch'
+                    }
+                    $lowCodeUnit = 0
+                    if (-not [int]::TryParse(
+                        $Text.Substring($Index.Value + 2, 4),
+                        [Globalization.NumberStyles]::HexNumber,
+                        [Globalization.CultureInfo]::InvariantCulture,
+                        [ref]$lowCodeUnit
+                    )) { throw 'bundle_candidate_inventory_mismatch' }
+                    $lowDecoded = [char]$lowCodeUnit
+                    if (-not [char]::IsLowSurrogate($lowDecoded)) { throw 'bundle_candidate_inventory_mismatch' }
+                    [void]$builder.Append($decoded)
+                    [void]$builder.Append($lowDecoded)
+                    $Index.Value += 6
+                    continue
+                }
+                if ([char]::IsLowSurrogate($decoded)) { throw 'bundle_candidate_inventory_mismatch' }
+                [void]$builder.Append($decoded)
+                continue
+            }
+            default { throw 'bundle_candidate_inventory_mismatch' }
+        }
+    }
+    throw 'bundle_candidate_inventory_mismatch'
+}
+
+function Skip-EvidenceJsonValue {
+    param([string] $Text, [ref] $Index)
+
+    Skip-EvidenceJsonWhitespace -Text $Text -Index $Index
+    if ($Index.Value -ge $Text.Length) { throw 'bundle_candidate_inventory_mismatch' }
+    $first = $Text[$Index.Value]
+    if ($first -eq '"') {
+        [void](Read-EvidenceJsonString -Text $Text -Index $Index)
+        return
+    }
+    if ($first -eq '{' -or $first -eq '[') {
+        $stack = New-Object 'Collections.Generic.Stack[char]'
+        $stack.Push($first)
+        $Index.Value++
+        while ($Index.Value -lt $Text.Length) {
+            $character = $Text[$Index.Value]
+            if ($character -eq '"') {
+                [void](Read-EvidenceJsonString -Text $Text -Index $Index)
+                continue
+            }
+            if ($character -eq '{' -or $character -eq '[') {
+                $stack.Push($character)
+                $Index.Value++
+                continue
+            }
+            if ($character -eq '}' -or $character -eq ']') {
+                if ($stack.Count -eq 0) { throw 'bundle_candidate_inventory_mismatch' }
+                $opening = $stack.Pop()
+                if (($opening -eq '{' -and $character -ne '}') -or
+                    ($opening -eq '[' -and $character -ne ']')) {
+                    throw 'bundle_candidate_inventory_mismatch'
+                }
+                $Index.Value++
+                if ($stack.Count -eq 0) { return }
+                continue
+            }
+            $Index.Value++
+        }
+        throw 'bundle_candidate_inventory_mismatch'
+    }
+
+    $start = $Index.Value
+    while ($Index.Value -lt $Text.Length -and $Text[$Index.Value] -ne ',' -and $Text[$Index.Value] -ne '}') {
+        $Index.Value++
+    }
+    $end = $Index.Value
+    while ($end -gt $start) {
+        $character = $Text[$end - 1]
+        if ($character -ne ' ' -and $character -ne "`t" -and $character -ne "`r" -and $character -ne "`n") { break }
+        $end--
+    }
+    if ($end -eq $start) { throw 'bundle_candidate_inventory_mismatch' }
+}
+
+function Assert-UniqueCandidateInventoryIdentityProperties {
+    param([string] $JsonText)
+
+    try {
+        $index = 0
+        Skip-EvidenceJsonWhitespace -Text $JsonText -Index ([ref]$index)
+        if ($index -ge $JsonText.Length -or $JsonText[$index] -ne '{') { throw 'bundle_candidate_inventory_mismatch' }
+        $index++
+        $shaCount = 0
+        $lengthCount = 0
+        while ($true) {
+            Skip-EvidenceJsonWhitespace -Text $JsonText -Index ([ref]$index)
+            if ($index -ge $JsonText.Length) { throw 'bundle_candidate_inventory_mismatch' }
+            if ($JsonText[$index] -eq '}') {
+                $index++
+                break
+            }
+            $propertyName = Read-EvidenceJsonString -Text $JsonText -Index ([ref]$index)
+            if ($propertyName -ceq 'candidateManifestSha256') { $shaCount++ }
+            if ($propertyName -ceq 'candidateManifestLength') { $lengthCount++ }
+            Skip-EvidenceJsonWhitespace -Text $JsonText -Index ([ref]$index)
+            if ($index -ge $JsonText.Length -or $JsonText[$index] -ne ':') { throw 'bundle_candidate_inventory_mismatch' }
+            $index++
+            Skip-EvidenceJsonValue -Text $JsonText -Index ([ref]$index)
+            Skip-EvidenceJsonWhitespace -Text $JsonText -Index ([ref]$index)
+            if ($index -ge $JsonText.Length) { throw 'bundle_candidate_inventory_mismatch' }
+            if ($JsonText[$index] -eq ',') {
+                $index++
+                continue
+            }
+            if ($JsonText[$index] -eq '}') {
+                $index++
+                break
+            }
+            throw 'bundle_candidate_inventory_mismatch'
+        }
+        Skip-EvidenceJsonWhitespace -Text $JsonText -Index ([ref]$index)
+        if ($index -ne $JsonText.Length -or $shaCount -ne 1 -or $lengthCount -ne 1) {
+            throw 'bundle_candidate_inventory_mismatch'
+        }
+    }
+    catch {
+        if ($_.Exception.Message -ceq 'bundle_candidate_inventory_mismatch') { throw }
+        throw 'bundle_candidate_inventory_mismatch'
+    }
+}
+
 function Assert-CompletedEvidenceZip {
     param([string] $ArchivePath, [object[]] $Entries)
     Assert-ZipArchivePreflight $ArchivePath
@@ -723,7 +901,9 @@ function Assert-CompletedEvidenceZip {
             }
             finally { $inventoryStream.Dispose() }
 
-            $inventory = (New-Object Text.UTF8Encoding($false, $true)).GetString($inventoryBytes) | ConvertFrom-Json
+            $inventoryText = (New-Object Text.UTF8Encoding($false, $true)).GetString($inventoryBytes)
+            Assert-UniqueCandidateInventoryIdentityProperties -JsonText $inventoryText
+            $inventory = $inventoryText | ConvertFrom-Json
             $shaProperty = $inventory.PSObject.Properties['candidateManifestSha256']
             $lengthProperty = $inventory.PSObject.Properties['candidateManifestLength']
             $lengthTypeSupported = $null -ne $lengthProperty -and

@@ -5,6 +5,7 @@ $collectorPath = Join-Path $repoRoot 'tools\collect-non-runtime-component-eviden
 $powershellPath = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $utf8NoBom = New-Object Text.UTF8Encoding($false)
 
+Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 function Get-TestSha256 {
@@ -46,6 +47,37 @@ function New-TestZip {
         finally { $archive.Dispose() }
     }
     finally { $stream.Dispose() }
+}
+
+function New-TestZipWithRawEntryName {
+    param([string] $Path, [string] $EntryName, [byte[]] $Bytes)
+
+    $targetNameBytes = [Text.Encoding]::UTF8.GetBytes($EntryName)
+    $containsNonAscii = @($targetNameBytes | Where-Object { $_ -gt 0x7F }).Count -gt 0
+    if ($containsNonAscii) {
+        $safeName = [char]0x00E9 + ('x' * ($targetNameBytes.Length - 2))
+    }
+    else {
+        $safeName = 'x' * $targetNameBytes.Length
+    }
+    $safeNameBytes = [Text.Encoding]::UTF8.GetBytes($safeName)
+    if ($safeNameBytes.Length -ne $targetNameBytes.Length) { throw 'raw ZIP test name length mismatch' }
+    New-TestZipFromEntryList -Path $Path -Entries @([pscustomobject]@{ Name = $safeName; Bytes = $Bytes })
+
+    $archiveBytes = [IO.File]::ReadAllBytes($Path)
+    $matches = 0
+    for ($offset = 0; $offset -le $archiveBytes.Length - $safeNameBytes.Length; $offset++) {
+        $equal = $true
+        for ($index = 0; $index -lt $safeNameBytes.Length; $index++) {
+            if ($archiveBytes[$offset + $index] -ne $safeNameBytes[$index]) { $equal = $false; break }
+        }
+        if (-not $equal) { continue }
+        [Array]::Copy($targetNameBytes, 0, $archiveBytes, $offset, $targetNameBytes.Length)
+        $matches++
+        $offset += $safeNameBytes.Length - 1
+    }
+    if ($matches -ne 2) { throw ('raw ZIP test name occurrence mismatch:' + $matches) }
+    [IO.File]::WriteAllBytes($Path, $archiveBytes)
 }
 
 function New-TestZipFromEntryList {
@@ -515,8 +547,14 @@ function Invoke-TestCollector {
         $arguments += @('-ApplicationCommit', $Fixture.ApplicationCommit, '-CandidateManifestPath', $Fixture.Candidate)
     }
     if (-not [string]::IsNullOrWhiteSpace($SevenZipExecutable)) { $arguments += @('-SevenZipExecutable', $SevenZipExecutable) }
-    $output = @(& $powershellPath @arguments 2>&1)
-    return [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = ($output -join [Environment]::NewLine) }
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $output = @(& $powershellPath @arguments 2>&1)
+        $exitCode = $LASTEXITCODE
+    }
+    finally { $ErrorActionPreference = $previousErrorActionPreference }
+    return [pscustomobject]@{ ExitCode = $exitCode; Output = ($output -join [Environment]::NewLine) }
 }
 
 function Read-TestManifest {
@@ -681,7 +719,13 @@ Describe 'non-runtime component evidence collector' {
         $fixture = New-ComponentEvidenceFixture 'windows-segment-policy'
         $manifest = Read-TestManifest $fixture
         $component = $manifest.components | Where-Object id -eq 'bit7z'
-        $forbidden = @('CON.txt', 'PRN.ext', 'AUX.bin', 'NUL.dat', 'COM1.txt', 'LPT9.txt', 'COM¹.txt', 'COM².txt', 'COM³.txt', 'LPT¹.txt', 'LPT².txt', 'LPT³.txt', 'CONIN$.txt', 'CONOUT$.txt', 'bad<name.txt', 'bad>name.txt', 'bad"name.txt', 'bad|name.txt', 'bad?name.txt', 'bad*name.txt', 'segment.', 'segment ', '.', '..')
+        $forbidden = @(
+            'CON.txt', 'PRN.ext', 'AUX.bin', 'NUL.dat', 'COM1.txt', 'LPT9.txt',
+            ('COM' + [char]0x00B9 + '.txt'), ('COM' + [char]0x00B2 + '.txt'), ('COM' + [char]0x00B3 + '.txt'),
+            ('LPT' + [char]0x00B9 + '.txt'), ('LPT' + [char]0x00B2 + '.txt'), ('LPT' + [char]0x00B3 + '.txt'),
+            'CONIN$.txt', 'CONOUT$.txt', 'bad<name.txt', 'bad>name.txt', 'bad"name.txt', 'bad|name.txt', 'bad?name.txt', 'bad*name.txt',
+            'segment.', 'segment ', '.', '..'
+        )
         $index = 0
         foreach ($name in $forbidden) {
             $id = 'invalid-leaf-' + $index.ToString('D2')
@@ -693,7 +737,7 @@ Describe 'non-runtime component evidence collector' {
             $id = 'invalid-segment-' + $index.ToString('D2')
             $fileName = $id + '.zip'
             $path = Join-Path $fixture.Cache $fileName
-            New-TestZipFromEntryList -Path $path -Entries @([pscustomobject]@{ Name = "root/$segment/payload.txt"; Bytes = [Text.Encoding]::UTF8.GetBytes('x') })
+            New-TestZipWithRawEntryName -Path $path -EntryName "root/$segment/payload.txt" -Bytes ([Text.Encoding]::UTF8.GetBytes('x'))
             $component.sourceArtifacts += New-TestArtifact -Id $id -Path $path -Url 'https://github.com/example/windows/archive/1111111111111111111111111111111111111111.zip' -Format 'zip' -Include $false
             $index++
         }
@@ -917,8 +961,7 @@ Describe 'non-runtime component evidence collector' {
         $candidateStream = [System.IO.File]::Open($fixture.Candidate, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
         try {
             $candidateStream.Write($validCandidateBytes, 0, $validCandidateBytes.Length)
-            $spaces = New-Object byte[] (1MB)
-            [Array]::Fill[byte]($spaces, [byte]0x20)
+            $spaces = [Text.Encoding]::ASCII.GetBytes((' ' * 64KB))
             $remaining = $candidateLength - $validCandidateBytes.Length
             while ($remaining -gt 0) {
                 $count = [int][Math]::Min([int64]$spaces.Length, $remaining)
@@ -935,7 +978,7 @@ Describe 'non-runtime component evidence collector' {
         $forgedCandidateBytes = [System.Text.Encoding]::UTF8.GetBytes('{"forgedAfterValidation":true}')
         $forgedCandidatePath = Join-Path $fixture.Root 'forged-candidate-manifest.json'
         [System.IO.File]::WriteAllBytes($forgedCandidatePath, $forgedCandidateBytes)
-        $forgedCandidateSha256 = [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($forgedCandidateBytes))
+        $forgedCandidateSha256 = Get-TestBytesSha256 $forgedCandidateBytes
 
         $signalPath = Join-Path $raceOutput '.candidate-after-inventory.signal'
         $continuePath = Join-Path $raceOutput '.candidate-after-inventory.continue'
@@ -1008,7 +1051,7 @@ Describe 'non-runtime component evidence collector' {
                 finally { $entryStream.Dispose(); $memory.Dispose() }
             }
             finally { $archive.Dispose() }
-            $bundleCandidateSha256 = [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($bundleCandidateBytes))
+            $bundleCandidateSha256 = Get-TestBytesSha256 $bundleCandidateBytes
             Write-Host ("RACE_RED original={0} inventory={1} zip={2} forged={3}" -f $originalCandidateSha256, $inventory.candidateManifestSha256, $bundleCandidateSha256, $forgedCandidateSha256)
             $inventory.candidateManifestSha256 | Should BeExactly $originalCandidateSha256
             $bundleCandidateSha256 | Should Not BeExactly $forgedCandidateSha256
@@ -1024,12 +1067,12 @@ Describe 'non-runtime component evidence collector' {
         $fixture = New-ComponentEvidenceFixture 'candidate-post-validation-swap'
         $raceOutput = Join-Path $fixture.Root 'output'
         $originalCandidateBytes = [System.IO.File]::ReadAllBytes($fixture.Candidate)
-        $originalCandidateSha256 = [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($originalCandidateBytes))
+        $originalCandidateSha256 = Get-TestBytesSha256 $originalCandidateBytes
         $originalCandidateLength = [int64]$originalCandidateBytes.Length
         $forgedCandidateBytes = [System.Text.Encoding]::UTF8.GetBytes('{"forgedAfterValidation":true}')
         $forgedCandidatePath = Join-Path $fixture.Root 'forged-candidate-manifest.json'
         [System.IO.File]::WriteAllBytes($forgedCandidatePath, $forgedCandidateBytes)
-        $forgedCandidateSha256 = [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($forgedCandidateBytes))
+        $forgedCandidateSha256 = Get-TestBytesSha256 $forgedCandidateBytes
 
         $signalPath = Join-Path $raceOutput '.candidate-after-inventory.signal'
         $continuePath = Join-Path $raceOutput '.candidate-after-inventory.continue'
@@ -1076,7 +1119,7 @@ Describe 'non-runtime component evidence collector' {
         }
         finally { $archive.Dispose() }
 
-        $bundleCandidateSha256 = [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($bundleCandidateBytes))
+        $bundleCandidateSha256 = Get-TestBytesSha256 $bundleCandidateBytes
         $inventory.candidateManifestSha256 | Should BeExactly $originalCandidateSha256
         ([int64]$inventory.candidateManifestLength) | Should Be $originalCandidateLength
         $bundleCandidateSha256 | Should BeExactly $inventory.candidateManifestSha256
@@ -1239,6 +1282,41 @@ Describe 'completed evidence ZIP candidate inventory cross-binding' {
         $failureToken | Should Be 'bundle_candidate_inventory_mismatch'
     }
 
+    It 'accepts the exact 1 MiB candidateManifestLength boundary' {
+        $tokens = $null
+        $parseErrors = $null
+        $collectorAst = [Management.Automation.Language.Parser]::ParseFile($collectorPath, [ref]$tokens, [ref]$parseErrors)
+        @($parseErrors).Count | Should Be 0
+        foreach ($functionAst in @($collectorAst.FindAll({
+            param($node)
+            $node -is [Management.Automation.Language.FunctionDefinitionAst]
+        }, $true))) {
+            Invoke-Expression $functionAst.Extent.Text
+        }
+
+        $candidateBytes = New-Object byte[] (1MB)
+        $candidateSha256 = Get-TestBytesSha256 $candidateBytes
+        $inventoryBytes = [Text.Encoding]::UTF8.GetBytes((([ordered]@{
+            candidateManifestSha256 = $candidateSha256
+            candidateManifestLength = [long]$candidateBytes.Length
+        } | ConvertTo-Json -Compress) + "`n"))
+        $zipPath = Join-Path $TestDrive 'candidate-exact-1mib.zip'
+        New-TestZip -Path $zipPath -Entries @{
+            'source-cache-inventory.json' = $inventoryBytes
+            'evidence/candidate-manifest.json' = $candidateBytes
+        }
+        $callerExpectedEntries = @(
+            [ordered]@{ name = 'source-cache-inventory.json'; expectedSha256 = Get-TestBytesSha256 $inventoryBytes; expectedLength = [long]$inventoryBytes.Length },
+            [ordered]@{ name = 'evidence/candidate-manifest.json'; expectedSha256 = $candidateSha256; expectedLength = [long]$candidateBytes.Length }
+        )
+
+        $failureToken = $null
+        try { Assert-CompletedEvidenceZip $zipPath $callerExpectedEntries }
+        catch { $failureToken = $_.Exception.Message }
+
+        $failureToken | Should BeNullOrEmpty
+    }
+
     It 'accepts a lowercase 64-hex SHA string after normalization' {
         $tokens = $null
         $parseErrors = $null
@@ -1272,5 +1350,85 @@ Describe 'completed evidence ZIP candidate inventory cross-binding' {
         catch { $failureToken = $_.Exception.Message }
 
         $failureToken | Should BeNullOrEmpty
+    }
+
+    $duplicateIdentityCases = @(
+        @{ Identity = 'SHA'; Spelling = 'exact'; Order = 'invalid-first-valid-last' },
+        @{ Identity = 'SHA'; Spelling = 'exact'; Order = 'valid-first-invalid-last' },
+        @{ Identity = 'SHA'; Spelling = 'escaped-alias'; Order = 'invalid-first-valid-last' },
+        @{ Identity = 'SHA'; Spelling = 'escaped-alias'; Order = 'valid-first-invalid-last' },
+        @{ Identity = 'length'; Spelling = 'exact'; Order = 'invalid-first-valid-last' },
+        @{ Identity = 'length'; Spelling = 'exact'; Order = 'valid-first-invalid-last' },
+        @{ Identity = 'length'; Spelling = 'escaped-alias'; Order = 'invalid-first-valid-last' },
+        @{ Identity = 'length'; Spelling = 'escaped-alias'; Order = 'valid-first-invalid-last' }
+    )
+
+    It 'rejects duplicate candidate identity <Identity> <Spelling> <Order>' -TestCases $duplicateIdentityCases {
+        param($Identity, $Spelling, $Order)
+
+        $tokens = $null
+        $parseErrors = $null
+        $collectorAst = [Management.Automation.Language.Parser]::ParseFile($collectorPath, [ref]$tokens, [ref]$parseErrors)
+        @($parseErrors).Count | Should Be 0
+        foreach ($functionAst in @($collectorAst.FindAll({
+            param($node)
+            $node -is [Management.Automation.Language.FunctionDefinitionAst]
+        }, $true))) {
+            Invoke-Expression $functionAst.Extent.Text
+        }
+
+        $candidateBytes = [Text.Encoding]::UTF8.GetBytes('{}')
+        $candidateSha256 = Get-TestBytesSha256 $candidateBytes
+        if ($Identity -ceq 'SHA') {
+            $exactKey = 'candidateManifestSha256'
+            $escapedKey = 'candidateManifestSha\u0032\u0035\u0036'
+            $singlePair = '"candidateManifestLength":2'
+            $invalidValue = 'null'
+            $validValue = '"' + $candidateSha256.ToLowerInvariant() + '"'
+        }
+        else {
+            $exactKey = 'candidateManifestLength'
+            $escapedKey = 'candidateManifest\u004cength'
+            $singlePair = '"candidateManifestSha256":"' + $candidateSha256 + '"'
+            $invalidValue = '"2"'
+            $validValue = '2'
+        }
+        if ($Spelling -ceq 'exact') {
+            $firstKey = $exactKey
+            $secondKey = $exactKey
+        }
+        elseif ($Order -ceq 'invalid-first-valid-last') {
+            $firstKey = $exactKey
+            $secondKey = $escapedKey
+        }
+        else {
+            $firstKey = $escapedKey
+            $secondKey = $exactKey
+        }
+        if ($Order -ceq 'invalid-first-valid-last') {
+            $firstValue = $invalidValue
+            $secondValue = $validValue
+        }
+        else {
+            $firstValue = $validValue
+            $secondValue = $invalidValue
+        }
+        $inventoryJson = '{' + $singlePair + ',"' + $firstKey + '":' + $firstValue + ',"' + $secondKey + '":' + $secondValue + "}`n"
+        $inventoryBytes = [Text.Encoding]::UTF8.GetBytes($inventoryJson)
+        $zipPath = Join-Path $TestDrive ('candidate-duplicate-' + $Identity + '-' + $Spelling + '-' + $Order + '.zip')
+        New-TestZip -Path $zipPath -Entries @{
+            'source-cache-inventory.json' = $inventoryBytes
+            'evidence/candidate-manifest.json' = $candidateBytes
+        }
+        $callerExpectedEntries = @(
+            [ordered]@{ name = 'source-cache-inventory.json'; expectedSha256 = Get-TestBytesSha256 $inventoryBytes; expectedLength = [long]$inventoryBytes.Length },
+            [ordered]@{ name = 'evidence/candidate-manifest.json'; expectedSha256 = $candidateSha256; expectedLength = [long]$candidateBytes.Length }
+        )
+
+        $failureToken = $null
+        try { Assert-CompletedEvidenceZip $zipPath $callerExpectedEntries }
+        catch { $failureToken = $_.Exception.Message }
+
+        $failureToken | Should Be 'bundle_candidate_inventory_mismatch'
     }
 }
