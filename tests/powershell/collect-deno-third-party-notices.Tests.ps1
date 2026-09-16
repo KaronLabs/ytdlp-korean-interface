@@ -512,5 +512,87 @@ Describe 'Deno collector trust-boundary regressions' -Tag 'TrustBoundaryRed' {
             Get-TrustError { Assert-DenoUniquePaths @($path) } | Should Match '^deno_path_invalid:'
         }
     }
-}
 
+    It 'rejects duplicate embeddedComponents decoded names: <Case>' -TestCases @(
+        @{ Case = 'exact canonical-last'; First = 'embeddedComponents'; FirstValue = '[]'; Second = 'embeddedComponents'; SecondValue = '[{"id":"typescript@5.9.2"}]' }
+        @{ Case = 'exact canonical-first'; First = 'embeddedComponents'; FirstValue = '[{"id":"typescript@5.9.2"}]'; Second = 'embeddedComponents'; SecondValue = '[]' }
+        @{ Case = 'escaped canonical-last'; First = 'embedded\u0043omponents'; FirstValue = '[]'; Second = 'embeddedComponents'; SecondValue = '[{"id":"typescript@5.9.2"}]' }
+        @{ Case = 'escaped canonical-first'; First = 'embeddedComponents'; FirstValue = '[{"id":"typescript@5.9.2"}]'; Second = 'embedded\u0043omponents'; SecondValue = '[]' }
+    ) {
+        param($Case, $First, $FirstValue, $Second, $SecondValue)
+        $path = Join-Path $TestDrive (($Case -replace '[^a-z-]', '_') + '.json')
+        $json = '{"' + $First + '":' + $FirstValue + ',"' + $Second + '":' + $SecondValue + '}'
+        [IO.File]::WriteAllText($path, $json, [Text.UTF8Encoding]::new($false))
+
+        Get-TrustError { Read-DenoJson -Path $path } | Should Be 'deno_json_duplicate_property:embeddedComponents'
+    }
+
+    It 'rejects decoded duplicate names in an object nested in an array without parsing string contents as structure' {
+        $path = Join-Path $TestDrive 'nested-duplicate.json'
+        $json = '{"text":"name name [ { } ]","nested":[{"name":1,"na\u006de":2}]}'
+        [IO.File]::WriteAllText($path, $json, [Text.UTF8Encoding]::new($false))
+
+        Get-TrustError { Read-DenoJson -Path $path } | Should Be 'deno_json_duplicate_property:name'
+    }
+
+    It 'hashes and parses Cargo.lock from one bounded immutable snapshot during a swap attempt' {
+        $path = Join-Path $TestDrive 'Cargo.lock'
+        $replacement = Join-Path $TestDrive 'Cargo.tampered.lock'
+        $trusted = '[[package]]' + "`n" + 'name = "trusted"' + "`n" + 'version = "1.0.0"' + "`n"
+        $tampered = '[[package]]' + "`n" + 'name = "tampered"' + "`n" + 'version = "9.9.9"' + "`n"
+        [IO.File]::WriteAllText($path, $trusted, [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText($replacement, $tampered, [Text.UTF8Encoding]::new($false))
+        $expected = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+        $script:cargoLockSwapFailure = $null
+        $probe = {
+            try {
+                Move-Item -LiteralPath $path -Destination ($path + '.old') -ErrorAction Stop
+                Move-Item -LiteralPath $replacement -Destination $path -ErrorAction Stop
+            }
+            catch { $script:cargoLockSwapFailure = $_.Exception.Message }
+        }
+
+        $packages = @(Read-DenoCargoLockPackages -CargoLockPath $path -ExpectedSha256 $expected -MaximumLength 4096 -AfterHashAction $probe)
+
+        $script:cargoLockSwapFailure | Should Not BeNullOrEmpty
+        $packages[0].name | Should Be 'trusted'
+        @(Read-DenoCargoLockPackages -Bytes ([Text.UTF8Encoding]::new($false).GetBytes($trusted)))[0].name | Should Be 'trusted'
+        @(Read-DenoCargoLockPackages -Text $trusted)[0].name | Should Be 'trusted'
+        Get-TrustError { Read-DenoCargoLockPackages -CargoLockPath $path -ExpectedSha256 $expected -MaximumLength 4 } | Should Match '^deno_input_too_large:'
+    }
+
+    It 'derives a staged license and notice from the same verified immutable bytes' {
+        $source = Join-Path $TestDrive 'LICENSE-source'
+        $replacement = Join-Path $TestDrive 'LICENSE-tampered'
+        $destination = Join-Path $TestDrive 'stage/LICENSE'
+        [IO.File]::WriteAllText($source, 'TRUSTED LICENSE', [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText($replacement, 'TAMPERED NOTICE', [Text.UTF8Encoding]::new($false))
+        $expected = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLowerInvariant()
+        $notice = [Text.StringBuilder]::new()
+        $script:licenseSourceSwapFailure = $null
+        $probe = {
+            try {
+                Move-Item -LiteralPath $source -Destination ($source + '.old') -ErrorAction Stop
+                Move-Item -LiteralPath $replacement -Destination $source -ErrorAction Stop
+            }
+            catch { $script:licenseSourceSwapFailure = $_.Exception.Message }
+        }
+
+        [void](Add-DenoVerifiedLicenseMaterial -SourcePath $source -DestinationPath $destination -DestinationRelative 'LICENSES/test/LICENSE' -Notice $notice -ExpectedSha256 $expected -ExpectedLength 15 -AfterStageAction $probe)
+
+        $script:licenseSourceSwapFailure | Should BeNullOrEmpty
+        [IO.File]::ReadAllText($destination) | Should Be 'TRUSTED LICENSE'
+        $notice.ToString() | Should Match 'TRUSTED LICENSE'
+        $notice.ToString() | Should Not Match 'TAMPERED NOTICE'
+    }
+
+    It 'uses a one-byte FILE_DISPOSITION_INFO and deletes an empty owned stage' {
+        [DenoPathSafety]::DispositionInfoSize | Should Be 1
+        $scratch = Join-Path $TestDrive 'empty-stage-scratch'
+        [void][IO.Directory]::CreateDirectory($scratch)
+        $stage = New-DenoProcessStageRoot -ScratchRoot $scratch
+
+        Remove-DenoProcessStageRoot -Path $stage | Should Be $true
+        [IO.Directory]::Exists($stage) | Should Be $false
+    }
+}
