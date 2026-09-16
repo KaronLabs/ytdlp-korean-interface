@@ -22,6 +22,75 @@ $utf8NoBom = New-Object Text.UTF8Encoding($false)
 $script:blockers = New-Object 'Collections.Generic.List[string]'
 $script:blockerSet = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
 $script:temporaryDirectories = New-Object 'Collections.Generic.List[string]'
+$script:stagingRoot = $null
+$script:stagedSevenZipExecutable = $null
+$productionApprovalProfile = 'karon-v2.19.1-karon.2-non-runtime-v1'
+$fixtureApprovalProfile = 'test-fixture-v1'
+
+$approvedProductionComponents = @{
+    'application' = [ordered]@{
+        version = '2.19.1-karon.2'; sourceRepository = 'https://github.com/KaronLabs/ytdlp-korean-interface'; sourceCommit = '$APPLICATION_RELEASE_COMMIT'
+        sourceTag = ''; sourceTagObject = ''; sourceTagPeeledCommit = ''; releaseTag = ''; licenseExpression = 'MIT'; artifacts = @()
+    }
+    'bit7z' = [ordered]@{
+        version = '4.1.0'; sourceRepository = 'https://github.com/rikyoz/bit7z'; sourceCommit = 'c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742'
+        sourceTag = ''; sourceTagObject = ''; sourceTagPeeledCommit = ''; releaseTag = ''; licenseExpression = 'MPL-2.0'
+        artifacts = @([ordered]@{ id = 'bit7z-source'; fileName = 'bit7z-c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742.zip'; url = 'https://github.com/rikyoz/bit7z/archive/c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742.zip'; sha256 = '6AF52B2E1B9895E8F1193728880206326161940E7A961E3162EC39752DBB3379'; length = 494710; format = 'zip'; includeInBundle = $true })
+    }
+    'cpm' = [ordered]@{
+        version = '0.42.3'; sourceRepository = 'https://github.com/cpm-cmake/CPM.cmake'; sourceCommit = '49acea0d775087ace0522ee4cc5de45e3da094a8'
+        sourceTag = 'v0.42.3'; sourceTagObject = ''; sourceTagPeeledCommit = '49acea0d775087ace0522ee4cc5de45e3da094a8'; releaseTag = ''; licenseExpression = 'MIT'
+        artifacts = @(
+            [ordered]@{ id = 'cpm-source'; fileName = 'cpm-49acea0d775087ace0522ee4cc5de45e3da094a8.zip'; url = 'https://github.com/cpm-cmake/CPM.cmake/archive/49acea0d775087ace0522ee4cc5de45e3da094a8.zip'; sha256 = '97D684CFB9E9F5EC37A2D52C737E24B75F2ABFDF2594E109718309CB7C0B8A33'; length = 168785; format = 'zip'; includeInBundle = $true },
+            [ordered]@{ id = 'cpm-bootstrap'; fileName = 'CPM_0.42.3.cmake'; url = 'https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.42.3/CPM.cmake'; sha256 = 'A609E875FD532B067174250F6ABBC3DAC22FE2D64869783FB1E80BDA1625C844'; length = 45045; format = 'text'; includeInBundle = $true }
+        )
+    }
+    '7zip' = [ordered]@{
+        version = '26.01'; sourceRepository = 'https://github.com/ip7z/7zip'; sourceCommit = '8c63d71ff886bda90c86db28466287f977374237'
+        sourceTag = ''; sourceTagObject = ''; sourceTagPeeledCommit = ''; releaseTag = ''; licenseExpression = 'LGPL-2.1-or-later AND BSD-2-Clause AND BSD-3-Clause'
+        artifacts = @([ordered]@{ id = 'sevenzip-source'; fileName = '7zip-8c63d71ff886bda90c86db28466287f977374237.zip'; url = 'https://github.com/ip7z/7zip/archive/8c63d71ff886bda90c86db28466287f977374237.zip'; sha256 = '01589AEDA50512955E66D360C6534B961EC95C51111A76E2FA2976A8DAA55271'; length = 2892293; format = 'zip'; includeInBundle = $true })
+    }
+    'nana' = [ordered]@{
+        version = '1.7.4'; sourceRepository = 'https://github.com/cnjinhao/nana'; sourceCommit = '554c4fe87fc31b8ee104228e9117d545d34855b5'
+        sourceTag = 'v1.7.4'; sourceTagObject = '324ab5bb2fdefe8be54b141dc12ba40a43c98815'; sourceTagPeeledCommit = '554c4fe87fc31b8ee104228e9117d545d34855b5'; releaseTag = ''; licenseExpression = 'BSL-1.0'
+        artifacts = @([ordered]@{ id = 'nana-source'; fileName = 'nana-554c4fe87fc31b8ee104228e9117d545d34855b5.zip'; url = 'https://github.com/cnjinhao/nana/archive/554c4fe87fc31b8ee104228e9117d545d34855b5.zip'; sha256 = 'EF657036A4623BBB5C4E0DF4E8AA699DC6AC713CA4A6725B30D3FD8175C4C145'; length = 745596; format = 'zip'; includeInBundle = $true })
+    }
+    'libpng' = [ordered]@{
+        version = '1.6.37'; sourceRepository = 'https://github.com/pnggroup/libpng'; sourceCommit = 'a40189cf881e9f0db80511c382292a5604c3c3d1'
+        sourceTag = ''; sourceTagObject = ''; sourceTagPeeledCommit = ''; releaseTag = ''; licenseExpression = 'libpng-2.0'
+        artifacts = @(
+            [ordered]@{ id = 'libpng-source'; fileName = 'libpng-a40189cf881e9f0db80511c382292a5604c3c3d1.zip'; url = 'https://github.com/pnggroup/libpng/archive/a40189cf881e9f0db80511c382292a5604c3c3d1.zip'; sha256 = 'B3AF9E92167F9C4233482F49AFF02730B7DC3A275871CE637ED668413DA6283F'; length = 1803566; format = 'zip'; includeInBundle = $true },
+            [ordered]@{ id = 'libpng-package'; fileName = 'libpng.static.1.6.37.nupkg'; url = 'https://api.nuget.org/v3-flatcontainer/libpng.static/1.6.37/libpng.static.1.6.37.nupkg'; sha256 = 'A5DD204D1CFB381A5BBE6E7FB8DDC3BF3ADE3818DDB177B6E23DFA495350CB68'; length = 325349; format = 'binary'; includeInBundle = $true }
+        )
+    }
+    'zlib' = [ordered]@{
+        version = '1.2.5'; sourceRepository = 'https://github.com/madler/zlib'; sourceCommit = '9712272c78b9d9c93746d9c8e156a3728c65ca72'
+        sourceTag = ''; sourceTagObject = ''; sourceTagPeeledCommit = ''; releaseTag = ''; licenseExpression = 'Zlib'
+        artifacts = @(
+            [ordered]@{ id = 'zlib-source'; fileName = 'zlib-9712272c78b9d9c93746d9c8e156a3728c65ca72.zip'; url = 'https://github.com/madler/zlib/archive/9712272c78b9d9c93746d9c8e156a3728c65ca72.zip'; sha256 = '66FAA243EA50094C2B399F5644CD4AA6110E739EAE26800120124BBD1DA00535'; length = 703697; format = 'zip'; includeInBundle = $true },
+            [ordered]@{ id = 'zlib-package'; fileName = 'zlib.static.1.2.5.nupkg'; url = 'https://api.nuget.org/v3-flatcontainer/zlib.static/1.2.5/zlib.static.1.2.5.nupkg'; sha256 = 'A2E4A9FD423F97ED8D7B46E6AFF120286E5A56ED90E8F2908231A116D81EEC5B'; length = 147388; format = 'binary'; includeInBundle = $true }
+        )
+    }
+    'libjpeg-turbo' = [ordered]@{
+        version = '3.1.2'; sourceRepository = 'https://github.com/libjpeg-turbo/libjpeg-turbo'; sourceCommit = '4e151a4ad91001b3aa8c2ece2205c15f487ce320'
+        sourceTag = ''; sourceTagObject = ''; sourceTagPeeledCommit = ''; releaseTag = ''; licenseExpression = 'BSD-3-Clause AND IJG AND Zlib'
+        artifacts = @([ordered]@{ id = 'libjpeg-turbo-source'; fileName = 'libjpeg-turbo-4e151a4ad91001b3aa8c2ece2205c15f487ce320.zip'; url = 'https://github.com/libjpeg-turbo/libjpeg-turbo/archive/4e151a4ad91001b3aa8c2ece2205c15f487ce320.zip'; sha256 = 'D3C33405B46AA14094EF26CD7B9618162EBCAFEED7FB2ACF2FDA5C7C10B80782'; length = 3033904; format = 'zip'; includeInBundle = $true })
+    }
+    'nlohmann-json' = [ordered]@{
+        version = '3.12.0'; sourceRepository = 'https://github.com/nlohmann/json'; sourceCommit = '55f93686c01528224f448c19128836e7df245f72'
+        sourceTag = ''; sourceTagObject = ''; sourceTagPeeledCommit = ''; releaseTag = ''; licenseExpression = 'MIT'
+        artifacts = @([ordered]@{ id = 'nlohmann-source'; fileName = 'nlohmann-json-55f93686c01528224f448c19128836e7df245f72.zip'; url = 'https://github.com/nlohmann/json/archive/55f93686c01528224f448c19128836e7df245f72.zip'; sha256 = '0746352E4E9532E7AEABBCBAA79079B6BC6008E9261E4D459C9486A9B48A172E'; length = 10243783; format = 'zip'; includeInBundle = $true })
+    }
+    'yt-dlp' = [ordered]@{
+        version = '2026.08.30.232658'; sourceRepository = 'https://github.com/yt-dlp/yt-dlp'; sourceCommit = 'bbc809a1161d3bfca51fa36f59dda35556ee85a0'
+        sourceTag = ''; sourceTagObject = ''; sourceTagPeeledCommit = ''; releaseTag = '2026.08.30.232658'; licenseExpression = 'Unlicense AND LicenseRef-yt-dlp-PyInstaller-Third-Party'
+        artifacts = @(
+            [ordered]@{ id = 'yt-dlp-source'; fileName = 'yt-dlp-bbc809a1161d3bfca51fa36f59dda35556ee85a0.zip'; url = 'https://github.com/yt-dlp/yt-dlp/archive/bbc809a1161d3bfca51fa36f59dda35556ee85a0.zip'; sha256 = '62A651DE6FFCD3631CA34F0F617932BDEDC4A6BE652777ACAE8A11D1CAFD172B'; length = 3854279; format = 'zip'; includeInBundle = $true },
+            [ordered]@{ id = 'yt-dlp-binary'; fileName = 'yt-dlp-2026.08.30.232658.exe'; url = 'https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/download/2026.08.30.232658/yt-dlp.exe'; sha256 = 'A3A504C66E91F6474CEF0BE83B16AEDFB7B42B9400A962242D0D433E98F67A70'; length = 17842860; format = 'binary'; includeInBundle = $false },
+            [ordered]@{ id = 'yt-dlp-sums'; fileName = 'yt-dlp-2026.08.30.232658-SHA2-256SUMS'; url = 'https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/download/2026.08.30.232658/SHA2-256SUMS'; sha256 = 'E5384D809D9C6D70E80996AA6728620C660165930CA3C7BC08AD1D755261293E'; length = 1505; format = 'text'; includeInBundle = $true }
+        )
+    }
+}
 
 function Add-EvidenceBlocker {
     param([Parameter(Mandatory = $true)] [string] $Code)
@@ -35,6 +104,52 @@ function Get-ObjectProperty {
     $property = $Value.PSObject.Properties[$Name]
     if ($null -eq $property) { return $null }
     return $property.Value
+}
+
+function Test-ProductionComponentApproval {
+    param([object] $Component)
+    $id = [string]$Component.id
+    if (-not $approvedProductionComponents.ContainsKey($id)) { return $false }
+    $expected = $approvedProductionComponents[$id]
+    foreach ($field in @('version', 'sourceRepository', 'sourceCommit', 'sourceTag', 'sourceTagObject', 'sourceTagPeeledCommit', 'licenseExpression')) {
+        if ([string](Get-ObjectProperty $Component $field) -cne [string](Get-ObjectProperty $expected $field)) { return $false }
+    }
+    if ([string](Get-ObjectProperty $expected 'releaseTag') -cne [string](Get-ObjectProperty (Get-ObjectProperty $Component 'binaryProvenance') 'releaseTag')) { return $false }
+    $actualArtifacts = @($Component.sourceArtifacts)
+    $expectedArtifacts = @($expected.artifacts)
+    if ($actualArtifacts.Count -ne $expectedArtifacts.Count) { return $false }
+    foreach ($approved in $expectedArtifacts) {
+        $actual = @($actualArtifacts | Where-Object { [string]$_.id -ceq [string]$approved.id })
+        if ($actual.Count -ne 1) { return $false }
+        foreach ($field in @('fileName', 'url', 'format')) {
+            if ([string](Get-ObjectProperty $actual[0] $field) -cne [string](Get-ObjectProperty $approved $field)) { return $false }
+        }
+        if (([string]$actual[0].sha256).ToUpperInvariant() -cne ([string]$approved.sha256).ToUpperInvariant() -or
+            [long]$actual[0].length -ne [long]$approved.length -or [bool]$actual[0].includeInBundle -ne [bool]$approved.includeInBundle) { return $false }
+    }
+    return $true
+}
+
+function Test-FixtureComponentApproval {
+    param([object] $Component)
+    $id = [string]$Component.id
+    $commitA = '1111111111111111111111111111111111111111'
+    $commitB = '2222222222222222222222222222222222222222'
+    $expectedVersion = switch ($id) {
+        'application' { '2.19.1-karon.2' } 'bit7z' { '4.1.0' } 'cpm' { '0.42.3' } '7zip' { '26.01' }
+        'nana' { '1.0' } 'libpng' { '1.0' } 'zlib' { '1.0' } 'libjpeg-turbo' { '1.0' }
+        'nlohmann-json' { '3.12.0' } 'yt-dlp' { '2026.08.30.232658' } default { return $false }
+    }
+    $expectedRepository = if ($id -ceq 'application') { 'https://github.com/KaronLabs/ytdlp-korean-interface' } else { 'https://github.com/example/' + $id }
+    $expectedCommit = if ($id -ceq 'application') { '$APPLICATION_RELEASE_COMMIT' } elseif ($id -ceq 'yt-dlp') { $commitB } else { $commitA }
+    return [string]$Component.version -ceq $expectedVersion -and [string]$Component.sourceRepository -ceq $expectedRepository -and [string]$Component.sourceCommit -ceq $expectedCommit
+}
+
+function Test-ComponentApproval {
+    param([object] $Component, [string] $Profile)
+    if ($Profile -ceq $productionApprovalProfile) { return Test-ProductionComponentApproval $Component }
+    if ($Profile -ceq $fixtureApprovalProfile) { return Test-FixtureComponentApproval $Component }
+    return $false
 }
 
 function Get-BytesSha256 {
@@ -68,11 +183,67 @@ function Write-AtomicBytes {
     }
 }
 
+function Assert-ReparseFreePath {
+    param([string] $Path, [string] $Label)
+    if ([string]::IsNullOrWhiteSpace($Path) -or $Path -match '^(?i)\\\\[?.]\\|^\\\?\?\\') { throw ('unsafe_reparse_path:' + $Label) }
+    $full = [IO.Path]::GetFullPath($Path)
+    $current = $full
+    while (-not [string]::IsNullOrWhiteSpace($current)) {
+        $item = Get-Item -LiteralPath $current -Force -ErrorAction SilentlyContinue
+        if ($null -ne $item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw ('unsafe_reparse_path:' + $Label) }
+        $parent = Split-Path -Parent $current
+        if ([string]::IsNullOrWhiteSpace($parent) -or $parent -ceq $current) { break }
+        $current = $parent
+    }
+    return $full
+}
+
+function Test-SafeLeafFileName {
+    param([string] $Name)
+    if ([string]::IsNullOrWhiteSpace($Name) -or $Name -ceq '.' -or $Name -ceq '..') { return $false }
+    if ($Name -match '[\\/:\x00-\x1f]' -or [IO.Path]::IsPathRooted($Name) -or $Name.TrimEnd(' ', '.') -cne $Name) { return $false }
+    $stem = $Name.Split('.')[0]
+    if ($stem -match '^(?i)(CON|PRN|AUX|NUL|CLOCK\$|COM[1-9]|LPT[1-9])$') { return $false }
+    return [IO.Path]::GetFileName($Name) -ceq $Name
+}
+
+function Get-DirectChildPath {
+    param([string] $Root, [string] $Leaf)
+    if (-not (Test-SafeLeafFileName $Leaf)) { throw 'unsafe_leaf_file_name' }
+    $rootFull = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+    $path = [IO.Path]::GetFullPath((Join-Path $rootFull $Leaf))
+    if ((Split-Path -Parent $path).TrimEnd('\', '/') -ine $rootFull) { throw 'unsafe_leaf_file_name' }
+    return $path
+}
+
+function Copy-InputToPrivateStaging {
+    param([string] $SourcePath, [string] $RelativePath, [string] $Label)
+    $sourceFull = Assert-ReparseFreePath -Path $SourcePath -Label $Label
+    if (-not (Test-Path -LiteralPath $sourceFull -PathType Leaf)) { throw ('input_missing:' + $Label) }
+    if ([string]::IsNullOrWhiteSpace($script:stagingRoot)) { throw 'private_staging_unavailable' }
+    $destination = [IO.Path]::GetFullPath((Join-Path $script:stagingRoot $RelativePath))
+    if (-not (Test-ChildPath -Root $script:stagingRoot -Path $destination)) { throw ('private_staging_escape:' + $Label) }
+    $parent = Split-Path -Parent $destination
+    [IO.Directory]::CreateDirectory($parent) | Out-Null
+    [void](Assert-ReparseFreePath -Path $parent -Label 'private-staging')
+    $inputStream = [IO.File]::Open($sourceFull, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    try {
+        $outputStream = [IO.File]::Open($destination, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        try { $inputStream.CopyTo($outputStream) }
+        finally { $outputStream.Dispose() }
+    }
+    finally { $inputStream.Dispose() }
+    [void](Assert-ReparseFreePath -Path $destination -Label 'private-staging')
+    return $destination
+}
+
 function New-TemporaryDirectory {
     param([string] $Label)
-    $path = Join-Path ([IO.Path]::GetTempPath()) ('karon-' + $Label + '-' + [Guid]::NewGuid().ToString('N'))
+    $tempRoot = Assert-ReparseFreePath -Path ([IO.Path]::GetTempPath()) -Label 'private-staging'
+    $path = Join-Path $tempRoot ('karon-' + $Label + '-' + [Guid]::NewGuid().ToString('N'))
     [IO.Directory]::CreateDirectory($path) | Out-Null
     $script:temporaryDirectories.Add($path)
+    [void](Assert-ReparseFreePath -Path $path -Label 'private-staging')
     return $path
 }
 
@@ -94,6 +265,57 @@ function Test-ImmutableSourceUrl {
     return $false
 }
 
+function Assert-SafeArchiveEntryName {
+    param([string] $Name, [object] $ExactNames, [object] $CaseInsensitiveNames)
+    if ([string]::IsNullOrWhiteSpace($Name) -or $Name -match '[\x00-\x1f:]') { throw 'archive_entry_path_invalid' }
+    $normalized = $Name.Replace('\', '/')
+    if ($normalized.StartsWith('/') -or $normalized.StartsWith('//') -or [IO.Path]::IsPathRooted($normalized) -or $normalized -match '^[A-Za-z]:') { throw 'archive_entry_path_invalid' }
+    $trimmed = $normalized.TrimEnd('/')
+    if ([string]::IsNullOrWhiteSpace($trimmed)) { throw 'archive_entry_path_invalid' }
+    foreach ($segment in $trimmed.Split('/')) {
+        if ([string]::IsNullOrWhiteSpace($segment) -or $segment -ceq '.' -or $segment -ceq '..') { throw 'archive_entry_path_invalid' }
+    }
+    if (-not $ExactNames.Add($normalized)) { throw 'archive_entry_duplicate' }
+    if (-not $CaseInsensitiveNames.Add($normalized)) { throw 'archive_entry_case_collision' }
+    return $normalized
+}
+
+function Assert-ZipArchivePreflight {
+    param([string] $ArchivePath)
+    $archive = [IO.Compression.ZipFile]::OpenRead($ArchivePath)
+    $exactNames = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+    $caseNames = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    try {
+        foreach ($entry in $archive.Entries) {
+            [void](Assert-SafeArchiveEntryName -Name $entry.FullName -ExactNames $exactNames -CaseInsensitiveNames $caseNames)
+            $attributes = [BitConverter]::ToUInt32([BitConverter]::GetBytes([int]$entry.ExternalAttributes), 0)
+            $unixType = ($attributes -shr 16) -band 0xF000
+            if ($unixType -eq 0xA000 -or ($attributes -band [uint32][IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'archive_link_or_reparse_entry' }
+        }
+    }
+    finally { $archive.Dispose() }
+}
+
+function Assert-SevenZipArchivePreflight {
+    param([string] $ArchivePath)
+    if ([string]::IsNullOrWhiteSpace($script:stagedSevenZipExecutable) -or -not (Test-Path -LiteralPath $script:stagedSevenZipExecutable -PathType Leaf)) { throw 'sevenzip_extractor_required' }
+    $lines = @(& $script:stagedSevenZipExecutable 'l' '-slt' '-ba' $ArchivePath 2>&1)
+    if ($LASTEXITCODE -ne 0) { throw ('sevenzip_list_failed:' + $LASTEXITCODE) }
+    $exactNames = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+    $caseNames = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($line in $lines) {
+        $text = [string]$line
+        if ($text -match '^Path = (.*)$') { [void](Assert-SafeArchiveEntryName -Name $Matches[1] -ExactNames $exactNames -CaseInsensitiveNames $caseNames) }
+        elseif ($text -match '^(?:Symbolic Link|Hard Link|Reparse Point) = .+$') { throw 'archive_link_or_reparse_entry' }
+    }
+}
+
+function Assert-ArchivePreflight {
+    param([string] $ArchivePath, [string] $Format)
+    if ($Format -ceq 'zip' -or [IO.Path]::GetExtension($ArchivePath) -ieq '.nupkg') { Assert-ZipArchivePreflight $ArchivePath; return }
+    if ($Format -ceq '7z') { Assert-SevenZipArchivePreflight $ArchivePath; return }
+}
+
 function Get-ZipEntryBytes {
     param([string] $ArchivePath, [string] $EntryPath)
     $archive = [IO.Compression.ZipFile]::OpenRead($ArchivePath)
@@ -111,6 +333,7 @@ function Get-ZipEntryBytes {
 
 function Expand-SafeZip {
     param([string] $ArchivePath, [string] $Destination)
+    Assert-ZipArchivePreflight $ArchivePath
     [IO.Directory]::CreateDirectory($Destination) | Out-Null
     $archive = [IO.Compression.ZipFile]::OpenRead($ArchivePath)
     $names = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
@@ -136,11 +359,12 @@ function Expand-SafeZip {
 function Expand-EvidenceArchive {
     param([string] $ArchivePath, [string] $Format, [string] $Destination)
     if ($Format -ceq 'zip') { Expand-SafeZip -ArchivePath $ArchivePath -Destination $Destination; return }
-    if ($Format -cne '7z' -or [string]::IsNullOrWhiteSpace($SevenZipExecutable) -or -not (Test-Path -LiteralPath $SevenZipExecutable -PathType Leaf)) {
+    if ($Format -cne '7z' -or [string]::IsNullOrWhiteSpace($script:stagedSevenZipExecutable) -or -not (Test-Path -LiteralPath $script:stagedSevenZipExecutable -PathType Leaf)) {
         throw 'sevenzip_extractor_required'
     }
+    Assert-SevenZipArchivePreflight $ArchivePath
     [IO.Directory]::CreateDirectory($Destination) | Out-Null
-    & $SevenZipExecutable 'x' '-y' ('-o' + $Destination) $ArchivePath | Out-Null
+    & $script:stagedSevenZipExecutable 'x' '-y' ('-o' + $Destination) $ArchivePath | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "sevenzip_extract_failed:$LASTEXITCODE" }
     foreach ($entry in @(Get-ChildItem -LiteralPath $Destination -Force -Recurse)) {
         if (($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or -not (Test-ChildPath -Root $Destination -Path $entry.FullName)) {
@@ -196,14 +420,15 @@ function Get-OrderedChunkDigest {
 
 function Test-FileIdentity {
     param([string] $Path, [string] $ExpectedSha256, [long] $ExpectedLength)
-    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
+    if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
     $file = Get-Item -LiteralPath $Path
     return $file.Length -eq $ExpectedLength -and (Get-PathSha256 $Path) -ceq $ExpectedSha256.ToUpperInvariant()
 }
 
 function Acquire-SourceArtifact {
     param([object] $Artifact, [string] $Destination)
-    if (Test-Path -LiteralPath $Destination) { return }
+    [void](Assert-ReparseFreePath -Path (Split-Path -Parent $Destination) -Label 'source-cache')
+    if (Test-Path -LiteralPath $Destination) { [void](Assert-ReparseFreePath -Path $Destination -Label 'source-cache'); return }
     if (-not $AcquireSources) { return }
     $partial = $Destination + '.partial.' + $PID + '.' + [Guid]::NewGuid().ToString('N')
     try {
@@ -220,10 +445,16 @@ function Acquire-SourceArtifact {
 }
 
 function New-DeterministicZip {
-    param([string] $OutputPath, [object[]] $Entries)
-    $nameSet = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    param([string] $OutputPath, [object[]] $Entries, [string] $PrivateRoot)
+    $exactNames = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+    $caseNames = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
     foreach ($entry in $Entries) {
-        if (-not $nameSet.Add([string]$entry.name)) { throw 'bundle_entry_case_collision' }
+        [void](Assert-SafeArchiveEntryName -Name ([string]$entry.name) -ExactNames $exactNames -CaseInsensitiveNames $caseNames)
+        $sourcePath = Get-ObjectProperty -Value $entry -Name 'path'
+        if ($null -ne $sourcePath) {
+            $sourceFull = Assert-ReparseFreePath -Path ([string]$sourcePath) -Label 'private-staging'
+            if (-not (Test-ChildPath -Root $PrivateRoot -Path $sourceFull)) { throw 'bundle_source_not_staged' }
+        }
     }
     $partial = $OutputPath + '.partial.' + $PID + '.' + [Guid]::NewGuid().ToString('N')
     $stream = $null
@@ -274,6 +505,7 @@ $manifestBytes = $null
 $manifestSha256 = $null
 $artifactById = @{}
 $artifactValid = @{}
+$artifactStagedPath = @{}
 $inventoryRecords = New-Object 'Collections.Generic.List[object]'
 $bundleEntries = New-Object 'Collections.Generic.List[object]'
 $nlohmannEvidenceBytes = $null
@@ -282,11 +514,31 @@ $candidate = $null
 $dependencyExtracted = $null
 $task5RuntimeExtracted = $null
 $task5SourceExtracted = $null
+$sourceCacheSafe = $true
+$applicationRepositorySafe = $true
+$releaseTag = 'v2.19.1-karon.2'
 
 try {
-    [IO.Directory]::CreateDirectory([IO.Path]::GetFullPath($SourceCacheDirectory)) | Out-Null
-    [IO.Directory]::CreateDirectory([IO.Path]::GetFullPath($OutputDirectory)) | Out-Null
-    if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf)) { throw 'component_manifest_missing' }
+    $OutputDirectory = Assert-ReparseFreePath -Path $OutputDirectory -Label 'output'
+    [IO.Directory]::CreateDirectory($OutputDirectory) | Out-Null
+    [void](Assert-ReparseFreePath -Path $OutputDirectory -Label 'output')
+}
+catch { throw }
+
+$script:stagingRoot = New-TemporaryDirectory 'component-evidence-staging'
+
+try {
+    $SourceCacheDirectory = Assert-ReparseFreePath -Path $SourceCacheDirectory -Label 'source-cache'
+    [IO.Directory]::CreateDirectory($SourceCacheDirectory) | Out-Null
+    [void](Assert-ReparseFreePath -Path $SourceCacheDirectory -Label 'source-cache')
+}
+catch { Add-EvidenceBlocker $_.Exception.Message; $sourceCacheSafe = $false }
+
+try { [void](Assert-ReparseFreePath -Path $ApplicationRepository -Label 'application-repository') }
+catch { Add-EvidenceBlocker $_.Exception.Message; $applicationRepositorySafe = $false }
+
+try {
+    $ManifestPath = Copy-InputToPrivateStaging -SourcePath $ManifestPath -RelativePath 'inputs\component-manifest.json' -Label 'component-manifest'
     $manifestBytes = [IO.File]::ReadAllBytes($ManifestPath)
     $manifestSha256 = Get-BytesSha256 $manifestBytes
     $manifestText = $utf8NoBom.GetString($manifestBytes)
@@ -297,9 +549,39 @@ catch {
     Add-EvidenceBlocker ('component_manifest_invalid:' + $_.Exception.Message)
 }
 
+foreach ($input in @(
+    @('DependencyArchivePath', $DependencyArchivePath, 'inputs\dependency-archive.bin', 'dependency-archive'),
+    @('SevenZipRuntimeArchivePath', $SevenZipRuntimeArchivePath, 'inputs\sevenzip-runtime.7z', 'sevenzip-runtime'),
+    @('SevenZipSourceArchivePath', $SevenZipSourceArchivePath, 'inputs\sevenzip-source.7z', 'sevenzip-source'),
+    @('SevenZipVerificationPath', $SevenZipVerificationPath, 'inputs\sevenzip-verification.json', 'sevenzip-verification'),
+    @('YtDlpBinaryPath', $YtDlpBinaryPath, 'inputs\yt-dlp.exe', 'yt-dlp-binary'))) {
+    try {
+        $staged = Copy-InputToPrivateStaging -SourcePath ([string]$input[1]) -RelativePath ([string]$input[2]) -Label ([string]$input[3])
+        Set-Variable -Name ([string]$input[0]) -Value $staged
+    }
+    catch { Add-EvidenceBlocker $_.Exception.Message; Set-Variable -Name ([string]$input[0]) -Value '' }
+}
+
+if (-not [string]::IsNullOrWhiteSpace($CandidateManifestPath)) {
+    try { $CandidateManifestPath = Copy-InputToPrivateStaging -SourcePath $CandidateManifestPath -RelativePath 'inputs\candidate-manifest.json' -Label 'candidate-manifest' }
+    catch { Add-EvidenceBlocker $_.Exception.Message; $CandidateManifestPath = '' }
+}
+
+if (-not [string]::IsNullOrWhiteSpace($SevenZipExecutable)) {
+    try {
+        $SevenZipExecutable = Copy-InputToPrivateStaging -SourcePath $SevenZipExecutable -RelativePath 'tools\7z.exe' -Label 'sevenzip-executable'
+        $script:stagedSevenZipExecutable = $SevenZipExecutable
+    }
+    catch { Add-EvidenceBlocker $_.Exception.Message; $SevenZipExecutable = '' }
+}
+
 if ($null -ne $manifest) {
-    if ([string]$manifest.schemaVersion -cne 'karon-non-runtime-component-evidence/v1' -or
-        [string]$manifest.release.tag -cne 'v2.19.1-karon.2' -or [string]$manifest.release.platform -cne 'win-x64') {
+    $approvalProfile = [string](Get-ObjectProperty $manifest 'approvalProfile')
+    $releaseTag = [string]$manifest.release.tag
+    $profileReleaseValid = ($approvalProfile -ceq $productionApprovalProfile -and $releaseTag -ceq 'v2.19.1-karon.2') -or
+        ($approvalProfile -ceq $fixtureApprovalProfile -and $releaseTag -ceq 'test-fixture')
+    if ($approvalProfile -cne $productionApprovalProfile -and $approvalProfile -cne $fixtureApprovalProfile) { Add-EvidenceBlocker 'approval_profile_invalid' }
+    if ([string]$manifest.schemaVersion -cne 'karon-non-runtime-component-evidence/v1' -or -not $profileReleaseValid -or [string]$manifest.release.platform -cne 'win-x64') {
         Add-EvidenceBlocker 'component_manifest_contract_mismatch'
     }
     $expectedIds = @('7zip', 'application', 'bit7z', 'cpm', 'libjpeg-turbo', 'libpng', 'nana', 'nlohmann-json', 'yt-dlp', 'zlib')
@@ -313,6 +595,7 @@ if ($null -ne $manifest) {
     $fileNameSet = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
     $artifactIdSet = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
     foreach ($component in @($manifest.components)) {
+        if (-not (Test-ComponentApproval -Component $component -Profile $approvalProfile)) { Add-EvidenceBlocker ('component_approval_mismatch:' + [string]$component.id) }
         if ([string]::IsNullOrWhiteSpace([string]$component.licenseExpression) -or [string]$component.licenseExpression -match '(?i)NOASSERTION') {
             Add-EvidenceBlocker ('license_expression_missing:' + [string]$component.id)
         }
@@ -325,30 +608,47 @@ if ($null -ne $manifest) {
         foreach ($artifact in @($component.sourceArtifacts)) {
             $id = [string]$artifact.id
             $fileName = [string]$artifact.fileName
-            if (-not $artifactIdSet.Add($id)) { Add-EvidenceBlocker 'source_artifact_id_collision' }
-            if (-not $fileNameSet.Add($fileName)) { Add-EvidenceBlocker 'source_cache_name_collision' }
+            $idAccepted = $artifactIdSet.Add($id)
+            $fileNameValid = Test-SafeLeafFileName $fileName
+            $fileNameAccepted = $fileNameValid -and $fileNameSet.Add($fileName)
+            if (-not $idAccepted) { Add-EvidenceBlocker 'source_artifact_id_collision' }
+            if (-not $fileNameValid) { Add-EvidenceBlocker ('source_artifact_file_name_invalid:' + $id) }
+            elseif (-not $fileNameAccepted) { Add-EvidenceBlocker 'source_cache_name_collision' }
             if (-not (Test-ImmutableSourceUrl ([string]$artifact.url))) { Add-EvidenceBlocker ('mutable_source_url:' + $id) }
             $artifactById[$id] = $artifact
-            $path = Join-Path $SourceCacheDirectory $fileName
-            try { Acquire-SourceArtifact -Artifact $artifact -Destination $path }
-            catch { Add-EvidenceBlocker ('source_acquire_failed:' + $id) }
-            $exists = Test-Path -LiteralPath $path -PathType Leaf
+            $exists = $false
             $actualSha = $null
             $actualLength = $null
             $valid = $false
-            if ($exists) {
-                $file = Get-Item -LiteralPath $path
-                $actualLength = [long]$file.Length
-                $actualSha = Get-PathSha256 $path
-                $valid = $actualLength -eq [long]$artifact.length -and $actualSha -ceq ([string]$artifact.sha256).ToUpperInvariant()
+            $status = 'unavailable'
+            if ($sourceCacheSafe -and $idAccepted -and $fileNameAccepted) {
+                try {
+                    $path = Get-DirectChildPath -Root $SourceCacheDirectory -Leaf $fileName
+                    Acquire-SourceArtifact -Artifact $artifact -Destination $path
+                    $exists = Test-Path -LiteralPath $path -PathType Leaf
+                    if ($exists) {
+                        [void](Assert-ReparseFreePath -Path $path -Label ('source-artifact-' + $id))
+                        $stagedPath = Copy-InputToPrivateStaging -SourcePath $path -RelativePath ('sources\' + $fileName) -Label ('source-artifact-' + $id)
+                        $file = Get-Item -LiteralPath $stagedPath
+                        $actualLength = [long]$file.Length
+                        $actualSha = Get-PathSha256 $stagedPath
+                        $valid = $actualLength -eq [long]$artifact.length -and $actualSha -ceq ([string]$artifact.sha256).ToUpperInvariant()
+                        if ($valid -and ([string]$artifact.format -ceq 'zip' -or [string]$artifact.format -ceq '7z' -or [IO.Path]::GetExtension($fileName) -ieq '.nupkg')) {
+                            try { Assert-ArchivePreflight -ArchivePath $stagedPath -Format ([string]$artifact.format) }
+                            catch { Add-EvidenceBlocker ('source_archive_preflight_failed:' + $id + ':' + $_.Exception.Message); $valid = $false; $status = 'archive-invalid' }
+                        }
+                        if ($valid) { $artifactStagedPath[$id] = $stagedPath; $status = 'verified' }
+                    }
+                }
+                catch { Add-EvidenceBlocker ('source_access_failed:' + $id + ':' + $_.Exception.Message) }
             }
-            if (-not $exists) { Add-EvidenceBlocker ('source_missing:' + $id) }
-            elseif (-not $valid) { Add-EvidenceBlocker ('source_hash_mismatch:' + $id) }
+            if ($sourceCacheSafe -and $fileNameAccepted -and -not $exists) { Add-EvidenceBlocker ('source_missing:' + $id) }
+            elseif ($exists -and -not $valid -and $status -cne 'archive-invalid') { Add-EvidenceBlocker ('source_hash_mismatch:' + $id); $status = 'mismatch' }
             $artifactValid[$id] = $valid
             $inventoryRecords.Add([ordered]@{
                 id = $id; component = [string]$component.id; fileName = $fileName; url = [string]$artifact.url
                 expectedSha256 = ([string]$artifact.sha256).ToUpperInvariant(); expectedLength = [long]$artifact.length
-                actualSha256 = $actualSha; actualLength = $actualLength; status = $(if ($valid) { 'verified' } elseif ($exists) { 'mismatch' } else { 'missing' })
+                actualSha256 = $actualSha; actualLength = $actualLength; status = $status
                 includeInBundle = [bool]$artifact.includeInBundle
             })
         }
@@ -359,10 +659,10 @@ if ($null -ne $manifest) {
             $kind = [string]$license.kind
             if ($kind -ceq 'archive-entry') {
                 $artifactId = [string]$license.sourceArtifactId
-                if (-not $artifactById.ContainsKey($artifactId) -or -not [bool]$artifactValid[$artifactId]) { continue }
+                if (-not $artifactById.ContainsKey($artifactId) -or -not [bool]$artifactValid[$artifactId] -or -not $artifactStagedPath.ContainsKey($artifactId)) { continue }
                 $artifact = $artifactById[$artifactId]
                 if ([string]$artifact.format -cne 'zip') { Add-EvidenceBlocker ('license_archive_format_invalid:' + [string]$component.id); continue }
-                try { $bytes = Get-ZipEntryBytes -ArchivePath (Join-Path $SourceCacheDirectory ([string]$artifact.fileName)) -EntryPath ([string]$license.archivePath) }
+                try { $bytes = Get-ZipEntryBytes -ArchivePath $artifactStagedPath[$artifactId] -EntryPath ([string]$license.archivePath) }
                 catch { $bytes = $null }
                 if ($null -eq $bytes) { Add-EvidenceBlocker ('license_entry_missing:' + [string]$component.id); continue }
                 if ($bytes.Length -ne [long]$license.length -or (Get-BytesSha256 $bytes) -cne ([string]$license.sha256).ToUpperInvariant()) {
@@ -371,7 +671,12 @@ if ($null -ne $manifest) {
             }
             elseif ($kind -ceq 'repository-file') {
                 $path = Join-Path $ApplicationRepository ([string]$license.path)
-                if (-not (Test-ChildPath $ApplicationRepository $path) -or -not (Test-FileIdentity $path ([string]$license.sha256) ([long]$license.length))) {
+                $repositoryLicenseValid = $applicationRepositorySafe -and (Test-ChildPath $ApplicationRepository $path)
+                if ($repositoryLicenseValid) {
+                    try { [void](Assert-ReparseFreePath -Path $path -Label 'application-license') }
+                    catch { Add-EvidenceBlocker $_.Exception.Message; $repositoryLicenseValid = $false }
+                }
+                if (-not $repositoryLicenseValid -or -not (Test-FileIdentity $path ([string]$license.sha256) ([long]$license.length))) {
                     Add-EvidenceBlocker ('license_repository_file_mismatch:' + [string]$component.id)
                 }
             }
@@ -385,6 +690,7 @@ if ($null -ne $manifest) {
     }
     else {
         try {
+            Assert-ArchivePreflight -ArchivePath $DependencyArchivePath -Format ([string]$dependency.format)
             $dependencyExtracted = New-TemporaryDirectory 'dependency-evidence'
             Expand-EvidenceArchive $DependencyArchivePath ([string]$dependency.format) $dependencyExtracted
             foreach ($embedded in @($dependency.embeddedFiles)) {
@@ -431,10 +737,14 @@ if ($null -ne $manifest) {
     }
     if ($task5InputsValid) {
         try {
+            Assert-ArchivePreflight -ArchivePath $SevenZipRuntimeArchivePath -Format ([string]$task5.format)
+            Assert-ArchivePreflight -ArchivePath $SevenZipSourceArchivePath -Format ([string]$task5.format)
             $verification = Get-Content -LiteralPath $SevenZipVerificationPath -Raw | ConvertFrom-Json
             if (([string]$verification.runtimeArchiveSha256).ToUpperInvariant() -cne ([string]$task5.runtimeArchiveSha256).ToUpperInvariant() -or
                 ([string]$verification.dllSha256).ToUpperInvariant() -cne ([string]$task5.dllSha256).ToUpperInvariant() -or
                 ([string]$verification.correspondingSourceArchiveSha256).ToUpperInvariant() -cne ([string]$task5.sourceArchiveSha256).ToUpperInvariant()) { Add-EvidenceBlocker 'sevenzip_verification_crosscheck_mismatch' }
+            if (-not [string]::IsNullOrWhiteSpace($SevenZipExecutable) -and $null -ne (Get-ObjectProperty $verification 'hostSha256') -and
+                (Get-PathSha256 $SevenZipExecutable) -cne ([string]$verification.hostSha256).ToUpperInvariant()) { Add-EvidenceBlocker 'sevenzip_extractor_identity_mismatch' }
             $task5RuntimeExtracted = New-TemporaryDirectory 'sevenzip-runtime'
             $task5SourceExtracted = New-TemporaryDirectory 'sevenzip-source'
             Expand-EvidenceArchive $SevenZipRuntimeArchivePath ([string]$task5.format) $task5RuntimeExtracted
@@ -473,9 +783,10 @@ if ($null -ne $manifest) {
         try {
             $transform = $nlohmann.transforms[0]
             $artifact = $artifactById[[string]$transform.sourceArtifactId]
-            $sourceBytes = Get-ZipEntryBytes (Join-Path $SourceCacheDirectory ([string]$artifact.fileName)) ([string]$transform.sourceArchivePath)
+            $sourceBytes = Get-ZipEntryBytes $artifactStagedPath[[string]$transform.sourceArtifactId] ([string]$transform.sourceArchivePath)
             $targetPath = Join-Path $ApplicationRepository ([string]$transform.repositoryPath).Replace('/', '\')
             if ($null -eq $sourceBytes -or -not (Test-Path -LiteralPath $targetPath -PathType Leaf)) { throw 'header_missing' }
+            [void](Assert-ReparseFreePath -Path $targetPath -Label 'application-header')
             $targetBytes = [IO.File]::ReadAllBytes($targetPath)
             $converted = New-Object IO.MemoryStream
             foreach ($byte in $sourceBytes) { if ($byte -eq 10) { $converted.WriteByte(13) }; $converted.WriteByte($byte) }
@@ -512,7 +823,7 @@ if ($null -ne $manifest) {
         $expectedBinaryLength = [long]$binaryArtifact.length
         if (-not (Test-FileIdentity $YtDlpBinaryPath $expectedBinarySha $expectedBinaryLength)) { Add-EvidenceBlocker 'yt_dlp_binary_mismatch' }
         if ($artifactValid[[string]$sumsArtifact.id]) {
-            $sumsText = Get-Content -LiteralPath (Join-Path $SourceCacheDirectory ([string]$sumsArtifact.fileName)) -Raw
+            $sumsText = Get-Content -LiteralPath $artifactStagedPath[[string]$sumsArtifact.id] -Raw
             if ($sumsText -notmatch ('(?im)^' + [regex]::Escape($expectedBinarySha.ToLowerInvariant()) + '  yt-dlp\.exe\r?$')) { Add-EvidenceBlocker 'yt_dlp_checksum_manifest_mismatch' }
         }
         if ([string]$ytDlp.binaryProvenance.sourceCommit -cne [string]$ytDlp.sourceCommit -or -not [bool]$ytDlp.binaryProvenance.releaseImmutable) { Add-EvidenceBlocker 'yt_dlp_release_provenance_mismatch' }
@@ -520,7 +831,7 @@ if ($null -ne $manifest) {
 
     $application = Get-ComponentById $manifest 'application'
     if ([string]::IsNullOrWhiteSpace($ApplicationCommit) -or $ApplicationCommit -notmatch '^[0-9a-f]{40}$') { Add-EvidenceBlocker 'application_release_commit_required' }
-    elseif (-not (Test-Path -LiteralPath $ApplicationRepository -PathType Container)) { Add-EvidenceBlocker 'application_repository_missing' }
+    elseif (-not $applicationRepositorySafe -or -not (Test-Path -LiteralPath $ApplicationRepository -PathType Container)) { Add-EvidenceBlocker 'application_repository_missing' }
     else {
         try {
             $head = (& git -C $ApplicationRepository rev-parse HEAD 2>$null | Out-String).Trim()
@@ -528,10 +839,13 @@ if ($null -ne $manifest) {
             if ($LASTEXITCODE -ne 0 -or $head -cne $ApplicationCommit) { Add-EvidenceBlocker 'application_commit_mismatch' }
             elseif (-not [string]::IsNullOrEmpty($status)) { Add-EvidenceBlocker 'application_tree_dirty' }
             else {
-                $applicationTemp = New-TemporaryDirectory 'application-source'
+                $applicationTemp = Join-Path $script:stagingRoot 'application'
+                [IO.Directory]::CreateDirectory($applicationTemp) | Out-Null
+                [void](Assert-ReparseFreePath -Path $applicationTemp -Label 'private-staging')
                 $applicationSourceArchive = Join-Path $applicationTemp ('karon-application-' + $ApplicationCommit.Substring(0, 12) + '.zip')
                 & git -C $ApplicationRepository archive --format=zip --output=$applicationSourceArchive $ApplicationCommit
                 if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $applicationSourceArchive -PathType Leaf)) { throw 'git_archive_failed' }
+                Assert-ZipArchivePreflight $applicationSourceArchive
                 $appFile = Get-Item -LiteralPath $applicationSourceArchive
                 $inventoryRecords.Add([ordered]@{
                     id = 'application-source'; component = 'application'; fileName = $appFile.Name
@@ -573,9 +887,10 @@ $inventoryStatus = if ($script:blockers.Count -eq 0) { 'closed' } else { 'blocke
 $orderedInventory = @($inventoryRecords | Sort-Object { [string]$_.id })
 $inventory = [ordered]@{
     schemaVersion = 'karon-source-cache-inventory/v1'
-    release = 'v2.19.1-karon.2'
+    release = $releaseTag
     scope = 'non-ffmpeg-non-deno'
     status = $inventoryStatus
+    approvalProfile = $(if ($null -eq $manifest) { $null } else { [string](Get-ObjectProperty $manifest 'approvalProfile') })
     manifestSha256 = $manifestSha256
     applicationCommit = $(if ([string]::IsNullOrWhiteSpace($ApplicationCommit)) { $null } else { $ApplicationCommit })
     candidateManifestSha256 = $(if (-not [string]::IsNullOrWhiteSpace($CandidateManifestPath) -and (Test-Path -LiteralPath $CandidateManifestPath -PathType Leaf)) { Get-PathSha256 $CandidateManifestPath } else { $null })
@@ -597,7 +912,7 @@ try {
         [Array]::Sort($orderedBlockers, [StringComparer]::Ordinal)
         $blockerDocument = [ordered]@{
             schemaVersion = 'karon-component-evidence-blockers/v1'
-            release = 'v2.19.1-karon.2'
+            release = $releaseTag
             scope = 'non-ffmpeg-non-deno'
             status = 'blocked'
             componentCount = $(if ($null -eq $manifest) { 0 } else { @($manifest.components).Count })
@@ -613,11 +928,11 @@ try {
 
     foreach ($component in @($manifest.components)) {
         foreach ($artifact in @($component.sourceArtifacts | Where-Object { [bool]$_.includeInBundle })) {
-            $bundleEntries.Add([ordered]@{ name = 'sources/' + [string]$artifact.fileName; path = Join-Path $SourceCacheDirectory ([string]$artifact.fileName) })
+            $bundleEntries.Add([ordered]@{ name = 'sources/' + [string]$artifact.fileName; path = $artifactStagedPath[[string]$artifact.id] })
         }
     }
     $bundleEntries.Add([ordered]@{ name = 'component-manifest.json'; path = $ManifestPath })
-    $bundleEntries.Add([ordered]@{ name = 'source-cache-inventory.json'; path = $inventoryPath })
+    $bundleEntries.Add([ordered]@{ name = 'source-cache-inventory.json'; bytes = $inventoryBytes })
     $bundleEntries.Add([ordered]@{ name = 'application/' + (Split-Path -Leaf $applicationSourceArchive); path = $applicationSourceArchive })
     $bundleEntries.Add([ordered]@{ name = 'evidence/candidate-manifest.json'; path = $CandidateManifestPath })
     $bundleEntries.Add([ordered]@{ name = 'evidence/nlohmann-json-header.transform.json'; bytes = $nlohmannEvidenceBytes })
@@ -625,13 +940,19 @@ try {
     $bundleEntries.Add([ordered]@{ name = 'evidence/task5/' + (Split-Path -Leaf $SevenZipRuntimeArchivePath); path = $SevenZipRuntimeArchivePath })
     $bundleEntries.Add([ordered]@{ name = 'evidence/task5/' + (Split-Path -Leaf $SevenZipSourceArchivePath); path = $SevenZipSourceArchivePath })
     $bundleEntries.Add([ordered]@{ name = 'evidence/task5/' + (Split-Path -Leaf $SevenZipVerificationPath); path = $SevenZipVerificationPath })
-    $bundlePath = Join-Path $OutputDirectory 'ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip'
-    New-DeterministicZip -OutputPath $bundlePath -Entries $bundleEntries.ToArray()
+    $bundleFileName = if ([string](Get-ObjectProperty $manifest 'approvalProfile') -ceq $productionApprovalProfile) { 'ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip' } else { 'test-fixture-non-runtime-component-evidence.zip' }
+    $bundlePath = Join-Path $OutputDirectory $bundleFileName
+    New-DeterministicZip -OutputPath $bundlePath -Entries $bundleEntries.ToArray() -PrivateRoot $script:stagingRoot
     Write-Output $bundlePath
     exit 0
 }
 finally {
     foreach ($directory in $script:temporaryDirectories) {
-        if (Test-Path -LiteralPath $directory) { Remove-Item -LiteralPath $directory -Recurse -Force -ErrorAction SilentlyContinue }
+        if (Test-Path -LiteralPath $directory) {
+            $item = Get-Item -LiteralPath $directory -Force -ErrorAction SilentlyContinue
+            if ($null -ne $item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) {
+                Remove-Item -LiteralPath $directory -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
     }
 }

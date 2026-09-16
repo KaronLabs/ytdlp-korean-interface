@@ -1,5 +1,6 @@
 {
   "schemaVersion": "karon-non-runtime-component-evidence/v1",
+  "approvalProfile": "karon-v2.19.1-karon.2-non-runtime-v1",
   "release": {
     "tag": "v2.19.1-karon.2",
     "platform": "win-x64",
@@ -103,6 +104,8 @@
       "version": "0.42.3",
       "sourceRepository": "https://github.com/cpm-cmake/CPM.cmake",
       "sourceCommit": "49acea0d775087ace0522ee4cc5de45e3da094a8",
+      "sourceTag": "v0.42.3",
+      "sourceTagPeeledCommit": "49acea0d775087ace0522ee4cc5de45e3da094a8",
       "licenseExpression": "MIT",
       "modified": false,
       "sourceArtifacts": [
@@ -145,9 +148,12 @@
     {
       "id": "nana",
       "name": "Nana",
-      "version": "1.8",
+      "version": "1.7.4",
       "sourceRepository": "https://github.com/cnjinhao/nana",
       "sourceCommit": "554c4fe87fc31b8ee104228e9117d545d34855b5",
+      "sourceTag": "v1.7.4",
+      "sourceTagObject": "324ab5bb2fdefe8be54b141dc12ba40a43c98815",
+      "sourceTagPeeledCommit": "554c4fe87fc31b8ee104228e9117d545d34855b5",
       "licenseExpression": "BSL-1.0",
       "modified": true,
       "sourceArtifacts": [

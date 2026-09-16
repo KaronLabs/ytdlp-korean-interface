@@ -48,6 +48,29 @@ function New-TestZip {
     finally { $stream.Dispose() }
 }
 
+function New-TestZipFromEntryList {
+    param([string] $Path, [object[]] $Entries)
+    [IO.Directory]::CreateDirectory((Split-Path -Parent $Path)) | Out-Null
+    $stream = [IO.File]::Open($Path, [IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    try {
+        $archive = New-Object IO.Compression.ZipArchive($stream, [IO.Compression.ZipArchiveMode]::Create, $true)
+        try {
+            foreach ($item in $Entries) {
+                $entry = $archive.CreateEntry([string]$item.Name, [IO.Compression.CompressionLevel]::Optimal)
+                $entry.LastWriteTime = [DateTimeOffset]::new(1980, 1, 1, 0, 0, 0, [TimeSpan]::Zero)
+                $entryStream = $entry.Open()
+                try {
+                    $bytes = [byte[]]$item.Bytes
+                    $entryStream.Write($bytes, 0, $bytes.Length)
+                }
+                finally { $entryStream.Dispose() }
+            }
+        }
+        finally { $archive.Dispose() }
+    }
+    finally { $stream.Dispose() }
+}
+
 function New-TestZipFromDirectory {
     param([string] $Path, [string] $SourceDirectory)
     $basePath = [IO.Path]::GetFullPath($SourceDirectory).TrimEnd('\', '/')
@@ -193,9 +216,9 @@ function New-ComponentEvidenceFixture {
     $cpmBootstrapPath = Join-Path $cache 'CPM_0.42.3.cmake'
     Write-TestText $cpmBootstrapPath "set(CURRENT_CPM_VERSION 0.42.3)`n"
     $zlibPackagePath = Join-Path $cache 'zlib.static.1.2.5.nupkg'
-    [IO.File]::WriteAllBytes($zlibPackagePath, [Text.Encoding]::UTF8.GetBytes('zlib package'))
+    New-TestZip -Path $zlibPackagePath -Entries @{ 'zlib-package.txt' = [Text.Encoding]::UTF8.GetBytes('zlib package') }
     $libpngPackagePath = Join-Path $cache 'libpng.static.1.6.37.nupkg'
-    [IO.File]::WriteAllBytes($libpngPackagePath, [Text.Encoding]::UTF8.GetBytes('libpng package'))
+    New-TestZip -Path $libpngPackagePath -Entries @{ 'libpng-package.txt' = [Text.Encoding]::UTF8.GetBytes('libpng package') }
     $ytBinaryPath = Join-Path $cache 'yt-dlp.exe'
     [IO.File]::WriteAllBytes($ytBinaryPath, [Text.Encoding]::UTF8.GetBytes('official yt-dlp binary'))
     $ytBinarySha = Get-TestSha256 $ytBinaryPath
@@ -395,7 +418,8 @@ function New-ComponentEvidenceFixture {
     }
     $manifest = [ordered]@{
         schemaVersion = 'karon-non-runtime-component-evidence/v1'
-        release = [ordered]@{ tag = 'v2.19.1-karon.2'; platform = 'win-x64'; expectedComponentCount = 10; excludedComponents = @('deno', 'ffmpeg') }
+        approvalProfile = 'test-fixture-v1'
+        release = [ordered]@{ tag = 'test-fixture'; platform = 'win-x64'; expectedComponentCount = 10; excludedComponents = @('deno', 'ffmpeg') }
         sharedInputs = [ordered]@{
             dependencyArchive = [ordered]@{
                 fileName = 'dependencies.zip'; format = 'zip'; sha256 = Get-TestSha256 $dependencyArchivePath; length = (Get-Item $dependencyArchivePath).Length
@@ -429,11 +453,12 @@ function Invoke-TestCollector {
         [object] $Fixture,
         [string] $OutputDirectory,
         [string] $YtDlpBinaryPath = $Fixture.YtDlpBinary,
-        [switch] $OmitReleaseBinding
+        [switch] $OmitReleaseBinding,
+        [string] $SourceCacheDirectory = $Fixture.Cache
     )
     $arguments = @(
         '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $collectorPath,
-        '-ManifestPath', $Fixture.Manifest, '-SourceCacheDirectory', $Fixture.Cache, '-OutputDirectory', $OutputDirectory,
+        '-ManifestPath', $Fixture.Manifest, '-SourceCacheDirectory', $SourceCacheDirectory, '-OutputDirectory', $OutputDirectory,
         '-ApplicationRepository', $Fixture.Application, '-DependencyArchivePath', $Fixture.DependencyArchive,
         '-SevenZipRuntimeArchivePath', $Fixture.RuntimeArchive, '-SevenZipSourceArchivePath', $Fixture.SourceArchive,
         '-SevenZipVerificationPath', $Fixture.Verification, '-YtDlpBinaryPath', $YtDlpBinaryPath
@@ -520,6 +545,61 @@ Describe 'non-runtime component evidence collector' {
         (Get-Content (Join-Path $fixture.Root 'output\non-runtime-component-blockers.json') -Raw) | Should Match 'source_cache_name_collision'
     }
 
+    It 'rejects forged Nana component and source provenance' {
+        $fixture = New-ComponentEvidenceFixture 'forged-nana-provenance'
+        $manifest = Read-TestManifest $fixture
+        $nana = $manifest.components | Where-Object id -eq 'nana'
+        $nana.version = '9.9.9'
+        $nana.sourceRepository = 'https://github.com/forged/nana'
+        $nana.sourceCommit = '3333333333333333333333333333333333333333'
+        $nana.sourceArtifacts[0].url = 'https://github.com/forged/nana/archive/3333333333333333333333333333333333333333.zip'
+        Save-TestManifest $fixture $manifest
+        $result = Invoke-TestCollector $fixture (Join-Path $fixture.Root 'output')
+        $result.ExitCode | Should Be 1
+        (Get-Content (Join-Path $fixture.Root 'output\non-runtime-component-blockers.json') -Raw) | Should Match 'component_approval_mismatch:nana'
+    }
+
+    It 'rejects a source artifact file name that escapes the cache root' {
+        $fixture = New-ComponentEvidenceFixture 'source-file-name-traversal'
+        Copy-Item -LiteralPath (Join-Path $fixture.Cache 'bit7z-source.zip') -Destination (Join-Path $fixture.Root 'escape.zip')
+        $manifest = Read-TestManifest $fixture
+        ($manifest.components | Where-Object id -eq 'bit7z').sourceArtifacts[0].fileName = '../escape.zip'
+        Save-TestManifest $fixture $manifest
+        $result = Invoke-TestCollector $fixture (Join-Path $fixture.Root 'output')
+        $result.ExitCode | Should Be 1
+        (Get-Content (Join-Path $fixture.Root 'output\non-runtime-component-blockers.json') -Raw) | Should Match 'source_artifact_file_name_invalid:bit7z-source'
+    }
+
+    It 'rejects a source cache directory junction' {
+        $fixture = New-ComponentEvidenceFixture 'source-cache-junction'
+        $junction = Join-Path $fixture.Root 'source-cache-junction-link'
+        New-Item -ItemType Junction -Path $junction -Target $fixture.Cache | Out-Null
+        $result = Invoke-TestCollector -Fixture $fixture -OutputDirectory (Join-Path $fixture.Root 'output') -SourceCacheDirectory $junction
+        $result.ExitCode | Should Be 1
+        (Get-Content (Join-Path $fixture.Root 'output\non-runtime-component-blockers.json') -Raw) | Should Match 'unsafe_reparse_path:source-cache'
+    }
+
+    It 'rejects a source ZIP containing traversal and case-insensitive duplicate entries' {
+        $fixture = New-ComponentEvidenceFixture 'malicious-source-zip'
+        $manifest = Read-TestManifest $fixture
+        $artifact = ($manifest.components | Where-Object id -eq 'bit7z').sourceArtifacts[0]
+        $archivePath = Join-Path $fixture.Cache $artifact.fileName
+        Remove-Item -LiteralPath $archivePath -Force
+        $licensePath = ($manifest.components | Where-Object id -eq 'bit7z').licenseTexts[0].archivePath
+        New-TestZipFromEntryList -Path $archivePath -Entries @(
+            [pscustomobject]@{ Name = $licensePath; Bytes = [Text.Encoding]::UTF8.GetBytes("test license`n") },
+            [pscustomobject]@{ Name = '../escape.txt'; Bytes = [Text.Encoding]::UTF8.GetBytes('escape') },
+            [pscustomobject]@{ Name = 'Case.txt'; Bytes = [Text.Encoding]::UTF8.GetBytes('upper') },
+            [pscustomobject]@{ Name = 'case.txt'; Bytes = [Text.Encoding]::UTF8.GetBytes('lower') }
+        )
+        $artifact.sha256 = Get-TestSha256 $archivePath
+        $artifact.length = (Get-Item -LiteralPath $archivePath).Length
+        Save-TestManifest $fixture $manifest
+        $result = Invoke-TestCollector $fixture (Join-Path $fixture.Root 'output')
+        $result.ExitCode | Should Be 1
+        (Get-Content (Join-Path $fixture.Root 'output\non-runtime-component-blockers.json') -Raw) | Should Match 'source_archive_preflight_failed:bit7z-source'
+    }
+
     It 'emits deterministic blockers while final release binding is unavailable' {
         $fixture = New-ComponentEvidenceFixture 'release-binding-blockers'
         $outputDirectory = Join-Path $fixture.Root 'output'
@@ -528,10 +608,11 @@ Describe 'non-runtime component evidence collector' {
         $blockerPath = Join-Path $outputDirectory 'non-runtime-component-blockers.json'
         (Test-Path -LiteralPath $blockerPath) | Should Be $true
         $document = Get-Content -LiteralPath $blockerPath -Raw | ConvertFrom-Json
+        if (@($document.blockers).Count -ne 2) { throw ($document | ConvertTo-Json -Depth 20 -Compress) }
         @($document.blockers).Count | Should Be 2
         (@($document.blockers) -contains 'application_release_commit_required') | Should Be $true
         (@($document.blockers) -contains 'candidate_manifest_required') | Should Be $true
-        (Test-Path -LiteralPath (Join-Path $outputDirectory 'ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip')) | Should Be $false
+        (Test-Path -LiteralPath (Join-Path $outputDirectory 'test-fixture-non-runtime-component-evidence.zip')) | Should Be $false
     }
 
     It 'creates byte-identical evidence bundles for the same closed inputs' {
@@ -548,8 +629,8 @@ Describe 'non-runtime component evidence collector' {
         }
         $first.ExitCode | Should Be 0
         $second.ExitCode | Should Be 0
-        $bundleA = Join-Path $fixture.Root 'output-a\ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip'
-        $bundleB = Join-Path $fixture.Root 'output-b\ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip'
+        $bundleA = Join-Path $fixture.Root 'output-a\test-fixture-non-runtime-component-evidence.zip'
+        $bundleB = Join-Path $fixture.Root 'output-b\test-fixture-non-runtime-component-evidence.zip'
         (Test-Path -LiteralPath $bundleA) | Should Be $true
         (Test-Path -LiteralPath (Join-Path $fixture.Root 'output-a\non-runtime-component-blockers.json')) | Should Be $false
         (Get-TestSha256 $bundleA) | Should Be (Get-TestSha256 $bundleB)
