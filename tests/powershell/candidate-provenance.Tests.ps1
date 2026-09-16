@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction Stop
 
 $RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $CandidateBuilder = Join-Path $RepositoryRoot 'tools\build-candidate.ps1'
@@ -94,6 +95,7 @@ function Remove-TestCase {
 Invoke-Test 'clean detached source seals exact commit and tree through JSON' {
     $case = New-TestCase -GitRepository
     try {
+        Assert-True ($null -ne ('System.IO.Compression.ZipFile' -as [type])) 'zipfile_type_unavailable'
         [void](Invoke-TestGit $case.Source @('checkout', '--detach', '-q'))
         $expectedCommit = Invoke-TestGit $case.Source @('rev-parse', '--verify', 'HEAD^{commit}')
         $expectedTree = Invoke-TestGit $case.Source @('rev-parse', '--verify', ($expectedCommit + '^{tree}'))
@@ -152,9 +154,15 @@ Invoke-Test 'missing source fails before candidate output exists' {
 Invoke-Test 'non-Git source fails before candidate output exists' {
     $case = New-TestCase
     try {
-        Assert-Throws {
+        $preferenceBefore = $ErrorActionPreference
+        $caught = $null
+        try {
             Invoke-BuildCandidate -SourceRoot $case.Source -ParentRuntime $case.Parent -CandidateBase $case.CandidateBase -DependencyArchiveDirectory $case.DependencyArchives -RuntimeArchiveDirectory $case.RuntimeArchives
-        } 'Git could not (enumerate tracked candidate source inputs|verify the candidate source revision)'
+        } catch { $caught = $_ }
+        Assert-True ($null -ne $caught) 'non-Git source did not fail'
+        Assert-Equal 'source_input_invalid' $caught.Exception.Message 'non-Git source escaped the controlled error contract'
+        Assert-True ($caught.ToString() -notmatch 'fatal:') 'non-Git source leaked native Git stderr'
+        Assert-Equal $preferenceBefore $ErrorActionPreference 'non-Git source changed the caller error preference'
         Assert-True (-not (Test-Path -LiteralPath $case.CandidateBase)) 'non-Git source produced candidate output'
     }
     finally { Remove-TestCase $case }
