@@ -1,0 +1,557 @@
+$ErrorActionPreference = 'Stop'
+
+$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$collectorPath = Join-Path $repoRoot 'tools\collect-non-runtime-component-evidence.ps1'
+$powershellPath = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+$utf8NoBom = New-Object Text.UTF8Encoding($false)
+
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+function Get-TestSha256 {
+    param([Parameter(Mandatory = $true)] [string] $Path)
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToUpperInvariant()
+}
+
+function Write-TestText {
+    param([string] $Path, [string] $Text)
+    [IO.Directory]::CreateDirectory((Split-Path -Parent $Path)) | Out-Null
+    [IO.File]::WriteAllText($Path, $Text, $utf8NoBom)
+}
+
+function Write-TestJson {
+    param([string] $Path, [object] $Value)
+    Write-TestText -Path $Path -Text (($Value | ConvertTo-Json -Depth 40 -Compress) + [char]10)
+}
+
+function New-TestZip {
+    param([string] $Path, [hashtable] $Entries)
+    [IO.Directory]::CreateDirectory((Split-Path -Parent $Path)) | Out-Null
+    $stream = [IO.File]::Open($Path, [IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    try {
+        $archive = New-Object IO.Compression.ZipArchive($stream, [IO.Compression.ZipArchiveMode]::Create, $true)
+        try {
+            $names = @($Entries.Keys | ForEach-Object { [string]$_ })
+            [Array]::Sort($names, [StringComparer]::Ordinal)
+            foreach ($name in $names) {
+                $entry = $archive.CreateEntry($name, [IO.Compression.CompressionLevel]::Optimal)
+                $entry.LastWriteTime = [DateTimeOffset]::new(1980, 1, 1, 0, 0, 0, [TimeSpan]::Zero)
+                $entryStream = $entry.Open()
+                try {
+                    $bytes = [byte[]]$Entries[$name]
+                    $entryStream.Write($bytes, 0, $bytes.Length)
+                }
+                finally { $entryStream.Dispose() }
+            }
+        }
+        finally { $archive.Dispose() }
+    }
+    finally { $stream.Dispose() }
+}
+
+function New-TestZipFromDirectory {
+    param([string] $Path, [string] $SourceDirectory)
+    $basePath = [IO.Path]::GetFullPath($SourceDirectory).TrimEnd('\', '/')
+    $basePrefix = $basePath + [IO.Path]::DirectorySeparatorChar
+    $entries = @{}
+    foreach ($file in @(Get-ChildItem -LiteralPath $basePath -File -Recurse)) {
+        $fullPath = [IO.Path]::GetFullPath($file.FullName)
+        if (-not $fullPath.StartsWith($basePrefix, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Fixture file escaped source directory: $fullPath"
+        }
+        $relative = $fullPath.Substring($basePrefix.Length).Replace('\', '/')
+        $entries[$relative] = [IO.File]::ReadAllBytes($file.FullName)
+    }
+    New-TestZip -Path $Path -Entries $entries
+}
+
+function Get-TestOrderedTreeDigest {
+    param([string] $Root)
+    $basePath = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+    $basePrefix = $basePath + [IO.Path]::DirectorySeparatorChar
+    $files = @(Get-ChildItem -LiteralPath $basePath -File -Recurse)
+    $rows = New-Object 'Collections.Generic.List[string]'
+    foreach ($file in $files) {
+        $fullPath = [IO.Path]::GetFullPath($file.FullName)
+        if (-not $fullPath.StartsWith($basePrefix, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Fixture file escaped digest root: $fullPath"
+        }
+        $relative = $fullPath.Substring($basePrefix.Length).Replace('\', '/')
+        $rows.Add($relative + [char]0 + $file.Length + [char]0 + (Get-TestSha256 $file.FullName).ToLowerInvariant() + [char]10)
+    }
+    $ordered = $rows.ToArray()
+    [Array]::Sort($ordered, [StringComparer]::Ordinal)
+    $bytes = [Text.Encoding]::UTF8.GetBytes(($ordered -join ''))
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '') }
+    finally { $sha.Dispose() }
+}
+
+function Get-TestOrderedChunkDigest {
+    param([byte[]] $Bytes)
+    $rows = New-Object 'Collections.Generic.List[string]'
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        $chunkSize = 65536
+        $index = 0
+        for ($offset = 0; $offset -lt $Bytes.Length; $offset += $chunkSize) {
+            $length = [Math]::Min($chunkSize, $Bytes.Length - $offset)
+            $chunk = New-Object byte[] $length
+            [Array]::Copy($Bytes, $offset, $chunk, 0, $length)
+            $chunkHash = ([BitConverter]::ToString($sha.ComputeHash($chunk))).Replace('-', '').ToLowerInvariant()
+            $rows.Add($index.ToString('D8') + [char]0 + $length + [char]0 + $chunkHash + "`r`n")
+            $index++
+        }
+        $aggregate = [Text.Encoding]::UTF8.GetBytes(($rows -join ''))
+        return ([BitConverter]::ToString($sha.ComputeHash($aggregate))).Replace('-', '')
+    }
+    finally { $sha.Dispose() }
+}
+
+function Get-TestBytesSha256 {
+    param([byte[]] $Bytes)
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($sha.ComputeHash($Bytes))).Replace('-', '') }
+    finally { $sha.Dispose() }
+}
+
+function Get-TestTransformEvidence {
+    param([byte[]] $Source, [byte[]] $Target)
+    $lfCount = @($Source | Where-Object { $_ -eq 10 }).Count
+    $crCount = @($Source | Where-Object { $_ -eq 13 }).Count
+    return [ordered]@{
+        schemaVersion = 'karon-text-transform/v1'
+        algorithm = 'lf-to-crlf'
+        sourceSha256 = Get-TestBytesSha256 $Source
+        sourceLength = $Source.Length
+        targetSha256 = Get-TestBytesSha256 $Target
+        targetLength = $Target.Length
+        lineFeedCount = $lfCount
+        sourceCarriageReturnCount = $crCount
+        sourceOrderedChunkSha256 = Get-TestOrderedChunkDigest $Source
+        targetOrderedChunkSha256 = Get-TestOrderedChunkDigest $Target
+    }
+}
+
+function New-TestArtifact {
+    param([string] $Id, [string] $Path, [string] $Url, [string] $Format = 'zip', [bool] $Include = $true)
+    $file = Get-Item -LiteralPath $Path
+    return [ordered]@{
+        id = $Id
+        fileName = $file.Name
+        url = $Url
+        sha256 = Get-TestSha256 $file.FullName
+        length = $file.Length
+        format = $Format
+        includeInBundle = $Include
+    }
+}
+
+function New-ComponentEvidenceFixture {
+    param([string] $Name, [switch] $IncludeRarObject)
+    $root = Join-Path $TestDrive $Name
+    $cache = Join-Path $root 'source-cache'
+    $application = Join-Path $root 'application'
+    $inputs = Join-Path $root 'inputs'
+    [IO.Directory]::CreateDirectory($cache) | Out-Null
+    [IO.Directory]::CreateDirectory($application) | Out-Null
+    [IO.Directory]::CreateDirectory($inputs) | Out-Null
+
+    $commitA = '1111111111111111111111111111111111111111'
+    $commitB = '2222222222222222222222222222222222222222'
+    $license = [Text.Encoding]::UTF8.GetBytes("test license`n")
+    $sourceHeader = [Text.Encoding]::UTF8.GetBytes("alpha`nbeta`n")
+    $targetHeader = [Text.Encoding]::UTF8.GetBytes("alpha`r`nbeta`r`n")
+
+    $archives = [ordered]@{}
+    $definitions = @(
+        @('bit7z-source.zip', "bit7z-$commitA/LICENSE", $license),
+        @('cpm-source.zip', "CPM.cmake-$commitA/LICENSE", $license),
+        @('sevenzip-source.zip', "7zip-$commitA/DOC/License.txt", $license),
+        @('nana-source.zip', "nana-$commitA/LICENSE", $license),
+        @('libpng-source.zip', "libpng-$commitA/LICENSE", $license),
+        @('zlib-source.zip', "zlib-$commitA/README", $license),
+        @('libjpeg-source.zip', "libjpeg-$commitA/LICENSE.md", $license)
+    )
+    foreach ($definition in $definitions) {
+        $path = Join-Path $cache $definition[0]
+        New-TestZip -Path $path -Entries @{ $definition[1] = [byte[]]$definition[2]; ("$($definition[1]).source") = [Text.Encoding]::UTF8.GetBytes('source') }
+        $archives[$definition[0]] = $path
+    }
+    $nlohmannPath = Join-Path $cache 'nlohmann-source.zip'
+    New-TestZip -Path $nlohmannPath -Entries @{
+        "json-$commitA/LICENSE.MIT" = $license
+        "json-$commitA/single_include/nlohmann/json.hpp" = $sourceHeader
+    }
+    $archives['nlohmann-source.zip'] = $nlohmannPath
+    $ytSourcePath = Join-Path $cache 'yt-dlp-source.zip'
+    New-TestZip -Path $ytSourcePath -Entries @{
+        "yt-dlp-$commitB/LICENSE" = $license
+        "yt-dlp-$commitB/THIRD_PARTY_LICENSES.txt" = [Text.Encoding]::UTF8.GetBytes("third party corpus`n")
+    }
+    $archives['yt-dlp-source.zip'] = $ytSourcePath
+
+    $cpmBootstrapPath = Join-Path $cache 'CPM_0.42.3.cmake'
+    Write-TestText $cpmBootstrapPath "set(CURRENT_CPM_VERSION 0.42.3)`n"
+    $zlibPackagePath = Join-Path $cache 'zlib.static.1.2.5.nupkg'
+    [IO.File]::WriteAllBytes($zlibPackagePath, [Text.Encoding]::UTF8.GetBytes('zlib package'))
+    $libpngPackagePath = Join-Path $cache 'libpng.static.1.6.37.nupkg'
+    [IO.File]::WriteAllBytes($libpngPackagePath, [Text.Encoding]::UTF8.GetBytes('libpng package'))
+    $ytBinaryPath = Join-Path $cache 'yt-dlp.exe'
+    [IO.File]::WriteAllBytes($ytBinaryPath, [Text.Encoding]::UTF8.GetBytes('official yt-dlp binary'))
+    $ytBinarySha = Get-TestSha256 $ytBinaryPath
+    $ytSumsPath = Join-Path $cache 'SHA2-256SUMS'
+    Write-TestText $ytSumsPath ($ytBinarySha.ToLowerInvariant() + "  yt-dlp.exe`n")
+
+    Write-TestText (Join-Path $application 'LICENSE.txt') "application license`n"
+    [IO.Directory]::CreateDirectory((Join-Path $application 'ytdlp-interface')) | Out-Null
+    [IO.File]::WriteAllBytes((Join-Path $application 'ytdlp-interface\json.hpp'), $targetHeader)
+    [IO.Directory]::CreateDirectory((Join-Path $application 'tools')) | Out-Null
+    Write-TestText (Join-Path $application 'tools\build-candidate.ps1') "Write-Output build`n"
+    & git -C $application init | Out-Null
+    & git -C $application config user.email 'fixture@example.invalid'
+    & git -C $application config user.name 'Fixture'
+    & git -C $application config core.autocrlf false
+    & git -C $application add -- LICENSE.txt ytdlp-interface/json.hpp tools/build-candidate.ps1
+    $oldAuthorDate = $env:GIT_AUTHOR_DATE
+    $oldCommitterDate = $env:GIT_COMMITTER_DATE
+    try {
+        $env:GIT_AUTHOR_DATE = '2026-01-01T00:00:00Z'
+        $env:GIT_COMMITTER_DATE = '2026-01-01T00:00:00Z'
+        & git -C $application commit -m 'fixture' | Out-Null
+    }
+    finally {
+        $env:GIT_AUTHOR_DATE = $oldAuthorDate
+        $env:GIT_COMMITTER_DATE = $oldCommitterDate
+    }
+    $applicationCommit = (& git -C $application rev-parse HEAD).Trim()
+
+    $dependencyTree = Join-Path $root 'dependency-tree'
+    $provenance = [ordered]@{
+        schemaVersion = 1
+        bit7z = [ordered]@{ version = '4.1.0'; commit = $commitA; license = 'MPL-2.0'; sourceSha256 = Get-TestSha256 $archives['bit7z-source.zip'] }
+        cpmBootstrap = [ordered]@{ version = '0.42.3'; tag = 'v0.42.3'; commit = $commitA; sourceSha256 = Get-TestSha256 $cpmBootstrapPath }
+        sevenZip = [ordered]@{ version = '26.01'; commit = $commitA; license = 'LGPL-2.1-or-later AND BSD-2-Clause AND BSD-3-Clause' }
+    }
+    Write-TestJson (Join-Path $dependencyTree 'bit7z\KARON_DEPENDENCY_PROVENANCE.json') $provenance
+    Write-TestText (Join-Path $dependencyTree 'bit7z\cmake\CPM_0.42.3.cmake') "set(CURRENT_CPM_VERSION 0.42.3)`n"
+    Write-TestText (Join-Path $dependencyTree 'bit7z\cmake\Dependencies.cmake') "set(CPM_DOWNLOAD_LOCATION local)`n"
+    Write-TestText (Join-Path $dependencyTree 'nana\build\vc2022\nana.vcxproj') '<Project />'
+    Write-TestText (Join-Path $dependencyTree 'libpng\libpng.vcxproj') '<Project />'
+    [IO.Directory]::CreateDirectory((Join-Path $dependencyTree 'libpng\packages\zlib.static.1.2.5')) | Out-Null
+    Copy-Item -LiteralPath $zlibPackagePath -Destination (Join-Path $dependencyTree 'libpng\packages\zlib.static.1.2.5\zlib.static.1.2.5.nupkg')
+    [IO.Directory]::CreateDirectory((Join-Path $dependencyTree 'libpng\packages\libpng.static.1.6.37')) | Out-Null
+    Copy-Item -LiteralPath $libpngPackagePath -Destination (Join-Path $dependencyTree 'libpng\packages\libpng.static.1.6.37\libpng.static.1.6.37.nupkg')
+    Write-TestText (Join-Path $dependencyTree 'libjpeg-turbo-3.1.2\CMakeLists.txt') 'project(jpeg)'
+    $dependencyArchivePath = Join-Path $inputs 'dependencies.zip'
+    New-TestZipFromDirectory -Path $dependencyArchivePath -SourceDirectory $dependencyTree
+
+    $dllBytes = [Text.Encoding]::UTF8.GetBytes('no rar dll')
+    $dllSha = Get-TestBytesSha256 $dllBytes
+    $objects = @('7zHandler.obj', '7zRegister.obj', 'ZipHandler.obj', 'ZipRegister.obj')
+    if ($IncludeRarObject) { $objects += 'RarHandler.obj' }
+    $buildMap = [ordered]@{ schemaVersion = 1; objectCount = $objects.Count; objects = $objects; excludedObjects = @('RarHandler.obj') }
+    $buildProvenance = [ordered]@{
+        schemaVersion = 1
+        product = '7-Zip'
+        version = '26.01'
+        architecture = 'x64'
+        policy = 'no-rar-handlers-or-code'
+        source = [ordered]@{ commit = $commitA; archiveSha256 = Get-TestSha256 $archives['sevenzip-source.zip']; patchedArcMakSha256 = ('A' * 64) }
+        buildRecipe = [ordered]@{ path = 'tools/build-sevenzip-no-rar.ps1'; sha256 = ('B' * 64); definitionPath = 'sevenzip-no-rar.json'; definitionSha256 = ('C' * 64) }
+        buildMap = 'provenance/build-map.json'
+        dll = [ordered]@{ archivePath = 'x64/7z.dll'; sha256 = $dllSha; fileVersion = '26.01'; size = $dllBytes.Length }
+        licenses = @('COPYING.LGPL-2.1.txt', 'BSD-NOTICES.txt')
+    }
+    $runtimeArchivePath = Join-Path $inputs 'sevenzip-runtime.zip'
+    New-TestZip -Path $runtimeArchivePath -Entries @{
+        'x64/7z.dll' = $dllBytes
+        'COPYING.LGPL-2.1.txt' = $license
+        'BSD-NOTICES.txt' = [Text.Encoding]::UTF8.GetBytes("bsd notices`n")
+        'provenance/build-map.json' = [Text.Encoding]::UTF8.GetBytes(($buildMap | ConvertTo-Json -Depth 10 -Compress) + [char]10)
+        'provenance/build-provenance.json' = [Text.Encoding]::UTF8.GetBytes(($buildProvenance | ConvertTo-Json -Depth 10 -Compress) + [char]10)
+        'provenance/build-commands.log' = [Text.Encoding]::UTF8.GetBytes("nmake PLATFORM=x64`n")
+    }
+    $sourceArchivePath = Join-Path $inputs 'sevenzip-corresponding-source.zip'
+    New-TestZip -Path $sourceArchivePath -Entries @{
+        "7zip-$commitA/CPP/7zip/Bundles/Format7zF/Arc.mak" = [Text.Encoding]::UTF8.GetBytes('RAR_OBJS =')
+        "7zip-$commitA/CPP/7zip/Archive/Icons/rar.ico" = [byte[]](0, 1, 2, 3)
+        "7zip-$commitA/KaronBuild/build-sevenzip-no-rar.ps1" = [Text.Encoding]::UTF8.GetBytes('build')
+    }
+    $verificationPath = Join-Path $inputs 'sevenzip-verification.json'
+    $verification = [ordered]@{
+        runtimeArchiveSha256 = Get-TestSha256 $runtimeArchivePath
+        dllSha256 = $dllSha
+        correspondingSourceArchiveSha256 = Get-TestSha256 $sourceArchivePath
+    }
+    Write-TestJson $verificationPath $verification
+
+    $candidatePath = Join-Path $inputs 'candidate-manifest.json'
+    $candidate = [ordered]@{
+        schemaVersion = 1
+        attestation = [ordered]@{
+            source = [ordered]@{ commit = $applicationCommit; dirty = $false; treeSha256 = ('D' * 64); trackedFileCount = 3 }
+            dependencyArchive = [ordered]@{ name = 'dependencies.zip'; sha256 = Get-TestSha256 $dependencyArchivePath }
+            linkerInputs = @(
+                [ordered]@{ name = 'bit7z'; library = 'bit7z.lib'; sha256 = ('1' * 64); length = 10 },
+                [ordered]@{ name = 'Nana'; library = 'nana_v143_Release_x64.lib'; sha256 = ('2' * 64); length = 20 },
+                [ordered]@{ name = 'libpng'; library = 'libpng.lib'; sha256 = ('3' * 64); length = 30 },
+                [ordered]@{ name = 'libjpeg-turbo'; library = 'turbojpeg-static.lib'; sha256 = ('4' * 64); length = 40 }
+            )
+        }
+        files = @(
+            [ordered]@{ path = '7z.dll'; sha256 = $dllSha; length = $dllBytes.Length },
+            [ordered]@{ path = 'yt-dlp.exe'; sha256 = $ytBinarySha; length = (Get-Item $ytBinaryPath).Length },
+            [ordered]@{ path = 'ytdlp-interface.exe'; sha256 = ('5' * 64); length = 50 }
+        )
+    }
+    Write-TestJson $candidatePath $candidate
+
+    $artifact = {
+        param($id, $fileName, $url, $format, $include)
+        New-TestArtifact -Id $id -Path (Join-Path $cache $fileName) -Url $url -Format $format -Include $include
+    }
+    $licenseRef = {
+        param($sourceArtifactId, $archivePath, $bytes)
+        [ordered]@{ kind = 'archive-entry'; sourceArtifactId = $sourceArtifactId; archivePath = $archivePath; sha256 = Get-TestBytesSha256 $bytes; length = $bytes.Length }
+    }
+    $componentBase = {
+        param($id, $version, $commit, $licenseExpression, $sourceArtifacts, $licenseTexts, $binding)
+        [ordered]@{
+            id = $id; name = $id; version = $version; sourceRepository = "https://github.com/example/$id"; sourceCommit = $commit
+            licenseExpression = $licenseExpression; modified = $false; sourceArtifacts = @($sourceArtifacts); licenseTexts = @($licenseTexts)
+            transforms = @(); buildRecipe = [ordered]@{ description = "Build $id"; candidateBinding = $binding }
+        }
+    }
+    $components = @()
+    $applicationLicensePath = Join-Path $application 'LICENSE.txt'
+    $components += [ordered]@{
+        id = 'application'; name = 'application'; version = '2.19.1-karon.2'; sourceRepository = 'https://github.com/KaronLabs/ytdlp-korean-interface'
+        sourceCommit = '$APPLICATION_RELEASE_COMMIT'; licenseExpression = 'MIT'; modified = $true; sourceArtifacts = @()
+        licenseTexts = @([ordered]@{ kind = 'repository-file'; path = 'LICENSE.txt'; sha256 = Get-TestSha256 $applicationLicensePath; length = (Get-Item $applicationLicensePath).Length })
+        transforms = @(); buildRecipe = [ordered]@{ description = 'tools/build-candidate.ps1'; candidateBinding = [ordered]@{ kind = 'application-source'; candidatePath = 'ytdlp-interface.exe' } }
+    }
+    $bit7zArtifact = & $artifact 'bit7z-source' 'bit7z-source.zip' "https://github.com/example/bit7z/archive/$commitA.zip" 'zip' $true
+    $components += & $componentBase 'bit7z' '4.1.0' $commitA 'MPL-2.0' @($bit7zArtifact) @(& $licenseRef 'bit7z-source' "bit7z-$commitA/LICENSE" $license) ([ordered]@{ kind = 'static-linker-input'; library = 'bit7z.lib' })
+    $cpmArtifacts = @(
+        (& $artifact 'cpm-source' 'cpm-source.zip' "https://github.com/example/cpm/archive/$commitA.zip" 'zip' $true),
+        (& $artifact 'cpm-bootstrap' 'CPM_0.42.3.cmake' 'https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.42.3/CPM.cmake' 'text' $true)
+    )
+    $components += & $componentBase 'cpm' '0.42.3' $commitA 'MIT' $cpmArtifacts @(& $licenseRef 'cpm-source' "CPM.cmake-$commitA/LICENSE" $license) ([ordered]@{ kind = 'build-input'; dependencyPath = 'bit7z/cmake/CPM_0.42.3.cmake' })
+    $sevenZipArtifact = & $artifact 'sevenzip-source' 'sevenzip-source.zip' "https://github.com/example/7zip/archive/$commitA.zip" 'zip' $true
+    $components += & $componentBase '7zip' '26.01' $commitA 'LGPL-2.1-or-later AND BSD-2-Clause AND BSD-3-Clause' @($sevenZipArtifact) @(
+        [ordered]@{ kind = 'task5-runtime-entry'; archivePath = 'COPYING.LGPL-2.1.txt'; sha256 = Get-TestBytesSha256 $license; length = $license.Length },
+        [ordered]@{ kind = 'task5-runtime-entry'; archivePath = 'BSD-NOTICES.txt'; sha256 = Get-TestBytesSha256 ([Text.Encoding]::UTF8.GetBytes("bsd notices`n")); length = 12 }
+    ) ([ordered]@{ kind = 'candidate-file'; candidatePath = '7z.dll'; sha256 = $dllSha })
+    foreach ($id in @('nana', 'libpng', 'zlib', 'libjpeg-turbo')) {
+        $fileName = switch ($id) { 'nana' {'nana-source.zip'} 'libpng' {'libpng-source.zip'} 'zlib' {'zlib-source.zip'} default {'libjpeg-source.zip'} }
+        $pathInZip = switch ($id) { 'nana' {"nana-$commitA/LICENSE"} 'libpng' {"libpng-$commitA/LICENSE"} 'zlib' {"zlib-$commitA/README"} default {"libjpeg-$commitA/LICENSE.md"} }
+        $licenseExpression = switch ($id) { 'nana' {'BSL-1.0'} 'libpng' {'libpng-2.0'} 'zlib' {'Zlib'} default {'BSD-3-Clause AND IJG AND Zlib'} }
+        $library = switch ($id) { 'nana' {'nana_v143_Release_x64.lib'} 'libpng' {'libpng.lib'} 'zlib' {'libpng.lib'} default {'turbojpeg-static.lib'} }
+        $sourceArtifacts = @(& $artifact "$id-source" $fileName "https://github.com/example/$id/archive/$commitA.zip" 'zip' $true)
+        if ($id -eq 'libpng') { $sourceArtifacts += & $artifact 'libpng-package' 'libpng.static.1.6.37.nupkg' 'https://api.nuget.org/v3-flatcontainer/libpng.static/1.6.37/libpng.static.1.6.37.nupkg' 'binary' $true }
+        if ($id -eq 'zlib') { $sourceArtifacts += & $artifact 'zlib-package' 'zlib.static.1.2.5.nupkg' 'https://api.nuget.org/v3-flatcontainer/zlib.static/1.2.5/zlib.static.1.2.5.nupkg' 'binary' $true }
+        $components += & $componentBase $id '1.0' $commitA $licenseExpression $sourceArtifacts @(& $licenseRef "$id-source" $pathInZip $license) ([ordered]@{ kind = 'static-linker-input'; library = $library })
+    }
+    $nlohmannArtifact = & $artifact 'nlohmann-source' 'nlohmann-source.zip' "https://github.com/example/json/archive/$commitA.zip" 'zip' $true
+    $transform = Get-TestTransformEvidence $sourceHeader $targetHeader
+    $transformBytes = [Text.Encoding]::UTF8.GetBytes(($transform | ConvertTo-Json -Compress) + "`r`n")
+    $nlohmann = & $componentBase 'nlohmann-json' '3.12.0' $commitA 'MIT' @($nlohmannArtifact) @(& $licenseRef 'nlohmann-source' "json-$commitA/LICENSE.MIT" $license) ([ordered]@{ kind = 'compiled-header'; repositoryPath = 'ytdlp-interface/json.hpp' })
+    $nlohmann.modified = $true
+    $nlohmann.transforms = @([ordered]@{
+        kind = 'lf-to-crlf'; sourceArtifactId = 'nlohmann-source'; sourceArchivePath = "json-$commitA/single_include/nlohmann/json.hpp"
+        repositoryPath = 'ytdlp-interface/json.hpp'; sourceSha256 = Get-TestBytesSha256 $sourceHeader; sourceLength = $sourceHeader.Length
+        targetSha256 = Get-TestBytesSha256 $targetHeader; targetLength = $targetHeader.Length
+        sourceOrderedChunkSha256 = $transform.sourceOrderedChunkSha256; targetOrderedChunkSha256 = $transform.targetOrderedChunkSha256
+        lineFeedCount = $transform.lineFeedCount; transformEvidenceSha256 = Get-TestBytesSha256 $transformBytes; transformEvidenceLength = $transformBytes.Length
+    })
+    $components += $nlohmann
+    $ytArtifacts = @(
+        (& $artifact 'yt-dlp-source' 'yt-dlp-source.zip' "https://github.com/yt-dlp/yt-dlp/archive/$commitB.zip" 'zip' $true),
+        (& $artifact 'yt-dlp-binary' 'yt-dlp.exe' 'https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/download/2026.08.30.232658/yt-dlp.exe' 'binary' $false),
+        (& $artifact 'yt-dlp-sums' 'SHA2-256SUMS' 'https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/download/2026.08.30.232658/SHA2-256SUMS' 'text' $true)
+    )
+    $thirdPartyBytes = [Text.Encoding]::UTF8.GetBytes("third party corpus`n")
+    $ytDlp = & $componentBase 'yt-dlp' '2026.08.30.232658' $commitB 'Unlicense AND LicenseRef-yt-dlp-PyInstaller-Third-Party' $ytArtifacts @(
+        (& $licenseRef 'yt-dlp-source' "yt-dlp-$commitB/LICENSE" $license),
+        (& $licenseRef 'yt-dlp-source' "yt-dlp-$commitB/THIRD_PARTY_LICENSES.txt" $thirdPartyBytes)
+    ) ([ordered]@{ kind = 'candidate-file'; candidatePath = 'yt-dlp.exe'; sha256 = $ytBinarySha })
+    $ytDlp.binaryProvenance = [ordered]@{ releaseTag = '2026.08.30.232658'; releaseImmutable = $true; assetId = 1; sourceCommit = $commitB; binaryArtifactId = 'yt-dlp-binary'; checksumsArtifactId = 'yt-dlp-sums' }
+    $components += $ytDlp
+
+    $embeddedFiles = @()
+    foreach ($relative in @(
+        'bit7z/KARON_DEPENDENCY_PROVENANCE.json', 'bit7z/cmake/Dependencies.cmake', 'bit7z/cmake/CPM_0.42.3.cmake',
+        'nana/build/vc2022/nana.vcxproj', 'libpng/libpng.vcxproj',
+        'libpng/packages/zlib.static.1.2.5/zlib.static.1.2.5.nupkg',
+        'libpng/packages/libpng.static.1.6.37/libpng.static.1.6.37.nupkg')) {
+        $file = Join-Path $dependencyTree $relative.Replace('/', '\')
+        $embeddedFiles += [ordered]@{ path = $relative; sha256 = Get-TestSha256 $file; length = (Get-Item $file).Length }
+    }
+    $roots = @()
+    foreach ($relative in @('bit7z', 'nana', 'libpng', 'libjpeg-turbo-3.1.2', 'libpng/packages/zlib.static.1.2.5')) {
+        $directory = Join-Path $dependencyTree $relative.Replace('/', '\')
+        $files = @(Get-ChildItem -LiteralPath $directory -File -Recurse)
+        $roots += [ordered]@{ path = $relative; fileCount = $files.Count; length = [long](($files | Measure-Object Length -Sum).Sum); orderedTreeSha256 = Get-TestOrderedTreeDigest $directory }
+    }
+    $manifest = [ordered]@{
+        schemaVersion = 'karon-non-runtime-component-evidence/v1'
+        release = [ordered]@{ tag = 'v2.19.1-karon.2'; platform = 'win-x64'; expectedComponentCount = 10; excludedComponents = @('deno', 'ffmpeg') }
+        sharedInputs = [ordered]@{
+            dependencyArchive = [ordered]@{
+                fileName = 'dependencies.zip'; format = 'zip'; sha256 = Get-TestSha256 $dependencyArchivePath; length = (Get-Item $dependencyArchivePath).Length
+                provenancePath = 'bit7z/KARON_DEPENDENCY_PROVENANCE.json'; provenanceSha256 = Get-TestSha256 (Join-Path $dependencyTree 'bit7z\KARON_DEPENDENCY_PROVENANCE.json')
+                roots = $roots; embeddedFiles = $embeddedFiles
+            }
+            sevenZipTask5 = [ordered]@{
+                format = 'zip'; runtimeArchiveSha256 = Get-TestSha256 $runtimeArchivePath; runtimeArchiveLength = (Get-Item $runtimeArchivePath).Length
+                sourceArchiveSha256 = Get-TestSha256 $sourceArchivePath; sourceArchiveLength = (Get-Item $sourceArchivePath).Length
+                verificationSha256 = Get-TestSha256 $verificationPath; verificationLength = (Get-Item $verificationPath).Length
+                sourceCommit = $commitA; dllSha256 = $dllSha; dllLength = $dllBytes.Length
+                buildMapPath = 'provenance/build-map.json'; buildMapSha256 = Get-TestBytesSha256 ([Text.Encoding]::UTF8.GetBytes(($buildMap | ConvertTo-Json -Depth 10 -Compress) + [char]10))
+                requiredObjects = @('7zHandler.obj', '7zRegister.obj', 'ZipHandler.obj', 'ZipRegister.obj')
+                forbiddenPattern = '(?i)rar'; forbiddenSourcePattern = '(?i)(^|/)(Rar(?:[^/]*\.(?:c|cc|cpp|cxx|h|hh|hpp|hxx))?|unRarLicense\.txt)($|/)'
+            }
+            candidate = [ordered]@{ requiredLinkerLibraries = @('bit7z.lib', 'nana_v143_Release_x64.lib', 'libpng.lib', 'turbojpeg-static.lib') }
+        }
+        components = $components
+    }
+    $manifestPath = Join-Path $root 'component-manifest.json'
+    Write-TestJson $manifestPath $manifest
+    return [pscustomobject]@{
+        Root = $root; Cache = $cache; Application = $application; ApplicationCommit = $applicationCommit; Manifest = $manifestPath
+        Candidate = $candidatePath; DependencyArchive = $dependencyArchivePath; RuntimeArchive = $runtimeArchivePath
+        SourceArchive = $sourceArchivePath; Verification = $verificationPath; YtDlpBinary = $ytBinaryPath
+    }
+}
+
+function Invoke-TestCollector {
+    param(
+        [object] $Fixture,
+        [string] $OutputDirectory,
+        [string] $YtDlpBinaryPath = $Fixture.YtDlpBinary,
+        [switch] $OmitReleaseBinding
+    )
+    $arguments = @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $collectorPath,
+        '-ManifestPath', $Fixture.Manifest, '-SourceCacheDirectory', $Fixture.Cache, '-OutputDirectory', $OutputDirectory,
+        '-ApplicationRepository', $Fixture.Application, '-DependencyArchivePath', $Fixture.DependencyArchive,
+        '-SevenZipRuntimeArchivePath', $Fixture.RuntimeArchive, '-SevenZipSourceArchivePath', $Fixture.SourceArchive,
+        '-SevenZipVerificationPath', $Fixture.Verification, '-YtDlpBinaryPath', $YtDlpBinaryPath
+    )
+    if (-not $OmitReleaseBinding) {
+        $arguments += @('-ApplicationCommit', $Fixture.ApplicationCommit, '-CandidateManifestPath', $Fixture.Candidate)
+    }
+    $output = @(& $powershellPath @arguments 2>&1)
+    return [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = ($output -join [Environment]::NewLine) }
+}
+
+function Read-TestManifest {
+    param([object] $Fixture)
+    return Get-Content -LiteralPath $Fixture.Manifest -Raw | ConvertFrom-Json
+}
+
+function Save-TestManifest {
+    param([object] $Fixture, [object] $Manifest)
+    Write-TestJson $Fixture.Manifest $Manifest
+}
+
+Describe 'non-runtime component evidence collector' {
+    It 'rejects a tampered immutable source cache artifact' {
+        $fixture = New-ComponentEvidenceFixture 'tampered-source'
+        [IO.File]::AppendAllText((Join-Path $fixture.Cache 'bit7z-source.zip'), 'tamper')
+        $result = Invoke-TestCollector $fixture (Join-Path $fixture.Root 'output')
+        $result.ExitCode | Should Be 1
+        (Get-Content (Join-Path $fixture.Root 'output\non-runtime-component-blockers.json') -Raw) | Should Match 'source_hash_mismatch:bit7z-source'
+    }
+
+    It 'rejects a missing exact license text entry' {
+        $fixture = New-ComponentEvidenceFixture 'missing-license'
+        $manifest = Read-TestManifest $fixture
+        ($manifest.components | Where-Object id -eq 'bit7z').licenseTexts[0].archivePath = 'missing/LICENSE'
+        Save-TestManifest $fixture $manifest
+        $result = Invoke-TestCollector $fixture (Join-Path $fixture.Root 'output')
+        $result.ExitCode | Should Be 1
+        (Get-Content (Join-Path $fixture.Root 'output\non-runtime-component-blockers.json') -Raw) | Should Match 'license_entry_missing:bit7z'
+    }
+
+    It 'rejects a mutable source URL before collecting bytes' {
+        $fixture = New-ComponentEvidenceFixture 'mutable-url'
+        $manifest = Read-TestManifest $fixture
+        ($manifest.components | Where-Object id -eq 'bit7z').sourceArtifacts[0].url = 'https://github.com/example/bit7z/archive/main.zip'
+        Save-TestManifest $fixture $manifest
+        $result = Invoke-TestCollector $fixture (Join-Path $fixture.Root 'output')
+        $result.ExitCode | Should Be 1
+        (Get-Content (Join-Path $fixture.Root 'output\non-runtime-component-blockers.json') -Raw) | Should Match 'mutable_source_url:bit7z-source'
+    }
+
+    It 'rejects a nlohmann transform evidence mismatch' {
+        $fixture = New-ComponentEvidenceFixture 'nlohmann-mismatch'
+        $manifest = Read-TestManifest $fixture
+        ($manifest.components | Where-Object id -eq 'nlohmann-json').transforms[0].transformEvidenceSha256 = ('0' * 64)
+        Save-TestManifest $fixture $manifest
+        $result = Invoke-TestCollector $fixture (Join-Path $fixture.Root 'output')
+        $result.ExitCode | Should Be 1
+        (Get-Content (Join-Path $fixture.Root 'output\non-runtime-component-blockers.json') -Raw) | Should Match 'nlohmann_transform_mismatch'
+    }
+
+    It 'rejects a preserved yt-dlp binary that differs from the official asset' {
+        $fixture = New-ComponentEvidenceFixture 'yt-dlp-mismatch'
+        $wrongBinary = Join-Path $fixture.Root 'wrong-yt-dlp.exe'
+        [IO.File]::WriteAllBytes($wrongBinary, [Text.Encoding]::UTF8.GetBytes('wrong binary'))
+        $result = Invoke-TestCollector $fixture (Join-Path $fixture.Root 'output') $wrongBinary
+        $result.ExitCode | Should Be 1
+        (Get-Content (Join-Path $fixture.Root 'output\non-runtime-component-blockers.json') -Raw) | Should Match 'yt_dlp_binary_mismatch'
+    }
+
+    It 'rejects Task 5 evidence containing a RAR object' {
+        $fixture = New-ComponentEvidenceFixture 'rar-evidence' -IncludeRarObject
+        $result = Invoke-TestCollector $fixture (Join-Path $fixture.Root 'output')
+        $result.ExitCode | Should Be 1
+        (Get-Content (Join-Path $fixture.Root 'output\non-runtime-component-blockers.json') -Raw) | Should Match 'sevenzip_rar_evidence_mismatch'
+    }
+
+    It 'rejects case-insensitive source cache name collisions' {
+        $fixture = New-ComponentEvidenceFixture 'case-collision'
+        $manifest = Read-TestManifest $fixture
+        ($manifest.components | Where-Object id -eq 'cpm').sourceArtifacts[0].fileName = 'BIT7Z-SOURCE.ZIP'
+        Save-TestManifest $fixture $manifest
+        $result = Invoke-TestCollector $fixture (Join-Path $fixture.Root 'output')
+        $result.ExitCode | Should Be 1
+        (Get-Content (Join-Path $fixture.Root 'output\non-runtime-component-blockers.json') -Raw) | Should Match 'source_cache_name_collision'
+    }
+
+    It 'emits deterministic blockers while final release binding is unavailable' {
+        $fixture = New-ComponentEvidenceFixture 'release-binding-blockers'
+        $outputDirectory = Join-Path $fixture.Root 'output'
+        $result = Invoke-TestCollector -Fixture $fixture -OutputDirectory $outputDirectory -OmitReleaseBinding
+        $result.ExitCode | Should Be 1
+        $blockerPath = Join-Path $outputDirectory 'non-runtime-component-blockers.json'
+        (Test-Path -LiteralPath $blockerPath) | Should Be $true
+        $document = Get-Content -LiteralPath $blockerPath -Raw | ConvertFrom-Json
+        @($document.blockers).Count | Should Be 2
+        (@($document.blockers) -contains 'application_release_commit_required') | Should Be $true
+        (@($document.blockers) -contains 'candidate_manifest_required') | Should Be $true
+        (Test-Path -LiteralPath (Join-Path $outputDirectory 'ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip')) | Should Be $false
+    }
+
+    It 'creates byte-identical evidence bundles for the same closed inputs' {
+        $fixture = New-ComponentEvidenceFixture 'positive'
+        $first = Invoke-TestCollector $fixture (Join-Path $fixture.Root 'output-a')
+        $second = Invoke-TestCollector $fixture (Join-Path $fixture.Root 'output-b')
+        if ($first.ExitCode -ne 0) {
+            $blockerPath = Join-Path $fixture.Root 'output-a\non-runtime-component-blockers.json'
+            $blockers = if (Test-Path -LiteralPath $blockerPath) { Get-Content -LiteralPath $blockerPath -Raw } else { 'blocker file missing' }
+            $archive = [IO.Compression.ZipFile]::OpenRead($fixture.DependencyArchive)
+            try { $entryNames = @($archive.Entries | ForEach-Object { $_.FullName }) -join ',' }
+            finally { $archive.Dispose() }
+            throw ($first.Output + [Environment]::NewLine + $blockers + [Environment]::NewLine + 'fixture entries=' + $entryNames)
+        }
+        $first.ExitCode | Should Be 0
+        $second.ExitCode | Should Be 0
+        $bundleA = Join-Path $fixture.Root 'output-a\ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip'
+        $bundleB = Join-Path $fixture.Root 'output-b\ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip'
+        (Test-Path -LiteralPath $bundleA) | Should Be $true
+        (Test-Path -LiteralPath (Join-Path $fixture.Root 'output-a\non-runtime-component-blockers.json')) | Should Be $false
+        (Get-TestSha256 $bundleA) | Should Be (Get-TestSha256 $bundleB)
+    }
+}

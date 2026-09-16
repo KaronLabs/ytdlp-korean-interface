@@ -1,0 +1,301 @@
+{
+  "schemaVersion": "karon-non-runtime-component-evidence/v1",
+  "release": {
+    "tag": "v2.19.1-karon.2",
+    "platform": "win-x64",
+    "expectedComponentCount": 10,
+    "excludedComponents": ["deno", "ffmpeg"]
+  },
+  "sharedInputs": {
+    "dependencyArchive": {
+      "fileName": "ytdlp-interface dependencies.7z",
+      "format": "7z",
+      "sha256": "F2CF2203E0F9DA8F4E3BB84977DB85F3FCA3C4EA14BE2E7913FEB42CF28CED85",
+      "length": 6877761,
+      "provenancePath": "bit7z/KARON_DEPENDENCY_PROVENANCE.json",
+      "provenanceSha256": "49DCD91E7F8F52B2850794AB62AF38D6EF9D13555C3EA19D29BC2E75F2D2EEC7",
+      "roots": [
+        {"path": "bit7z", "fileCount": 1511, "length": 18087909, "orderedTreeSha256": "B7A17C65C3D03CE4EBEDD6C39A8156009670863169936E370A8EA5BEDCE09A08"},
+        {"path": "nana", "fileCount": 258, "length": 3053466, "orderedTreeSha256": "06EDF470E396F9A49E0C438E4CFF0A5D2705FA3BC5EFB7171505987B53B9EF0A"},
+        {"path": "libpng", "fileCount": 240, "length": 17950075, "orderedTreeSha256": "22C040747BD87D996EA127F5DFAF115740D3E62690E38F85538F1B20F87F68AF"},
+        {"path": "libjpeg-turbo-3.1.2", "fileCount": 629, "length": 9786615, "orderedTreeSha256": "270FC7C9DC12DD272E07B5E0E187137CBFEB567A7486821287A628FDAB07F4B5"},
+        {"path": "libpng/packages/zlib.static.1.2.5", "fileCount": 31, "length": 638629, "orderedTreeSha256": "9B08BC7A062D375EBA894D51DE800F8AED416A80EFD5E679D418672D1FE987BA"}
+      ],
+      "embeddedFiles": [
+        {"path": "bit7z/KARON_DEPENDENCY_PROVENANCE.json", "length": 5372, "sha256": "49DCD91E7F8F52B2850794AB62AF38D6EF9D13555C3EA19D29BC2E75F2D2EEC7"},
+        {"path": "bit7z/cmake/Dependencies.cmake", "length": 6613, "sha256": "D5B20EF14BB2469C7A94A8B9746C253AAC9FAE9E3206082EC1C3CF7119905D08"},
+        {"path": "bit7z/cmake/CPM_0.42.3.cmake", "length": 45045, "sha256": "A609E875FD532B067174250F6ABBC3DAC22FE2D64869783FB1E80BDA1625C844"},
+        {"path": "nana/build/vc2022/nana.vcxproj", "length": 30202, "sha256": "312FE9C297C3FA90B8EB7D1C41842ED7EE54F8890D6512EB556F6DCE88F5DA18"},
+        {"path": "libpng/libpng.vcxproj", "length": 9299, "sha256": "1BA17F55BA7E26FF31D6E07087B64FA3E4C2DFEE20533940AA816385BB739761"},
+        {"path": "libpng/packages/zlib.static.1.2.5/zlib.static.1.2.5.nupkg", "length": 147388, "sha256": "A2E4A9FD423F97ED8D7B46E6AFF120286E5A56ED90E8F2908231A116D81EEC5B"},
+        {"path": "libpng/packages/libpng.static.1.6.37/libpng.static.1.6.37.nupkg", "length": 325349, "sha256": "A5DD204D1CFB381A5BBE6E7FB8DDC3BF3ADE3818DDB177B6E23DFA495350CB68"}
+      ]
+    },
+    "sevenZipTask5": {
+      "format": "7z",
+      "runtimeArchiveSha256": "30CA5F1E80DF040AA7B46A0FB956500C3008796CA6A36980BE32BFF1F2C3A2BA",
+      "runtimeArchiveLength": 578523,
+      "sourceArchiveSha256": "7C02369194417C13270ED2B34513472DE8BB6D322AC8721F45D41C19898B7FFD",
+      "sourceArchiveLength": 1481890,
+      "verificationSha256": "76F911AF24C7B4BAF2B8FA18A902529D85F6759A04F177AB74CF7C81D3CF8AC5",
+      "verificationLength": 7563,
+      "sourceCommit": "8c63d71ff886bda90c86db28466287f977374237",
+      "dllSha256": "1A482E7ED19B1C7A547558E6E728CC4E4215AA9A98846702DBD8C1E22419C6E0",
+      "dllLength": 1537536,
+      "buildMapPath": "provenance/build-map.json",
+      "buildMapSha256": "38FA4631DEAB10ABDF0367B0E54CCAFA96402FEFF3F441E5A100A48310B03BD6",
+      "requiredObjects": ["7zHandler.obj", "7zRegister.obj", "ZipHandler.obj", "ZipRegister.obj"],
+      "forbiddenPattern": "(?i)rar",
+      "forbiddenSourcePattern": "(?i)(^|/)(Rar(?:[^/]*\\.(?:c|cc|cpp|cxx|h|hh|hpp|hxx))?|unRarLicense\\.txt)($|/)"
+    },
+    "candidate": {
+      "requiredLinkerLibraries": ["bit7z.lib", "nana_v143_Release_x64.lib", "libpng.lib", "turbojpeg-static.lib"]
+    }
+  },
+  "components": [
+    {
+      "id": "application",
+      "name": "ytdlp-interface application source",
+      "version": "2.19.1-karon.2",
+      "sourceRepository": "https://github.com/KaronLabs/ytdlp-korean-interface",
+      "sourceCommit": "$APPLICATION_RELEASE_COMMIT",
+      "licenseExpression": "MIT",
+      "modified": true,
+      "sourceArtifacts": [],
+      "licenseTexts": [
+        {"kind": "repository-file", "path": "release/licenses/v2.19.1-karon.2/application/LICENSE.txt", "sha256": "75A66AF70A8AD5BC92ED5A891F2986DE2A76D8FBACDA07B4DE8B99F8773DB70C", "length": 1067}
+      ],
+      "transforms": [],
+      "buildRecipe": {
+        "description": "Run tools/build-candidate.ps1 from the exact clean final release commit; bind its source attestation, dependency archive, linker inputs, toolchain, commands, and candidate file hashes.",
+        "repositoryPath": "tools/build-candidate.ps1",
+        "sha256AtEvidenceBase": "24AD81E52A2E64AAF1FD6C9FB8920F902316143067055F3E6E8260BC2D15F7BE",
+        "candidateBinding": {"kind": "application-source", "candidatePath": "ytdlp-interface.exe"}
+      }
+    },
+    {
+      "id": "bit7z",
+      "name": "bit7z",
+      "version": "4.1.0",
+      "sourceRepository": "https://github.com/rikyoz/bit7z",
+      "sourceCommit": "c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742",
+      "licenseExpression": "MPL-2.0",
+      "modified": true,
+      "sourceArtifacts": [
+        {"id": "bit7z-source", "fileName": "bit7z-c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742.zip", "url": "https://github.com/rikyoz/bit7z/archive/c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742.zip", "sha256": "6AF52B2E1B9895E8F1193728880206326161940E7A961E3162EC39752DBB3379", "length": 494710, "format": "zip", "includeInBundle": true}
+      ],
+      "licenseTexts": [
+        {"kind": "archive-entry", "sourceArtifactId": "bit7z-source", "archivePath": "bit7z-c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742/LICENSE", "sha256": "66A3107D5AD6A058AAB753EAAC2047CCB2ED0E39465DD0FE5844DA3E300D5172", "length": 16727}
+      ],
+      "transforms": [
+        {"kind": "full-modified-source-tree", "dependencyRoot": "bit7z", "orderedTreeSha256": "B7A17C65C3D03CE4EBEDD6C39A8156009670863169936E370A8EA5BEDCE09A08", "provenancePath": "bit7z/KARON_DEPENDENCY_PROVENANCE.json"},
+        {"kind": "remove-rar-unrar-sources", "evidencePath": "bit7z/KARON_DEPENDENCY_PROVENANCE.json", "removedPathCount": 29},
+        {"kind": "pin-cpm-bootstrap-offline", "path": "bit7z/cmake/Dependencies.cmake", "sha256": "D5B20EF14BB2469C7A94A8B9746C253AAC9FAE9E3206082EC1C3CF7119905D08"}
+      ],
+      "buildRecipe": {
+        "description": "Configure and build Release x64 with CMake, MSVC v143, native strings, path sanitization, regex matching, static runtime, custom no-RAR 7-Zip SDK, and the pinned local CPM bootstrap.",
+        "candidateBinding": {"kind": "static-linker-input", "library": "bit7z.lib"}
+      }
+    },
+    {
+      "id": "cpm",
+      "name": "CPM.cmake bootstrap",
+      "version": "0.42.3",
+      "sourceRepository": "https://github.com/cpm-cmake/CPM.cmake",
+      "sourceCommit": "49acea0d775087ace0522ee4cc5de45e3da094a8",
+      "licenseExpression": "MIT",
+      "modified": false,
+      "sourceArtifacts": [
+        {"id": "cpm-source", "fileName": "cpm-49acea0d775087ace0522ee4cc5de45e3da094a8.zip", "url": "https://github.com/cpm-cmake/CPM.cmake/archive/49acea0d775087ace0522ee4cc5de45e3da094a8.zip", "sha256": "97D684CFB9E9F5EC37A2D52C737E24B75F2ABFDF2594E109718309CB7C0B8A33", "length": 168785, "format": "zip", "includeInBundle": true},
+        {"id": "cpm-bootstrap", "fileName": "CPM_0.42.3.cmake", "url": "https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.42.3/CPM.cmake", "sha256": "A609E875FD532B067174250F6ABBC3DAC22FE2D64869783FB1E80BDA1625C844", "length": 45045, "format": "text", "includeInBundle": true}
+      ],
+      "licenseTexts": [
+        {"kind": "archive-entry", "sourceArtifactId": "cpm-source", "archivePath": "CPM.cmake-49acea0d775087ace0522ee4cc5de45e3da094a8/LICENSE", "sha256": "301547B6A3C4210D93C1337F01F326EA35E6128B785F924CFFADC322C0BB50C9", "length": 1092}
+      ],
+      "transforms": [],
+      "buildRecipe": {
+        "description": "Use the exact v0.42.3 release asset bytes as CPM_DOWNLOAD_LOCATION with no network fallback.",
+        "candidateBinding": {"kind": "build-input", "dependencyPath": "bit7z/cmake/CPM_0.42.3.cmake"}
+      }
+    },
+    {
+      "id": "7zip",
+      "name": "7-Zip DLL without RAR handlers",
+      "version": "26.01",
+      "sourceRepository": "https://github.com/ip7z/7zip",
+      "sourceCommit": "8c63d71ff886bda90c86db28466287f977374237",
+      "licenseExpression": "LGPL-2.1-or-later AND BSD-2-Clause AND BSD-3-Clause",
+      "modified": true,
+      "sourceArtifacts": [
+        {"id": "sevenzip-source", "fileName": "7zip-8c63d71ff886bda90c86db28466287f977374237.zip", "url": "https://github.com/ip7z/7zip/archive/8c63d71ff886bda90c86db28466287f977374237.zip", "sha256": "01589AEDA50512955E66D360C6534B961EC95C51111A76E2FA2976A8DAA55271", "length": 2892293, "format": "zip", "includeInBundle": true}
+      ],
+      "licenseTexts": [
+        {"kind": "task5-runtime-entry", "archivePath": "COPYING.LGPL-2.1.txt", "sha256": "DC626520DCD53A22F727AF3EE42C770E56C97A64FE3ADB063799D8AB032FE551", "length": 26530},
+        {"kind": "task5-runtime-entry", "archivePath": "BSD-NOTICES.txt", "sha256": "A3F8AAB7C98A7363A60F3360552929CE50D6A6F7253E28097BD10D7DC9FB9682", "length": 3161}
+      ],
+      "transforms": [
+        {"kind": "arc-mak-no-rar-patch", "path": "CPP/7zip/Bundles/Format7zF/Arc.mak", "upstreamSha256": "21BDEC7EF04A92DBB7A19E71146929A85A851A6E7A4D992AC9529E963D9BF381", "patchedSha256": "F8C87876AE5BDD74A338E01BE7A02EDB699E2470468F02DA380D4B061E353FBE"},
+        {"kind": "remove-rar-code-and-license", "evidenceArchive": "7z2601-x64-no-rar-source.7z", "excludedObjectCount": 11, "buildMapSha256": "38FA4631DEAB10ABDF0367B0E54CCAFA96402FEFF3F441E5A100A48310B03BD6"}
+      ],
+      "buildRecipe": {
+        "description": "Use KaronBuild/build-sevenzip-no-rar.ps1 from the sealed corresponding-source archive; retain commands, link object map, toolchain hashes, runtime ZIP/7z extraction results, and exact DLL SHA.",
+        "candidateBinding": {"kind": "candidate-file", "candidatePath": "7z.dll", "sha256": "1A482E7ED19B1C7A547558E6E728CC4E4215AA9A98846702DBD8C1E22419C6E0"}
+      }
+    },
+    {
+      "id": "nana",
+      "name": "Nana",
+      "version": "1.8",
+      "sourceRepository": "https://github.com/cnjinhao/nana",
+      "sourceCommit": "554c4fe87fc31b8ee104228e9117d545d34855b5",
+      "licenseExpression": "BSL-1.0",
+      "modified": true,
+      "sourceArtifacts": [
+        {"id": "nana-source", "fileName": "nana-554c4fe87fc31b8ee104228e9117d545d34855b5.zip", "url": "https://github.com/cnjinhao/nana/archive/554c4fe87fc31b8ee104228e9117d545d34855b5.zip", "sha256": "EF657036A4623BBB5C4E0DF4E8AA699DC6AC713CA4A6725B30D3FD8175C4C145", "length": 745596, "format": "zip", "includeInBundle": true}
+      ],
+      "licenseTexts": [
+        {"kind": "archive-entry", "sourceArtifactId": "nana-source", "archivePath": "nana-554c4fe87fc31b8ee104228e9117d545d34855b5/LICENSE", "sha256": "C9BFF75738922193E67FA726FA225535870D2AA1059F91452C411736284AD566", "length": 1338}
+      ],
+      "transforms": [
+        {"kind": "full-modified-source-tree", "dependencyRoot": "nana", "orderedTreeSha256": "06EDF470E396F9A49E0C438E4CFF0A5D2705FA3BC5EFB7171505987B53B9EF0A", "buildProject": "nana/build/vc2022/nana.vcxproj", "buildProjectSha256": "312FE9C297C3FA90B8EB7D1C41842ED7EE54F8890D6512EB556F6DCE88F5DA18"}
+      ],
+      "buildRecipe": {
+        "description": "Build the complete modified vendored Nana source tree with nana/build/vc2022/nana.sln, Release x64, MSVC v143, and hermetic MSBuild properties.",
+        "candidateBinding": {"kind": "static-linker-input", "library": "nana_v143_Release_x64.lib"}
+      }
+    },
+    {
+      "id": "libpng",
+      "name": "libpng",
+      "version": "1.6.37",
+      "sourceRepository": "https://github.com/pnggroup/libpng",
+      "sourceCommit": "a40189cf881e9f0db80511c382292a5604c3c3d1",
+      "licenseExpression": "libpng-2.0",
+      "modified": true,
+      "sourceArtifacts": [
+        {"id": "libpng-source", "fileName": "libpng-a40189cf881e9f0db80511c382292a5604c3c3d1.zip", "url": "https://github.com/pnggroup/libpng/archive/a40189cf881e9f0db80511c382292a5604c3c3d1.zip", "sha256": "B3AF9E92167F9C4233482F49AFF02730B7DC3A275871CE637ED668413DA6283F", "length": 1803566, "format": "zip", "includeInBundle": true},
+        {"id": "libpng-package", "fileName": "libpng.static.1.6.37.nupkg", "url": "https://api.nuget.org/v3-flatcontainer/libpng.static/1.6.37/libpng.static.1.6.37.nupkg", "sha256": "A5DD204D1CFB381A5BBE6E7FB8DDC3BF3ADE3818DDB177B6E23DFA495350CB68", "length": 325349, "format": "binary", "includeInBundle": true}
+      ],
+      "licenseTexts": [
+        {"kind": "archive-entry", "sourceArtifactId": "libpng-source", "archivePath": "libpng-a40189cf881e9f0db80511c382292a5604c3c3d1/LICENSE", "sha256": "BF5E22B9DCE8464064AE17A48EA1133C3369AC9E1D80EF9E320E5219AA14EA9B", "length": 5345}
+      ],
+      "transforms": [
+        {"kind": "full-modified-source-tree", "dependencyRoot": "libpng", "orderedTreeSha256": "22C040747BD87D996EA127F5DFAF115740D3E62690E38F85538F1B20F87F68AF", "buildProject": "libpng/libpng.vcxproj", "buildProjectSha256": "1BA17F55BA7E26FF31D6E07087B64FA3E4C2DFEE20533940AA816385BB739761"}
+      ],
+      "buildRecipe": {
+        "description": "Build the complete modified vendored libpng tree with libpng/libpng.sln, Release x64, MSVC v143, hermetic MSBuild properties, and the exact zlib.static 1.2.5 package.",
+        "candidateBinding": {"kind": "static-linker-input", "library": "libpng.lib"}
+      }
+    },
+    {
+      "id": "zlib",
+      "name": "zlib",
+      "version": "1.2.5",
+      "sourceRepository": "https://github.com/madler/zlib",
+      "sourceCommit": "9712272c78b9d9c93746d9c8e156a3728c65ca72",
+      "licenseExpression": "Zlib",
+      "modified": false,
+      "sourceArtifacts": [
+        {"id": "zlib-source", "fileName": "zlib-9712272c78b9d9c93746d9c8e156a3728c65ca72.zip", "url": "https://github.com/madler/zlib/archive/9712272c78b9d9c93746d9c8e156a3728c65ca72.zip", "sha256": "66FAA243EA50094C2B399F5644CD4AA6110E739EAE26800120124BBD1DA00535", "length": 703697, "format": "zip", "includeInBundle": true},
+        {"id": "zlib-package", "fileName": "zlib.static.1.2.5.nupkg", "url": "https://api.nuget.org/v3-flatcontainer/zlib.static/1.2.5/zlib.static.1.2.5.nupkg", "sha256": "A2E4A9FD423F97ED8D7B46E6AFF120286E5A56ED90E8F2908231A116D81EEC5B", "length": 147388, "format": "binary", "includeInBundle": true}
+      ],
+      "licenseTexts": [
+        {"kind": "archive-entry", "sourceArtifactId": "zlib-source", "archivePath": "zlib-9712272c78b9d9c93746d9c8e156a3728c65ca72/README", "sha256": "1A09937F90583E12E43AEBA0E5ED422B77BC5A879A481C9DBF37B3F3E880B38B", "length": 5200}
+      ],
+      "transforms": [],
+      "buildRecipe": {
+        "description": "Use the exact official zlib.static 1.2.5 NuGet package embedded byte-for-byte in the dependency archive; its complete source directory is retained there and consumed by the libpng project.",
+        "candidateBinding": {"kind": "transitive-static-source", "parentLibrary": "libpng.lib", "dependencyPath": "libpng/packages/zlib.static.1.2.5"}
+      }
+    },
+    {
+      "id": "libjpeg-turbo",
+      "name": "libjpeg-turbo",
+      "version": "3.1.2",
+      "sourceRepository": "https://github.com/libjpeg-turbo/libjpeg-turbo",
+      "sourceCommit": "4e151a4ad91001b3aa8c2ece2205c15f487ce320",
+      "licenseExpression": "BSD-3-Clause AND IJG AND Zlib",
+      "modified": false,
+      "sourceArtifacts": [
+        {"id": "libjpeg-turbo-source", "fileName": "libjpeg-turbo-4e151a4ad91001b3aa8c2ece2205c15f487ce320.zip", "url": "https://github.com/libjpeg-turbo/libjpeg-turbo/archive/4e151a4ad91001b3aa8c2ece2205c15f487ce320.zip", "sha256": "D3C33405B46AA14094EF26CD7B9618162EBCAFEED7FB2ACF2FDA5C7C10B80782", "length": 3033904, "format": "zip", "includeInBundle": true}
+      ],
+      "licenseTexts": [
+        {"kind": "archive-entry", "sourceArtifactId": "libjpeg-turbo-source", "archivePath": "libjpeg-turbo-4e151a4ad91001b3aa8c2ece2205c15f487ce320/LICENSE.md", "sha256": "2189DC45A8FE96204069F8124CAA53A148DFDC193F50F584C6CA7849A6072872", "length": 5620}
+      ],
+      "transforms": [],
+      "buildRecipe": {
+        "description": "Configure the complete retained source tree for VS 2022 x64 with ENABLE_SHARED=OFF, ENABLE_STATIC=ON, WITH_TURBOJPEG=ON, WITH_CRT_DLL=OFF; build turbojpeg-static.",
+        "candidateBinding": {"kind": "static-linker-input", "library": "turbojpeg-static.lib"}
+      }
+    },
+    {
+      "id": "nlohmann-json",
+      "name": "nlohmann-json single header",
+      "version": "3.12.0",
+      "sourceRepository": "https://github.com/nlohmann/json",
+      "sourceCommit": "55f93686c01528224f448c19128836e7df245f72",
+      "licenseExpression": "MIT",
+      "modified": true,
+      "sourceArtifacts": [
+        {"id": "nlohmann-source", "fileName": "nlohmann-json-55f93686c01528224f448c19128836e7df245f72.zip", "url": "https://github.com/nlohmann/json/archive/55f93686c01528224f448c19128836e7df245f72.zip", "sha256": "0746352E4E9532E7AEABBCBAA79079B6BC6008E9261E4D459C9486A9B48A172E", "length": 10243783, "format": "zip", "includeInBundle": true}
+      ],
+      "licenseTexts": [
+        {"kind": "archive-entry", "sourceArtifactId": "nlohmann-source", "archivePath": "json-55f93686c01528224f448c19128836e7df245f72/LICENSE.MIT", "sha256": "46A65CFFD1EA955132D95A8DD921640714A8D6B537D2E4E482D31145AE95B603", "length": 1076}
+      ],
+      "transforms": [
+        {
+          "kind": "lf-to-crlf",
+          "sourceArtifactId": "nlohmann-source",
+          "sourceArchivePath": "json-55f93686c01528224f448c19128836e7df245f72/single_include/nlohmann/json.hpp",
+          "repositoryPath": "ytdlp-interface/json.hpp",
+          "sourceSha256": "AAF127C04CB31C406E5B04A63F1AE89369FCCDE6D8FA7CDDA1ED4F32DFC5DE63",
+          "sourceLength": 953436,
+          "targetSha256": "5F09D1EEBE9B3557F21DF155869AF13BCDE79B74A0748F82CA946E8CC088AAA0",
+          "targetLength": 978962,
+          "sourceOrderedChunkSha256": "818FA47652A97822277261C6A14CBC4C5EDBCE2065F0C4C3F26BAF2C4525F01E",
+          "targetOrderedChunkSha256": "3EB300A9133FFA64C15037A847545900F5E433DB046EE35B6A8C8FA8F589C874",
+          "lineFeedCount": 25526,
+          "transformEvidenceSha256": "714E24AD6F0F3F89056994CC03BA57B8761B6D1E84EE85B50FC91C94BF8B89FC",
+          "transformEvidenceLength": 518
+        }
+      ],
+      "buildRecipe": {
+        "description": "Compile ytdlp-interface/json.hpp from the exact final application source. The only upstream-to-vendored byte transform is deterministic LF-to-CRLF conversion.",
+        "candidateBinding": {"kind": "compiled-header", "repositoryPath": "ytdlp-interface/json.hpp", "targetSha256": "5F09D1EEBE9B3557F21DF155869AF13BCDE79B74A0748F82CA946E8CC088AAA0"}
+      }
+    },
+    {
+      "id": "yt-dlp",
+      "name": "yt-dlp nightly Windows executable",
+      "version": "2026.08.30.232658",
+      "sourceRepository": "https://github.com/yt-dlp/yt-dlp",
+      "sourceCommit": "bbc809a1161d3bfca51fa36f59dda35556ee85a0",
+      "licenseExpression": "Unlicense AND LicenseRef-yt-dlp-PyInstaller-Third-Party",
+      "modified": false,
+      "sourceArtifacts": [
+        {"id": "yt-dlp-source", "fileName": "yt-dlp-bbc809a1161d3bfca51fa36f59dda35556ee85a0.zip", "url": "https://github.com/yt-dlp/yt-dlp/archive/bbc809a1161d3bfca51fa36f59dda35556ee85a0.zip", "sha256": "62A651DE6FFCD3631CA34F0F617932BDEDC4A6BE652777ACAE8A11D1CAFD172B", "length": 3854279, "format": "zip", "includeInBundle": true},
+        {"id": "yt-dlp-binary", "fileName": "yt-dlp-2026.08.30.232658.exe", "url": "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/download/2026.08.30.232658/yt-dlp.exe", "sha256": "A3A504C66E91F6474CEF0BE83B16AEDFB7B42B9400A962242D0D433E98F67A70", "length": 17842860, "format": "binary", "includeInBundle": false},
+        {"id": "yt-dlp-sums", "fileName": "yt-dlp-2026.08.30.232658-SHA2-256SUMS", "url": "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/download/2026.08.30.232658/SHA2-256SUMS", "sha256": "E5384D809D9C6D70E80996AA6728620C660165930CA3C7BC08AD1D755261293E", "length": 1505, "format": "text", "includeInBundle": true}
+      ],
+      "licenseTexts": [
+        {"kind": "archive-entry", "sourceArtifactId": "yt-dlp-source", "archivePath": "yt-dlp-bbc809a1161d3bfca51fa36f59dda35556ee85a0/LICENSE", "sha256": "7E12E5DF4BAE12CB21581BA157CED20E1986A0508DD10D0E8A4AB9A4CF94E85C", "length": 1211},
+        {"kind": "archive-entry", "sourceArtifactId": "yt-dlp-source", "archivePath": "yt-dlp-bbc809a1161d3bfca51fa36f59dda35556ee85a0/THIRD_PARTY_LICENSES.txt", "sha256": "472AEFE951C7DB35E1657C1D13FD337140511ED6F2B329205105AD441C5A02B7", "length": 243550}
+      ],
+      "transforms": [],
+      "binaryProvenance": {
+        "releaseTag": "2026.08.30.232658",
+        "releaseId": 379432130,
+        "releaseImmutable": true,
+        "assetId": 537182018,
+        "sourceCommit": "bbc809a1161d3bfca51fa36f59dda35556ee85a0",
+        "binaryArtifactId": "yt-dlp-binary",
+        "checksumsAssetId": 537182010,
+        "checksumsArtifactId": "yt-dlp-sums"
+      },
+      "buildRecipe": {
+        "description": "Use the official immutable nightly release asset generated from source commit bbc809a1161d3bfca51fa36f59dda35556ee85a0; verify the official SHA2-256SUMS and preserve the exact source LICENSE and THIRD_PARTY_LICENSES.txt corpus.",
+        "candidateBinding": {"kind": "candidate-file", "candidatePath": "yt-dlp.exe", "sha256": "A3A504C66E91F6474CEF0BE83B16AEDFB7B42B9400A962242D0D433E98F67A70"}
+      }
+    }
+  ]
+}
