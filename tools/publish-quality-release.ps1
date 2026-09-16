@@ -89,6 +89,21 @@ function Invoke-KaronPublishChecked {
     $result.Output
 }
 
+function Get-KaronPublishAuthToken {
+    param(
+        [Parameter(Mandatory)] [scriptblock] $CommandRunner,
+        [Parameter(Mandatory)] [string] $RepositoryRoot
+    )
+    try {
+        $result = Invoke-KaronPublishRunner $CommandRunner 'gh' @('auth', 'token', '--hostname', 'github.com') $RepositoryRoot
+    }
+    catch { throw 'publication_gh_token_failed' }
+    if ($result.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($result.Output) -or $result.Output -match '\s') {
+        throw 'publication_gh_token_failed'
+    }
+    [string]$result.Output
+}
+
 function Invoke-KaronPublishHttpExternal {
     param(
         [Parameter(Mandatory)] [object] $Request,
@@ -644,8 +659,7 @@ function Invoke-QualityReleasePublication {
         $uploadSnapshot = New-KaronPublishUploadSnapshot $assets $inventory
         $uploadInventory = $uploadSnapshot.Inventory
         $plan = New-KaronPublishDraftPlan $uploadInventory $receipt.NotesBody
-        $token = Invoke-KaronPublishChecked $CommandRunner 'gh' @('auth', 'token', '--hostname', 'github.com') $root 'publication_gh_token_failed'
-        if ([string]::IsNullOrWhiteSpace($token) -or $token -match '\s') { throw 'publication_gh_token_failed' }
+        $token = Get-KaronPublishAuthToken $CommandRunner $root
         if ($null -eq $HttpRunner) {
             $capturedToken = $token
             $HttpRunner = { param($request) Invoke-KaronPublishHttpExternal $request $capturedToken }.GetNewClosure()

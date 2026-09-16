@@ -587,6 +587,8 @@ function New-FakePublicationRunner {
         WrongReleaseAccessed = $false
         WrongReleaseMutated = $false
         UploadedAssetNames = [Collections.Generic.List[string]]::new()
+        TokenExitCode = 0
+        TokenOutput = 'test-token-not-a-secret'
     }
     foreach ($key in $Options.Keys) { $state[$key] = $Options[$key] }
     $calls = [Collections.Generic.List[object]]::new()
@@ -655,7 +657,9 @@ function New-FakePublicationRunner {
             return & $ok ('100644 blob ' + $state.NotesBlob + [char]9 + 'release/notes/v2.19.1-karon.2.md')
         }
         if ($key -ceq 'gh|auth|status|--hostname|github.com') { return & $ok 'authenticated' }
-        if ($key -ceq 'gh|auth|token|--hostname|github.com') { return & $ok 'test-token-not-a-secret' }
+        if ($key -ceq 'gh|auth|token|--hostname|github.com') {
+            return [pscustomobject]@{ ExitCode = [int]$state.TokenExitCode; Output = [string]$state.TokenOutput }
+        }
         $apiKey = 'gh|api|--method|GET|repos/KaronLabs/ytdlp-korean-interface/releases/tags/' + $tag
         if ($key -ceq $apiKey) {
             if ($state.Stage -ceq 'absent') { return & $fail 'gh: Not Found (HTTP 404)' }
@@ -1295,6 +1299,47 @@ Describe 'Release identity tag-rebinding perimeter' {
         $fake.State.WrongReleaseAccessed | Should Be $false
         $fake.State.WrongReleaseMutated | Should Be $false
         $fake.State.Stage | Should Be 'draft-assets'
+    }
+}
+
+Describe 'Credential token non-reflection perimeter' {
+    It 'never reflects failed token-command output into exceptions arguments plans files or captured output' {
+        $sentinel = 'SECRET_SENTINEL_TOKEN_OUTPUT_7c0b59f4'
+        $case = New-PackagedPublicationCase 'publish-token-failure-non-reflection'
+        $fake = New-FakePublicationRunner $case @{ TokenExitCode = 1; TokenOutput = $sentinel }
+        $caught = $null
+        try { [void](Invoke-TestPublication $case $fake) }
+        catch { $caught = $_ }
+        $caught | Should Not BeNullOrEmpty
+        $caught.Exception.Message | Should Be 'publication_gh_token_failed'
+        ($caught | Out-String) | Should Not Match $sentinel
+        (($fake.Calls | ConvertTo-Json -Depth 8) -join '') | Should Not Match $sentinel
+        (($fake.Operations | ConvertTo-Json -Depth 8) -join '') | Should Not Match $sentinel
+        $planFake = New-FakePublicationRunner $case
+        $plan = Invoke-TestPublication $case $planFake -PlanOnly
+        (($plan.Commands | ConvertTo-Json -Depth 8) -join '') | Should Not Match $sentinel
+        $treeContainsSentinel = $false
+        foreach ($file in @(Get-ChildItem -LiteralPath $case.Root -File -Recurse -Force)) {
+            $text = [Text.UTF8Encoding]::new($false, $false).GetString([IO.File]::ReadAllBytes($file.FullName))
+            if ($text.Contains($sentinel, [StringComparison]::Ordinal)) { $treeContainsSentinel = $true; break }
+        }
+        $treeContainsSentinel | Should Be $false
+        $fake.HttpCalls.Count | Should Be 0
+        $fake.State.Stage | Should Be 'absent'
+    }
+
+    It 'fails closed without reflection for an empty or whitespace success token' -TestCases @(
+        @{ Name = 'empty'; TokenOutput = '' },
+        @{ Name = 'spaces'; TokenOutput = '   ' },
+        @{ Name = 'mixed-whitespace'; TokenOutput = "`t `r`n" }
+    ) {
+        param($Name, $TokenOutput)
+        $case = New-PackagedPublicationCase ('publish-token-invalid-' + $Name)
+        $fake = New-FakePublicationRunner $case @{ TokenExitCode = 0; TokenOutput = $TokenOutput }
+        $failure = Get-TestFailure { Invoke-TestPublication $case $fake }
+        $failure | Should Be 'publication_gh_token_failed'
+        $fake.HttpCalls.Count | Should Be 0
+        $fake.State.Stage | Should Be 'absent'
     }
 }
 
