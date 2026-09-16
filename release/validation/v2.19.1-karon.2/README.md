@@ -1,120 +1,125 @@
-# GUI release evidence contract for v2.19.1-karon.2
+# v2.19.1-karon.2 GUI release evidence contract
 
-This directory defines the manual GUI evidence gate. It does not contain final
-evidence and does not claim that the six-case matrix passed.
+This directory defines the manual evidence contract for the sealed Windows x64 candidate. It does not claim that the GUI matrix has been run or that the release passed.
 
-## Required cases
+## Fixed matrix
 
-Run the same sealed `ytdlp-interface.exe` bytes in this exact matrix:
+Exactly these six case IDs are accepted:
 
-| Case ID | Language | Windows scale |
+| Case ID | Language | DPI |
 |---|---|---:|
-| `ko-KR-100` | `ko-KR` | 100% |
-| `ko-KR-150` | `ko-KR` | 150% |
-| `ko-KR-200` | `ko-KR` | 200% |
-| `en-US-100` | `en-US` | 100% |
-| `en-US-150` | `en-US` | 150% |
-| `en-US-200` | `en-US` | 200% |
+| `ko-KR-100` | `ko-KR` | 100 |
+| `ko-KR-150` | `ko-KR` | 150 |
+| `ko-KR-200` | `ko-KR` | 200 |
+| `en-US-100` | `en-US` | 100 |
+| `en-US-150` | `en-US` | 150 |
+| `en-US-200` | `en-US` | 200 |
 
-The recorder never changes Windows DPI or language. Before each run, the
-operator must explicitly set the requested scale and application language,
-sign out or restart the application when Windows requires it, visually confirm
-the effective values, and then record those observed values.
+Every case must bind to one identical `ytdlp-interface.exe` SHA-256. The verifier also resolves `ffprobe.exe` from that executable's directory and records its SHA-256 and length. When `candidate-manifest.json` is supplied, both binaries must match the manifest entries exactly.
 
-## Operator flow
+## Required observations
 
-Use a new evidence directory and the final sealed candidate path. `Initialize`
-records the candidate SHA and creates only null observations. It does not set a
-PASS value.
+Each case records actual observed booleans for:
+
+- launch
+- download type
+- 1080p preset
+- 720p preset
+- best-quality preset
+- expected resolution
+- queue registration
+- progress
+- completion
+- advanced-settings navigation
+- no clipping
+
+The recorder initializes every observation to `null`; it never presets PASS. It does not change Windows display scaling or application language. The operator must perform those changes explicitly before each run and record the values actually observed.
+
+`ko-KR-100` and `en-US-200` require a completed video lifecycle. The lifecycle references only the downloaded media file plus the expected width and height. Operator-authored ffprobe JSON is prohibited. The verifier executes the sealed candidate's own `ffprobe.exe`, requires both video and audio streams, compares the probed dimensions, and writes canonical probe JSON into its controlled output directory.
+
+Representative coverage across the six cases must also include:
+
+- MP3 conversion with a valid MP3 artifact
+- settings save and restart restore
+- legacy-settings transition
+
+The verifier probes every referenced MP3 with the sealed candidate's `ffprobe.exe`; a filename or operator assertion is not sufficient.
+
+## Evidence files
+
+Screenshots must be fully decodable PNG files at least 640x480. Their recorded SHA-256, byte length, width, height, and capture timestamp must match the actual file. Truncated images, header-only images, and 1x1 placeholders are rejected.
+
+All referenced evidence files must be direct descendants of the evidence directory and form its exact file allowlist. Any extra file, including an unknown binary, causes rejection. Candidate and evidence paths are rejected when any path component is a reparse point or junction.
+
+Decoded JSON strings are recursively checked for cookies, tokens, authorization values, signed URLs, and query-bearing URLs. Evidence must not contain secrets or expiring media URLs.
+
+## Operator workflow
+
+Initialize one case from the null template:
 
 ```powershell
-pwsh -NoProfile -File tools/record-gui-release-evidence.ps1 `
+./tools/record-gui-release-evidence.ps1 `
   -Action Initialize `
-  -EvidenceRoot C:\release-evidence\gui `
-  -CandidateExePath C:\sealed-candidate\ytdlp-interface.exe `
+  -EvidenceRoot <evidence-directory> `
+  -CandidateExePath <sealed-candidate>/ytdlp-interface.exe `
   -Language ko-KR `
   -DpiPercent 100
 ```
 
-After manually applying and observing the environment:
+After explicitly selecting the required language and DPI, record each observed result and attach screenshots with the recorder's matching actions. Attach a required video lifecycle without supplying probe JSON:
 
 ```powershell
-pwsh -NoProfile -File tools/record-gui-release-evidence.ps1 `
-  -Action RecordEnvironment `
-  -CasePath C:\release-evidence\gui\cases\ko-KR-100.json `
-  -ObservedLanguage ko-KR `
-  -ObservedDpiPercent 100
-```
-
-Record every observation separately. Use `-Result false` when the observed
-behavior failed. Never enter `true` merely to complete the form.
-
-```powershell
-pwsh -NoProfile -File tools/record-gui-release-evidence.ps1 `
-  -Action RecordObservation `
-  -CasePath C:\release-evidence\gui\cases\ko-KR-100.json `
-  -Observation launch `
-  -Result true
-```
-
-Capture screenshots with Computer Use or an operator-controlled local capture
-tool, then attach each PNG. The recorder copies it into the evidence root and
-records its byte hash, dimensions, length, and current UTC capture time.
-
-```powershell
-pwsh -NoProfile -File tools/record-gui-release-evidence.ps1 `
-  -Action AddScreenshot `
-  -CasePath C:\release-evidence\gui\cases\ko-KR-100.json `
-  -EvidenceFilePath C:\captures\ko100-main.png `
-  -Label main
-```
-
-For `ko-KR-100` and `en-US-200`, create ffprobe JSON from the actual completed
-video and attach both files:
-
-```powershell
-& C:\sealed-candidate\ffprobe.exe -v error -show_streams -of json `
-  C:\test-output\video.mp4 | Set-Content -Encoding utf8NoBOM C:\captures\video.ffprobe.json
-
-pwsh -NoProfile -File tools/record-gui-release-evidence.ps1 `
+./tools/record-gui-release-evidence.ps1 `
   -Action AttachVideoLifecycle `
-  -CasePath C:\release-evidence\gui\cases\ko-KR-100.json `
-  -EvidenceFilePath C:\test-output\video.mp4 `
-  -FfprobeJsonPath C:\captures\video.ffprobe.json `
+  -CasePath <evidence-directory>/cases/ko-KR-100.json `
+  -EvidenceFilePath <downloaded-video> `
   -ExpectedWidth 1920 `
   -ExpectedHeight 1080 `
   -Result true
 ```
 
-Use `RecordMp3`, `RecordSettingsRestore`, and `RecordLegacyTransition` in at
-least one representative case each. Settings and legacy checks must reference
-a screenshot already attached to that same case. Finally run `Finalize` after
-all observations and evidence were recorded.
-
-## Secret hygiene
-
-Do not record cookies, authorization headers, bearer tokens, signed media URLs,
-proxy credentials, or URLs containing query strings. The verifier rejects
-secret-like text in every JSON, log, text, Markdown, CSV, XML, and YAML evidence
-file. Use a neutral local test identifier in notes instead of a media URL.
-
-## Final verification
-
-Run this only against the final sealed candidate and completed six-case
-evidence directory:
+Run the verifier only after all six case files and their referenced evidence are complete:
 
 ```powershell
-pwsh -NoProfile -File tools/verify-gui-release-evidence.ps1 `
-  -EvidenceRoot C:\release-evidence\gui `
-  -CandidateExePath C:\sealed-candidate\ytdlp-interface.exe `
-  -OutputDirectory C:\release-evidence\sealed
+./tools/verify-gui-release-evidence.ps1 `
+  -EvidenceRoot <evidence-directory> `
+  -CandidateExePath <sealed-candidate>/ytdlp-interface.exe `
+  -CandidateManifestPath <sealed-candidate>/candidate-manifest.json `
+  -OutputDirectory <empty-parent>/gui-contract-output
 ```
 
-Success creates one atomic directory named
-`gui-validation-v2.19.1-karon.2` containing:
+## Verifier output contract for packaging
 
-- `gui-validation-summary.json`
-- `gui-validation-evidence-manifest.json`
+Output is created only after all six cases pass. The verifier writes to a unique partial directory and performs a no-overwrite atomic directory move. If another producer wins the race, its final directory is preserved and the loser removes only its own partial directory.
 
-If any gate fails, neither file is emitted. A competing producer's final
-directory is never overwritten or deleted.
+`gui-validation-summary.json` has this exact schema:
+
+```text
+schemaVersion: 2
+releaseVersion: "v2.19.1-karon.2"
+status: "PASS"
+candidate:
+  executable: { fileName, sha256, length }
+  ffprobe: { fileName, sha256, length }
+  manifest: null | { fileName, sha256, length }
+cases: [{ caseId, language, dpi, evidenceFile, evidenceSha256 } x 6]
+videoLifecycleCases: ["ko-KR-100", "en-US-200"]
+representativeCoverage: { mp3Conversion, settingsRestartRestore, legacySettingsTransition }
+generatedProbes: [{ caseId, kind, sourceEvidencePath, path, sha256, length }]
+evidenceFileCount: integer
+evidenceManifestFile: "gui-validation-evidence-manifest.json"
+```
+
+`gui-validation-evidence-manifest.json` has this exact schema:
+
+```text
+schemaVersion: 2
+releaseVersion: "v2.19.1-karon.2"
+candidate: <exact same object as summary.candidate>
+evidenceFiles: [{ path, sha256, length }]
+generatedProbeFiles: [{ path, sha256, length }]
+```
+
+The packaging gate must consume both files, require `status == "PASS"`, require the exact six cases, require byte-for-byte-equivalent candidate objects, and bind `candidate.executable` and `candidate.ffprobe` to the packaged files. If `candidate.manifest` is non-null, the packaging gate must also bind its hash and length and verify that its file table contains matching root entries for both binaries. Packaging integration is intentionally outside this change.
+
+The verifier-generated probe files are outputs, not operator evidence. No other evidence-root exclusions exist.

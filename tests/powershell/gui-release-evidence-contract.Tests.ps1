@@ -10,19 +10,11 @@ $script:Pwsh = (Get-Command pwsh.exe -ErrorAction Stop).Source
 $script:ReleaseVersion = 'v2.19.1-karon.2'
 $script:ExpectedCases = @('ko-KR-100', 'ko-KR-150', 'ko-KR-200', 'en-US-100', 'en-US-150', 'en-US-200')
 $script:ObservationNames = @(
-    'launch',
-    'downloadType',
-    'quality1080p',
-    'quality720p',
-    'qualityBest',
-    'expectedResolution',
-    'queueRegistration',
-    'progress',
-    'completion',
-    'advancedNavigation',
-    'noClipping'
+    'launch', 'downloadType', 'quality1080p', 'quality720p', 'qualityBest', 'expectedResolution',
+    'queueRegistration', 'progress', 'completion', 'advancedNavigation', 'noClipping'
 )
 $script:FixtureRoots = [Collections.Generic.List[string]]::new()
+$script:Media = $null
 
 function New-TestDirectory {
     $path = Join-Path ([IO.Path]::GetTempPath()) ('karon-gui-evidence-' + [Guid]::NewGuid().ToString('N'))
@@ -47,35 +39,126 @@ function Get-TestSha256 {
     (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
+function Find-TestRuntimeTool {
+    param([string] $Name)
+    $projectParent = Split-Path -Parent (Split-Path -Parent $script:RepositoryRoot)
+    $candidates = [Collections.Generic.List[string]]::new()
+    if (-not [string]::IsNullOrWhiteSpace($env:KARON_TEST_FFMPEG_DIR)) {
+        $candidates.Add((Join-Path $env:KARON_TEST_FFMPEG_DIR $Name))
+    }
+    foreach ($root in @($script:RepositoryRoot, (Split-Path -Parent $script:RepositoryRoot), $projectParent)) {
+        $candidates.Add((Join-Path $root $Name))
+    }
+    $command = Get-Command $Name -ErrorAction SilentlyContinue
+    if ($null -ne $command) { $candidates.Add($command.Source) }
+    foreach ($path in $candidates) {
+        if (Test-Path -LiteralPath $path -PathType Leaf) {
+            $item = Get-Item -LiteralPath $path
+            if ($item.Length -gt 0) { return $item.FullName }
+        }
+    }
+    throw "test_runtime_tool_missing: $Name"
+}
+
+function Invoke-NativeChecked {
+    param([string] $Path, [string[]] $Arguments)
+    $output = & $Path @Arguments 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "fixture_command_failed: $Path exit=$LASTEXITCODE $output" }
+}
+
+function Initialize-TestMedia {
+    $root = New-TestDirectory
+    $ffmpeg = Find-TestRuntimeTool 'ffmpeg.exe'
+    $ffprobeSource = Find-TestRuntimeTool 'ffprobe.exe'
+    $ffprobe = Join-Path $root 'ffprobe.exe'
+    Copy-Item -LiteralPath $ffprobeSource -Destination $ffprobe
+
+    $validVideo = Join-Path $root 'valid-video.mp4'
+    $videoOnly = Join-Path $root 'video-only.mp4'
+    $audioOnly = Join-Path $root 'audio-only.mp4'
+    $validMp3 = Join-Path $root 'valid-audio.mp3'
+    Invoke-NativeChecked $ffmpeg @(
+        '-hide_banner', '-loglevel', 'error',
+        '-f', 'lavfi', '-i', 'color=c=black:s=1920x1080:r=1:d=1',
+        '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1',
+        '-c:v', 'mpeg4', '-q:v', '20', '-c:a', 'aac', '-shortest', '-y', $validVideo
+    )
+    Invoke-NativeChecked $ffmpeg @(
+        '-hide_banner', '-loglevel', 'error',
+        '-f', 'lavfi', '-i', 'color=c=black:s=1920x1080:r=1:d=1',
+        '-c:v', 'mpeg4', '-q:v', '20', '-an', '-y', $videoOnly
+    )
+    Invoke-NativeChecked $ffmpeg @(
+        '-hide_banner', '-loglevel', 'error',
+        '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1',
+        '-c:a', 'aac', '-vn', '-y', $audioOnly
+    )
+    Invoke-NativeChecked $ffmpeg @(
+        '-hide_banner', '-loglevel', 'error',
+        '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1',
+        '-c:a', 'libmp3lame', '-y', $validMp3
+    )
+
+    Add-Type -AssemblyName System.Drawing
+    $validPng = Join-Path $root 'screen-640x480.png'
+    $smallPng = Join-Path $root 'screen-1x1.png'
+    $bitmap = [Drawing.Bitmap]::new(640, 480)
+    try { $bitmap.Save($validPng, [Drawing.Imaging.ImageFormat]::Png) }
+    finally { $bitmap.Dispose() }
+    $bitmap = [Drawing.Bitmap]::new(1, 1)
+    try { $bitmap.Save($smallPng, [Drawing.Imaging.ImageFormat]::Png) }
+    finally { $bitmap.Dispose() }
+
+    $script:Media = [pscustomobject]@{
+        Ffprobe = $ffprobe
+        ValidVideo = $validVideo
+        VideoOnly = $videoOnly
+        AudioOnly = $audioOnly
+        ValidMp3 = $validMp3
+        ValidPng = $validPng
+        SmallPng = $smallPng
+    }
+}
+
+function New-TestCandidate {
+    param([string] $Root)
+    $candidate = Join-Path $Root 'candidate'
+    New-Item -ItemType Directory -Path $candidate | Out-Null
+    $exe = Join-Path $candidate 'ytdlp-interface.exe'
+    $ffprobe = Join-Path $candidate 'ffprobe.exe'
+    [IO.File]::WriteAllBytes($exe, [Text.Encoding]::ASCII.GetBytes('sealed-candidate-fixture'))
+    New-Item -ItemType HardLink -Path $ffprobe -Target $script:Media.Ffprobe | Out-Null
+    $files = @(
+        [ordered]@{ path = 'ytdlp-interface.exe'; sha256 = Get-TestSha256 $exe; length = (Get-Item $exe).Length },
+        [ordered]@{ path = 'ffprobe.exe'; sha256 = Get-TestSha256 $ffprobe; length = (Get-Item $ffprobe).Length }
+    )
+    $manifest = Join-Path $candidate 'candidate-manifest.json'
+    Write-TestJson $manifest ([ordered]@{
+        schemaVersion = 1
+        createdAtUtc = ConvertTo-UtcText ([DateTimeOffset]::UtcNow)
+        attestation = [ordered]@{}
+        versions = [ordered]@{}
+        files = $files
+    })
+    [pscustomobject]@{ Root = $candidate; Exe = $exe; Ffprobe = $ffprobe; Manifest = $manifest }
+}
+
 function Invoke-TestScript {
     param([string] $ScriptPath, [string[]] $Arguments)
-
-    if (-not (Test-Path -LiteralPath $ScriptPath -PathType Leaf)) {
-        throw "production_script_missing: $ScriptPath"
-    }
-
+    if (-not (Test-Path -LiteralPath $ScriptPath -PathType Leaf)) { throw "production_script_missing: $ScriptPath" }
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $script:Pwsh
     $startInfo.UseShellExecute = $false
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
-    $startInfo.ArgumentList.Add('-NoProfile')
-    $startInfo.ArgumentList.Add('-File')
-    $startInfo.ArgumentList.Add($ScriptPath)
-    foreach ($argument in $Arguments) { $startInfo.ArgumentList.Add($argument) }
-
+    foreach ($argument in @('-NoProfile', '-File', $ScriptPath) + $Arguments) { $startInfo.ArgumentList.Add($argument) }
     $process = [Diagnostics.Process]::new()
     $process.StartInfo = $startInfo
     if (-not $process.Start()) { throw 'test_process_start_failed' }
     $stdout = $process.StandardOutput.ReadToEnd()
     $stderr = $process.StandardError.ReadToEnd()
     $process.WaitForExit()
-    [pscustomobject]@{
-        ExitCode = $process.ExitCode
-        Output = $stdout
-        Error = $stderr
-        Combined = $stdout + "`n" + $stderr
-    }
+    [pscustomobject]@{ ExitCode = $process.ExitCode; Output = $stdout; Error = $stderr; Combined = $stdout + "`n" + $stderr }
 }
 
 function New-ObservationSet {
@@ -95,17 +178,14 @@ function New-ValidGuiFixture {
     $artifacts = Join-Path $evidence 'artifacts'
     $output = Join-Path $root 'output'
     New-Item -ItemType Directory -Path $evidence, $cases, $screenshots, $artifacts, $output | Out-Null
-
-    $exe = Join-Path $root 'ytdlp-interface.exe'
-    [IO.File]::WriteAllBytes($exe, [Text.Encoding]::ASCII.GetBytes('sealed-candidate-fixture'))
-    $exeInfo = Get-Item -LiteralPath $exe
-    $exeSha = Get-TestSha256 $exe
+    $candidate = New-TestCandidate $root
+    $exeInfo = Get-Item -LiteralPath $candidate.Exe
+    $exeSha = Get-TestSha256 $candidate.Exe
 
     $now = [DateTimeOffset]::UtcNow
     $started = ConvertTo-UtcText $now.AddMinutes(-12)
     $observed = ConvertTo-UtcText $now.AddMinutes(-6)
     $completed = ConvertTo-UtcText $now.AddMinutes(-2)
-    $pngBytes = [Convert]::FromBase64String('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=')
 
     foreach ($caseId in $script:ExpectedCases) {
         $parts = $caseId.Split('-')
@@ -113,31 +193,21 @@ function New-ValidGuiFixture {
         $dpi = [int]$parts[2]
         $screenshotRelative = "screenshots/$caseId-main.png"
         $screenshotPath = Join-Path $evidence ($screenshotRelative.Replace('/', '\'))
-        [IO.File]::WriteAllBytes($screenshotPath, $pngBytes)
+        Copy-Item -LiteralPath $script:Media.ValidPng -Destination $screenshotPath
         $screenshotInfo = Get-Item -LiteralPath $screenshotPath
 
         $lifecycle = $null
         if ($caseId -in @('ko-KR-100', 'en-US-200')) {
             $mediaRelative = "artifacts/$caseId-video.mp4"
-            $probeRelative = "artifacts/$caseId-ffprobe.json"
             $mediaPath = Join-Path $evidence ($mediaRelative.Replace('/', '\'))
-            $probePath = Join-Path $evidence ($probeRelative.Replace('/', '\'))
-            [IO.File]::WriteAllBytes($mediaPath, [Text.Encoding]::ASCII.GetBytes("media-$caseId"))
-            Write-TestJson $probePath ([ordered]@{
-                streams = @(
-                    [ordered]@{ codec_type = 'video'; width = 1920; height = 1080 },
-                    [ordered]@{ codec_type = 'audio'; channels = 2 }
-                )
-            })
+            Copy-Item -LiteralPath $script:Media.ValidVideo -Destination $mediaPath
             $mediaInfo = Get-Item -LiteralPath $mediaPath
-            $probeInfo = Get-Item -LiteralPath $probePath
             $lifecycle = [ordered]@{
                 completed = $true
                 observedAtUtc = $observed
                 expectedWidth = 1920
                 expectedHeight = 1080
                 output = [ordered]@{ path = $mediaRelative; sha256 = Get-TestSha256 $mediaPath; length = $mediaInfo.Length }
-                ffprobe = [ordered]@{ path = $probeRelative; sha256 = Get-TestSha256 $probePath; length = $probeInfo.Length }
             }
         }
 
@@ -149,7 +219,7 @@ function New-ValidGuiFixture {
         if ($caseId -eq 'ko-KR-100') {
             $mp3Relative = 'artifacts/ko-KR-100-audio.mp3'
             $mp3Path = Join-Path $evidence ($mp3Relative.Replace('/', '\'))
-            [IO.File]::WriteAllBytes($mp3Path, [Text.Encoding]::ASCII.GetBytes('mp3-fixture'))
+            Copy-Item -LiteralPath $script:Media.ValidMp3 -Destination $mp3Path
             $mp3Info = Get-Item -LiteralPath $mp3Path
             $representative.mp3Conversion = [ordered]@{
                 result = $true
@@ -171,7 +241,7 @@ function New-ValidGuiFixture {
         }
 
         $case = [ordered]@{
-            schemaVersion = 1
+            schemaVersion = 2
             releaseVersion = $script:ReleaseVersion
             caseId = $caseId
             language = $language
@@ -185,8 +255,8 @@ function New-ValidGuiFixture {
                 path = $screenshotRelative
                 sha256 = Get-TestSha256 $screenshotPath
                 length = $screenshotInfo.Length
-                width = 1
-                height = 1
+                width = 640
+                height = 480
                 capturedAtUtc = $observed
             })
             fullVideoLifecycle = $lifecycle
@@ -203,7 +273,8 @@ function New-ValidGuiFixture {
         Screenshots = $screenshots
         Artifacts = $artifacts
         Output = $output
-        Exe = $exe
+        Candidate = $candidate
+        Exe = $candidate.Exe
         ExeSha = $exeSha
     }
 }
@@ -211,7 +282,10 @@ function New-ValidGuiFixture {
 function Read-TestCase {
     param([object] $Fixture, [string] $CaseId)
     $path = Join-Path $Fixture.Cases "$CaseId.json"
-    [pscustomobject]@{ Path = $path; Value = (Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 64 -DateKind String) }
+    [pscustomobject]@{
+        Path = $path
+        Value = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 64 -DateKind String
+    }
 }
 
 function Save-TestCase {
@@ -219,11 +293,36 @@ function Save-TestCase {
     Write-TestJson $Case.Path $Case.Value
 }
 
+function Update-DescriptorForFile {
+    param([object] $Descriptor, [string] $Path)
+    $Descriptor.sha256 = Get-TestSha256 $Path
+    $Descriptor.length = (Get-Item -LiteralPath $Path).Length
+}
+
+function Replace-LifecycleMedia {
+    param([object] $Fixture, [string] $CaseId, [string] $Source)
+    $case = Read-TestCase $Fixture $CaseId
+    $path = Join-Path $Fixture.Evidence (([string]$case.Value.fullVideoLifecycle.output.path).Replace('/', '\'))
+    Copy-Item -LiteralPath $Source -Destination $path -Force
+    Update-DescriptorForFile $case.Value.fullVideoLifecycle.output $path
+    Save-TestCase $case
+}
+
+function Replace-Mp3Media {
+    param([object] $Fixture, [string] $Source)
+    $case = Read-TestCase $Fixture 'ko-KR-100'
+    $path = Join-Path $Fixture.Evidence (([string]$case.Value.representativeChecks.mp3Conversion.output.path).Replace('/', '\'))
+    Copy-Item -LiteralPath $Source -Destination $path -Force
+    Update-DescriptorForFile $case.Value.representativeChecks.mp3Conversion.output $path
+    Save-TestCase $case
+}
+
 function Invoke-GuiVerifier {
     param([object] $Fixture, [string] $OutputDirectory = $Fixture.Output)
     Invoke-TestScript $script:Verifier @(
         '-EvidenceRoot', $Fixture.Evidence,
         '-CandidateExePath', $Fixture.Exe,
+        '-CandidateManifestPath', $Fixture.Candidate.Manifest,
         '-OutputDirectory', $OutputDirectory,
         '-MaximumEvidenceAgeHours', '24'
     )
@@ -237,26 +336,16 @@ function Assert-VerifierRejects {
     (Test-Path -LiteralPath (Join-Path $Fixture.Output 'gui-validation-v2.19.1-karon.2')) | Should Be $false
 }
 
-function Set-ProbeStreams {
-    param([object] $Fixture, [object[]] $Streams)
-    $case = Read-TestCase $Fixture 'ko-KR-100'
-    $relative = [string]$case.Value.fullVideoLifecycle.ffprobe.path
-    $path = Join-Path $Fixture.Evidence ($relative.Replace('/', '\'))
-    Write-TestJson $path ([ordered]@{ streams = $Streams })
-    $info = Get-Item -LiteralPath $path
-    $case.Value.fullVideoLifecycle.ffprobe.sha256 = Get-TestSha256 $path
-    $case.Value.fullVideoLifecycle.ffprobe.length = $info.Length
-    Save-TestCase $case
-}
-
 Describe 'v2.19.1-karon.2 GUI release evidence contract' {
+    BeforeAll { Initialize-TestMedia }
+
     AfterAll {
         foreach ($root in $script:FixtureRoots) {
             Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
 
-    It 'accepts exactly six complete cases and emits deterministic summary and manifest bytes' {
+    It 'accepts six complete cases, probes real media, and emits deterministic schema-v2 bytes' {
         $fixture = New-ValidGuiFixture
         $first = Invoke-GuiVerifier $fixture
         $first.ExitCode | Should Be 0
@@ -265,17 +354,18 @@ Describe 'v2.19.1-karon.2 GUI release evidence contract' {
         $manifest = Join-Path $final 'gui-validation-evidence-manifest.json'
         (Test-Path -LiteralPath $summary -PathType Leaf) | Should Be $true
         (Test-Path -LiteralPath $manifest -PathType Leaf) | Should Be $true
-
-        $summaryValue = Get-Content -LiteralPath $summary -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 64
-        $summaryValue.status | Should Be 'PASS'
-        $summaryValue.executableSha256 | Should Be $fixture.ExeSha
-        @($summaryValue.cases).Count | Should Be 6
-        (@($summaryValue.cases) -join ',') | Should Be ($script:ExpectedCases -join ',')
+        $value = Get-Content -LiteralPath $summary -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 64 -DateKind String
+        $value.schemaVersion | Should Be 2
+        $value.status | Should Be 'PASS'
+        $value.candidate.executable.sha256 | Should Be $fixture.ExeSha
+        $value.candidate.ffprobe.sha256 | Should Be (Get-TestSha256 $fixture.Candidate.Ffprobe)
+        $value.candidate.manifest.sha256 | Should Be (Get-TestSha256 $fixture.Candidate.Manifest)
+        @($value.cases).Count | Should Be 6
+        @($value.generatedProbes).Count | Should Be 3
 
         $secondOutput = Join-Path $fixture.Root 'second-output'
         New-Item -ItemType Directory -Path $secondOutput | Out-Null
-        $second = Invoke-GuiVerifier $fixture $secondOutput
-        $second.ExitCode | Should Be 0
+        (Invoke-GuiVerifier $fixture $secondOutput).ExitCode | Should Be 0
         $secondFinal = Join-Path $secondOutput 'gui-validation-v2.19.1-karon.2'
         (Get-TestSha256 $summary) | Should Be (Get-TestSha256 (Join-Path $secondFinal 'gui-validation-summary.json'))
         (Get-TestSha256 $manifest) | Should Be (Get-TestSha256 (Join-Path $secondFinal 'gui-validation-evidence-manifest.json'))
@@ -328,7 +418,7 @@ Describe 'v2.19.1-karon.2 GUI release evidence contract' {
         Assert-VerifierRejects $fixture 'gui_executable_sha_mixed'
     }
 
-    It 'rejects a uniform executable SHA that does not match the candidate bytes' {
+    It 'rejects a uniform executable SHA that does not match candidate bytes' {
         $fixture = New-ValidGuiFixture
         foreach ($caseId in $script:ExpectedCases) {
             $case = Read-TestCase $fixture $caseId
@@ -378,23 +468,29 @@ Describe 'v2.19.1-karon.2 GUI release evidence contract' {
         Assert-VerifierRejects $fixture 'gui_clipping_detected'
     }
 
-    It 'rejects a missing ffprobe artifact for a required lifecycle case' {
+    It 'rejects a missing candidate ffprobe executable' {
         $fixture = New-ValidGuiFixture
-        $case = Read-TestCase $fixture 'ko-KR-100'
-        $probe = Join-Path $fixture.Evidence (([string]$case.Value.fullVideoLifecycle.ffprobe.path).Replace('/', '\'))
-        Remove-Item -LiteralPath $probe
-        Assert-VerifierRejects $fixture 'gui_evidence_file_missing'
+        Remove-Item -LiteralPath $fixture.Candidate.Ffprobe
+        Assert-VerifierRejects $fixture 'gui_candidate_ffprobe_missing'
     }
 
-    It 'rejects ffprobe evidence without an audio stream' {
+    It 'rejects candidate ffprobe bytes that do not match the supplied manifest' {
         $fixture = New-ValidGuiFixture
-        Set-ProbeStreams $fixture @([ordered]@{ codec_type = 'video'; width = 1920; height = 1080 })
+        $manifest = Get-Content -LiteralPath $fixture.Candidate.Manifest -Raw | ConvertFrom-Json -Depth 64 -DateKind String
+        @($manifest.files | Where-Object { $_.path -ceq 'ffprobe.exe' })[0].sha256 = ('c' * 64)
+        Write-TestJson $fixture.Candidate.Manifest $manifest
+        Assert-VerifierRejects $fixture 'gui_candidate_manifest_mismatch: ffprobe.exe'
+    }
+
+    It 'rejects required video without audio' {
+        $fixture = New-ValidGuiFixture
+        Replace-LifecycleMedia $fixture 'ko-KR-100' $script:Media.VideoOnly
         Assert-VerifierRejects $fixture 'gui_ffprobe_audio_missing'
     }
 
-    It 'rejects ffprobe evidence without a video stream' {
+    It 'rejects required video without video' {
         $fixture = New-ValidGuiFixture
-        Set-ProbeStreams $fixture @([ordered]@{ codec_type = 'audio'; channels = 2 })
+        Replace-LifecycleMedia $fixture 'ko-KR-100' $script:Media.AudioOnly
         Assert-VerifierRejects $fixture 'gui_ffprobe_video_missing'
     }
 
@@ -419,7 +515,7 @@ Describe 'v2.19.1-karon.2 GUI release evidence contract' {
     It 'rejects screenshot dimension mismatch' {
         $fixture = New-ValidGuiFixture
         $case = Read-TestCase $fixture 'ko-KR-150'
-        $case.Value.screenshots[0].width = 2
+        $case.Value.screenshots[0].width = 641
         Save-TestCase $case
         Assert-VerifierRejects $fixture 'gui_screenshot_dimensions_mismatch'
     }
@@ -432,7 +528,7 @@ Describe 'v2.19.1-karon.2 GUI release evidence contract' {
         Assert-VerifierRejects $fixture 'gui_timestamp_outside_case|gui_evidence_stale'
     }
 
-    It 'rejects an artifact length or hash mismatch' {
+    It 'rejects an artifact length mismatch' {
         $fixture = New-ValidGuiFixture
         $case = Read-TestCase $fixture 'ko-KR-100'
         $case.Value.fullVideoLifecycle.output.length = [long]$case.Value.fullVideoLifecycle.output.length + 1
@@ -440,28 +536,15 @@ Describe 'v2.19.1-karon.2 GUI release evidence contract' {
         Assert-VerifierRejects $fixture 'gui_evidence_length_mismatch'
     }
 
-    It 'rejects missing MP3 representative coverage' {
-        $fixture = New-ValidGuiFixture
-        $case = Read-TestCase $fixture 'ko-KR-100'
-        $case.Value.representativeChecks.mp3Conversion = $null
-        Save-TestCase $case
-        Assert-VerifierRejects $fixture 'gui_representative_check_missing: mp3Conversion'
-    }
-
-    It 'rejects missing settings save and restart coverage' {
-        $fixture = New-ValidGuiFixture
-        $case = Read-TestCase $fixture 'ko-KR-100'
-        $case.Value.representativeChecks.settingsSaveRestartRestore = $null
-        Save-TestCase $case
-        Assert-VerifierRejects $fixture 'gui_representative_check_missing: settingsSaveRestartRestore'
-    }
-
-    It 'rejects missing legacy settings transition coverage' {
-        $fixture = New-ValidGuiFixture
-        $case = Read-TestCase $fixture 'en-US-200'
-        $case.Value.representativeChecks.legacySettingsTransition = $null
-        Save-TestCase $case
-        Assert-VerifierRejects $fixture 'gui_representative_check_missing: legacySettingsTransition'
+    foreach ($checkName in @('mp3Conversion', 'settingsSaveRestartRestore', 'legacySettingsTransition')) {
+        It "rejects missing representative coverage for $checkName" {
+            $fixture = New-ValidGuiFixture
+            $caseId = if ($checkName -ceq 'legacySettingsTransition') { 'en-US-200' } else { 'ko-KR-100' }
+            $case = Read-TestCase $fixture $caseId
+            $case.Value.representativeChecks.$checkName = $null
+            Save-TestCase $case
+            Assert-VerifierRejects $fixture "gui_representative_check_missing: $checkName"
+        }
     }
 
     It 'rejects a false representative result' {
@@ -472,7 +555,7 @@ Describe 'v2.19.1-karon.2 GUI release evidence contract' {
         Assert-VerifierRejects $fixture 'gui_representative_check_failed'
     }
 
-    It 'rejects secret-like query URLs in evidence text' {
+    It 'rejects a plain secret-like query URL' {
         $fixture = New-ValidGuiFixture
         $case = Read-TestCase $fixture 'ko-KR-150'
         $case.Value.notes = 'https://media.example.invalid/file?signature=secret&expires=9999999999'
@@ -480,18 +563,89 @@ Describe 'v2.19.1-karon.2 GUI release evidence contract' {
         Assert-VerifierRejects $fixture 'gui_secret_material_detected'
     }
 
-    It 'preserves another producer final directory during a no-overwrite race' {
+    It 'rejects a non-media file presented as required video' {
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-100'
+        $path = Join-Path $fixture.Evidence (([string]$case.Value.fullVideoLifecycle.output.path).Replace('/', '\'))
+        [IO.File]::WriteAllText($path, 'not a video')
+        Update-DescriptorForFile $case.Value.fullVideoLifecycle.output $path
+        Save-TestCase $case
+        Assert-VerifierRejects $fixture 'gui_ffprobe_failed|gui_ffprobe_video_missing'
+    }
+
+    It 'rejects a non-media file presented as MP3 output' {
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-100'
+        $path = Join-Path $fixture.Evidence (([string]$case.Value.representativeChecks.mp3Conversion.output.path).Replace('/', '\'))
+        [IO.File]::WriteAllText($path, 'not an mp3')
+        Update-DescriptorForFile $case.Value.representativeChecks.mp3Conversion.output $path
+        Save-TestCase $case
+        Assert-VerifierRejects $fixture 'gui_ffprobe_failed|gui_mp3_audio_invalid'
+    }
+
+    It 'rejects a JSON-escaped secret URL after decoding strings' {
+        $fixture = New-ValidGuiFixture
+        $casePath = Join-Path $fixture.Cases 'ko-KR-150.json'
+        $raw = [IO.File]::ReadAllText($casePath)
+        $raw = $raw.Replace('"notes": ""', '"notes": "https:\/\/media.example.invalid\/file?opaque=value"')
+        [IO.File]::WriteAllText($casePath, $raw, [Text.UTF8Encoding]::new($false))
+        Assert-VerifierRejects $fixture 'gui_secret_material_detected'
+    }
+
+    It 'rejects every unreferenced evidence file including binary data' {
+        $fixture = New-ValidGuiFixture
+        [IO.File]::WriteAllBytes((Join-Path $fixture.Evidence 'secret.bin'), [byte[]](1, 2, 3, 4))
+        Assert-VerifierRejects $fixture 'gui_unreferenced_evidence_file'
+    }
+
+    It 'rejects a 24-byte PNG header without a decodable image body' {
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-150'
+        $path = Join-Path $fixture.Evidence (([string]$case.Value.screenshots[0].path).Replace('/', '\'))
+        [IO.File]::WriteAllBytes($path, [byte[]](137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,2,128,0,0,1,224))
+        Update-DescriptorForFile $case.Value.screenshots[0] $path
+        $case.Value.screenshots[0].width = 640
+        $case.Value.screenshots[0].height = 480
+        Save-TestCase $case
+        Assert-VerifierRejects $fixture 'gui_screenshot_decode_failed'
+    }
+
+    It 'rejects a fully decodable but impractical 1x1 screenshot' {
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-150'
+        $path = Join-Path $fixture.Evidence (([string]$case.Value.screenshots[0].path).Replace('/', '\'))
+        Copy-Item -LiteralPath $script:Media.SmallPng -Destination $path -Force
+        Update-DescriptorForFile $case.Value.screenshots[0] $path
+        $case.Value.screenshots[0].width = 1
+        $case.Value.screenshots[0].height = 1
+        Save-TestCase $case
+        Assert-VerifierRejects $fixture 'gui_screenshot_too_small'
+    }
+
+    It 'rejects evidence reached through a parent junction' {
+        $fixture = New-ValidGuiFixture
+        $junctionParent = Join-Path $fixture.Root 'junction-parent'
+        $junction = Join-Path $junctionParent 'alias'
+        New-Item -ItemType Directory -Path $junctionParent | Out-Null
+        New-Item -ItemType Junction -Path $junction -Target $fixture.Root | Out-Null
+        $fixture.Evidence = Join-Path $junction 'evidence'
+        Assert-VerifierRejects $fixture 'gui_path_reparse_point'
+    }
+
+    It 'rejects unknown schema fields that could misdirect executable lookup' {
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-150'
+        $case.Value.executable | Add-Member -NotePropertyName path -NotePropertyValue 'other.exe'
+        Save-TestCase $case
+        Assert-VerifierRejects $fixture 'gui_schema_unknown_property'
+    }
+
+    It 'preserves another producer final directory during no-overwrite race' {
         $fixture = New-ValidGuiFixture
         $seedOutput = Join-Path $fixture.Root 'seed-output'
         New-Item -ItemType Directory -Path $seedOutput | Out-Null
-        $seedResult = Invoke-GuiVerifier $fixture $seedOutput
-        $seedResult.ExitCode | Should Be 0
+        (Invoke-GuiVerifier $fixture $seedOutput).ExitCode | Should Be 0
         $seedFinal = Join-Path $seedOutput 'gui-validation-v2.19.1-karon.2'
-
-        for ($i = 0; $i -lt 2000; $i++) {
-            [IO.File]::WriteAllText((Join-Path $fixture.Evidence ("padding-{0:D4}.txt" -f $i)), 'evidence padding')
-        }
-
         $raceOutput = Join-Path $fixture.Root 'race-output'
         New-Item -ItemType Directory -Path $raceOutput | Out-Null
         $raceFinal = Join-Path $raceOutput 'gui-validation-v2.19.1-karon.2'
@@ -512,30 +666,26 @@ exit 2
         $watcher = Start-Process -FilePath $script:Pwsh -ArgumentList @('-NoProfile', '-File', $watcherPath, $raceOutput, $seedFinal, $raceFinal) -PassThru -WindowStyle Hidden
         $raceResult = Invoke-GuiVerifier $fixture $raceOutput
         $watcher.WaitForExit()
-
         $watcher.ExitCode | Should Be 0
         $raceResult.ExitCode | Should Not Be 0
         $raceResult.Combined | Should Match 'gui_validation_output_race'
-        (Test-Path -LiteralPath $raceFinal -PathType Container) | Should Be $true
         (Get-TestSha256 (Join-Path $raceFinal 'gui-validation-summary.json')) | Should Be (Get-TestSha256 (Join-Path $seedFinal 'gui-validation-summary.json'))
         (Get-TestSha256 (Join-Path $raceFinal 'gui-validation-evidence-manifest.json')) | Should Be (Get-TestSha256 (Join-Path $seedFinal 'gui-validation-evidence-manifest.json'))
         @(Get-ChildItem -LiteralPath $raceOutput -Directory -Filter '.gui-validation-v2.19.1-karon.2.partial.*').Count | Should Be 0
     }
 
-    It 'initializes an operator case with no preset observations or environment PASS values' {
+    It 'initializes operator case with no preset observations or environment PASS values' {
         $root = New-TestDirectory
         $evidence = Join-Path $root 'operator-evidence'
         $exe = Join-Path $root 'ytdlp-interface.exe'
         [IO.File]::WriteAllText($exe, 'operator-fixture')
         $result = Invoke-TestScript $script:Recorder @(
-            '-Action', 'Initialize',
-            '-EvidenceRoot', $evidence,
-            '-CandidateExePath', $exe,
-            '-Language', 'ko-KR',
-            '-DpiPercent', '100'
+            '-Action', 'Initialize', '-EvidenceRoot', $evidence, '-CandidateExePath', $exe,
+            '-Language', 'ko-KR', '-DpiPercent', '100'
         )
         $result.ExitCode | Should Be 0
-        $case = Get-Content -LiteralPath (Join-Path $evidence 'cases\ko-KR-100.json') -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 64
+        $case = Get-Content -LiteralPath (Join-Path $evidence 'cases\ko-KR-100.json') -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 64 -DateKind String
+        $case.schemaVersion | Should Be 2
         $case.completedAtUtc | Should Be $null
         $case.environment.observedLanguage | Should Be $null
         $case.environment.observedDpiPercent | Should Be $null

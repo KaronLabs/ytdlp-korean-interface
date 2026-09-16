@@ -16,7 +16,6 @@ param(
     [string] $Observation,
     [ValidateSet('true', 'false')] [string] $Result,
     [string] $EvidenceFilePath,
-    [string] $FfprobeJsonPath,
     [string] $Label,
     [int] $ExpectedWidth,
     [int] $ExpectedHeight,
@@ -79,15 +78,33 @@ function Assert-SourceFile {
 
 function Get-PngDimensions {
     param([string] $Path)
-    $bytes = [byte[]]::new(24)
-    $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
-    try { if ($stream.Read($bytes, 0, 24) -ne 24) { throw 'operator_screenshot_invalid' } }
-    finally { $stream.Dispose() }
-    $signature = [byte[]](137, 80, 78, 71, 13, 10, 26, 10)
-    for ($i = 0; $i -lt 8; $i++) { if ($bytes[$i] -ne $signature[$i]) { throw 'operator_screenshot_invalid' } }
-    $width = ([uint32]$bytes[16] -shl 24) -bor ([uint32]$bytes[17] -shl 16) -bor ([uint32]$bytes[18] -shl 8) -bor [uint32]$bytes[19]
-    $height = ([uint32]$bytes[20] -shl 24) -bor ([uint32]$bytes[21] -shl 16) -bor ([uint32]$bytes[22] -shl 8) -bor [uint32]$bytes[23]
-    if ($width -eq 0 -or $height -eq 0) { throw 'operator_screenshot_invalid' }
+    try { Add-Type -AssemblyName System.Drawing.Common -ErrorAction Stop }
+    catch { Add-Type -AssemblyName System.Drawing -ErrorAction Stop }
+
+    $stream = $null
+    $image = $null
+    $bitmap = $null
+    $bitmapData = $null
+    try {
+        $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+        $image = [Drawing.Image]::FromStream($stream, $true, $true)
+        if ($image.RawFormat.Guid -ne [Drawing.Imaging.ImageFormat]::Png.Guid) { throw 'not_png' }
+        $bitmap = [Drawing.Bitmap]::new($image)
+        $rectangle = [Drawing.Rectangle]::new(0, 0, $bitmap.Width, $bitmap.Height)
+        $bitmapData = $bitmap.LockBits($rectangle, [Drawing.Imaging.ImageLockMode]::ReadOnly, $bitmap.PixelFormat)
+        $bitmap.UnlockBits($bitmapData)
+        $bitmapData = $null
+        $width = $bitmap.Width
+        $height = $bitmap.Height
+    }
+    catch { throw 'operator_screenshot_invalid' }
+    finally {
+        if ($null -ne $bitmapData -and $null -ne $bitmap) { $bitmap.UnlockBits($bitmapData) }
+        if ($null -ne $bitmap) { $bitmap.Dispose() }
+        if ($null -ne $image) { $image.Dispose() }
+        if ($null -ne $stream) { $stream.Dispose() }
+    }
+    if ($width -lt 640 -or $height -lt 480) { throw 'operator_screenshot_too_small' }
     [pscustomobject]@{ Width = [int64]$width; Height = [int64]$height }
 }
 
@@ -131,7 +148,7 @@ try {
         $observations = [ordered]@{}
         foreach ($name in $ObservationNames) { $observations[$name] = $null }
         $case = [ordered]@{
-            schemaVersion = 1
+            schemaVersion = 2
             releaseVersion = $ReleaseVersion
             caseId = $caseId
             language = $Language
@@ -187,16 +204,13 @@ try {
         if ($ExpectedWidth -le 0 -or $ExpectedHeight -le 0) { throw 'operator_lifecycle_resolution_invalid' }
         $media = Assert-SourceFile $EvidenceFilePath 'operator_lifecycle_output_missing'
         if ($media.Extension -notin @('.mp4', '.mkv', '.webm')) { throw 'operator_lifecycle_output_invalid' }
-        $null = Get-Content -LiteralPath (Assert-SourceFile $FfprobeJsonPath 'operator_ffprobe_missing').FullName -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 64
         $mediaCopy = Copy-EvidenceFile $media.FullName 'artifacts' ($case.caseId + '-video' + $media.Extension.ToLowerInvariant())
-        $probeCopy = Copy-EvidenceFile $FfprobeJsonPath 'artifacts' ($case.caseId + '-ffprobe.json')
         $case.fullVideoLifecycle = [ordered]@{
             completed = Convert-Result
             observedAtUtc = $now
             expectedWidth = $ExpectedWidth
             expectedHeight = $ExpectedHeight
             output = [ordered]@{ path = $mediaCopy.RelativePath; sha256 = $mediaCopy.Sha256; length = $mediaCopy.Length }
-            ffprobe = [ordered]@{ path = $probeCopy.RelativePath; sha256 = $probeCopy.Sha256; length = $probeCopy.Length }
         }
     }
     elseif ($Action -ceq 'RecordMp3') {
