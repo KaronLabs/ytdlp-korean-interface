@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "releaseVersion": "v2.19.1-karon.2",
+  "caseId": null,
+  "language": null,
+  "dpiPercent": null,
+  "startedAtUtc": null,
+  "completedAtUtc": null,
+  "executable": {
+    "fileName": "ytdlp-interface.exe",
+    "sha256": null,
+    "length": null
+  },
+  "environment": {
+    "observedLanguage": null,
+    "observedDpiPercent": null,
+    "recordedAtUtc": null
+  },
+  "observations": {
+    "launch": null,
+    "downloadType": null,
+    "quality1080p": null,
+    "quality720p": null,
+    "qualityBest": null,
+    "expectedResolution": null,
+    "queueRegistration": null,
+    "progress": null,
+    "completion": null,
+    "advancedNavigation": null,
+    "noClipping": null
+  },
+  "screenshots": [],
+  "fullVideoLifecycle": null,
+  "representativeChecks": {
+    "mp3Conversion": null,
+    "settingsSaveRestartRestore": null,
+    "legacySettingsTransition": null
+  },
+  "notes": ""
+}
