@@ -17,15 +17,64 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+if ($null -eq ('KaronEvidenceDirectoryIdentity' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+
+public static class KaronEvidenceDirectoryIdentity
+{
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ByHandleFileInformation
+    {
+        public uint FileAttributes;
+        public System.Runtime.InteropServices.ComTypes.FILETIME CreationTime;
+        public System.Runtime.InteropServices.ComTypes.FILETIME LastAccessTime;
+        public System.Runtime.InteropServices.ComTypes.FILETIME LastWriteTime;
+        public uint VolumeSerialNumber;
+        public uint FileSizeHigh;
+        public uint FileSizeLow;
+        public uint NumberOfLinks;
+        public uint FileIndexHigh;
+        public uint FileIndexLow;
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern SafeFileHandle CreateFile(
+        string fileName, uint desiredAccess, uint shareMode, IntPtr securityAttributes,
+        uint creationDisposition, uint flagsAndAttributes, IntPtr templateFile);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetFileInformationByHandle(
+        SafeFileHandle file, out ByHandleFileInformation information);
+
+    public static string Get(string path)
+    {
+        using (SafeFileHandle handle = CreateFile(path, 0, 7, IntPtr.Zero, 3, 0x02000000, IntPtr.Zero))
+        {
+            if (handle.IsInvalid) throw new Win32Exception(Marshal.GetLastWin32Error());
+            ByHandleFileInformation information;
+            if (!GetFileInformationByHandle(handle, out information)) throw new Win32Exception(Marshal.GetLastWin32Error());
+            return information.VolumeSerialNumber.ToString("X8") + ":" +
+                information.FileIndexHigh.ToString("X8") + information.FileIndexLow.ToString("X8");
+        }
+    }
+}
+'@
+}
 
 $utf8NoBom = New-Object Text.UTF8Encoding($false)
 $script:blockers = New-Object 'Collections.Generic.List[string]'
 $script:blockerSet = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
-$script:temporaryDirectories = New-Object 'Collections.Generic.List[string]'
+$script:temporaryDirectories = New-Object 'Collections.Generic.List[object]'
 $script:stagingRoot = $null
 $script:stagedSevenZipExecutable = $null
 $productionApprovalProfile = 'karon-v2.19.1-karon.2-non-runtime-v1'
 $fixtureApprovalProfile = 'test-fixture-v1'
+$productionManifestRelativePath = 'release/evidence/v2.19.1-karon.2/non-runtime-components.json'
+$productionManifestProjectionSha256 = '6120601F62EA99F4A09C9C2491854DCE7A3F3F56687958D4109F51FD393EB5BD'
 
 $approvedProductionComponents = @{
     'application' = [ordered]@{
@@ -169,6 +218,72 @@ function ConvertTo-CanonicalJsonBytes {
     return $utf8NoBom.GetBytes(($Value | ConvertTo-Json -Depth 50 -Compress) + [char]10)
 }
 
+function Add-ManifestProjectionToken {
+    param([object] $Value, [Collections.Generic.List[string]] $Rows)
+    if ($null -eq $Value) { $Rows.Add('N'); return }
+    if ($Value -is [bool]) { $Rows.Add($(if ($Value) { 'B:1' } else { 'B:0' })); return }
+    if ($Value -is [string]) { $Rows.Add('S:' + [Convert]::ToBase64String($utf8NoBom.GetBytes($Value))); return }
+    if ($Value -is [Collections.IDictionary]) {
+        $keys = @($Value.Keys | ForEach-Object { [string]$_ })
+        [Array]::Sort($keys, [StringComparer]::Ordinal)
+        $Rows.Add('O:' + $keys.Count)
+        foreach ($key in $keys) {
+            $Rows.Add('K:' + [Convert]::ToBase64String($utf8NoBom.GetBytes($key)))
+            Add-ManifestProjectionToken $Value[$key] $Rows
+        }
+        return
+    }
+    if ($Value -is [Collections.IEnumerable]) {
+        $items = @($Value)
+        $Rows.Add('A:' + $items.Count)
+        foreach ($item in $items) { Add-ManifestProjectionToken $item $Rows }
+        return
+    }
+    if ($Value -is [ValueType]) {
+        $Rows.Add('I:' + $Value.ToString([Globalization.CultureInfo]::InvariantCulture))
+        return
+    }
+    $names = @($Value.PSObject.Properties | ForEach-Object { $_.Name })
+    [Array]::Sort($names, [StringComparer]::Ordinal)
+    $Rows.Add('O:' + $names.Count)
+    foreach ($name in $names) {
+        $Rows.Add('K:' + [Convert]::ToBase64String($utf8NoBom.GetBytes($name)))
+        Add-ManifestProjectionToken $Value.$name $Rows
+    }
+}
+
+function Get-ManifestProjectionSha256 {
+    param([object] $Manifest)
+    $rows = New-Object 'Collections.Generic.List[string]'
+    Add-ManifestProjectionToken $Manifest $rows
+    return Get-BytesSha256 $utf8NoBom.GetBytes(($rows.ToArray() -join [char]10) + [char]10)
+}
+
+function Test-ProductionManifestGitBinding {
+    param([string] $OriginalManifestPath, [string] $Repository)
+    try {
+        $repositoryRoot = (@(& git -C $Repository rev-parse --show-toplevel 2>$null) -join '').Trim()
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repositoryRoot)) { throw 'repository-root' }
+        $expectedPath = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $productionManifestRelativePath.Replace('/', '\')))
+        $actualPath = [IO.Path]::GetFullPath($OriginalManifestPath)
+        if (-not $actualPath.Equals($expectedPath, [StringComparison]::OrdinalIgnoreCase)) {
+            Add-EvidenceBlocker 'production_manifest_path_invalid'
+            return
+        }
+        $tracked = @(& git -C $repositoryRoot ls-files --full-name -- $productionManifestRelativePath 2>$null)
+        if ($LASTEXITCODE -ne 0 -or $tracked.Count -ne 1 -or [string]$tracked[0] -cne $productionManifestRelativePath) {
+            Add-EvidenceBlocker 'production_manifest_path_invalid'
+            return
+        }
+        $headBlob = (@(& git -C $repositoryRoot rev-parse ('HEAD:' + $productionManifestRelativePath) 2>$null) -join '').Trim()
+        $workingBlob = (@(& git -C $repositoryRoot hash-object --no-filters -- $actualPath 2>$null) -join '').Trim()
+        if ($LASTEXITCODE -ne 0 -or $headBlob -notmatch '^[0-9a-f]{40}$' -or $workingBlob -cne $headBlob) {
+            Add-EvidenceBlocker 'production_manifest_git_blob_mismatch'
+        }
+    }
+    catch { Add-EvidenceBlocker 'production_manifest_git_blob_mismatch' }
+}
+
 function Write-AtomicBytes {
     param([string] $Path, [byte[]] $Bytes)
     if (Test-Path -LiteralPath $Path) { throw "output_exists:$Path" }
@@ -198,13 +313,22 @@ function Assert-ReparseFreePath {
     return $full
 }
 
+function Assert-WindowsPathSegment {
+    param([string] $Segment)
+    if ([string]::IsNullOrEmpty($Segment) -or $Segment -ceq '.' -or $Segment -ceq '..') { throw 'windows_path_segment_invalid' }
+    if ($Segment -match '[<>:"/\\|?*\x00-\x1f]' -or $Segment.TrimEnd(' ', '.') -cne $Segment) { throw 'windows_path_segment_invalid' }
+    $canonical = $Segment.Normalize([Text.NormalizationForm]::FormC)
+    if ($canonical -cne $Segment) { throw 'windows_path_segment_not_nfc' }
+    if ($canonical -match '^(?i)(CON|PRN|AUX|NUL|CLOCK\$|CONIN\$|CONOUT\$|COM[1-9\u00B9\u00B2\u00B3]|LPT[1-9\u00B9\u00B2\u00B3])(?:\..*)?$') {
+        throw 'windows_path_segment_reserved'
+    }
+    return $canonical
+}
+
 function Test-SafeLeafFileName {
     param([string] $Name)
-    if ([string]::IsNullOrWhiteSpace($Name) -or $Name -ceq '.' -or $Name -ceq '..') { return $false }
-    if ($Name -match '[\\/:\x00-\x1f]' -or [IO.Path]::IsPathRooted($Name) -or $Name.TrimEnd(' ', '.') -cne $Name) { return $false }
-    $stem = $Name.Split('.')[0]
-    if ($stem -match '^(?i)(CON|PRN|AUX|NUL|CLOCK\$|COM[1-9]|LPT[1-9])$') { return $false }
-    return [IO.Path]::GetFileName($Name) -ceq $Name
+    try { return (Assert-WindowsPathSegment $Name) -ceq $Name }
+    catch { return $false }
 }
 
 function Get-DirectChildPath {
@@ -221,6 +345,7 @@ function Copy-InputToPrivateStaging {
     $sourceFull = Assert-ReparseFreePath -Path $SourcePath -Label $Label
     if (-not (Test-Path -LiteralPath $sourceFull -PathType Leaf)) { throw ('input_missing:' + $Label) }
     if ([string]::IsNullOrWhiteSpace($script:stagingRoot)) { throw 'private_staging_unavailable' }
+    Assert-OwnedTemporaryDirectory $script:stagingRoot
     $destination = [IO.Path]::GetFullPath((Join-Path $script:stagingRoot $RelativePath))
     if (-not (Test-ChildPath -Root $script:stagingRoot -Path $destination)) { throw ('private_staging_escape:' + $Label) }
     $parent = Split-Path -Parent $destination
@@ -237,13 +362,43 @@ function Copy-InputToPrivateStaging {
     return $destination
 }
 
+function Get-OwnedTemporaryDirectory {
+    param([string] $Path)
+    return @($script:temporaryDirectories | Where-Object { [string]$_.path -ceq [IO.Path]::GetFullPath($Path) }) | Select-Object -First 1
+}
+
+function Assert-OwnedTemporaryDirectory {
+    param([string] $Path)
+    $record = Get-OwnedTemporaryDirectory $Path
+    if ($null -eq $record -or -not (Test-Path -LiteralPath $record.path -PathType Container)) { throw 'private_staging_ownership_mismatch' }
+    [void](Assert-ReparseFreePath -Path $record.path -Label 'private-staging')
+    if ([KaronEvidenceDirectoryIdentity]::Get($record.path) -cne [string]$record.identity -or
+        -not (Test-Path -LiteralPath $record.markerPath -PathType Leaf)) { throw 'private_staging_ownership_mismatch' }
+    [void](Assert-ReparseFreePath -Path $record.markerPath -Label 'private-staging-marker')
+    $marker = Get-Content -LiteralPath $record.markerPath -Raw | ConvertFrom-Json
+    if ([string]$marker.token -cne [string]$record.token -or [string]$marker.identity -cne [string]$record.identity) {
+        throw 'private_staging_ownership_mismatch'
+    }
+}
+
 function New-TemporaryDirectory {
     param([string] $Label)
     $tempRoot = Assert-ReparseFreePath -Path ([IO.Path]::GetTempPath()) -Label 'private-staging'
-    $path = Join-Path $tempRoot ('karon-' + $Label + '-' + [Guid]::NewGuid().ToString('N'))
-    [IO.Directory]::CreateDirectory($path) | Out-Null
-    $script:temporaryDirectories.Add($path)
+    $suffix = [Guid]::NewGuid().ToString('N')
+    $creating = Join-Path $tempRoot ('karon-private-creating-' + $suffix)
+    $path = Join-Path $tempRoot ('karon-' + $Label + '-' + $suffix)
+    [IO.Directory]::CreateDirectory($creating) | Out-Null
+    [void](Assert-ReparseFreePath -Path $creating -Label 'private-staging')
+    $identity = [KaronEvidenceDirectoryIdentity]::Get($creating)
+    $token = [Guid]::NewGuid().ToString('N')
+    $markerName = '.karon-owner-' + $token + '.json'
+    $markerCreating = Join-Path $creating $markerName
+    [IO.File]::WriteAllBytes($markerCreating, (ConvertTo-CanonicalJsonBytes ([ordered]@{ token = $token; identity = $identity })))
+    [IO.Directory]::Move($creating, $path)
+    $markerPath = Join-Path $path $markerName
     [void](Assert-ReparseFreePath -Path $path -Label 'private-staging')
+    if ([KaronEvidenceDirectoryIdentity]::Get($path) -cne $identity) { throw 'private_staging_ownership_mismatch' }
+    $script:temporaryDirectories.Add([pscustomobject]@{ path = $path; token = $token; identity = $identity; markerPath = $markerPath })
     return $path
 }
 
@@ -267,30 +422,69 @@ function Test-ImmutableSourceUrl {
 
 function Assert-SafeArchiveEntryName {
     param([string] $Name, [object] $ExactNames, [object] $CaseInsensitiveNames)
-    if ([string]::IsNullOrWhiteSpace($Name) -or $Name -match '[\x00-\x1f:]') { throw 'archive_entry_path_invalid' }
+    if ([string]::IsNullOrWhiteSpace($Name) -or $Name.StartsWith('/') -or $Name.StartsWith('\') -or $Name -match '^[A-Za-z]:' -or $Name -match '[\x00-\x1f]') { throw 'archive_entry_path_invalid' }
     $normalized = $Name.Replace('\', '/')
-    if ($normalized.StartsWith('/') -or $normalized.StartsWith('//') -or [IO.Path]::IsPathRooted($normalized) -or $normalized -match '^[A-Za-z]:') { throw 'archive_entry_path_invalid' }
-    $trimmed = $normalized.TrimEnd('/')
-    if ([string]::IsNullOrWhiteSpace($trimmed)) { throw 'archive_entry_path_invalid' }
-    foreach ($segment in $trimmed.Split('/')) {
-        if ([string]::IsNullOrWhiteSpace($segment) -or $segment -ceq '.' -or $segment -ceq '..') { throw 'archive_entry_path_invalid' }
+    $directory = $normalized.EndsWith('/')
+    $trimmed = if ($directory) { $normalized.Substring(0, $normalized.Length - 1) } else { $normalized }
+    if ([string]::IsNullOrWhiteSpace($trimmed) -or $trimmed.EndsWith('/')) { throw 'archive_entry_path_invalid' }
+    $segments = New-Object 'Collections.Generic.List[string]'
+    try { foreach ($segment in $trimmed.Split('/')) { $segments.Add((Assert-WindowsPathSegment $segment)) } }
+    catch { throw 'archive_entry_path_invalid' }
+    $canonical = $segments.ToArray() -join '/'
+    if (-not $ExactNames.Add($canonical)) { throw 'archive_entry_duplicate' }
+    if (-not $CaseInsensitiveNames.Add($canonical.ToUpperInvariant())) { throw 'archive_entry_case_collision' }
+    return $canonical + $(if ($directory) { '/' } else { '' })
+}
+
+function Get-RawZipDirectoryEntries {
+    param([string] $ArchivePath)
+    $bytes = [IO.File]::ReadAllBytes($ArchivePath)
+    $minimum = [Math]::Max(0, $bytes.Length - 65557)
+    $eocd = -1
+    for ($offset = $bytes.Length - 22; $offset -ge $minimum; $offset--) {
+        if ([BitConverter]::ToUInt32($bytes, $offset) -eq 0x06054B50) { $eocd = $offset; break }
     }
-    if (-not $ExactNames.Add($normalized)) { throw 'archive_entry_duplicate' }
-    if (-not $CaseInsensitiveNames.Add($normalized)) { throw 'archive_entry_case_collision' }
-    return $normalized
+    if ($eocd -lt 0) { throw 'zip_central_directory_missing' }
+    $count = [BitConverter]::ToUInt16($bytes, $eocd + 10)
+    $centralOffset = [BitConverter]::ToUInt32($bytes, $eocd + 16)
+    if ($count -eq 0xFFFF -or $centralOffset -eq 0xFFFFFFFF) { throw 'zip64_not_supported' }
+    $entries = New-Object 'Collections.Generic.List[object]'
+    $offset = [int64]$centralOffset
+    for ($index = 0; $index -lt $count; $index++) {
+        if ($offset -lt 0 -or $offset + 46 -gt $bytes.Length -or [BitConverter]::ToUInt32($bytes, [int]$offset) -ne 0x02014B50) {
+            throw 'zip_central_directory_invalid'
+        }
+        $flags = [BitConverter]::ToUInt16($bytes, [int]$offset + 8)
+        $nameLength = [BitConverter]::ToUInt16($bytes, [int]$offset + 28)
+        $extraLength = [BitConverter]::ToUInt16($bytes, [int]$offset + 30)
+        $commentLength = [BitConverter]::ToUInt16($bytes, [int]$offset + 32)
+        $externalAttributes = [BitConverter]::ToUInt32($bytes, [int]$offset + 38)
+        $next = $offset + 46 + $nameLength + $extraLength + $commentLength
+        if ($nameLength -eq 0 -or $next -gt $bytes.Length) { throw 'zip_central_directory_invalid' }
+        $encoding = if (($flags -band 0x0800) -ne 0) { [Text.Encoding]::UTF8 } else { [Text.Encoding]::GetEncoding(437) }
+        $name = $encoding.GetString($bytes, [int]$offset + 46, $nameLength)
+        $entries.Add([ordered]@{ name = $name; externalAttributes = $externalAttributes })
+        $offset = $next
+    }
+    return $entries.ToArray()
 }
 
 function Assert-ZipArchivePreflight {
     param([string] $ArchivePath)
-    $archive = [IO.Compression.ZipFile]::OpenRead($ArchivePath)
     $exactNames = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
     $caseNames = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    $rawEntries = @(Get-RawZipDirectoryEntries $ArchivePath)
+    foreach ($entry in $rawEntries) {
+        [void](Assert-SafeArchiveEntryName -Name ([string]$entry.name) -ExactNames $exactNames -CaseInsensitiveNames $caseNames)
+        $attributes = [uint32]$entry.externalAttributes
+        $unixType = ($attributes -shr 16) -band 0xF000
+        if ($unixType -eq 0xA000 -or ($attributes -band [uint32][IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'archive_link_or_reparse_entry' }
+    }
+    $archive = [IO.Compression.ZipFile]::OpenRead($ArchivePath)
     try {
-        foreach ($entry in $archive.Entries) {
-            [void](Assert-SafeArchiveEntryName -Name $entry.FullName -ExactNames $exactNames -CaseInsensitiveNames $caseNames)
-            $attributes = [BitConverter]::ToUInt32([BitConverter]::GetBytes([int]$entry.ExternalAttributes), 0)
-            $unixType = ($attributes -shr 16) -band 0xF000
-            if ($unixType -eq 0xA000 -or ($attributes -band [uint32][IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'archive_link_or_reparse_entry' }
+        if ($archive.Entries.Count -ne $rawEntries.Count) { throw 'zip_managed_entry_projection_mismatch' }
+        for ($index = 0; $index -lt $rawEntries.Count; $index++) {
+            if ([string]$archive.Entries[$index].FullName -cne [string]$rawEntries[$index].name) { throw 'zip_managed_entry_projection_mismatch' }
         }
     }
     finally { $archive.Dispose() }
@@ -306,6 +500,7 @@ function Assert-SevenZipArchivePreflight {
     foreach ($line in $lines) {
         $text = [string]$line
         if ($text -match '^Path = (.*)$') { [void](Assert-SafeArchiveEntryName -Name $Matches[1] -ExactNames $exactNames -CaseInsensitiveNames $caseNames) }
+        elseif ($text -match '^Attributes = (.*)$' -and $Matches[1] -match '(?i)L|REPARSE|LINK') { throw 'archive_link_or_reparse_entry' }
         elseif ($text -match '^(?:Symbolic Link|Hard Link|Reparse Point) = .+$') { throw 'archive_link_or_reparse_entry' }
     }
 }
@@ -444,16 +639,65 @@ function Acquire-SourceArtifact {
     finally { if (Test-Path -LiteralPath $partial) { Remove-Item -LiteralPath $partial -Force -ErrorAction SilentlyContinue } }
 }
 
+function Copy-StreamWithSha256 {
+    param([IO.Stream] $Source, [IO.Stream] $Destination)
+    $sha = [Security.Cryptography.SHA256]::Create()
+    $buffer = New-Object byte[] 65536
+    $length = [long]0
+    try {
+        while (($read = $Source.Read($buffer, 0, $buffer.Length)) -gt 0) {
+            [void]$sha.TransformBlock($buffer, 0, $read, $buffer, 0)
+            if ($null -ne $Destination) { $Destination.Write($buffer, 0, $read) }
+            $length += $read
+        }
+        [void]$sha.TransformFinalBlock((New-Object byte[] 0), 0, 0)
+        return [ordered]@{ sha256 = ([BitConverter]::ToString($sha.Hash)).Replace('-', ''); length = $length }
+    }
+    finally { $sha.Dispose() }
+}
+
+function Assert-CompletedEvidenceZip {
+    param([string] $ArchivePath, [object[]] $Entries)
+    Assert-ZipArchivePreflight $ArchivePath
+    $expected = New-Object 'Collections.Generic.Dictionary[string,object]' ([StringComparer]::Ordinal)
+    foreach ($entry in $Entries) { $expected.Add([string]$entry.name, $entry) }
+    $archive = [IO.Compression.ZipFile]::OpenRead($ArchivePath)
+    try {
+        if ($archive.Entries.Count -ne $expected.Count) { throw 'bundle_entry_count_mismatch' }
+        foreach ($entry in $archive.Entries) {
+            if (-not $expected.ContainsKey($entry.FullName)) { throw ('bundle_entry_unexpected:' + $entry.FullName) }
+            $stream = $entry.Open()
+            try { $actual = Copy-StreamWithSha256 -Source $stream -Destination $null }
+            finally { $stream.Dispose() }
+            $wanted = $expected[$entry.FullName]
+            if ($actual.sha256 -cne [string]$wanted.expectedSha256 -or $actual.length -ne [long]$wanted.expectedLength) {
+                throw ('bundle_entry_identity_mismatch:' + $entry.FullName)
+            }
+        }
+    }
+    finally { $archive.Dispose() }
+}
+
 function New-DeterministicZip {
     param([string] $OutputPath, [object[]] $Entries, [string] $PrivateRoot)
+    Assert-OwnedTemporaryDirectory $PrivateRoot
     $exactNames = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
     $caseNames = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    $prepared = New-Object 'Collections.Generic.List[object]'
     foreach ($entry in $Entries) {
-        [void](Assert-SafeArchiveEntryName -Name ([string]$entry.name) -ExactNames $exactNames -CaseInsensitiveNames $caseNames)
+        $name = Assert-SafeArchiveEntryName -Name ([string]$entry.name) -ExactNames $exactNames -CaseInsensitiveNames $caseNames
         $sourcePath = Get-ObjectProperty -Value $entry -Name 'path'
         if ($null -ne $sourcePath) {
             $sourceFull = Assert-ReparseFreePath -Path ([string]$sourcePath) -Label 'private-staging'
             if (-not (Test-ChildPath -Root $PrivateRoot -Path $sourceFull)) { throw 'bundle_source_not_staged' }
+            $expectedSha = ([string](Get-ObjectProperty $entry 'expectedSha256')).ToUpperInvariant()
+            $expectedLength = [long](Get-ObjectProperty $entry 'expectedLength')
+            if ($expectedSha -notmatch '^[0-9A-F]{64}$' -or $expectedLength -lt 0) { throw ('bundle_source_identity_missing:' + $name) }
+            $prepared.Add([ordered]@{ name = $name; path = $sourceFull; expectedSha256 = $expectedSha; expectedLength = $expectedLength })
+        }
+        else {
+            $bytes = [byte[]]$entry.bytes
+            $prepared.Add([ordered]@{ name = $name; bytes = $bytes; expectedSha256 = Get-BytesSha256 $bytes; expectedLength = $bytes.Length })
         }
     }
     $partial = $OutputPath + '.partial.' + $PID + '.' + [Guid]::NewGuid().ToString('N')
@@ -462,15 +706,19 @@ function New-DeterministicZip {
     try {
         $stream = [IO.File]::Open($partial, [IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
         $archive = New-Object IO.Compression.ZipArchive($stream, [IO.Compression.ZipArchiveMode]::Create, $true)
-        foreach ($item in @($Entries | Sort-Object { [string]$_.name })) {
+        foreach ($item in @($prepared.ToArray() | Sort-Object { [string]$_.name })) {
             $zipEntry = $archive.CreateEntry(([string]$item.name).Replace('\', '/'), [IO.Compression.CompressionLevel]::Optimal)
             $zipEntry.LastWriteTime = [DateTimeOffset]::new(1980, 1, 1, 0, 0, 0, [TimeSpan]::Zero)
             $target = $zipEntry.Open()
             try {
                 if ($null -ne (Get-ObjectProperty -Value $item -Name 'path')) {
-                    $source = [IO.File]::OpenRead([string]$item.path)
-                    try { $source.CopyTo($target) }
+                    Assert-OwnedTemporaryDirectory $PrivateRoot
+                    $source = [IO.File]::Open([string]$item.path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
+                    try { $actual = Copy-StreamWithSha256 -Source $source -Destination $target }
                     finally { $source.Dispose() }
+                    if ($actual.sha256 -cne [string]$item.expectedSha256 -or $actual.length -ne [long]$item.expectedLength) {
+                        throw ('bundle_source_identity_mismatch:' + [string]$item.name)
+                    }
                 }
                 else {
                     $bytes = [byte[]]$item.bytes
@@ -481,6 +729,7 @@ function New-DeterministicZip {
         }
         $archive.Dispose(); $archive = $null
         $stream.Dispose(); $stream = $null
+        Assert-CompletedEvidenceZip -ArchivePath $partial -Entries $prepared.ToArray()
         [IO.File]::Move($partial, $OutputPath)
     }
     finally {
@@ -501,8 +750,10 @@ function Get-CandidateFile {
 }
 
 $manifest = $null
+$originalManifestPath = [IO.Path]::GetFullPath($ManifestPath)
 $manifestBytes = $null
 $manifestSha256 = $null
+$manifestProjectionSha256 = $null
 $artifactById = @{}
 $artifactValid = @{}
 $artifactStagedPath = @{}
@@ -544,6 +795,7 @@ try {
     $manifestText = $utf8NoBom.GetString($manifestBytes)
     if ($manifestText -match '(?i)NOASSERTION') { Add-EvidenceBlocker 'forbidden_license_assertion' }
     $manifest = $manifestText | ConvertFrom-Json
+    $manifestProjectionSha256 = Get-ManifestProjectionSha256 $manifest
 }
 catch {
     Add-EvidenceBlocker ('component_manifest_invalid:' + $_.Exception.Message)
@@ -581,6 +833,10 @@ if ($null -ne $manifest) {
     $profileReleaseValid = ($approvalProfile -ceq $productionApprovalProfile -and $releaseTag -ceq 'v2.19.1-karon.2') -or
         ($approvalProfile -ceq $fixtureApprovalProfile -and $releaseTag -ceq 'test-fixture')
     if ($approvalProfile -cne $productionApprovalProfile -and $approvalProfile -cne $fixtureApprovalProfile) { Add-EvidenceBlocker 'approval_profile_invalid' }
+    if ($approvalProfile -ceq $productionApprovalProfile) {
+        Test-ProductionManifestGitBinding -OriginalManifestPath $originalManifestPath -Repository $ApplicationRepository
+        if ($manifestProjectionSha256 -cne $productionManifestProjectionSha256) { Add-EvidenceBlocker 'production_manifest_projection_mismatch' }
+    }
     if ([string]$manifest.schemaVersion -cne 'karon-non-runtime-component-evidence/v1' -or -not $profileReleaseValid -or [string]$manifest.release.platform -cne 'win-x64') {
         Add-EvidenceBlocker 'component_manifest_contract_mismatch'
     }
@@ -676,7 +932,12 @@ if ($null -ne $manifest) {
                     try { [void](Assert-ReparseFreePath -Path $path -Label 'application-license') }
                     catch { Add-EvidenceBlocker $_.Exception.Message; $repositoryLicenseValid = $false }
                 }
-                if (-not $repositoryLicenseValid -or -not (Test-FileIdentity $path ([string]$license.sha256) ([long]$license.length))) {
+                $stagedLicense = $null
+                if ($repositoryLicenseValid -and (Test-Path -LiteralPath $path -PathType Leaf)) {
+                    try { $stagedLicense = Copy-InputToPrivateStaging -SourcePath $path -RelativePath ('application\licenses\' + [string]$component.id + '.txt') -Label 'application-license' }
+                    catch { Add-EvidenceBlocker $_.Exception.Message; $repositoryLicenseValid = $false }
+                }
+                if (-not $repositoryLicenseValid -or -not (Test-FileIdentity $stagedLicense ([string]$license.sha256) ([long]$license.length))) {
                     Add-EvidenceBlocker ('license_repository_file_mismatch:' + [string]$component.id)
                 }
             }
@@ -787,7 +1048,8 @@ if ($null -ne $manifest) {
             $targetPath = Join-Path $ApplicationRepository ([string]$transform.repositoryPath).Replace('/', '\')
             if ($null -eq $sourceBytes -or -not (Test-Path -LiteralPath $targetPath -PathType Leaf)) { throw 'header_missing' }
             [void](Assert-ReparseFreePath -Path $targetPath -Label 'application-header')
-            $targetBytes = [IO.File]::ReadAllBytes($targetPath)
+            $stagedTargetPath = Copy-InputToPrivateStaging -SourcePath $targetPath -RelativePath 'application\nlohmann-json.hpp' -Label 'application-header'
+            $targetBytes = [IO.File]::ReadAllBytes($stagedTargetPath)
             $converted = New-Object IO.MemoryStream
             foreach ($byte in $sourceBytes) { if ($byte -eq 10) { $converted.WriteByte(13) }; $converted.WriteByte($byte) }
             $convertedBytes = $converted.ToArray(); $converted.Dispose()
@@ -892,6 +1154,7 @@ $inventory = [ordered]@{
     status = $inventoryStatus
     approvalProfile = $(if ($null -eq $manifest) { $null } else { [string](Get-ObjectProperty $manifest 'approvalProfile') })
     manifestSha256 = $manifestSha256
+    manifestProjectionSha256 = $manifestProjectionSha256
     applicationCommit = $(if ([string]::IsNullOrWhiteSpace($ApplicationCommit)) { $null } else { $ApplicationCommit })
     candidateManifestSha256 = $(if (-not [string]::IsNullOrWhiteSpace($CandidateManifestPath) -and (Test-Path -LiteralPath $CandidateManifestPath -PathType Leaf)) { Get-PathSha256 $CandidateManifestPath } else { $null })
     dependencyArchiveSha256 = $(if (Test-Path -LiteralPath $DependencyArchivePath -PathType Leaf) { Get-PathSha256 $DependencyArchivePath } else { $null })
@@ -928,18 +1191,18 @@ try {
 
     foreach ($component in @($manifest.components)) {
         foreach ($artifact in @($component.sourceArtifacts | Where-Object { [bool]$_.includeInBundle })) {
-            $bundleEntries.Add([ordered]@{ name = 'sources/' + [string]$artifact.fileName; path = $artifactStagedPath[[string]$artifact.id] })
+            $bundleEntries.Add([ordered]@{ name = 'sources/' + [string]$artifact.fileName; path = $artifactStagedPath[[string]$artifact.id]; expectedSha256 = ([string]$artifact.sha256).ToUpperInvariant(); expectedLength = [long]$artifact.length })
         }
     }
-    $bundleEntries.Add([ordered]@{ name = 'component-manifest.json'; path = $ManifestPath })
+    $bundleEntries.Add([ordered]@{ name = 'component-manifest.json'; path = $ManifestPath; expectedSha256 = $manifestSha256; expectedLength = $manifestBytes.Length })
     $bundleEntries.Add([ordered]@{ name = 'source-cache-inventory.json'; bytes = $inventoryBytes })
-    $bundleEntries.Add([ordered]@{ name = 'application/' + (Split-Path -Leaf $applicationSourceArchive); path = $applicationSourceArchive })
-    $bundleEntries.Add([ordered]@{ name = 'evidence/candidate-manifest.json'; path = $CandidateManifestPath })
+    $bundleEntries.Add([ordered]@{ name = 'application/' + (Split-Path -Leaf $applicationSourceArchive); path = $applicationSourceArchive; expectedSha256 = Get-PathSha256 $applicationSourceArchive; expectedLength = (Get-Item -LiteralPath $applicationSourceArchive).Length })
+    $bundleEntries.Add([ordered]@{ name = 'evidence/candidate-manifest.json'; path = $CandidateManifestPath; expectedSha256 = Get-PathSha256 $CandidateManifestPath; expectedLength = (Get-Item -LiteralPath $CandidateManifestPath).Length })
     $bundleEntries.Add([ordered]@{ name = 'evidence/nlohmann-json-header.transform.json'; bytes = $nlohmannEvidenceBytes })
-    $bundleEntries.Add([ordered]@{ name = 'evidence/dependency-archive/' + (Split-Path -Leaf $DependencyArchivePath); path = $DependencyArchivePath })
-    $bundleEntries.Add([ordered]@{ name = 'evidence/task5/' + (Split-Path -Leaf $SevenZipRuntimeArchivePath); path = $SevenZipRuntimeArchivePath })
-    $bundleEntries.Add([ordered]@{ name = 'evidence/task5/' + (Split-Path -Leaf $SevenZipSourceArchivePath); path = $SevenZipSourceArchivePath })
-    $bundleEntries.Add([ordered]@{ name = 'evidence/task5/' + (Split-Path -Leaf $SevenZipVerificationPath); path = $SevenZipVerificationPath })
+    $bundleEntries.Add([ordered]@{ name = 'evidence/dependency-archive/' + (Split-Path -Leaf $DependencyArchivePath); path = $DependencyArchivePath; expectedSha256 = ([string]$manifest.sharedInputs.dependencyArchive.sha256).ToUpperInvariant(); expectedLength = [long]$manifest.sharedInputs.dependencyArchive.length })
+    $bundleEntries.Add([ordered]@{ name = 'evidence/task5/' + (Split-Path -Leaf $SevenZipRuntimeArchivePath); path = $SevenZipRuntimeArchivePath; expectedSha256 = ([string]$manifest.sharedInputs.sevenZipTask5.runtimeArchiveSha256).ToUpperInvariant(); expectedLength = [long]$manifest.sharedInputs.sevenZipTask5.runtimeArchiveLength })
+    $bundleEntries.Add([ordered]@{ name = 'evidence/task5/' + (Split-Path -Leaf $SevenZipSourceArchivePath); path = $SevenZipSourceArchivePath; expectedSha256 = ([string]$manifest.sharedInputs.sevenZipTask5.sourceArchiveSha256).ToUpperInvariant(); expectedLength = [long]$manifest.sharedInputs.sevenZipTask5.sourceArchiveLength })
+    $bundleEntries.Add([ordered]@{ name = 'evidence/task5/' + (Split-Path -Leaf $SevenZipVerificationPath); path = $SevenZipVerificationPath; expectedSha256 = ([string]$manifest.sharedInputs.sevenZipTask5.verificationSha256).ToUpperInvariant(); expectedLength = [long]$manifest.sharedInputs.sevenZipTask5.verificationLength })
     $bundleFileName = if ([string](Get-ObjectProperty $manifest 'approvalProfile') -ceq $productionApprovalProfile) { 'ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip' } else { 'test-fixture-non-runtime-component-evidence.zip' }
     $bundlePath = Join-Path $OutputDirectory $bundleFileName
     New-DeterministicZip -OutputPath $bundlePath -Entries $bundleEntries.ToArray() -PrivateRoot $script:stagingRoot
@@ -948,11 +1211,10 @@ try {
 }
 finally {
     foreach ($directory in $script:temporaryDirectories) {
-        if (Test-Path -LiteralPath $directory) {
-            $item = Get-Item -LiteralPath $directory -Force -ErrorAction SilentlyContinue
-            if ($null -ne $item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) {
-                Remove-Item -LiteralPath $directory -Recurse -Force -ErrorAction SilentlyContinue
-            }
+        try {
+            Assert-OwnedTemporaryDirectory $directory.path
+            Remove-Item -LiteralPath $directory.path -Recurse -Force -ErrorAction SilentlyContinue
         }
+        catch { }
     }
 }

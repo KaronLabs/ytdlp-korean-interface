@@ -87,6 +87,29 @@ function New-TestZipFromDirectory {
     New-TestZip -Path $Path -Entries $entries
 }
 
+function New-FixedLengthTestZip {
+    param([string] $Path, [int] $Length)
+    New-TestZip -Path $Path -Entries @{ 'self-signed/provenance.json' = [Text.Encoding]::UTF8.GetBytes('{"authority":"self"}') }
+    $currentLength = (Get-Item -LiteralPath $Path).Length
+    if ($currentLength -gt $Length) { throw "Fixture ZIP exceeds requested length: $currentLength > $Length" }
+    $stream = [IO.File]::Open($Path, [IO.FileMode]::Append, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    try {
+        $padding = New-Object byte[] ($Length - $currentLength)
+        $stream.Write($padding, 0, $padding.Length)
+    }
+    finally { $stream.Dispose() }
+}
+
+function Get-TestSevenZipExecutable {
+    $sealed = 'E:\03_AllWork\ytdlp-korean-interface\.scratch\task-5-sevenzip-no-rar\output-final\build-work-3e751a83ca044735b5c3780e64f91df2\upstream\7zip-8c63d71ff886bda90c86db28466287f977374237\CPP\7zip\UI\Console\x64\7z.exe'
+    foreach ($candidate in @($env:YTDLP_TEST_7Z_EXE, $sealed)) {
+        if (-not [string]::IsNullOrWhiteSpace($candidate) -and (Test-Path -LiteralPath $candidate -PathType Leaf)) { return $candidate }
+    }
+    $command = Get-Command 7z.exe -ErrorAction SilentlyContinue
+    if ($null -ne $command) { return $command.Source }
+    throw 'A real 7z executable is required for the symlink regression.'
+}
+
 function Get-TestOrderedTreeDigest {
     param([string] $Root)
     $basePath = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
@@ -444,8 +467,32 @@ function New-ComponentEvidenceFixture {
     return [pscustomobject]@{
         Root = $root; Cache = $cache; Application = $application; ApplicationCommit = $applicationCommit; Manifest = $manifestPath
         Candidate = $candidatePath; DependencyArchive = $dependencyArchivePath; RuntimeArchive = $runtimeArchivePath
-        SourceArchive = $sourceArchivePath; Verification = $verificationPath; YtDlpBinary = $ytBinaryPath
+        SourceArchive = $sourceArchivePath; Verification = $verificationPath; YtDlpBinary = $ytBinaryPath; DependencyTree = $dependencyTree
     }
+}
+
+function Set-TestProductionManifest {
+    param([object] $Fixture, [scriptblock] $Mutation)
+    $relative = 'release/evidence/v2.19.1-karon.2/non-runtime-components.json'
+    $source = Join-Path $repoRoot $relative.Replace('/', '\')
+    $destination = Join-Path $Fixture.Application $relative.Replace('/', '\')
+    $manifest = Get-Content -LiteralPath $source -Raw | ConvertFrom-Json
+    & $Mutation $manifest
+    Write-TestJson -Path $destination -Value $manifest
+    & git -C $Fixture.Application add -f -- $relative
+    $oldAuthorDate = $env:GIT_AUTHOR_DATE
+    $oldCommitterDate = $env:GIT_COMMITTER_DATE
+    try {
+        $env:GIT_AUTHOR_DATE = '2026-01-02T00:00:00Z'
+        $env:GIT_COMMITTER_DATE = '2026-01-02T00:00:00Z'
+        & git -C $Fixture.Application commit -m 'mutated production evidence manifest' | Out-Null
+    }
+    finally {
+        $env:GIT_AUTHOR_DATE = $oldAuthorDate
+        $env:GIT_COMMITTER_DATE = $oldCommitterDate
+    }
+    $Fixture.Manifest = $destination
+    $Fixture.ApplicationCommit = (& git -C $Fixture.Application rev-parse HEAD).Trim()
 }
 
 function Invoke-TestCollector {
@@ -454,7 +501,8 @@ function Invoke-TestCollector {
         [string] $OutputDirectory,
         [string] $YtDlpBinaryPath = $Fixture.YtDlpBinary,
         [switch] $OmitReleaseBinding,
-        [string] $SourceCacheDirectory = $Fixture.Cache
+        [string] $SourceCacheDirectory = $Fixture.Cache,
+        [string] $SevenZipExecutable = ''
     )
     $arguments = @(
         '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $collectorPath,
@@ -466,6 +514,7 @@ function Invoke-TestCollector {
     if (-not $OmitReleaseBinding) {
         $arguments += @('-ApplicationCommit', $Fixture.ApplicationCommit, '-CandidateManifestPath', $Fixture.Candidate)
     }
+    if (-not [string]::IsNullOrWhiteSpace($SevenZipExecutable)) { $arguments += @('-SevenZipExecutable', $SevenZipExecutable) }
     $output = @(& $powershellPath @arguments 2>&1)
     return [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = ($output -join [Environment]::NewLine) }
 }
@@ -481,6 +530,228 @@ function Save-TestManifest {
 }
 
 Describe 'non-runtime component evidence collector' {
+    It 'rejects a coordinated self-signed 696-byte dependency archive replacement' {
+        $fixture = New-ComponentEvidenceFixture 'coordinated-dependency-replacement'
+        $replacement = Join-Path $fixture.Root 'inputs\self-signed-dependencies.zip'
+        New-FixedLengthTestZip -Path $replacement -Length 696
+        Set-TestProductionManifest -Fixture $fixture -Mutation {
+            param($manifest)
+            $manifest.sharedInputs.dependencyArchive.fileName = 'self-signed-dependencies.zip'
+            $manifest.sharedInputs.dependencyArchive.format = 'zip'
+            $manifest.sharedInputs.dependencyArchive.sha256 = Get-TestSha256 $replacement
+            $manifest.sharedInputs.dependencyArchive.length = 696
+            $manifest.sharedInputs.dependencyArchive.provenancePath = 'self-signed/provenance.json'
+            $manifest.sharedInputs.dependencyArchive.provenanceSha256 = ('0' * 64)
+            $manifest.sharedInputs.dependencyArchive.roots = @()
+            $manifest.sharedInputs.dependencyArchive.embeddedFiles = @()
+        }
+        $fixture.DependencyArchive = $replacement
+        $result = Invoke-TestCollector -Fixture $fixture -OutputDirectory (Join-Path $fixture.Root 'output') -OmitReleaseBinding
+        $result.ExitCode | Should Be 1
+        (Get-Item -LiteralPath $replacement).Length | Should Be 696
+        $blockers = Get-Content -LiteralPath (Join-Path $fixture.Root 'output\non-runtime-component-blockers.json') -Raw
+        $blockers | Should Match 'production_manifest_projection_mismatch'
+        $blockers | Should Not Match 'dependency_archive_mismatch'
+    }
+
+    It 'rejects a staged source swapped after initial verification but before ZIP creation' {
+        $fixture = New-ComponentEvidenceFixture 'staged-source-swap'
+        $padding = New-Object byte[] (8MB)
+        $random = [Security.Cryptography.RandomNumberGenerator]::Create()
+        try { $random.GetBytes($padding) }
+        finally { $random.Dispose() }
+        [IO.File]::WriteAllBytes((Join-Path $fixture.DependencyTree 'padding.bin'), $padding)
+        Remove-Item -LiteralPath $fixture.DependencyArchive -Force
+        New-TestZipFromDirectory -Path $fixture.DependencyArchive -SourceDirectory $fixture.DependencyTree
+        $manifest = Read-TestManifest $fixture
+        $manifest.sharedInputs.dependencyArchive.sha256 = Get-TestSha256 $fixture.DependencyArchive
+        $manifest.sharedInputs.dependencyArchive.length = (Get-Item -LiteralPath $fixture.DependencyArchive).Length
+        Save-TestManifest $fixture $manifest
+        $candidate = Get-Content -LiteralPath $fixture.Candidate -Raw | ConvertFrom-Json
+        $candidate.attestation.dependencyArchive.sha256 = Get-TestSha256 $fixture.DependencyArchive
+        Write-TestJson $fixture.Candidate $candidate
+        $replacement = Join-Path $fixture.Root 'replacement-source.bin'
+        $sourceLength = (Get-Item -LiteralPath (Join-Path $fixture.Cache 'bit7z-source.zip')).Length
+        [IO.File]::WriteAllBytes($replacement, [byte[]](,0x5A * $sourceLength))
+        $privateTemp = Join-Path $fixture.Root 'private-temp'
+        [IO.Directory]::CreateDirectory($privateTemp) | Out-Null
+        $outputDirectory = Join-Path $fixture.Root 'output'
+        $job = Start-Job -ScriptBlock {
+            param($TempRoot, $OutputDirectory, $Replacement)
+            $deadline = [DateTime]::UtcNow.AddSeconds(45)
+            while ([DateTime]::UtcNow -lt $deadline) {
+                if (Test-Path -LiteralPath (Join-Path $OutputDirectory 'source-cache-inventory.json')) {
+                    $source = Get-ChildItem -LiteralPath $TempRoot -Directory -Filter 'karon-component-evidence-staging-*' -ErrorAction SilentlyContinue |
+                        ForEach-Object { Join-Path $_.FullName 'sources\bit7z-source.zip' } | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+                    if ($null -ne $source) { Copy-Item -LiteralPath $Replacement -Destination $source -Force; return "swapped:$source" }
+                }
+                Start-Sleep -Milliseconds 5
+            }
+            return 'swap-timeout'
+        } -ArgumentList $privateTemp, $outputDirectory, $replacement
+        $oldTemp = $env:TEMP; $oldTmp = $env:TMP
+        try {
+            $env:TEMP = $privateTemp; $env:TMP = $privateTemp
+            $result = Invoke-TestCollector $fixture $outputDirectory
+            Wait-Job -Job $job -Timeout 50 | Out-Null
+            $jobResult = Receive-Job -Job $job
+        }
+        finally {
+            $env:TEMP = $oldTemp; $env:TMP = $oldTmp
+            Stop-Job -Job $job -ErrorAction SilentlyContinue
+            Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+        }
+        $jobResult | Should Match '^swapped:'
+        $result.ExitCode | Should Be 1
+        (Test-Path -LiteralPath (Join-Path $outputDirectory 'test-fixture-non-runtime-component-evidence.zip')) | Should Be $false
+        @(Get-ChildItem -LiteralPath $outputDirectory -Filter '*.partial.*' -File -ErrorAction SilentlyContinue).Count | Should Be 0
+    }
+
+    It 'rejects exact production manifest semantic projection mutations' {
+        $mutations = @(
+            [pscustomobject]@{ Name = 'component-id-casing'; Apply = { param($m) ($m.components | Where-Object id -eq 'nana').id = 'Nana' } },
+            [pscustomobject]@{ Name = 'license-text'; Apply = { param($m) ($m.components | Where-Object id -eq 'nana').licenseTexts[0].sha256 = ('0' * 64) } },
+            [pscustomobject]@{ Name = 'transform'; Apply = { param($m) ($m.components | Where-Object id -eq 'bit7z').transforms[0].orderedTreeSha256 = ('0' * 64) } },
+            [pscustomobject]@{ Name = 'build-recipe'; Apply = { param($m) ($m.components | Where-Object id -eq 'bit7z').buildRecipe.description += ' forged' } },
+            [pscustomobject]@{ Name = 'required-linker-libraries'; Apply = { param($m) [array]::Reverse($m.sharedInputs.candidate.requiredLinkerLibraries) } }
+        )
+        foreach ($mutation in $mutations) {
+            $fixture = New-ComponentEvidenceFixture ('projection-' + $mutation.Name)
+            Set-TestProductionManifest -Fixture $fixture -Mutation $mutation.Apply
+            $result = Invoke-TestCollector -Fixture $fixture -OutputDirectory (Join-Path $fixture.Root 'output') -OmitReleaseBinding
+            $result.ExitCode | Should Be 1
+            (Get-Content -LiteralPath (Join-Path $fixture.Root 'output\non-runtime-component-blockers.json') -Raw) | Should Match 'production_manifest_projection_mismatch'
+        }
+    }
+
+    It 'accepts the exact approved production manifest projection committed at the required path' {
+        $fixture = New-ComponentEvidenceFixture 'approved-production-projection'
+        Set-TestProductionManifest -Fixture $fixture -Mutation { param($manifest) }
+        $result = Invoke-TestCollector -Fixture $fixture -OutputDirectory (Join-Path $fixture.Root 'output') -OmitReleaseBinding
+        $result.ExitCode | Should Be 1
+        $blockers = Get-Content -LiteralPath (Join-Path $fixture.Root 'output\non-runtime-component-blockers.json') -Raw
+        $blockers | Should Not Match 'production_manifest_path_invalid'
+        $blockers | Should Not Match 'production_manifest_git_blob_mismatch'
+        $blockers | Should Not Match 'production_manifest_projection_mismatch'
+    }
+
+    It 'rejects a real 7z symlink reported with Attributes AL' {
+        $fixture = New-ComponentEvidenceFixture 'sevenzip-symlink-al'
+        $sevenZip = Get-TestSevenZipExecutable
+        $linkRoot = Join-Path $fixture.Root 'link-source'
+        [IO.Directory]::CreateDirectory($linkRoot) | Out-Null
+        Write-TestText (Join-Path $linkRoot 'target.txt') 'target'
+        New-Item -ItemType SymbolicLink -Path (Join-Path $linkRoot 'link.txt') -Target (Join-Path $linkRoot 'target.txt') | Out-Null
+        $archivePath = Join-Path $fixture.Cache 'bit7z-source.7z'
+        Push-Location $linkRoot
+        try { & $sevenZip 'a' '-snl' '-bd' '-y' $archivePath 'link.txt' | Out-Null }
+        finally { Pop-Location }
+        $listing = @(& $sevenZip 'l' '-slt' '-ba' $archivePath 2>&1) -join [Environment]::NewLine
+        $listing | Should Match '(?m)^Attributes = AL\r?$'
+        $manifest = Read-TestManifest $fixture
+        $artifact = ($manifest.components | Where-Object id -eq 'bit7z').sourceArtifacts[0]
+        $artifact.fileName = 'bit7z-source.7z'; $artifact.format = '7z'; $artifact.sha256 = Get-TestSha256 $archivePath; $artifact.length = (Get-Item $archivePath).Length
+        Save-TestManifest $fixture $manifest
+        $result = Invoke-TestCollector -Fixture $fixture -OutputDirectory (Join-Path $fixture.Root 'output') -SevenZipExecutable $sevenZip
+        $result.ExitCode | Should Be 1
+        (Get-Content -LiteralPath (Join-Path $fixture.Root 'output\non-runtime-component-blockers.json') -Raw) | Should Match 'source_archive_preflight_failed:bit7z-source:archive_link_or_reparse_entry'
+    }
+
+    It 'accepts normal nested paths emitted by real 7z with backslash separators' {
+        $fixture = New-ComponentEvidenceFixture 'sevenzip-normal-nested-path'
+        $sevenZip = Get-TestSevenZipExecutable
+        $archiveRoot = Join-Path $fixture.Root 'normal-archive-source'
+        Write-TestText (Join-Path $archiveRoot 'nested\file.txt') 'normal'
+        $archivePath = Join-Path $fixture.Cache 'bit7z-source.7z'
+        Push-Location $archiveRoot
+        try { & $sevenZip 'a' '-bd' '-y' $archivePath 'nested\file.txt' | Out-Null }
+        finally { Pop-Location }
+        $listing = @(& $sevenZip 'l' '-slt' '-ba' $archivePath 2>&1) -join [Environment]::NewLine
+        $listing | Should Match '(?m)^Path = nested\\file\.txt\r?$'
+        $manifest = Read-TestManifest $fixture
+        $artifact = ($manifest.components | Where-Object id -eq 'bit7z').sourceArtifacts[0]
+        $artifact.fileName = 'bit7z-source.7z'; $artifact.format = '7z'; $artifact.sha256 = Get-TestSha256 $archivePath; $artifact.length = (Get-Item $archivePath).Length
+        Save-TestManifest $fixture $manifest
+        $result = Invoke-TestCollector -Fixture $fixture -OutputDirectory (Join-Path $fixture.Root 'output') -SevenZipExecutable $sevenZip
+        $result.ExitCode | Should Be 1
+        (Get-Content -LiteralPath (Join-Path $fixture.Root 'output\non-runtime-component-blockers.json') -Raw) | Should Not Match 'source_archive_preflight_failed:bit7z-source:archive_entry_path_invalid'
+    }
+
+    It 'rejects forbidden Windows leaves and archive segments using one canonical policy' {
+        $fixture = New-ComponentEvidenceFixture 'windows-segment-policy'
+        $manifest = Read-TestManifest $fixture
+        $component = $manifest.components | Where-Object id -eq 'bit7z'
+        $forbidden = @('CON.txt', 'PRN.ext', 'AUX.bin', 'NUL.dat', 'COM1.txt', 'LPT9.txt', 'COM¹.txt', 'COM².txt', 'COM³.txt', 'LPT¹.txt', 'LPT².txt', 'LPT³.txt', 'CONIN$.txt', 'CONOUT$.txt', 'bad<name.txt', 'bad>name.txt', 'bad"name.txt', 'bad|name.txt', 'bad?name.txt', 'bad*name.txt', 'segment.', 'segment ', '.', '..')
+        $index = 0
+        foreach ($name in $forbidden) {
+            $id = 'invalid-leaf-' + $index.ToString('D2')
+            $component.sourceArtifacts += [pscustomobject]@{ id = $id; fileName = $name; url = 'https://github.com/example/windows/archive/1111111111111111111111111111111111111111.zip'; sha256 = ('0' * 64); length = 1; format = 'text'; includeInBundle = $false }
+            $index++
+        }
+        $index = 0
+        foreach ($segment in $forbidden) {
+            $id = 'invalid-segment-' + $index.ToString('D2')
+            $fileName = $id + '.zip'
+            $path = Join-Path $fixture.Cache $fileName
+            New-TestZipFromEntryList -Path $path -Entries @([pscustomobject]@{ Name = "root/$segment/payload.txt"; Bytes = [Text.Encoding]::UTF8.GetBytes('x') })
+            $component.sourceArtifacts += New-TestArtifact -Id $id -Path $path -Url 'https://github.com/example/windows/archive/1111111111111111111111111111111111111111.zip' -Format 'zip' -Include $false
+            $index++
+        }
+        $unicodePath = Join-Path $fixture.Cache 'unicode-normalization-collision.zip'
+        New-TestZipFromEntryList -Path $unicodePath -Entries @(
+            [pscustomobject]@{ Name = "root/CAF$([char]0x00C9).txt"; Bytes = [Text.Encoding]::UTF8.GetBytes('a') },
+            [pscustomobject]@{ Name = "root/cafe$([char]0x0301).txt"; Bytes = [Text.Encoding]::UTF8.GetBytes('b') }
+        )
+        $component.sourceArtifacts += New-TestArtifact -Id 'unicode-normalization-collision' -Path $unicodePath -Url 'https://github.com/example/windows/archive/1111111111111111111111111111111111111111.zip' -Format 'zip' -Include $false
+        Save-TestManifest $fixture $manifest
+        $result = Invoke-TestCollector $fixture (Join-Path $fixture.Root 'output')
+        $result.ExitCode | Should Be 1
+        $blockerPath = Join-Path $fixture.Root 'output\non-runtime-component-blockers.json'
+        if (-not (Test-Path -LiteralPath $blockerPath -PathType Leaf)) { throw $result.Output }
+        $blockers = Get-Content -LiteralPath $blockerPath -Raw
+        for ($i = 0; $i -lt $forbidden.Count; $i++) {
+            $blockers | Should Match ('source_artifact_file_name_invalid:invalid-leaf-' + $i.ToString('D2'))
+            $blockers | Should Match ('source_archive_preflight_failed:invalid-segment-' + $i.ToString('D2'))
+        }
+        $blockers | Should Match 'source_archive_preflight_failed:unicode-normalization-collision'
+    }
+
+    It 'does not delete a replacement staging directory during cleanup' {
+        $fixture = New-ComponentEvidenceFixture 'staging-cleanup-identity'
+        $privateTemp = Join-Path $fixture.Root 'private-temp'
+        [IO.Directory]::CreateDirectory($privateTemp) | Out-Null
+        $job = Start-Job -ScriptBlock {
+            param($TempRoot)
+            $deadline = [DateTime]::UtcNow.AddSeconds(30)
+            while ([DateTime]::UtcNow -lt $deadline) {
+                $directory = Get-ChildItem -LiteralPath $TempRoot -Directory -Filter 'karon-component-evidence-staging-*' -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($null -ne $directory) {
+                    Remove-Item -LiteralPath $directory.FullName -Recurse -Force
+                    [IO.Directory]::CreateDirectory($directory.FullName) | Out-Null
+                    [IO.File]::WriteAllText((Join-Path $directory.FullName 'attacker-owned.txt'), 'replacement')
+                    return $directory.FullName
+                }
+                Start-Sleep -Milliseconds 5
+            }
+            return 'replacement-timeout'
+        } -ArgumentList $privateTemp
+        $oldTemp = $env:TEMP; $oldTmp = $env:TMP
+        try {
+            $env:TEMP = $privateTemp; $env:TMP = $privateTemp
+            $result = Invoke-TestCollector -Fixture $fixture -OutputDirectory (Join-Path $fixture.Root 'output') -OmitReleaseBinding
+            Wait-Job -Job $job -Timeout 35 | Out-Null
+            $replacementPath = Receive-Job -Job $job
+        }
+        finally {
+            $env:TEMP = $oldTemp; $env:TMP = $oldTmp
+            Stop-Job -Job $job -ErrorAction SilentlyContinue
+            Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+        }
+        $replacementPath | Should Not Be 'replacement-timeout'
+        (Test-Path -LiteralPath (Join-Path $replacementPath 'attacker-owned.txt') -PathType Leaf) | Should Be $true
+        Remove-Item -LiteralPath $replacementPath -Recurse -Force
+    }
+
     It 'rejects a tampered immutable source cache artifact' {
         $fixture = New-ComponentEvidenceFixture 'tampered-source'
         [IO.File]::AppendAllText((Join-Path $fixture.Cache 'bit7z-source.zip'), 'tamper')
