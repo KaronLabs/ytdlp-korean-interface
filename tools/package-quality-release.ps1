@@ -282,7 +282,8 @@ function Get-KaronPackageCandidateEntries {
         throw 'package_candidate_manifest_invalid'
     }
     $applicationSourceCommit = Get-KaronPackageRawString (Get-KaronPackageRawProperty $manifestDocument.Raw 'applicationSourceCommit' 'package_candidate_manifest_invalid') 'package_candidate_manifest_invalid'
-    if ($applicationSourceCommit -notmatch '^[a-fA-F0-9]{40}$') { throw 'package_candidate_manifest_invalid' }
+    $applicationSourceTree = Get-KaronPackageRawString (Get-KaronPackageRawProperty $manifestDocument.Raw 'applicationSourceTree' 'package_candidate_manifest_invalid') 'package_candidate_manifest_invalid'
+    if ($applicationSourceCommit -notmatch '^[a-fA-F0-9]{40}$' -or $applicationSourceTree -notmatch '^[a-fA-F0-9]{40}$') { throw 'package_candidate_manifest_invalid' }
     $manifestFiles = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($entry in @($manifest.files)) {
         $relative = [string]$entry.path
@@ -856,8 +857,11 @@ function Get-KaronPackageApplicationProvenance {
     )
     $manifest = ConvertFrom-KaronPackageJsonStrict ([IO.File]::ReadAllText($CandidateEntries['candidate-manifest.json'].SourcePath, [Text.UTF8Encoding]::new($false, $true))) 'package_candidate_manifest_invalid'
     $applicationSourceCommit = Get-KaronPackageRawString (Get-KaronPackageRawProperty $manifest.Raw 'applicationSourceCommit' 'package_candidate_manifest_invalid') 'package_candidate_manifest_invalid'
-    if ($applicationSourceCommit -notmatch '^[a-fA-F0-9]{40}$' -or $PackagingCommit -notmatch '^[a-fA-F0-9]{40}$') { throw 'package_application_source_invalid' }
+    $manifestApplicationSourceTree = Get-KaronPackageRawString (Get-KaronPackageRawProperty $manifest.Raw 'applicationSourceTree' 'package_candidate_manifest_invalid') 'package_candidate_manifest_invalid'
+    if ($applicationSourceCommit -notmatch '^[a-fA-F0-9]{40}$' -or $manifestApplicationSourceTree -notmatch '^[a-fA-F0-9]{40}$' -or
+        $PackagingCommit -notmatch '^[a-fA-F0-9]{40}$') { throw 'package_application_source_invalid' }
     $applicationSourceCommit = $applicationSourceCommit.ToLowerInvariant()
+    $manifestApplicationSourceTree = $manifestApplicationSourceTree.ToLowerInvariant()
     $packaging = $PackagingCommit.ToLowerInvariant()
     $applicationComponents = @($Lock.components | Where-Object { [string]$_.id -ceq 'application' })
     if ($applicationComponents.Count -ne 1) { throw 'package_application_source_invalid' }
@@ -876,6 +880,7 @@ function Get-KaronPackageApplicationProvenance {
     $treeOutput = @(& git -C $RepositoryRoot rev-parse --verify ($applicationSourceCommit + '^{tree}') 2>&1)
     $applicationSourceTree = (($treeOutput | Out-String).Trim()).ToLowerInvariant()
     if ($LASTEXITCODE -ne 0 -or $applicationSourceTree -notmatch '^[a-f0-9]{40}$') { throw 'package_application_source_object_invalid' }
+    if ($manifestApplicationSourceTree -cne $applicationSourceTree) { throw 'package_application_source_tree_mismatch' }
     [pscustomobject]@{
         ApplicationSourceCommit = $applicationSourceCommit
         ApplicationSourceTree = $applicationSourceTree

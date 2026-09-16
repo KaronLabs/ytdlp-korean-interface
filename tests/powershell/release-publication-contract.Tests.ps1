@@ -112,8 +112,12 @@ function New-TestProvenanceOnlyCase {
         $applicationCommit = [string](Invoke-TestGit $root @('commit-tree', $applicationTree, '-m', 'unrelated application source'))
     }
 
+    $applicationTree = [string](Invoke-TestGit $root @('rev-parse', ($applicationCommit + '^{tree}')))
     $manifestPath = Join-Path $root 'candidate-manifest.json'
-    Write-TestJson $manifestPath ([ordered]@{ applicationSourceCommit = $applicationCommit })
+    Write-TestJson $manifestPath ([ordered]@{
+        applicationSourceCommit = $applicationCommit
+        applicationSourceTree = $applicationTree
+    })
     $entries = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
     $entries.Add('candidate-manifest.json', [pscustomobject]@{ SourcePath = $manifestPath })
     $lock = [pscustomobject]@{
@@ -199,6 +203,7 @@ function New-ReleaseContractCase {
         schemaVersion = 1
         createdAtUtc = '2026-09-16T00:00:00Z'
         applicationSourceCommit = $applicationSourceCommit
+        applicationSourceTree = $applicationSourceTree
         files = @(
             [ordered]@{ path = 'ffprobe.exe'; sha256 = Get-TestSha256 $ffprobePath; length = [long](Get-Item $ffprobePath).Length },
             [ordered]@{ path = 'ytdlp-interface.exe'; sha256 = Get-TestSha256 $appPath; length = [long](Get-Item $appPath).Length }
@@ -865,6 +870,20 @@ Describe 'Independent immutable provenance anchors' {
         $case = New-ReleaseContractCase 'provenance-application-substitution'
         Set-TestApplicationSourceCommit $case ('b' * 40)
         (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_application_source_mismatch'
+    }
+
+    It 'rejects application source tree substitution' {
+        $case = New-ReleaseContractCase 'provenance-tree-substitution'
+        $case.CandidateManifest.applicationSourceTree = 'f' * 40
+        Write-TestJson $case.ManifestPath $case.CandidateManifest
+        $manifestRecord = @($case.Lock.release.candidateFiles | Where-Object { [string]$_.path -ceq 'candidate-manifest.json' })
+        $manifestRecord.Count | Should Be 1
+        $manifestRecord[0].sha256 = Get-TestSha256 $case.ManifestPath
+        $entries = Get-KaronPackageCandidateEntries $case.Lock $case.Candidate
+        $packagingCommit = [string](Invoke-TestGit $case.Repository @('rev-parse', 'HEAD^{commit}'))
+        (Get-TestFailure {
+            Get-KaronPackageApplicationProvenance $case.Lock $entries $case.Repository $packagingCommit
+        }) | Should Match 'package_application_source_tree_mismatch'
     }
 
     It 'rejects an application lock that self-references the packaging commit' {

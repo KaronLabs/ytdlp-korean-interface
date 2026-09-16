@@ -281,13 +281,21 @@ function Get-SourceAttestation {
     }
     if (-not (Test-Path -LiteralPath $GitPath -PathType Leaf)) { throw 'Git executable is missing for source attestation.' }
     $safeDirectory = 'safe.directory=' + $source
-    $commit = (& $GitPath -c $safeDirectory -C $source rev-parse --verify HEAD 2>&1 | Out-String).Trim()
-    if ($LASTEXITCODE -ne 0) { throw 'Git could not verify the candidate source revision.' }
-    $status = & $GitPath -c $safeDirectory -C $source status --porcelain=v1 2>&1 | Out-String
+    $commit = (& $GitPath -c $safeDirectory -C $source rev-parse --verify 'HEAD^{commit}' 2>&1 | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[a-fA-F0-9]{40}$') { throw 'Git could not verify the candidate source revision.' }
+    $tree = (& $GitPath -c $safeDirectory -C $source rev-parse --verify 'HEAD^{tree}' 2>&1 | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or $tree -notmatch '^[a-fA-F0-9]{40}$') { throw 'Git could not verify the candidate source tree.' }
+    $status = & $GitPath -c $safeDirectory -C $source status --porcelain=v1 --untracked-files=all 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0) { throw 'Git could not inspect the candidate source status.' }
-    if ([string]::IsNullOrWhiteSpace($commit)) { throw 'Git source revision is empty.' }
     if ($null -eq $TrackedPaths -or $TrackedPaths.Count -eq 0) { $TrackedPaths = Get-GitTrackedPaths -SourceRoot $source -GitPath $GitPath }
-    return Get-SourceInputAttestation -SourceRoot $source -Commit $commit -StatusPorcelain $status -TrackedPaths $TrackedPaths
+    $input = Get-SourceInputAttestation -SourceRoot $source -Commit $commit.ToLowerInvariant() -StatusPorcelain $status -TrackedPaths $TrackedPaths
+    return [ordered]@{
+        commit = $input.commit
+        tree = $tree.ToLowerInvariant()
+        dirty = $input.dirty
+        treeSha256 = $input.treeSha256
+        trackedFileCount = $input.trackedFileCount
+    }
 }
 
 function Test-ArchiveEntrySafe {
@@ -871,6 +879,8 @@ function Get-CandidateManifest {
     return [ordered]@{
         schemaVersion = 1
         createdAtUtc = [DateTime]::UtcNow.ToString('o')
+        applicationSourceCommit = $Attestation.source.commit
+        applicationSourceTree = $Attestation.source.tree
         attestation = $Attestation
         versions = $versions
         files = @($files | ForEach-Object {

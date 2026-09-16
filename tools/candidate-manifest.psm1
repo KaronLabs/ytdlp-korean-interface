@@ -177,11 +177,12 @@ function Assert-AttestationShape {
     }
     $source = Get-ManifestField -Value $Attestation -Name 'source'
     $commit = [string](Get-ManifestField -Value $source -Name 'commit')
+    $tree = [string](Get-ManifestField -Value $source -Name 'tree')
     $treeSha256 = [string](Get-ManifestField -Value $source -Name 'treeSha256')
     $trackedFileCount = Get-ManifestField -Value $source -Name 'trackedFileCount'
     $dirty = Get-ManifestField -Value $source -Name 'dirty'
     $count = 0
-    if ($commit -notmatch '^[A-Fa-f0-9]{40}([A-Fa-f0-9]{24})?$' -or $treeSha256 -notmatch '^[A-Fa-f0-9]{64}$' -or
+    if ($commit -notmatch '^[A-Fa-f0-9]{40}$' -or $tree -notmatch '^[A-Fa-f0-9]{40}$' -or $treeSha256 -notmatch '^[A-Fa-f0-9]{64}$' -or
         -not [int]::TryParse([string]$trackedFileCount, [ref]$count) -or $count -le 0 -or [bool]$dirty) { throw 'candidate_manifest_invalid' }
 
     $archive = Get-ManifestField -Value $Attestation -Name 'dependencyArchive'
@@ -242,9 +243,15 @@ function Assert-CandidateManifestSeal {
     $candidate = [IO.Path]::GetFullPath($CandidateRoot)
     if ((Get-ManifestField -Value $Manifest -Name 'schemaVersion') -ne 1) { throw 'candidate_manifest_invalid' }
     if ([string]::IsNullOrWhiteSpace([string](Get-ManifestField -Value $Manifest -Name 'createdAtUtc'))) { throw 'candidate_manifest_invalid' }
+    $applicationSourceCommit = [string](Get-ManifestField -Value $Manifest -Name 'applicationSourceCommit')
+    $applicationSourceTree = [string](Get-ManifestField -Value $Manifest -Name 'applicationSourceTree')
+    if ($applicationSourceCommit -notmatch '^[A-Fa-f0-9]{40}$' -or $applicationSourceTree -notmatch '^[A-Fa-f0-9]{40}$') { throw 'candidate_manifest_invalid' }
     $attestation = Get-ManifestField -Value $Manifest -Name 'attestation'
     if ($null -eq $attestation) { throw 'candidate_manifest_invalid' }
     Assert-AttestationShape -Attestation $attestation
+    $source = Get-ManifestField -Value $attestation -Name 'source'
+    if ($applicationSourceCommit -cne [string](Get-ManifestField -Value $source -Name 'commit') -or
+        $applicationSourceTree -cne [string](Get-ManifestField -Value $source -Name 'tree')) { throw 'candidate_manifest_invalid' }
     $versions = Get-ManifestField -Value $Manifest -Name 'versions'
     if ($null -eq $versions) { throw 'candidate_manifest_invalid' }
     foreach ($name in @('product', 'ytdlp', 'ffmpeg', 'ffprobe', 'deno')) {
