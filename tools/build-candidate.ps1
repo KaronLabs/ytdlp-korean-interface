@@ -246,6 +246,158 @@ function Get-GitTrackedPaths {
     return @($paths)
 }
 
+function Test-SafeGitRelativePath {
+    param([Parameter(Mandatory = $true)] [string] $Path)
+    if ([string]::IsNullOrWhiteSpace($Path) -or $Path.IndexOf([char] 0) -ge 0) { return $false }
+    $normalized = $Path.Replace('\', '/')
+    if ([IO.Path]::IsPathRooted($normalized) -or $normalized -match '^[A-Za-z]:' -or $normalized.StartsWith('/')) { return $false }
+    $invalid = [IO.Path]::GetInvalidFileNameChars()
+    foreach ($segment in $normalized.Split([char] '/')) {
+        if ([string]::IsNullOrEmpty($segment) -or $segment -eq '.' -or $segment -eq '..' -or
+            $segment.IndexOfAny($invalid) -ge 0 -or $segment.EndsWith('.') -or $segment.EndsWith(' ')) { return $false }
+    }
+    return $true
+}
+
+function Get-GitTreeEntries {
+    param(
+        [Parameter(Mandatory = $true)] [string] $SourceRoot,
+        [Parameter(Mandatory = $true)] [string] $GitPath,
+        [Parameter(Mandatory = $true)] [string] $Commit
+    )
+    if ($Commit -notmatch '^[a-fA-F0-9]{40}$') { throw 'source_export_commit_invalid' }
+    $source = [IO.Path]::GetFullPath($SourceRoot)
+    $safeDirectory = 'safe.directory=' + $source
+    try {
+        $result = Invoke-CheckedProcess `
+            -FilePath $GitPath `
+            -Arguments @('-c', $safeDirectory, '-c', 'core.quotepath=false', '-C', $source, 'ls-tree', '-r', '-z', '--full-tree', $Commit) `
+            -Name 'Git source tree inventory'
+    } catch {
+        throw "source_export_inventory_failed: $($_.Exception.Message)"
+    }
+    $records = @($result.StandardOutput.Split([char[]] @([char] 0), [StringSplitOptions]::RemoveEmptyEntries))
+    if ($records.Count -eq 0) { throw 'source_export_inventory_invalid' }
+
+    $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $entries = @()
+    foreach ($record in $records) {
+        $match = [regex]::Match($record, '\A(?<mode>[0-7]{6}) (?<type>[a-z]+) (?<object>[0-9a-fA-F]{40})\t(?<path>[\s\S]+)\z')
+        if (-not $match.Success -or $match.Groups['type'].Value -ne 'blob') { throw 'source_export_inventory_invalid' }
+        $relative = $match.Groups['path'].Value.Replace('\', '/')
+        if (-not (Test-SafeGitRelativePath -Path $relative) -or -not $seen.Add($relative)) { throw 'source_export_path_invalid' }
+        $entries += [pscustomobject]@{
+            Path = $relative
+            ObjectId = $match.Groups['object'].Value.ToLowerInvariant()
+            Mode = $match.Groups['mode'].Value
+        }
+    }
+    return @($entries)
+}
+
+function Get-GitBlobObjectId {
+    param([Parameter(Mandatory = $true)] [string] $Path)
+    $stream = [IO.File]::OpenRead($Path)
+    $hasher = [Security.Cryptography.SHA1]::Create()
+    try {
+        $length = $stream.Length.ToString([Globalization.CultureInfo]::InvariantCulture)
+        $header = [Text.Encoding]::ASCII.GetBytes("blob $length`0")
+        [void] $hasher.TransformBlock($header, 0, $header.Length, $header, 0)
+        $buffer = [byte[]]::new(81920)
+        while (($read = $stream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+            [void] $hasher.TransformBlock($buffer, 0, $read, $buffer, 0)
+        }
+        [void] $hasher.TransformFinalBlock([byte[]]::new(0), 0, 0)
+        return ([BitConverter]::ToString($hasher.Hash)).Replace('-', '').ToLowerInvariant()
+    } finally {
+        $hasher.Dispose()
+        $stream.Dispose()
+    }
+}
+
+function Expand-GitSourceArchive {
+    param(
+        [Parameter(Mandatory = $true)] [string] $ArchivePath,
+        [Parameter(Mandatory = $true)] [string] $DestinationRoot,
+        [Parameter(Mandatory = $true)] [AllowEmptyCollection()] [object[]] $TrackedEntries
+    )
+    $archiveFile = [IO.Path]::GetFullPath($ArchivePath)
+    $destination = [IO.Path]::GetFullPath($DestinationRoot)
+    if (Test-Path -LiteralPath $destination) { throw 'source_export_destination_exists' }
+
+    $expected = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($tracked in @($TrackedEntries)) {
+        $relative = [string] $tracked.Path
+        $objectId = [string] $tracked.ObjectId
+        if (-not (Test-SafeGitRelativePath -Path $relative) -or $objectId -notmatch '^[a-fA-F0-9]{40}$' -or $expected.ContainsKey($relative)) {
+            throw 'source_export_inventory_invalid'
+        }
+        $expected.Add($relative, $tracked)
+    }
+
+    $archive = $null
+    $createdDestination = $false
+    try {
+        if (-not (Test-Path -LiteralPath $archiveFile -PathType Leaf)) { throw 'source_export_invalid' }
+        try { $archive = [IO.Compression.ZipFile]::OpenRead($archiveFile) }
+        catch { throw 'source_export_invalid' }
+
+        [IO.Directory]::CreateDirectory($destination) | Out-Null
+        $createdDestination = $true
+        $seenEntries = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+        $seenFiles = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+
+        foreach ($entry in $archive.Entries) {
+            $entryName = $entry.FullName.Replace('\', '/')
+            $isDirectory = $entryName.EndsWith('/')
+            $relative = $(if ($isDirectory) { $entryName.TrimEnd([char] '/') } else { $entryName })
+            if (-not (Test-SafeGitRelativePath -Path $relative) -or -not $seenEntries.Add($relative)) { throw 'source_export_path_invalid' }
+            $target = [IO.Path]::GetFullPath((Join-Path $destination $relative))
+            if (-not (Test-PathContained -Root $destination -Path $target)) { throw 'source_export_path_invalid' }
+
+            if ($isDirectory) {
+                [IO.Directory]::CreateDirectory($target) | Out-Null
+                continue
+            }
+
+            $expectedEntry = $null
+            if (-not $expected.TryGetValue($relative, [ref] $expectedEntry) -or $relative -cne [string] $expectedEntry.Path) {
+                throw 'source_export_unexpected_entry'
+            }
+            $parent = Split-Path -Parent $target
+            if (-not [string]::IsNullOrWhiteSpace($parent)) { [IO.Directory]::CreateDirectory($parent) | Out-Null }
+            $inputStream = $entry.Open()
+            try {
+                $outputStream = [IO.File]::Open($target, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+                try { $inputStream.CopyTo($outputStream) }
+                finally { $outputStream.Dispose() }
+            } finally {
+                $inputStream.Dispose()
+            }
+            if ((Get-GitBlobObjectId -Path $target) -ne ([string] $expectedEntry.ObjectId).ToLowerInvariant()) {
+                throw 'source_export_blob_mismatch'
+            }
+            [void] $seenFiles.Add($relative)
+        }
+
+        if ($seenFiles.Count -ne $expected.Count) { throw 'source_export_inventory_mismatch' }
+        foreach ($relative in $expected.Keys) {
+            if (-not $seenFiles.Contains($relative)) { throw 'source_export_inventory_mismatch' }
+        }
+        return $destination
+    } catch {
+        $failure = $_.Exception.Message
+        if ($createdDestination -and [IO.Directory]::Exists($destination)) {
+            try { [IO.Directory]::Delete($destination, $true) }
+            catch { throw 'source_export_cleanup_failed' }
+        }
+        if ($failure -like 'source_export_*') { throw $failure }
+        throw "source_export_invalid: $failure"
+    } finally {
+        if ($null -ne $archive) { $archive.Dispose() }
+    }
+}
+
 function Get-SourceInputAttestation {
     param(
         [Parameter(Mandatory = $true)] [string] $SourceRoot,
@@ -272,7 +424,7 @@ function Get-SourceInputAttestation {
 }
 
 function Get-SourceAttestation {
-    param([Parameter(Mandatory = $true)] [string] $SourceRoot, [string] $GitPath, [string[]] $TrackedPaths)
+    param([Parameter(Mandatory = $true)] [string] $SourceRoot, [string] $GitPath)
     $source = [IO.Path]::GetFullPath($SourceRoot)
     if ([string]::IsNullOrWhiteSpace($GitPath)) {
         $git = Get-Command git.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -287,14 +439,11 @@ function Get-SourceAttestation {
     if ($LASTEXITCODE -ne 0 -or $tree -notmatch '^[a-fA-F0-9]{40}$') { throw 'Git could not verify the candidate source tree.' }
     $status = & $GitPath -c $safeDirectory -C $source status --porcelain=v1 --untracked-files=all 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0) { throw 'Git could not inspect the candidate source status.' }
-    if ($null -eq $TrackedPaths -or $TrackedPaths.Count -eq 0) { $TrackedPaths = Get-GitTrackedPaths -SourceRoot $source -GitPath $GitPath }
-    $input = Get-SourceInputAttestation -SourceRoot $source -Commit $commit.ToLowerInvariant() -StatusPorcelain $status -TrackedPaths $TrackedPaths
+    if (-not [string]::IsNullOrWhiteSpace($status)) { throw 'source_worktree_dirty' }
     return [ordered]@{
-        commit = $input.commit
+        commit = $commit.ToLowerInvariant()
         tree = $tree.ToLowerInvariant()
-        dirty = $input.dirty
-        treeSha256 = $input.treeSha256
-        trackedFileCount = $input.trackedFileCount
+        dirty = $false
     }
 }
 
@@ -576,24 +725,35 @@ function New-IsolatedBuildSource {
         [Parameter(Mandatory = $true)] [string] $SourceRoot,
         [Parameter(Mandatory = $true)] [string] $WorkspaceRoot,
         [Parameter(Mandatory = $true)] [string[]] $DependencyRoots,
-        [string[]] $TrackedPaths
+        [Parameter(Mandatory = $true)] [string] $Commit,
+        [Parameter(Mandatory = $true)] [string] $GitPath
     )
     $source = [IO.Path]::GetFullPath($SourceRoot)
-    $isolated = Join-Path $WorkspaceRoot 'source'
-    [IO.Directory]::CreateDirectory($isolated) | Out-Null
-    if ($null -eq $TrackedPaths -or $TrackedPaths.Count -eq 0) {
-        $git = Get-Command git.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1
-        $TrackedPaths = Get-GitTrackedPaths -SourceRoot $source -GitPath $git.Source
+    $workspace = [IO.Path]::GetFullPath($WorkspaceRoot)
+    $isolated = Join-Path $workspace 'source'
+    if (Test-Path -LiteralPath $isolated) { throw 'source_export_destination_exists' }
+    [IO.Directory]::CreateDirectory($workspace) | Out-Null
+
+    try { $trackedEntries = @(Get-GitTreeEntries -SourceRoot $source -GitPath $GitPath -Commit $Commit) }
+    catch { throw "source_export_failed: $($_.Exception.Message)" }
+    $archivePath = Join-Path $workspace ('.source-' + [Guid]::NewGuid().ToString('N') + '.zip')
+    $safeDirectory = 'safe.directory=' + $source
+    try {
+        try {
+            [void](Invoke-CheckedProcess `
+                -FilePath $GitPath `
+                -Arguments @('-c', 'core.autocrlf=false', '-c', $safeDirectory, '-C', $source, 'archive', '--format=zip', ('--output=' + $archivePath), $Commit) `
+                -Name 'Git immutable source export')
+        } catch {
+            throw "source_export_failed: $($_.Exception.Message)"
+        }
+        if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf) -or (Get-Item -LiteralPath $archivePath).Length -eq 0) {
+            throw 'source_export_failed: Git did not create a source archive.'
+        }
+        return Expand-GitSourceArchive -ArchivePath $archivePath -DestinationRoot $isolated -TrackedEntries $trackedEntries
+    } finally {
+        if ([IO.File]::Exists($archivePath)) { [IO.File]::Delete($archivePath) }
     }
-    foreach ($relative in @($TrackedPaths | Sort-Object -Unique)) {
-        $rootName = ($relative -split '[/\\]')[0]
-        if ($DependencyRoots -contains $rootName -or $rootName -eq '.git') { continue }
-        $from = Join-Path $source $relative; $to = Join-Path $isolated $relative
-        if (-not (Test-PathContained -Root $source -Path $from) -or -not (Test-Path -LiteralPath $from -PathType Leaf)) { throw 'source_input_invalid' }
-        [IO.Directory]::CreateDirectory((Split-Path -Parent $to)) | Out-Null
-        Copy-Item -LiteralPath $from -Destination $to -Force
-    }
-    return $isolated
 }
 
 function New-IsolatedBuildWorkspace {
@@ -914,16 +1074,23 @@ function Invoke-BuildCandidate {
     foreach ($path in @($solution, $project, $catalog, $settings)) { if (-not (Test-Path -LiteralPath $path)) { throw "Required build input is missing: $path" } }
     if (-not (Select-String -LiteralPath $project -Pattern '<PlatformToolset>v143</PlatformToolset>' -Quiet)) { throw 'The project does not declare v143.' }
     $git = Get-Command git.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1
-    $trackedPaths = Get-GitTrackedPaths -SourceRoot $source -GitPath $git.Source
-    $sourceAttestation = Get-SourceAttestation -SourceRoot $source -GitPath $git.Source -TrackedPaths $trackedPaths
+    $sourceIdentity = Get-SourceAttestation -SourceRoot $source -GitPath $git.Source
+    $trackedEntries = @(Get-GitTreeEntries -SourceRoot $source -GitPath $git.Source -Commit $sourceIdentity.commit)
+    $trackedPaths = @($trackedEntries | ForEach-Object { $_.Path })
     $dependencyManifest = Get-DependencyArchiveManifest -SourceRoot $source
     $verifiedParent = Get-VerifiedParentRuntime -ParentRuntime $parent
     $buildWorkspace = $null
     try {
         $buildWorkspace = New-IsolatedBuildWorkspace -WorkspaceBase (Join-Path $env:SystemDrive 'oai-ytdlp-build')
-        $buildSource = New-IsolatedBuildSource -SourceRoot $source -WorkspaceRoot $buildWorkspace -DependencyRoots @($dependencyManifest.roots) -TrackedPaths $trackedPaths
-        $copiedSourceAttestation = Get-SourceInputAttestation -SourceRoot $buildSource -Commit $sourceAttestation.commit -StatusPorcelain '' -TrackedPaths $trackedPaths
-        if ($copiedSourceAttestation.treeSha256 -cne $sourceAttestation.treeSha256 -or $copiedSourceAttestation.trackedFileCount -ne $sourceAttestation.trackedFileCount) { throw 'source_input_changed' }
+        $buildSource = New-IsolatedBuildSource -SourceRoot $source -WorkspaceRoot $buildWorkspace -DependencyRoots @($dependencyManifest.roots) -Commit $sourceIdentity.commit -GitPath $git.Source
+        $sourceInput = Get-SourceInputAttestation -SourceRoot $buildSource -Commit $sourceIdentity.commit -StatusPorcelain '' -TrackedPaths $trackedPaths
+        $sourceAttestation = [ordered]@{
+            commit = $sourceIdentity.commit
+            tree = $sourceIdentity.tree
+            dirty = $sourceInput.dirty
+            treeSha256 = $sourceInput.treeSha256
+            trackedFileCount = $sourceInput.trackedFileCount
+        }
         $dependencyArchiveSourcePath = Join-Path $DependencyArchiveDirectory $dependencyManifest.name
         if (-not (Test-Path -LiteralPath $dependencyArchiveSourcePath -PathType Leaf)) { throw "Reviewed dependency archive is missing: $dependencyArchiveSourcePath" }
         $dependencyArchivePath = Join-Path $buildWorkspace $dependencyManifest.name
