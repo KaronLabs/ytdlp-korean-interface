@@ -506,6 +506,7 @@ function Assert-PngByteStructure {
     $iendCount = 0
     $colorType = -1
     $seenIdat = $false
+    $seenTrns = $false
     $idatClosed = $false
     [uint64]$cumulativeIdat = 0
     $seenAncillary = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
@@ -532,7 +533,7 @@ function Assert-PngByteStructure {
         if ([char]::IsLower($type[0]) -and -not $AllowedPngAncillaryChunks.Contains($type)) {
             throw 'gui_screenshot_png_chunk_not_allowed'
         }
-        if ([char]::IsLower($type[0]) -and -not $seenAncillary.Add($type)) {
+        if ([char]::IsLower($type[0]) -and $type -cne 'tRNS' -and -not $seenAncillary.Add($type)) {
             throw 'gui_screenshot_png_structure_invalid'
         }
         switch -CaseSensitive ($type) {
@@ -553,7 +554,7 @@ function Assert-PngByteStructure {
             }
             'PLTE' {
                 $plteCount++
-                if ($plteCount -gt 1 -or $seenIdat -or $length -eq 0 -or ($length % 3) -ne 0 -or $length -gt 768 -or
+                if ($plteCount -gt 1 -or $seenIdat -or $seenTrns -or $length -eq 0 -or ($length % 3) -ne 0 -or $length -gt 768 -or
                     $colorType -in @(0, 4)) {
                     throw 'gui_screenshot_png_structure_invalid'
                 }
@@ -573,12 +574,15 @@ function Assert-PngByteStructure {
                 if ($type -in @('cHRM', 'gAMA', 'sBIT', 'sRGB', 'pHYs', 'tRNS') -and $seenIdat) {
                     throw 'gui_screenshot_png_structure_invalid'
                 }
-                if ($type -ceq 'tRNS' -and (
-                    ($colorType -eq 0 -and $length -ne 2) -or
-                    ($colorType -eq 2 -and $length -ne 6) -or
-                    ($colorType -eq 3 -and ($plteCount -ne 1 -or $length -lt 1 -or $length -gt $plteEntries)) -or
-                    $colorType -in @(4, 6))) {
-                    throw 'gui_screenshot_png_structure_invalid'
+                if ($type -ceq 'tRNS') {
+                    if ($seenTrns) { throw 'gui_screenshot_png_structure_invalid' }
+                    $seenTrns = $true
+                    if (($colorType -eq 0 -and $length -ne 2) -or
+                        ($colorType -eq 2 -and $length -ne 6) -or
+                        ($colorType -eq 3 -and ($plteCount -ne 1 -or $length -lt 1 -or $length -gt $plteEntries)) -or
+                        $colorType -in @(4, 6)) {
+                        throw 'gui_screenshot_png_structure_invalid'
+                    }
                 }
             }
         }

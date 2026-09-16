@@ -989,6 +989,42 @@ exit 2
         Assert-VerifierRejects $fixture 'gui_screenshot_png_structure_invalid'
     }
 
+    It 'rejects type-2 tRNS placed before an optional PLTE chunk' {
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-150'
+        $path = Join-Path $fixture.Evidence (([string]$case.Value.screenshots[0].path).Replace('/', '\'))
+        Set-TestPngColorType $path 2
+        Insert-TestBytes $path (Get-TestPngChunkOffset $path 'IDAT') (New-ValidTestPngChunk 'tRNS' ([byte[]](0, 0, 0, 0, 0, 0)))
+        Insert-TestBytes $path (Get-TestPngChunkOffset $path 'IDAT') (New-ValidTestPngChunk 'PLTE' ([byte[]](0, 0, 0)))
+        Update-DescriptorForFile $case.Value.screenshots[0] $path
+        Save-TestCase $case
+        Assert-VerifierRejects $fixture 'gui_screenshot_png_structure_invalid'
+    }
+
+    It 'accepts type-2 PLTE followed by tRNS before the first IDAT' {
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-150'
+        $path = Join-Path $fixture.Evidence (([string]$case.Value.screenshots[0].path).Replace('/', '\'))
+        Set-TestPngColorType $path 2
+        Insert-TestBytes $path (Get-TestPngChunkOffset $path 'IDAT') (New-ValidTestPngChunk 'PLTE' ([byte[]](0, 0, 0)))
+        Insert-TestBytes $path (Get-TestPngChunkOffset $path 'IDAT') (New-ValidTestPngChunk 'tRNS' ([byte[]](0, 0, 0, 0, 0, 0)))
+        Update-DescriptorForFile $case.Value.screenshots[0] $path
+        Save-TestCase $case
+        (Invoke-GuiVerifier $fixture).ExitCode | Should Be 0
+    }
+
+    It 'rejects duplicate type-2 tRNS chunks before the first IDAT' {
+        $fixture = New-ValidGuiFixture
+        $case = Read-TestCase $fixture 'ko-KR-150'
+        $path = Join-Path $fixture.Evidence (([string]$case.Value.screenshots[0].path).Replace('/', '\'))
+        Set-TestPngColorType $path 2
+        Insert-TestBytes $path (Get-TestPngChunkOffset $path 'IDAT') (New-ValidTestPngChunk 'tRNS' ([byte[]](0, 0, 0, 0, 0, 0)))
+        Insert-TestBytes $path (Get-TestPngChunkOffset $path 'IDAT') (New-ValidTestPngChunk 'tRNS' ([byte[]](0, 0, 0, 0, 0, 0)))
+        Update-DescriptorForFile $case.Value.screenshots[0] $path
+        Save-TestCase $case
+        Assert-VerifierRejects $fixture 'gui_screenshot_png_structure_invalid'
+    }
+
     It 'rejects a sparse screenshot above the encoded byte budget before whole-file allocation' {
         $fixture = New-ValidGuiFixture
         $case = Read-TestCase $fixture 'ko-KR-150'
