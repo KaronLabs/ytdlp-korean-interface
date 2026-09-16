@@ -192,14 +192,35 @@ function Get-Bit7zSourceAttestation {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'bit7z dependency provenance is missing.' }
     $provenance = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
     $patches = @($provenance.packaging.patches)
+    $rarPatch = @($patches | Where-Object id -eq 'remove-rar-unrar-sources')
+    $cpmPatch = @($patches | Where-Object id -eq 'pin-cpm-bootstrap-offline')
+    $cpm = $provenance.cpmBootstrap
     if ($provenance.schemaVersion -ne 1 -or $provenance.bit7z.version -cne '4.1.0' -or
         $provenance.bit7z.commit -cne 'c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742' -or
         $provenance.bit7z.license -cne 'MPL-2.0' -or
         $provenance.bit7z.sourceUrl -cne 'https://github.com/rikyoz/bit7z/archive/c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742.zip' -or
         $provenance.bit7z.sourceSha256 -cne '6AF52B2E1B9895E8F1193728880206326161940E7A961E3162EC39752DBB3379' -or
-        $provenance.packaging.sourceTreeStatus -cne 'MPL-2.0-permitted modified subset' -or $patches.Count -ne 1 -or
-        $patches[0].buildOptions.BIT7Z_DISABLE_RAR -cne 'ON' -or @($patches[0].removedPaths).Count -ne 29 -or
+        $provenance.packaging.sourceTreeStatus -cne 'MPL-2.0-permitted modified subset' -or $patches.Count -ne 2 -or
+        $rarPatch.Count -ne 1 -or $rarPatch[0].buildOptions.BIT7Z_DISABLE_RAR -cne 'ON' -or @($rarPatch[0].removedPaths).Count -ne 29 -or
+        $cpmPatch.Count -ne 1 -or $cpmPatch[0].path -cne 'cmake/Dependencies.cmake' -or
+        $cpmPatch[0].sha256 -cne 'D5B20EF14BB2469C7A94A8B9746C253AAC9FAE9E3206082EC1C3CF7119905D08' -or
+        $cpmPatch[0].bootstrapPath -cne 'cmake/CPM_0.42.3.cmake' -or
+        $cpmPatch[0].bootstrapSha256 -cne 'A609E875FD532B067174250F6ABBC3DAC22FE2D64869783FB1E80BDA1625C844' -or
+        $cpm.version -cne '0.42.3' -or $cpm.tag -cne 'v0.42.3' -or
+        $cpm.commit -cne '49acea0d775087ace0522ee4cc5de45e3da094a8' -or
+        $cpm.sourceUrl -cne 'https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.42.3/CPM.cmake' -or
+        $cpm.sourceSha256 -cne 'A609E875FD532B067174250F6ABBC3DAC22FE2D64869783FB1E80BDA1625C844' -or
+        $cpm.path -cne 'cmake/CPM_0.42.3.cmake' -or
+        $cpm.repositoryRawUrl -cne 'https://raw.githubusercontent.com/cpm-cmake/CPM.cmake/49acea0d775087ace0522ee4cc5de45e3da094a8/cmake/CPM.cmake' -or
+        $cpm.repositoryRawSha256 -cne '3DD51370ACE79FE042E3A223B1EF98FB37D98D93ABA97B72F7CBBCC11D1B38FE' -or
         $provenance.sevenZip.build.options.BIT7Z_DISABLE_RAR -cne 'ON') { throw 'bit7z dependency provenance is invalid.' }
+    $bit7zRoot = Join-Path $SourceRoot 'bit7z'
+    $bootstrapPath = Join-Path $bit7zRoot ([string]$cpm.path)
+    if (-not (Test-Path -LiteralPath $bootstrapPath -PathType Leaf)) { throw 'bit7z CPM bootstrap is missing.' }
+    if ((Get-FileHash -LiteralPath $bootstrapPath -Algorithm SHA256).Hash.ToUpperInvariant() -cne [string]$cpm.sourceSha256) { throw 'bit7z CPM bootstrap SHA-256 mismatch.' }
+    $dependenciesPath = Join-Path $bit7zRoot ([string]$cpmPatch[0].path)
+    if (-not (Test-Path -LiteralPath $dependenciesPath -PathType Leaf) -or
+        (Get-FileHash -LiteralPath $dependenciesPath -Algorithm SHA256).Hash.ToUpperInvariant() -cne [string]$cpmPatch[0].sha256) { throw 'bit7z CPM integration patch SHA-256 mismatch.' }
     return [ordered]@{
         version = $provenance.bit7z.version
         commit = $provenance.bit7z.commit
@@ -208,6 +229,11 @@ function Get-Bit7zSourceAttestation {
         sourceSha256 = $provenance.bit7z.sourceSha256
         sourceTreeStatus = $provenance.packaging.sourceTreeStatus
         provenancePath = $relativePath.Replace('\', '/')
+        cpmBootstrap = [ordered]@{
+            version = $cpm.version; tag = $cpm.tag; commit = $cpm.commit
+            sourceUrl = $cpm.sourceUrl; sourceSha256 = $cpm.sourceSha256; path = $cpm.path
+            repositoryRawUrl = $cpm.repositoryRawUrl; repositoryRawSha256 = $cpm.repositoryRawSha256
+        }
     }
 }
 
@@ -636,6 +662,7 @@ function Get-ReleaseX64DependencyPlan {
                 '-T', 'v143',
                 $CmakeVsGlobalsArgument,
                 "-DBIT7Z_CUSTOM_7ZIP_PATH=$(Join-Path $source 'bit7z\lib\7zSDK')",
+                "-DCPM_DOWNLOAD_LOCATION=$(Join-Path $source 'bit7z\cmake\CPM_0.42.3.cmake')",
                 '-DBIT7Z_USE_NATIVE_STRING=ON',
                 '-DBIT7Z_PATH_SANITIZATION=ON',
                 '-DBIT7Z_REGEX_MATCHING=ON',

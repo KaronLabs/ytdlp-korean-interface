@@ -60,6 +60,20 @@ function Assert-Bit7zSourceIdentity {
     foreach ($name in $expected.Keys) {
         if ([string](Get-ManifestField -Value $Source -Name $name) -cne $expected[$name]) { throw 'candidate_manifest_invalid' }
     }
+    $cpm = Get-ManifestField -Value $Source -Name 'cpmBootstrap'
+    $expectedCpm = [ordered]@{
+        version = '0.42.3'
+        tag = 'v0.42.3'
+        commit = '49acea0d775087ace0522ee4cc5de45e3da094a8'
+        sourceUrl = 'https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.42.3/CPM.cmake'
+        sourceSha256 = 'A609E875FD532B067174250F6ABBC3DAC22FE2D64869783FB1E80BDA1625C844'
+        path = 'cmake/CPM_0.42.3.cmake'
+        repositoryRawUrl = 'https://raw.githubusercontent.com/cpm-cmake/CPM.cmake/49acea0d775087ace0522ee4cc5de45e3da094a8/cmake/CPM.cmake'
+        repositoryRawSha256 = '3DD51370ACE79FE042E3A223B1EF98FB37D98D93ABA97B72F7CBBCC11D1B38FE'
+    }
+    foreach ($name in $expectedCpm.Keys) {
+        if ([string](Get-ManifestField -Value $cpm -Name $name) -cne $expectedCpm[$name]) { throw 'candidate_manifest_invalid' }
+    }
 }
 
 function Assert-HermeticMsBuildTail {
@@ -86,7 +100,7 @@ function Assert-CommandSemantics {
     if ($userRoot -cne '<hermetic-user-root>' -or $vcToolsVersion -notmatch '^[0-9]+(?:\.[0-9]+)+$' -or
         $windowsSdkVersion -notmatch '^[0-9]+(?:\.[0-9]+)+$') { throw 'candidate_manifest_invalid' }
     if ($name -eq 'bit7z Release x64 configure') {
-        if ($executable -ine 'cmake.exe' -or $arguments.Count -ne 18 -or $arguments[0] -cne '-S' -or
+        if ($executable -ine 'cmake.exe' -or $arguments.Count -ne 19 -or $arguments[0] -cne '-S' -or
             -not (Test-NormalizedArgumentPath $arguments[1] '<source>/bit7z') -or $arguments[2] -cne '-B' -or
             -not (Test-NormalizedArgumentPath $arguments[3] '<source>/bit7z/out/build/x64-Release') -or
             $arguments[4] -cne '-G' -or $arguments[5] -cne 'Visual Studio 17 2022' -or $arguments[6] -cne '-A' -or
@@ -100,10 +114,11 @@ function Assert-CommandSemantics {
         ) -join ';')
         if ($arguments[10] -cne $expectedGlobals -or
             -not (Test-NormalizedArgumentPath $arguments[11] '-DBIT7Z_CUSTOM_7ZIP_PATH=<source>/bit7z/lib/7zSDK') -or
-            $arguments[12] -cne '-DBIT7Z_USE_NATIVE_STRING=ON' -or $arguments[13] -cne '-DBIT7Z_PATH_SANITIZATION=ON' -or
-            $arguments[14] -cne '-DBIT7Z_REGEX_MATCHING=ON' -or $arguments[15] -cne '-DBIT7Z_STATIC_RUNTIME=ON' -or
-            $arguments[16] -cne '-DCMAKE_CXX_FLAGS=/utf-8' -or
-            -not (Test-NormalizedArgumentPath $arguments[17] '-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE=<source>/bit7z/bin/x64')) { throw 'candidate_manifest_invalid' }
+            -not (Test-NormalizedArgumentPath $arguments[12] '-DCPM_DOWNLOAD_LOCATION=<source>/bit7z/cmake/CPM_0.42.3.cmake') -or
+            $arguments[13] -cne '-DBIT7Z_USE_NATIVE_STRING=ON' -or $arguments[14] -cne '-DBIT7Z_PATH_SANITIZATION=ON' -or
+            $arguments[15] -cne '-DBIT7Z_REGEX_MATCHING=ON' -or $arguments[16] -cne '-DBIT7Z_STATIC_RUNTIME=ON' -or
+            $arguments[17] -cne '-DCMAKE_CXX_FLAGS=/utf-8' -or
+            -not (Test-NormalizedArgumentPath $arguments[18] '-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE=<source>/bit7z/bin/x64')) { throw 'candidate_manifest_invalid' }
         return
     }
     if ($name -eq 'bit7z Release x64 build') {
@@ -171,7 +186,7 @@ function Assert-AttestationShape {
 
     $archive = Get-ManifestField -Value $Attestation -Name 'dependencyArchive'
     if ([string](Get-ManifestField -Value $archive -Name 'name') -cne 'ytdlp-interface dependencies.7z' -or
-        [string](Get-ManifestField -Value $archive -Name 'sha256') -cne '41004108B9FC41454A97B97850C4E41D537F226A27255E8213ABD14BFFFFEBD3') { throw 'candidate_manifest_invalid' }
+        [string](Get-ManifestField -Value $archive -Name 'sha256') -cne 'F2CF2203E0F9DA8F4E3BB84977DB85F3FCA3C4EA14BE2E7913FEB42CF28CED85') { throw 'candidate_manifest_invalid' }
     Assert-Bit7zSourceIdentity -Source (Get-ManifestField -Value $archive -Name 'bit7zSource')
 
     $linkerInputs = @(Get-ManifestField -Value $Attestation -Name 'linkerInputs')

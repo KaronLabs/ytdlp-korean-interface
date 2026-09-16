@@ -3,10 +3,24 @@ $ErrorActionPreference = 'Stop'
 
 $script:RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $script:ArchivePath = Join-Path $script:RepositoryRoot 'ytdlp-interface dependencies.7z'
-$script:ExpectedArchiveSha256 = '41004108B9FC41454A97B97850C4E41D537F226A27255E8213ABD14BFFFFEBD3'
+$script:ExpectedArchiveSha256 = 'F2CF2203E0F9DA8F4E3BB84977DB85F3FCA3C4EA14BE2E7913FEB42CF28CED85'
 $script:Bit7zCommit = 'c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742'
 $script:Bit7zSourceUrl = 'https://github.com/rikyoz/bit7z/archive/c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742.zip'
 $script:Bit7zSourceSha256 = '6AF52B2E1B9895E8F1193728880206326161940E7A961E3162EC39752DBB3379'
+$script:CpmVersion = '0.42.3'
+$script:CpmTag = 'v0.42.3'
+$script:CpmCommit = '49acea0d775087ace0522ee4cc5de45e3da094a8'
+$script:CpmSourceUrl = 'https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.42.3/CPM.cmake'
+$script:CpmSourceSha256 = 'A609E875FD532B067174250F6ABBC3DAC22FE2D64869783FB1E80BDA1625C844'
+$script:CpmPath = 'cmake/CPM_0.42.3.cmake'
+$script:CpmRepositoryRawUrl = 'https://raw.githubusercontent.com/cpm-cmake/CPM.cmake/49acea0d775087ace0522ee4cc5de45e3da094a8/cmake/CPM.cmake'
+$script:CpmRepositoryRawSha256 = '3DD51370ACE79FE042E3A223B1EF98FB37D98D93ABA97B72F7CBBCC11D1B38FE'
+$script:OfflineEnvironment = [ordered]@{
+    HTTP_PROXY = 'http://127.0.0.1:1'
+    HTTPS_PROXY = 'http://127.0.0.1:1'
+    ALL_PROXY = 'http://127.0.0.1:1'
+    NO_PROXY = ''
+}
 $programFilesX86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
 $script:SevenZip = @(
     (Join-Path $env:ProgramFiles '7-Zip\7z.exe'),
@@ -92,6 +106,11 @@ function New-TestAttestation {
                 sourceUrl = $script:Bit7zSourceUrl; sourceSha256 = $script:Bit7zSourceSha256
                 sourceTreeStatus = 'MPL-2.0-permitted modified subset'
                 provenancePath = 'bit7z/KARON_DEPENDENCY_PROVENANCE.json'
+                cpmBootstrap = [ordered]@{
+                    version = $script:CpmVersion; tag = $script:CpmTag; commit = $script:CpmCommit
+                    sourceUrl = $script:CpmSourceUrl; sourceSha256 = $script:CpmSourceSha256; path = $script:CpmPath
+                    repositoryRawUrl = $script:CpmRepositoryRawUrl; repositoryRawSha256 = $script:CpmRepositoryRawSha256
+                }
             }
         }
         linkerInputs = @(
@@ -125,6 +144,9 @@ Describe 'bit7z v4 dependency and candidate contracts' {
         if ($LASTEXITCODE -ne 0) { throw 'Dependency archive extraction failed.' }
         $script:Bit7zRoot = Join-Path $script:ExtractionRoot 'bit7z'
         $script:Provenance = Get-Content -LiteralPath (Join-Path $script:Bit7zRoot 'KARON_DEPENDENCY_PROVENANCE.json') -Raw | ConvertFrom-Json
+        $script:BuildTools = Get-VsBuildTools
+        $script:Cmake = Get-CmakeExecutable -VisualStudioInstallation $script:BuildTools.InstallationPath
+        $script:CmakeVsGlobals = '-DCMAKE_VS_GLOBALS=VCToolsVersion=' + $script:BuildTools.VCToolsVersion + ';WindowsTargetPlatformVersion=' + $script:BuildTools.WindowsSdkVersion
     }
 
     It 'uses the production manifest and archive safety functions for every entry' {
@@ -160,17 +182,54 @@ Describe 'bit7z v4 dependency and candidate contracts' {
         }
     }
 
+    It 'vendors the exact immutable CPM bootstrap with machine-readable provenance' {
+        $bootstrap = Join-Path $script:Bit7zRoot $script:CpmPath
+        (Test-Path -LiteralPath $bootstrap -PathType Leaf) | Should Be $true
+        (Get-FileHash -LiteralPath $bootstrap -Algorithm SHA256).Hash | Should Be $script:CpmSourceSha256
+        $script:Provenance.cpmBootstrap.version | Should Be $script:CpmVersion
+        $script:Provenance.cpmBootstrap.tag | Should Be $script:CpmTag
+        $script:Provenance.cpmBootstrap.commit | Should Be $script:CpmCommit
+        $script:Provenance.cpmBootstrap.sourceUrl | Should Be $script:CpmSourceUrl
+        $script:Provenance.cpmBootstrap.sourceSha256 | Should Be $script:CpmSourceSha256
+        $script:Provenance.cpmBootstrap.path | Should Be $script:CpmPath
+        $script:Provenance.cpmBootstrap.repositoryRawUrl | Should Be $script:CpmRepositoryRawUrl
+        $script:Provenance.cpmBootstrap.repositoryRawSha256 | Should Be $script:CpmRepositoryRawSha256
+        $patch = @($script:Provenance.packaging.patches | Where-Object id -eq 'pin-cpm-bootstrap-offline')[0]
+        $patch.path | Should Be 'cmake/Dependencies.cmake'
+        $patch.sha256 | Should Be (Get-FileHash -LiteralPath (Join-Path $script:Bit7zRoot $patch.path) -Algorithm SHA256).Hash
+        { Get-Bit7zSourceAttestation -SourceRoot $script:ExtractionRoot } | Should Not Throw
+    }
+
+    It 'rejects a missing CPM bootstrap before configure' {
+        $bootstrap = Join-Path $script:Bit7zRoot $script:CpmPath
+        $backup = $bootstrap + '.test-backup'
+        Move-Item -LiteralPath $bootstrap -Destination $backup
+        try { { Get-Bit7zSourceAttestation -SourceRoot $script:ExtractionRoot } | Should Throw 'bit7z CPM bootstrap is missing.' }
+        finally { Move-Item -LiteralPath $backup -Destination $bootstrap }
+    }
+
+    It 'rejects a modified CPM bootstrap before configure' {
+        $bootstrap = Join-Path $script:Bit7zRoot $script:CpmPath
+        $original = [IO.File]::ReadAllBytes($bootstrap)
+        try {
+            [IO.File]::WriteAllText($bootstrap, 'tampered-cpm-bootstrap', [Text.UTF8Encoding]::new($false))
+            { Get-Bit7zSourceAttestation -SourceRoot $script:ExtractionRoot } | Should Throw 'bit7z CPM bootstrap SHA-256 mismatch.'
+        }
+        finally { [IO.File]::WriteAllBytes($bootstrap, $original) }
+    }
+
     It 'uses the production bit7z v4 CMake configure and build plan' {
         $inputs = New-TestBuildInputs -Root (Join-Path $TestDrive 'plan')
         $inputs.Plan.Count | Should Be 4
         $bit7z = @($inputs.Plan | Where-Object Name -eq 'bit7z')[0]
         (Split-Path -Leaf $bit7z.FilePath) | Should Be 'cmake.exe'
         (Split-Path -Leaf $bit7z.LibraryPath) | Should Be 'bit7z.lib'
-        @($bit7z.Arguments).Count | Should Be 18
+        @($bit7z.Arguments).Count | Should Be 19
         $bit7z.Arguments[0] | Should Be '-S'
         $bit7z.Arguments[5] | Should Be 'Visual Studio 17 2022'
         ($bit7z.Arguments -contains '-DBIT7Z_USE_NATIVE_STRING=ON') | Should Be $true
         ($bit7z.Arguments -contains '-DBIT7Z_PATH_SANITIZATION=ON') | Should Be $true
+        ($bit7z.Arguments -contains ('-DCPM_DOWNLOAD_LOCATION=' + (Join-Path $inputs.Source 'bit7z\cmake\CPM_0.42.3.cmake'))) | Should Be $true
         $bit7z.BuildArguments[0] | Should Be '--build'
         ($bit7z.BuildArguments -contains 'bit7z') | Should Be $true
         ($bit7z.Arguments -join '|') | Should Not Match 'bit7z\.sln|bit7z64\.lib'
@@ -184,13 +243,38 @@ Describe 'bit7z v4 dependency and candidate contracts' {
         $configure = @($commands | Where-Object name -eq 'bit7z Release x64 configure')[0]
         $build = @($commands | Where-Object name -eq 'bit7z Release x64 build')[0]
         $configure.executable | Should Be 'cmake.exe'
-        @($configure.arguments).Count | Should Be 18
+        @($configure.arguments).Count | Should Be 19
         $configure.arguments[1] | Should Be '<source>\bit7z'
         ($configure.arguments -contains '-DBIT7Z_CUSTOM_7ZIP_PATH=<source>\bit7z\lib\7zSDK') | Should Be $true
+        ($configure.arguments -contains '-DCPM_DOWNLOAD_LOCATION=<source>\bit7z\cmake\CPM_0.42.3.cmake') | Should Be $true
         $build.executable | Should Be 'cmake.exe'
         @($build.arguments).Count | Should Be 9
         $build.arguments[1] | Should Be '<source>\bit7z\out\build\x64-Release'
         $build.arguments[5] | Should Be 'bit7z'
+    }
+
+    It 'fails closed without attempting a network fallback when the CPM bootstrap is missing' {
+        $source = Join-Path $TestDrive 'missing-bootstrap-source'
+        [IO.Directory]::CreateDirectory($source) | Out-Null
+        Copy-Item -LiteralPath $script:Bit7zRoot -Destination (Join-Path $source 'bit7z') -Recurse
+        Remove-Item -LiteralPath (Join-Path $source 'bit7z\cmake\CPM_0.42.3.cmake')
+        $plan = @(Get-ReleaseX64DependencyPlan -SourceRoot $source -MsBuildPath $script:BuildTools.MsBuildPath -CmakePath $script:Cmake -CmakeVsGlobalsArgument $script:CmakeVsGlobals)
+        $bit7z = @($plan | Where-Object Name -eq 'bit7z')[0]
+        $failure = try {
+            Invoke-CheckedProcess -FilePath $bit7z.FilePath -Arguments $bit7z.Arguments -Name 'bit7z missing CPM configure' -EnvironmentOverrides $script:OfflineEnvironment | Out-Null
+            'configure unexpectedly succeeded'
+        }
+        catch { $_.Exception.Message }
+        $failure | Should Match 'bit7z_cpm_bootstrap_missing'
+        $failure | Should Not Match 'Downloading CPM.cmake|github.com/cpm-cmake'
+    }
+
+    It 'configures and builds bit7z with deliberately invalid outbound proxies' {
+        $plan = @(Get-ReleaseX64DependencyPlan -SourceRoot $script:ExtractionRoot -MsBuildPath $script:BuildTools.MsBuildPath -CmakePath $script:Cmake -CmakeVsGlobalsArgument $script:CmakeVsGlobals)
+        $bit7z = @($plan | Where-Object Name -eq 'bit7z')[0]
+        Invoke-CheckedProcess -FilePath $bit7z.FilePath -Arguments $bit7z.Arguments -Name 'offline bit7z configure' -EnvironmentOverrides $script:OfflineEnvironment | Out-Null
+        Invoke-CheckedProcess -FilePath $bit7z.FilePath -Arguments $bit7z.BuildArguments -Name 'offline bit7z build' -EnvironmentOverrides $script:OfflineEnvironment | Out-Null
+        (Test-Path -LiteralPath $bit7z.LibraryPath -PathType Leaf) | Should Be $true
     }
 
     It 'seals only the exact v4 source identity command and linker contract' {
@@ -209,6 +293,10 @@ Describe 'bit7z v4 dependency and candidate contracts' {
         }
         $accepted = try { Assert-CandidateManifestSeal -CandidateRoot $candidate -Manifest $manifest; 'accepted' } catch { $_.Exception.Message }
         $accepted | Should Be 'accepted'
+        $manifest.attestation.dependencyArchive.bit7zSource.cpmBootstrap.sourceSha256 = ('0' * 64)
+        $cpmRejected = try { Assert-CandidateManifestSeal -CandidateRoot $candidate -Manifest $manifest; 'accepted' } catch { $_.Exception.Message }
+        $cpmRejected | Should Be 'candidate_manifest_invalid'
+        $manifest.attestation.dependencyArchive.bit7zSource.cpmBootstrap.sourceSha256 = $script:CpmSourceSha256
         $manifest.attestation.dependencyArchive.bit7zSource.commit = ('0' * 40)
         $rejected = try { Assert-CandidateManifestSeal -CandidateRoot $candidate -Manifest $manifest; 'accepted' } catch { $_.Exception.Message }
         $rejected | Should Be 'candidate_manifest_invalid'
