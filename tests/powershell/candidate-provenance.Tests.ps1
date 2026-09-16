@@ -96,7 +96,7 @@ Invoke-Test 'clean detached source seals exact commit and tree through JSON' {
     try {
         [void](Invoke-TestGit $case.Source @('checkout', '--detach', '-q'))
         $expectedCommit = Invoke-TestGit $case.Source @('rev-parse', '--verify', 'HEAD^{commit}')
-        $expectedTree = Invoke-TestGit $case.Source @('rev-parse', '--verify', 'HEAD^{tree}')
+        $expectedTree = Invoke-TestGit $case.Source @('rev-parse', '--verify', ($expectedCommit + '^{tree}'))
         $attestation = Get-SourceAttestation -SourceRoot $case.Source -GitPath $script:GitPath
         $trackedEntries = @(Get-GitTreeEntries -SourceRoot $case.Source -GitPath $script:GitPath -Commit $attestation.commit)
         $trackedPaths = @($trackedEntries | ForEach-Object { $_.Path })

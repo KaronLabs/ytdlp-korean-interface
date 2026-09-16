@@ -435,7 +435,7 @@ function Get-SourceAttestation {
     $safeDirectory = 'safe.directory=' + $source
     $commit = (& $GitPath -c $safeDirectory -C $source rev-parse --verify 'HEAD^{commit}' 2>&1 | Out-String).Trim()
     if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[a-fA-F0-9]{40}$') { throw 'Git could not verify the candidate source revision.' }
-    $tree = (& $GitPath -c $safeDirectory -C $source rev-parse --verify 'HEAD^{tree}' 2>&1 | Out-String).Trim()
+    $tree = (& $GitPath -c $safeDirectory -C $source rev-parse --verify ($commit + '^{tree}') 2>&1 | Out-String).Trim()
     if ($LASTEXITCODE -ne 0 -or $tree -notmatch '^[a-fA-F0-9]{40}$') { throw 'Git could not verify the candidate source tree.' }
     $status = & $GitPath -c $safeDirectory -C $source status --porcelain=v1 --untracked-files=all 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0) { throw 'Git could not inspect the candidate source status.' }
