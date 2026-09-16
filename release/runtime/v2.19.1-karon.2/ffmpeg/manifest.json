@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 1,
+  "release": "v2.19.1-karon.2",
+  "closureStatus": "incomplete",
+  "binary": {
+    "repository": "BtbN/FFmpeg-Builds",
+    "releaseTag": "autobuild-2026-09-15-13-18",
+    "assetId": 565742558,
+    "archiveName": "ffmpeg-n9.0.1-30-g9258bacca5-win64-lgpl-9.0.zip",
+    "archiveSha256": "39697D69681A09BD55A0F0224360A9A4285BC12127DF807D7242592B0E144A7B",
+    "ffmpegSha256": "41482EABC1A33F9D1E4334CA32EC9259AA34A3EC2493FCC9F214BFE54301CE38",
+    "ffprobeSha256": "376F55EB141C3B0D8790B64967B8CBF1737D76BEBE0820189356C71CC884B395",
+    "expectedVersion": "n9.0.1-30-g9258bacca5",
+    "ffmpegCommit": "9258bacca50d7ca28bcb6d797e8952123e35105b",
+    "buildConfigurationPath": "buildconf.txt"
+  },
+  "provenance": {
+    "builderCommit": "3e6685eda92f9288c15ac320139622dcedca09a4",
+    "actionsRunId": 34967781095,
+    "actionsRunNumber": 3118,
+    "targetImageJobId": 104378764705,
+    "binaryBuildJobId": 104384912273,
+    "releaseId": 389161663,
+    "sourceCacheArtifactId": 10396032837,
+    "sourceCacheArtifactDigest": "sha256:89219a2bad8686b27a2b10907c290fe1ec87088e86869a0c6433d96c6a5832c8",
+    "sourceCacheArtifactSize": 2166872038,
+    "sourceCacheExpiresAt": "2026-09-29T12:15:12Z",
+    "sourceCacheInnerName": "cache.tar.gz",
+    "sourceCacheInnerSize": 2166213260,
+    "sourceCacheInnerSha256": "F5859AA90C962360FAA4593BFED1618D94C1190CEF720303D996693EEBA7B189",
+    "sourceCacheCanonicalArchiveCount": 122
+  },
+  "includedPaths": [],
+  "components": [
+    {
+      "id": "ffmpeg",
+      "version": "n9.0.1-30-g9258bacca5",
+      "commit": "9258bacca50d7ca28bcb6d797e8952123e35105b",
+      "source": {
+        "url": "https://codeload.github.com/FFmpeg/FFmpeg/zip/9258bacca50d7ca28bcb6d797e8952123e35105b",
+        "sha256": "5A486A7A20FDF673D0FE9314B41897725ABE34AA8BB63C5C440F2B017935644C"
+      },
+      "license": {
+        "expression": "LGPL-3.0-or-later",
+        "textPath": "COPYING.LGPLv3 (inside source archive)"
+      },
+      "recipe": {
+        "scriptPath": "build.sh (inside btbn-build-scripts source archive)",
+        "patches": []
+      }
+    },
+    {
+      "id": "btbn-build-scripts",
+      "version": "3e6685eda92f9288c15ac320139622dcedca09a4",
+      "commit": "3e6685eda92f9288c15ac320139622dcedca09a4",
+      "source": {
+        "url": "https://codeload.github.com/BtbN/FFmpeg-Builds/zip/3e6685eda92f9288c15ac320139622dcedca09a4",
+        "sha256": "21BAACE73D2D9599DEDA5688247CC250DFA7E5D9557A06B12C69C8175618AB92"
+      },
+      "license": {
+        "expression": "MIT",
+        "textPath": "LICENSE (inside source archive)"
+      },
+      "recipe": {
+        "scriptPath": "generate.sh, build.sh, variants/win64-lgpl.sh, addins/9.0.sh (inside source archive)",
+        "patches": "patches/ and inline script transforms (inside source archive)"
+      }
+    }
+  ],
+  "enabledExternalLibraries": [
+    { "option": "--enable-iconv", "status": "unresolved" },
+    { "option": "--enable-zlib", "status": "unresolved" },
+    { "option": "--enable-libxml2", "status": "unresolved" },
+    { "option": "--enable-libvmaf", "status": "unresolved" },
+    { "option": "--enable-fontconfig", "status": "unresolved" },
+    { "option": "--enable-libharfbuzz", "status": "unresolved" },
+    { "option": "--enable-libfreetype", "status": "unresolved" },
+    { "option": "--enable-libfribidi", "status": "unresolved" },
+    { "option": "--enable-vulkan", "status": "unresolved" },
+    { "option": "--enable-libdav1d", "status": "unresolved" },
+    { "option": "--enable-libvorbis", "status": "unresolved" },
+    { "option": "--enable-librav1e", "status": "unresolved" },
+    { "option": "--enable-librsvg", "status": "unresolved" },
+    { "option": "--enable-gmp", "status": "unresolved" },
+    { "option": "--enable-lzma", "status": "unresolved" },
+    { "option": "--enable-liblcevc-dec", "status": "unresolved" },
+    { "option": "--enable-opencl", "status": "unresolved" },
+    { "option": "--enable-amf", "status": "unresolved" },
+    { "option": "--enable-libaom", "status": "unresolved" },
+    { "option": "--enable-chromaprint", "status": "unresolved" },
+    { "option": "--enable-ffnvcodec", "status": "unresolved" },
+    { "option": "--enable-libgme", "status": "unresolved" },
+    { "option": "--enable-libkvazaar", "status": "unresolved" },
+    { "option": "--enable-libaribb24", "status": "unresolved" },
+    { "option": "--enable-libaribcaption", "status": "unresolved" },
+    { "option": "--enable-libass", "status": "unresolved" },
+    { "option": "--enable-libbluray", "status": "unresolved" },
+    { "option": "--enable-libjxl", "status": "unresolved" },
+    { "option": "--enable-libmp3lame", "status": "unresolved" },
+    { "option": "--enable-libopus", "status": "unresolved" },
+    { "option": "--enable-libplacebo", "status": "unresolved" },
+    { "option": "--enable-librist", "status": "unresolved" },
+    { "option": "--enable-libssh", "status": "unresolved" },
+    { "option": "--enable-libtheora", "status": "unresolved" },
+    { "option": "--enable-libvpx", "status": "unresolved" },
+    { "option": "--enable-libwebp", "status": "unresolved" },
+    { "option": "--enable-libzmq", "status": "unresolved" },
+    { "option": "--enable-lv2", "status": "unresolved" },
+    { "option": "--enable-libvpl", "status": "unresolved" },
+    { "option": "--enable-openal", "status": "unresolved" },
+    { "option": "--enable-liboapv", "status": "unresolved" },
+    { "option": "--enable-libopencore-amrnb", "status": "unresolved" },
+    { "option": "--enable-libopencore-amrwb", "status": "unresolved" },
+    { "option": "--enable-libopenh264", "status": "unresolved" },
+    { "option": "--enable-libopenjpeg", "status": "unresolved" },
+    { "option": "--enable-libopenmpt", "status": "unresolved" },
+    { "option": "--enable-sdl2", "status": "unresolved" },
+    { "option": "--enable-libsnappy", "status": "unresolved" },
+    { "option": "--enable-libsoxr", "status": "unresolved" },
+    { "option": "--enable-libsrt", "status": "unresolved" },
+    { "option": "--enable-libsvtav1", "status": "unresolved" },
+    { "option": "--enable-libtwolame", "status": "unresolved" },
+    { "option": "--enable-libuavs3d", "status": "unresolved" },
+    { "option": "--enable-libvvenc", "status": "unresolved" },
+    { "option": "--enable-libzimg", "status": "unresolved" },
+    { "option": "--enable-libzvbi", "status": "unresolved" }
+  ],
+  "systemOrToolchainFeatures": [
+    "--enable-pthreads",
+    "--enable-cuda-llvm",
+    "--enable-schannel",
+    "--enable-vaapi"
+  ],
+  "unresolvedItems": [
+    "The exact Actions download-cache bytes were acquired and inventoried, but the 122 cache archives have not been mapped to the enabled direct and transitive static link set with audited license expressions and license-text paths.",
+    "The public GitHub job-log API returned HTTP 403 for target-image job 104378764705, so the target image digest and checkout/log details could not be independently retained from that endpoint.",
+    "The BtbN release contains no corresponding-source asset; Actions artifact 10396032837 requires authenticated access and expires at 2026-09-29T12:15:12Z.",
+    "BtbN build.sh clones FFmpeg branch release/9.0 without an explicit commit argument. Commit 9258bacca50d7ca28bcb6d797e8952123e35105b is supported by the binary identity and supplied release evidence, not by a retained checkout log.",
+    "No complete per-component local-patch and inline-transform applicability map has been established for every enabled static library."
+  ]
+}
