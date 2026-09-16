@@ -1129,4 +1129,148 @@ Describe 'completed evidence ZIP candidate inventory cross-binding' {
 
         $failureToken | Should Be 'bundle_candidate_inventory_mismatch'
     }
+    $invalidLengthCases = @(
+        @{ Name = 'missing-property'; IncludeLength = $false; LengthValue = $null; CandidateLength = 0; InjectDecimal = $false },
+        @{ Name = 'null'; IncludeLength = $true; LengthValue = $null; CandidateLength = 0; InjectDecimal = $false },
+        @{ Name = 'string'; IncludeLength = $true; LengthValue = '2'; CandidateLength = 2; InjectDecimal = $false },
+        @{ Name = 'fractional-Double'; IncludeLength = $true; LengthValue = [double]1.5; CandidateLength = 2; InjectDecimal = $false },
+        @{ Name = 'fractional-Decimal'; IncludeLength = $true; LengthValue = [decimal]1.5; CandidateLength = 2; InjectDecimal = $true },
+        @{ Name = 'Boolean'; IncludeLength = $true; LengthValue = $true; CandidateLength = 1; InjectDecimal = $false },
+        @{ Name = 'zero'; IncludeLength = $true; LengthValue = [long]0; CandidateLength = 0; InjectDecimal = $false },
+        @{ Name = 'negative'; IncludeLength = $true; LengthValue = [long]-1; CandidateLength = 0; InjectDecimal = $false },
+        @{ Name = 'over-1-MiB'; IncludeLength = $true; LengthValue = [long]((1MB) + 1); CandidateLength = (1MB) + 1; InjectDecimal = $false }
+    )
+
+    It 'rejects malformed candidateManifestLength <Name>' -TestCases $invalidLengthCases {
+        param($Name, $IncludeLength, $LengthValue, $CandidateLength, $InjectDecimal)
+
+        $tokens = $null
+        $parseErrors = $null
+        $collectorAst = [Management.Automation.Language.Parser]::ParseFile($collectorPath, [ref]$tokens, [ref]$parseErrors)
+        @($parseErrors).Count | Should Be 0
+        foreach ($functionAst in @($collectorAst.FindAll({
+            param($node)
+            $node -is [Management.Automation.Language.FunctionDefinitionAst]
+        }, $true))) {
+            Invoke-Expression $functionAst.Extent.Text
+        }
+
+        $candidateBytes = New-Object byte[] ([int]$CandidateLength)
+        $candidateSha256 = Get-TestBytesSha256 $candidateBytes
+        $inventoryObject = [ordered]@{ candidateManifestSha256 = $candidateSha256 }
+        if ($IncludeLength) { $inventoryObject.candidateManifestLength = $LengthValue }
+        $inventoryBytes = [Text.Encoding]::UTF8.GetBytes((($inventoryObject | ConvertTo-Json -Compress) + "`n"))
+        $zipPath = Join-Path $TestDrive ('candidate-length-' + $Name + '.zip')
+        New-TestZip -Path $zipPath -Entries @{
+            'source-cache-inventory.json' = $inventoryBytes
+            'evidence/candidate-manifest.json' = $candidateBytes
+        }
+        $callerExpectedEntries = @(
+            [ordered]@{ name = 'source-cache-inventory.json'; expectedSha256 = Get-TestBytesSha256 $inventoryBytes; expectedLength = [long]$inventoryBytes.Length },
+            [ordered]@{ name = 'evidence/candidate-manifest.json'; expectedSha256 = $candidateSha256; expectedLength = [long]$candidateBytes.Length }
+        )
+
+        if ($InjectDecimal) {
+            $decimalInventory = [pscustomobject]@{
+                candidateManifestSha256 = $candidateSha256
+                candidateManifestLength = [decimal]$LengthValue
+            }
+            function ConvertFrom-Json {
+                [CmdletBinding()]
+                param([Parameter(ValueFromPipeline = $true)] $InputObject)
+                process { $decimalInventory }
+            }
+        }
+        $failureToken = $null
+        try { Assert-CompletedEvidenceZip $zipPath $callerExpectedEntries }
+        catch { $failureToken = $_.Exception.Message }
+        finally {
+            if ($InjectDecimal) { Remove-Item -LiteralPath Function:\ConvertFrom-Json -ErrorAction SilentlyContinue }
+        }
+
+        $failureToken | Should Be 'bundle_candidate_inventory_mismatch'
+    }
+
+    $invalidShaCases = @(
+        @{ Name = 'missing-property'; IncludeSha = $false; ShaValue = $null },
+        @{ Name = 'null'; IncludeSha = $true; ShaValue = $null },
+        @{ Name = 'single-element-array'; IncludeSha = $true; ShaValue = 'VALID_SHA_ARRAY' },
+        @{ Name = 'Int64'; IncludeSha = $true; ShaValue = [long]123 },
+        @{ Name = 'Boolean'; IncludeSha = $true; ShaValue = $true },
+        @{ Name = 'short-string'; IncludeSha = $true; ShaValue = ('a' * 63) },
+        @{ Name = 'non-hex-string'; IncludeSha = $true; ShaValue = ('g' * 64) },
+        @{ Name = 'wrong-length-string'; IncludeSha = $true; ShaValue = ('a' * 65) }
+    )
+
+    It 'rejects malformed candidateManifestSha256 <Name>' -TestCases $invalidShaCases {
+        param($Name, $IncludeSha, $ShaValue)
+
+        $tokens = $null
+        $parseErrors = $null
+        $collectorAst = [Management.Automation.Language.Parser]::ParseFile($collectorPath, [ref]$tokens, [ref]$parseErrors)
+        @($parseErrors).Count | Should Be 0
+        foreach ($functionAst in @($collectorAst.FindAll({
+            param($node)
+            $node -is [Management.Automation.Language.FunctionDefinitionAst]
+        }, $true))) {
+            Invoke-Expression $functionAst.Extent.Text
+        }
+
+        $candidateBytes = [Text.Encoding]::UTF8.GetBytes('{}')
+        $candidateSha256 = Get-TestBytesSha256 $candidateBytes
+        if ($ShaValue -is [string] -and $ShaValue -ceq 'VALID_SHA_ARRAY') { $ShaValue = @($candidateSha256.ToLowerInvariant()) }
+        $inventoryObject = [ordered]@{ candidateManifestLength = [long]$candidateBytes.Length }
+        if ($IncludeSha) { $inventoryObject.candidateManifestSha256 = $ShaValue }
+        $inventoryBytes = [Text.Encoding]::UTF8.GetBytes((($inventoryObject | ConvertTo-Json -Compress) + "`n"))
+        $zipPath = Join-Path $TestDrive ('candidate-sha-' + $Name + '.zip')
+        New-TestZip -Path $zipPath -Entries @{
+            'source-cache-inventory.json' = $inventoryBytes
+            'evidence/candidate-manifest.json' = $candidateBytes
+        }
+        $callerExpectedEntries = @(
+            [ordered]@{ name = 'source-cache-inventory.json'; expectedSha256 = Get-TestBytesSha256 $inventoryBytes; expectedLength = [long]$inventoryBytes.Length },
+            [ordered]@{ name = 'evidence/candidate-manifest.json'; expectedSha256 = $candidateSha256; expectedLength = [long]$candidateBytes.Length }
+        )
+
+        $failureToken = $null
+        try { Assert-CompletedEvidenceZip $zipPath $callerExpectedEntries }
+        catch { $failureToken = $_.Exception.Message }
+
+        $failureToken | Should Be 'bundle_candidate_inventory_mismatch'
+    }
+
+    It 'accepts a lowercase 64-hex SHA string after normalization' {
+        $tokens = $null
+        $parseErrors = $null
+        $collectorAst = [Management.Automation.Language.Parser]::ParseFile($collectorPath, [ref]$tokens, [ref]$parseErrors)
+        @($parseErrors).Count | Should Be 0
+        foreach ($functionAst in @($collectorAst.FindAll({
+            param($node)
+            $node -is [Management.Automation.Language.FunctionDefinitionAst]
+        }, $true))) {
+            Invoke-Expression $functionAst.Extent.Text
+        }
+
+        $candidateBytes = [Text.Encoding]::UTF8.GetBytes('{"candidate":"lowercase-sha"}')
+        $candidateSha256 = Get-TestBytesSha256 $candidateBytes
+        $inventoryBytes = [Text.Encoding]::UTF8.GetBytes((([ordered]@{
+            candidateManifestSha256 = $candidateSha256.ToLowerInvariant()
+            candidateManifestLength = [long]$candidateBytes.Length
+        } | ConvertTo-Json -Compress) + "`n"))
+        $zipPath = Join-Path $TestDrive 'candidate-lowercase-sha.zip'
+        New-TestZip -Path $zipPath -Entries @{
+            'source-cache-inventory.json' = $inventoryBytes
+            'evidence/candidate-manifest.json' = $candidateBytes
+        }
+        $callerExpectedEntries = @(
+            [ordered]@{ name = 'source-cache-inventory.json'; expectedSha256 = Get-TestBytesSha256 $inventoryBytes; expectedLength = [long]$inventoryBytes.Length },
+            [ordered]@{ name = 'evidence/candidate-manifest.json'; expectedSha256 = $candidateSha256; expectedLength = [long]$candidateBytes.Length }
+        )
+
+        $failureToken = $null
+        try { Assert-CompletedEvidenceZip $zipPath $callerExpectedEntries }
+        catch { $failureToken = $_.Exception.Message }
+
+        $failureToken | Should BeNullOrEmpty
+    }
 }

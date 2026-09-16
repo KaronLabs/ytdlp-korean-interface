@@ -724,14 +724,23 @@ function Assert-CompletedEvidenceZip {
             finally { $inventoryStream.Dispose() }
 
             $inventory = (New-Object Text.UTF8Encoding($false, $true)).GetString($inventoryBytes) | ConvertFrom-Json
-            $claimedSha256 = [string]$inventory.candidateManifestSha256
-            $claimedLength = [long]$inventory.candidateManifestLength
-            if ($claimedSha256 -notmatch '^[0-9a-fA-F]{64}$' -or $claimedLength -lt 0) { throw 'bundle_candidate_inventory_mismatch' }
+            $shaProperty = $inventory.PSObject.Properties['candidateManifestSha256']
+            $lengthProperty = $inventory.PSObject.Properties['candidateManifestLength']
+            $lengthTypeSupported = $null -ne $lengthProperty -and
+                ($lengthProperty.Value -is [int] -or $lengthProperty.Value -is [long])
+            if ($null -eq $shaProperty -or $shaProperty.Value -isnot [string] -or
+                $shaProperty.Value -notmatch '^[0-9a-fA-F]{64}$' -or
+                -not $lengthTypeSupported -or
+                $lengthProperty.Value -le 0 -or $lengthProperty.Value -gt 1MB) {
+                throw 'bundle_candidate_inventory_mismatch'
+            }
+            $claimedSha256 = $shaProperty.Value.ToUpperInvariant()
+            $claimedLength = [long]$lengthProperty.Value
 
             $candidateStream = $candidateEntries[0].Open()
             try { $candidateActual = Copy-StreamWithSha256 -Source $candidateStream -Destination $null }
             finally { $candidateStream.Dispose() }
-            if ($candidateActual.sha256 -cne $claimedSha256.ToUpperInvariant() -or $candidateActual.length -ne $claimedLength) {
+            if ($candidateActual.sha256 -cne $claimedSha256 -or $candidateActual.length -ne $claimedLength) {
                 throw 'bundle_candidate_inventory_mismatch'
             }
         }
