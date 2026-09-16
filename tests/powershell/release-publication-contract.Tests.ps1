@@ -13,6 +13,8 @@ $script:GuiSchemaRepositoryPath = 'release/validation/v2.19.1-karon.2/gui-valida
 $script:ProducerGuiSchemaFixture = Join-Path $PSScriptRoot 'fixtures\gui-validation-output.schema-e49cc702.json'
 $script:ProducerGuiSchemaSha256 = 'e49cc70253bd5dd4b4abd8ee00406f5dd8ed39434e309e3e3c74694b85c1b80e'
 $script:SpdxSchemaFixture = Join-Path $PSScriptRoot 'fixtures\spdx-2.3-schema-aadf3b0b.json'
+$script:SpdxSchemaLength = 45312L
+$script:SpdxSchemaSha256 = '239208b7ac287b3cf5d9a9af23f9d69863971102a5e1587a27a398b43490b89b'
 $script:GuiCases = @(
     [pscustomobject]@{ id = 'ko-KR-100'; language = 'ko-KR'; dpi = 100 },
     [pscustomobject]@{ id = 'ko-KR-150'; language = 'ko-KR'; dpi = 150 },
@@ -79,6 +81,54 @@ function Write-TestJson {
     Write-TestUtf8 $Path (($Value | ConvertTo-Json -Depth 64) + [char]10)
 }
 
+function New-TestProvenanceOnlyCase {
+    param(
+        [Parameter(Mandatory)] [string] $Name,
+        [ValidateSet('release-only', 'source-change', 'unrelated')] [string] $Mode
+    )
+    $root = Join-Path $TestDrive ('provenance-only-' + $Name)
+    [void](New-Item -ItemType Directory -Path $root)
+    [void](Invoke-TestGit $root @('init', '-q'))
+    [void](Invoke-TestGit $root @('config', 'user.email', 'release-contract@example.invalid'))
+    [void](Invoke-TestGit $root @('config', 'user.name', 'Release Contract Test'))
+    Write-TestUtf8 (Join-Path $root 'src\application-source.txt') ('sealed application source' + [char]10)
+    [void](Invoke-TestGit $root @('add', '--', 'src/application-source.txt'))
+    [void](Invoke-TestGit $root @('commit', '-q', '-m', 'sealed application source'))
+    $applicationCommit = [string](Invoke-TestGit $root @('rev-parse', 'HEAD^{commit}'))
+
+    if ($Mode -ceq 'source-change') {
+        Write-TestUtf8 (Join-Path $root 'src\application-source.txt') ('changed after seal' + [char]10)
+        [void](Invoke-TestGit $root @('add', '--', 'src/application-source.txt'))
+    }
+    else {
+        Write-TestUtf8 (Join-Path $root 'release\evidence\sealed.txt') ('release evidence' + [char]10)
+        [void](Invoke-TestGit $root @('add', '--', 'release/evidence/sealed.txt'))
+    }
+    [void](Invoke-TestGit $root @('commit', '-q', '-m', 'packaging delta'))
+    $packagingCommit = [string](Invoke-TestGit $root @('rev-parse', 'HEAD^{commit}'))
+
+    if ($Mode -ceq 'unrelated') {
+        $applicationTree = [string](Invoke-TestGit $root @('rev-parse', ($applicationCommit + '^{tree}')))
+        $applicationCommit = [string](Invoke-TestGit $root @('commit-tree', $applicationTree, '-m', 'unrelated application source'))
+    }
+
+    $manifestPath = Join-Path $root 'candidate-manifest.json'
+    Write-TestJson $manifestPath ([ordered]@{ applicationSourceCommit = $applicationCommit })
+    $entries = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+    $entries.Add('candidate-manifest.json', [pscustomobject]@{ SourcePath = $manifestPath })
+    $lock = [pscustomobject]@{
+        release = [pscustomobject]@{ metadataPackage = [pscustomobject]@{ sourceCommit = $applicationCommit } }
+        components = @([pscustomobject]@{ id = 'application'; sourceCommit = $applicationCommit })
+    }
+    [pscustomobject]@{
+        Repository = $root
+        Lock = $lock
+        Entries = $entries
+        ApplicationCommit = $applicationCommit
+        PackagingCommit = $packagingCommit
+    }
+}
+
 function New-TestZip {
     param([Parameter(Mandatory)] [string] $Path, [Parameter(Mandatory)] [hashtable] $Entries)
     $parent = Split-Path -Parent $Path
@@ -130,13 +180,15 @@ function New-ReleaseContractCase {
     [void](Invoke-TestGit $repository @('config', 'user.name', 'Release Contract Test'))
     $applicationSourcePath = Join-Path $repository 'src\application-source.txt'
     Write-TestUtf8 $applicationSourcePath ('sealed application source' + [char]10)
-    [void](Invoke-TestGit $repository @('add', '--', 'src/application-source.txt'))
-    [void](Invoke-TestGit $repository @('commit', '-q', '-m', 'sealed application source'))
-    $applicationSourceCommit = [string](Invoke-TestGit $repository @('rev-parse', 'HEAD^{commit}'))
-    $applicationSourceTree = [string](Invoke-TestGit $repository @('rev-parse', 'HEAD^{tree}'))
     $spdxSchemaPath = Join-Path $repository 'tests\powershell\fixtures\spdx-2.3-schema-aadf3b0b.json'
     [void](New-Item -ItemType Directory -Path (Split-Path -Parent $spdxSchemaPath))
     [IO.File]::Copy($script:SpdxSchemaFixture, $spdxSchemaPath, $false)
+    $noticePath = Join-Path $repository 'THIRD-PARTY-NOTICES.txt'
+    Write-TestUtf8 $noticePath ('Verified third-party notices.' + [char]10)
+    [void](Invoke-TestGit $repository @('add', '--', 'src/application-source.txt', 'THIRD-PARTY-NOTICES.txt', 'tests/powershell/fixtures/spdx-2.3-schema-aadf3b0b.json'))
+    [void](Invoke-TestGit $repository @('commit', '-q', '-m', 'sealed application source'))
+    $applicationSourceCommit = [string](Invoke-TestGit $repository @('rev-parse', 'HEAD^{commit}'))
+    $applicationSourceTree = [string](Invoke-TestGit $repository @('rev-parse', 'HEAD^{tree}'))
 
     $appPath = Join-Path $candidate 'ytdlp-interface.exe'
     $ffprobePath = Join-Path $candidate 'ffprobe.exe'
@@ -154,10 +206,8 @@ function New-ReleaseContractCase {
     }
     Write-TestJson $manifestPath $manifest
 
-    $noticePath = Join-Path $repository 'THIRD-PARTY-NOTICES.txt'
     $licensePath = Join-Path $repository 'release\licenses\v2.19.1-karon.2\application\LICENSE.txt'
     $notesPath = Join-Path $repository 'release\notes\v2.19.1-karon.2.md'
-    Write-TestUtf8 $noticePath ('Verified third-party notices.' + [char]10)
     Write-TestUtf8 $licensePath ('Fixture application license.' + [char]10)
     Write-TestUtf8 $notesPath ('# v2.19.1-karon.2' + [char]10)
 
@@ -532,16 +582,53 @@ function New-FakePublicationRunner {
         ReleaseTitle = $script:Tag
         ReleaseBody = [IO.File]::ReadAllText($Case.NotesPath, [Text.UTF8Encoding]::new($false, $true))
         AssetIdRaceAt = 0
+        TagRebindBoundary = ''
+        PostCreateTagQueries = 0
+        WrongReleaseAccessed = $false
+        WrongReleaseMutated = $false
+        UploadedAssetNames = [Collections.Generic.List[string]]::new()
     }
     foreach ($key in $Options.Keys) { $state[$key] = $Options[$key] }
     $calls = [Collections.Generic.List[object]]::new()
+    $httpCalls = [Collections.Generic.List[object]]::new()
+    $operations = [Collections.Generic.List[object]]::new()
     $assetDirectory = $Case.Output
     $tag = $script:Tag
     $assetNames = @($script:AssetNames)
     $binaryName = $script:BinaryName
+    $releaseJson = {
+        param([long] $ReleaseId)
+        $assets = @()
+        foreach ($name in $state.UploadedAssetNames) {
+            $path = Join-Path $assetDirectory $name
+            $digest = $null
+            if ($state.DigestMode -ceq 'match') { $digest = 'sha256:' + (Get-TestSha256 $path) }
+            if ($state.DigestMode -ceq 'mismatch' -and $name -ceq $binaryName) { $digest = 'sha256:' + ('f' * 64) }
+            $assetIndex = [Array]::IndexOf([string[]]$assetNames, [string]$name)
+            $assetId = 7000 + $assetIndex
+            if ($state.AssetIdRaceAt -eq $state.ReleaseQueries -and $assetIndex -eq 0) { $assetId += 1000 }
+            $assets += [ordered]@{ id = $assetId; name = $name; size = [long](Get-Item $path).Length; state = 'uploaded'; digest = $digest }
+        }
+        $release = [ordered]@{
+            id = $ReleaseId
+            tag_name = $tag
+            name = [string]$state.ReleaseTitle
+            body = [string]$state.ReleaseBody
+            draft = ($state.Stage -ne 'stable')
+            prerelease = $false
+            upload_url = 'https://uploads.github.com/repos/KaronLabs/ytdlp-korean-interface/releases/' + [string]$ReleaseId + '/assets{?name,label}'
+            assets = $assets
+        }
+        if ($state.MissingReleaseId) { $release.Remove('id') }
+        $json = $release | ConvertTo-Json -Depth 8 -Compress
+        if ($state.TagNameAsArray) { $json = $json.Replace(('"tag_name":"' + $tag + '"'), ('"tag_name":["' + $tag + '"]')) }
+        if ($state.DuplicateTagKey) { $json = $json -replace '"tag_name":', '"TAG_NAME":"duplicate","tag_name":' }
+        $json
+    }.GetNewClosure()
     $runner = {
         param([string] $Executable, [string[]] $Arguments, [string] $WorkingDirectory)
         $calls.Add([pscustomobject]@{ Executable = $Executable; Arguments = @($Arguments); WorkingDirectory = $WorkingDirectory })
+        $operations.Add([pscustomobject]@{ Kind = 'command'; Executable = $Executable; Arguments = @($Arguments) })
         $key = $Executable + '|' + ($Arguments -join '|')
         $ok = { param([string] $Output = '') [pscustomobject]@{ ExitCode = 0; Output = $Output } }
         $fail = { param([string] $Output) [pscustomobject]@{ ExitCode = 1; Output = $Output } }
@@ -568,39 +655,26 @@ function New-FakePublicationRunner {
             return & $ok ('100644 blob ' + $state.NotesBlob + [char]9 + 'release/notes/v2.19.1-karon.2.md')
         }
         if ($key -ceq 'gh|auth|status|--hostname|github.com') { return & $ok 'authenticated' }
+        if ($key -ceq 'gh|auth|token|--hostname|github.com') { return & $ok 'test-token-not-a-secret' }
         $apiKey = 'gh|api|--method|GET|repos/KaronLabs/ytdlp-korean-interface/releases/tags/' + $tag
         if ($key -ceq $apiKey) {
             if ($state.Stage -ceq 'absent') { return & $fail 'gh: Not Found (HTTP 404)' }
+            $state.PostCreateTagQueries++
+            if (($state.TagRebindBoundary -ceq 'lookup' -and $state.PostCreateTagQueries -eq 1) -or
+                ($state.TagRebindBoundary -ceq 'rollback' -and $state.Stage -ceq 'stable')) {
+                $state.WrongReleaseAccessed = $true
+            }
             $state.ReleaseQueries++
-            $assets = @()
-            if ($state.Stage -ceq 'draft-assets' -or $state.Stage -ceq 'stable') {
-                foreach ($name in $assetNames) {
-                    $path = Join-Path $assetDirectory $name
-                    $digest = $null
-                    if ($state.DigestMode -ceq 'match') { $digest = 'sha256:' + (Get-TestSha256 $path) }
-                    if ($state.DigestMode -ceq 'mismatch' -and $name -ceq $binaryName) { $digest = 'sha256:' + ('f' * 64) }
-                    $assetId = 7000 + $assets.Count
-                    if ($state.AssetIdRaceAt -eq $state.ReleaseQueries -and $assets.Count -eq 0) { $assetId += 1000 }
-                    $assets += [ordered]@{ id = $assetId; name = $name; size = [long](Get-Item $path).Length; state = 'uploaded'; digest = $digest }
-                }
-            }
             $releaseId = if ($state.ReleaseIdRaceAt -eq $state.ReleaseQueries) { [long]$state.ReleaseId + 1L } else { [long]$state.ReleaseId }
-            $release = [ordered]@{
-                id = $releaseId
-                tag_name = $tag
-                name = [string]$state.ReleaseTitle
-                body = [string]$state.ReleaseBody
-                draft = ($state.Stage -ne 'stable')
-                prerelease = $false
-                assets = $assets
-            }
-            if ($state.MissingReleaseId) { $release.Remove('id') }
-            $json = $release | ConvertTo-Json -Depth 8 -Compress
-            if ($state.TagNameAsArray) {
-                $json = $json.Replace(('"tag_name":"' + $tag + '"'), ('"tag_name":["' + $tag + '"]'))
-            }
-            if ($state.DuplicateTagKey) { $json = $json -replace '"tag_name":', '"TAG_NAME":"duplicate","tag_name":' }
-            return & $ok $json
+            return & $ok (& $releaseJson $releaseId)
+        }
+        $numericRelease = [regex]::Match($key, '^gh\|api\|--method\|GET\|repos/KaronLabs/ytdlp-korean-interface/releases/([0-9]+)$')
+        if ($numericRelease.Success) {
+            $state.ReleaseQueries++
+            $releaseId = [long]$numericRelease.Groups[1].Value
+            if ($releaseId -ne [long]$state.ReleaseId) { $state.WrongReleaseAccessed = $true }
+            $responseId = if ($state.ReleaseIdRaceAt -eq $state.ReleaseQueries) { $releaseId + 1L } else { $releaseId }
+            return & $ok (& $releaseJson $responseId)
         }
         if ($Executable -ceq 'gh' -and $Arguments.Count -ge 3 -and $Arguments[0] -ceq 'release' -and $Arguments[1] -ceq 'create') {
             if ($state.Stage -cne 'absent') { return & $fail 'release already exists' }
@@ -608,11 +682,16 @@ function New-FakePublicationRunner {
             return & $ok 'draft created'
         }
         if ($Executable -ceq 'gh' -and $Arguments.Count -ge 3 -and $Arguments[0] -ceq 'release' -and $Arguments[1] -ceq 'upload') {
+            if ($state.TagRebindBoundary -ceq 'upload') {
+                $state.WrongReleaseAccessed = $true
+                $state.WrongReleaseMutated = $true
+            }
             if ($state.Stage -cne 'draft-empty') { return & $fail 'upload state invalid' }
             $state.Stage = 'draft-assets'
             return & $ok 'uploaded'
         }
         if ($Executable -ceq 'gh' -and $Arguments.Count -ge 9 -and $Arguments[0] -ceq 'release' -and $Arguments[1] -ceq 'download') {
+            if ($state.TagRebindBoundary -ceq 'download') { $state.WrongReleaseAccessed = $true }
             $name = [string]$Arguments[6]
             $directory = [string]$Arguments[8]
             [IO.File]::Copy((Join-Path $assetDirectory $name), (Join-Path $directory $name), $false)
@@ -638,7 +717,51 @@ function New-FakePublicationRunner {
         }
         [pscustomobject]@{ ExitCode = 99; Output = 'unexpected command: ' + $key }
     }.GetNewClosure()
-    [pscustomobject]@{ Runner = $runner; Calls = $calls; State = $state }
+    $httpRunner = {
+        param([object] $Request)
+        $httpCalls.Add([pscustomobject]@{ Method = [string]$Request.Method; Uri = [string]$Request.Uri; Accept = [string]$Request.Accept })
+        $operations.Add([pscustomobject]@{ Kind = 'http'; Method = [string]$Request.Method; Uri = [string]$Request.Uri; Accept = [string]$Request.Accept })
+        $uri = [Uri][string]$Request.Uri
+        if ($Request.Method -ceq 'POST' -and $uri.AbsoluteUri -ceq 'https://api.github.com/repos/KaronLabs/ytdlp-korean-interface/releases') {
+            if ($state.Stage -cne 'absent') { return [pscustomobject]@{ StatusCode = 422; Body = '' } }
+            $state.Stage = 'draft-empty'
+            return [pscustomobject]@{ StatusCode = 201; Body = (& $releaseJson ([long]$state.ReleaseId)) }
+        }
+        $uploadMatch = [regex]::Match($uri.AbsolutePath, '^/repos/KaronLabs/ytdlp-korean-interface/releases/([0-9]+)/assets$')
+        if ($Request.Method -ceq 'POST' -and $uploadMatch.Success) {
+            $releaseId = [long]$uploadMatch.Groups[1].Value
+            if ($releaseId -ne [long]$state.ReleaseId) { $state.WrongReleaseAccessed = $true; $state.WrongReleaseMutated = $true }
+            $name = [Uri]::UnescapeDataString($uri.Query.Substring(6))
+            if ($state.TagRebindBoundary -ceq 'upload') { $state.TagMappedReleaseId = [long]$state.ReleaseId + 1L }
+            if (-not $state.UploadedAssetNames.Contains($name)) { $state.UploadedAssetNames.Add($name) }
+            $state.Stage = if ($state.UploadedAssetNames.Count -eq 4) { 'draft-assets' } else { 'draft-partial' }
+            $index = [Array]::IndexOf([string[]]$assetNames, $name)
+            $path = Join-Path $assetDirectory $name
+            $digest = $null
+            if ($state.DigestMode -ceq 'match') { $digest = 'sha256:' + (Get-TestSha256 $path) }
+            if ($state.DigestMode -ceq 'mismatch' -and $name -ceq $binaryName) { $digest = 'sha256:' + ('f' * 64) }
+            $asset = [ordered]@{ id = 7000 + $index; name = $name; size = [long](Get-Item $path).Length; state = 'uploaded'; digest = $digest }
+            return [pscustomobject]@{ StatusCode = 201; Body = ($asset | ConvertTo-Json -Compress) }
+        }
+        $downloadMatch = [regex]::Match($uri.AbsolutePath, '^/repos/KaronLabs/ytdlp-korean-interface/releases/assets/([0-9]+)$')
+        if ($Request.Method -ceq 'GET' -and $downloadMatch.Success) {
+            $assetId = [int]$downloadMatch.Groups[1].Value
+            $index = $assetId - 7000
+            if ($index -lt 0 -or $index -ge $assetNames.Count) { $state.WrongReleaseAccessed = $true; return [pscustomobject]@{ StatusCode = 404; Body = '' } }
+            if ($state.TagRebindBoundary -ceq 'download') { $state.TagMappedReleaseId = [long]$state.ReleaseId + 1L }
+            $name = $assetNames[$index]
+            [IO.File]::Copy((Join-Path $assetDirectory $name), [string]$Request.DownloadPath, $false)
+            $state.DownloadCount++
+            if ($state.DownloadMismatch -and $state.DownloadCount -eq 1) {
+                $bytes = [IO.File]::ReadAllBytes([string]$Request.DownloadPath)
+                $bytes[0] = $bytes[0] -bxor 1
+                [IO.File]::WriteAllBytes([string]$Request.DownloadPath, $bytes)
+            }
+            return [pscustomobject]@{ StatusCode = 200; Body = '' }
+        }
+        [pscustomobject]@{ StatusCode = 599; Body = '' }
+    }.GetNewClosure()
+    [pscustomobject]@{ Runner = $runner; HttpRunner = $httpRunner; Calls = $calls; HttpCalls = $httpCalls; Operations = $operations; State = $state }
 }
 
 function Invoke-TestPublication {
@@ -650,6 +773,7 @@ function Invoke-TestPublication {
         ReleaseNotesPath = $NotesPath
         ReceiptPath = $Case.ReceiptPath
         CommandRunner = $Fake.Runner
+        HttpRunner = $Fake.HttpRunner
         PlanOnly = $PlanOnly
     }
     Invoke-QualityReleasePublication @arguments
@@ -661,23 +785,17 @@ Describe 'Single production publication entry point' {
         ($null -eq (Get-Command Get-KaronPublishCommandPlan -ErrorAction SilentlyContinue)) | Should Be $true
     }
 
-    It 'contains no latest flag and every release create literal is draft-first' {
+    It 'contains no latest flag and creates only a draft through the REST endpoint' {
         $text = [IO.File]::ReadAllText($script:PublishTool)
         $text | Should Not Match '(?i)--latest'
         $text | Should Not Match "(?i)'release'\s*,\s*'edit'"
+        $text | Should Not Match "(?i)'release'\s*,\s*'create'"
+        $text | Should Match 'https://api\.github\.com/repos/KaronLabs/ytdlp-korean-interface/releases'
+        $text | Should Match 'draft\s*=\s*\$true'
         $tokens = $null
         $errors = $null
-        $ast = [Management.Automation.Language.Parser]::ParseFile($script:PublishTool, [ref]$tokens, [ref]$errors)
+        [void][Management.Automation.Language.Parser]::ParseFile($script:PublishTool, [ref]$tokens, [ref]$errors)
         @($errors).Count | Should Be 0
-        $createFunctions = @($ast.FindAll({
-            param($node)
-            $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
-            $node.Extent.Text -match "'release'\s*,\s*'create'"
-        }, $true))
-        $createFunctions.Count | Should Be 1
-        $createFunctions[0].Extent.Text | Should Match '(?i)--verify-tag'
-        $createFunctions[0].Extent.Text | Should Match '(?i)--draft'
-        $createFunctions[0].Extent.Text | Should Not Match '(?i)--latest'
     }
 }
 
@@ -732,6 +850,39 @@ Describe 'Independent immutable provenance anchors' {
         $fake = New-FakePublicationRunner $case
         (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly }) | Should Match 'package_receipt_packaging_commit_mismatch'
         $fake.Calls.Count | Should Be 0
+    }
+}
+
+Describe 'Application provenance ancestry and release-only delta' {
+    It 'rejects a coherent but unrelated application source commit' {
+        $case = New-TestProvenanceOnlyCase 'unrelated' 'unrelated'
+        (Get-TestFailure {
+            Get-KaronPackageApplicationProvenance $case.Lock $case.Entries $case.Repository $case.PackagingCommit
+        }) | Should Match 'package_application_source_not_ancestor'
+    }
+
+    It 'rejects a stale application ancestor followed by a source-code change' {
+        $case = New-TestProvenanceOnlyCase 'source-change' 'source-change'
+        (Get-TestFailure {
+            Get-KaronPackageApplicationProvenance $case.Lock $case.Entries $case.Repository $case.PackagingCommit
+        }) | Should Match 'package_application_source_delta_invalid'
+    }
+
+    It 'accepts an application ancestor followed only by release evidence' {
+        $case = New-TestProvenanceOnlyCase 'release-only' 'release-only'
+        $result = Get-KaronPackageApplicationProvenance $case.Lock $case.Entries $case.Repository $case.PackagingCommit
+        $result.ApplicationSourceCommit | Should Be $case.ApplicationCommit
+        $result.PackagingCommit | Should Be $case.PackagingCommit
+    }
+}
+
+Describe 'Exact upstream SPDX schema fixture' {
+    It 'pins the exact aadf3b0b upstream bytes without newline normalization' {
+        [long](Get-Item -LiteralPath $script:SpdxSchemaFixture).Length | Should Be $script:SpdxSchemaLength
+        (Get-TestSha256 $script:SpdxSchemaFixture) | Should Be $script:SpdxSchemaSha256
+        $toolText = [IO.File]::ReadAllText($script:PackageTool)
+        $toolText | Should Match ([regex]::Escape([string]$script:SpdxSchemaLength + 'L'))
+        $toolText | Should Match $script:SpdxSchemaSha256
     }
 }
 
@@ -1028,7 +1179,7 @@ Describe 'Exact package, GUI evidence, and receipt contract' {
         $bytes[0] = $bytes[0] -bxor 1
         [IO.File]::WriteAllBytes($case.NoticePath, $bytes)
         Refresh-TestInputRecord $case 'rootThirdPartyNotices' $case.NoticePath 'THIRD-PARTY-NOTICES.txt'
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_sources_entry_hash_mismatch'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_application_source_delta_invalid'
     }
 
     It 'rejects unlisted and duplicate-case candidate paths' -TestCases @(
@@ -1117,25 +1268,61 @@ Describe 'Fail-closed publication preflight and receipt checks' {
     }
 }
 
+Describe 'Release identity tag-rebinding perimeter' {
+    It 'contains no post-create tag-based upload or download command' {
+        $text = [IO.File]::ReadAllText($script:PublishTool)
+        $text | Should Not Match "'release'\s*,\s*'upload'"
+        $text | Should Not Match "'release'\s*,\s*'download'"
+    }
+
+    It 'never accesses or mutates a rebound tag target at lookup upload or download boundaries' -TestCases @(
+        @{ Boundary = 'lookup' },
+        @{ Boundary = 'upload' },
+        @{ Boundary = 'download' }
+    ) {
+        param($Boundary)
+        $case = New-PackagedPublicationCase ('publish-tag-rebind-' + $Boundary)
+        $fake = New-FakePublicationRunner $case @{ TagRebindBoundary = $Boundary }
+        [void](Get-TestFailure { Invoke-TestPublication $case $fake })
+        $fake.State.WrongReleaseAccessed | Should Be $false
+        $fake.State.WrongReleaseMutated | Should Be $false
+    }
+
+    It 'rolls back only by the sealed numeric release id after a tag rebind' {
+        $case = New-PackagedPublicationCase 'publish-tag-rebind-rollback'
+        $fake = New-FakePublicationRunner $case @{ TagRebindBoundary = 'rollback'; MainRaceAt = 7 }
+        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should Match 'publication_'
+        $fake.State.WrongReleaseAccessed | Should Be $false
+        $fake.State.WrongReleaseMutated | Should Be $false
+        $fake.State.Stage | Should Be 'draft-assets'
+    }
+}
+
 Describe 'Draft-first publication, redownload proof, and race gates' {
-    It 'returns the exact draft, upload, four download, and publish command order' {
+    It 'returns the exact REST draft, four upload, four numeric download, and publish order' {
         $case = New-PackagedPublicationCase 'publish-plan'
         $fake = New-FakePublicationRunner $case
         $result = Invoke-TestPublication $case $fake -PlanOnly
         $result.Mode | Should Be 'plan'
-        @($result.Commands).Count | Should Be 7
-        ($result.Commands[0].Arguments -join '|') | Should Be ('release|create|' + $script:Tag + '|--repo|KaronLabs/ytdlp-korean-interface|--title|' + $script:Tag + '|--notes-file|' + [IO.Path]::GetFullPath($case.NotesPath) + '|--verify-tag|--draft')
-        $result.Commands[1].Arguments[0] | Should Be 'release'
-        $result.Commands[1].Arguments[1] | Should Be 'upload'
+        @($result.Commands).Count | Should Be 10
+        $result.Commands[0].Method | Should Be 'POST'
+        $result.Commands[0].Uri | Should Be 'https://api.github.com/repos/KaronLabs/ytdlp-korean-interface/releases'
+        $createBody = $result.Commands[0].Body | ConvertFrom-Json
+        $createBody.tag_name | Should Be $script:Tag
+        $createBody.draft | Should Be $true
+        $createBody.prerelease | Should Be $false
         for ($index = 0; $index -lt 4; $index++) {
-            $command = $result.Commands[$index + 2]
-            $command.Arguments[1] | Should Be 'download'
-            $command.Arguments[5] | Should Be '--pattern'
-            $command.Arguments[6] | Should Be $script:AssetNames[$index]
-            ($command.Arguments -contains '--clobber') | Should Be $false
+            $upload = $result.Commands[$index + 1]
+            $upload.Method | Should Be 'POST'
+            $upload.AssetName | Should Be $script:AssetNames[$index]
+            $upload.Uri | Should Be ('{sealed-upload-url}?name=' + [Uri]::EscapeDataString($script:AssetNames[$index]))
+            $download = $result.Commands[$index + 5]
+            $download.Method | Should Be 'GET'
+            $download.Uri | Should Be 'https://api.github.com/repos/KaronLabs/ytdlp-korean-interface/releases/assets/{sealed-asset-id}'
+            $download.Accept | Should Be 'application/octet-stream'
         }
-        @($result.Commands[2..5] | ForEach-Object { $_.Arguments[8] } | Select-Object -Unique).Count | Should Be 1
-        ($result.Commands[6].Arguments -join '|') | Should Be 'api|--method|PATCH|repos/KaronLabs/ytdlp-korean-interface/releases/{sealed-release-id}|--field|draft=false'
+        @($result.Commands[5..8] | ForEach-Object { $_.Directory } | Select-Object -Unique).Count | Should Be 1
+        ($result.Commands[9].Arguments -join '|') | Should Be 'api|--method|PATCH|repos/KaronLabs/ytdlp-korean-interface/releases/{sealed-release-id}|--field|draft=false'
         (@($fake.Calls | Where-Object { $_.Executable -ceq 'gh' -and $_.Arguments[0] -ceq 'release' })).Count | Should Be 0
     }
 
@@ -1146,12 +1333,13 @@ Describe 'Draft-first publication, redownload proof, and race gates' {
         $result.Mode | Should Be 'published'
         $result.RedownloadsVerified | Should Be 4
         $fake.State.Stage | Should Be 'stable'
-        $releaseCalls = @($fake.Calls | Where-Object { $_.Executable -ceq 'gh' -and $_.Arguments[0] -ceq 'release' })
-        ($releaseCalls | ForEach-Object { $_.Arguments[1] } | Where-Object { $_ -ceq 'download' }).Count | Should Be 4
-        (@($releaseCalls | Where-Object { $_.Arguments[1] -ceq 'verify-asset' })).Count | Should Be 0
-        $allCalls = [object[]]@($fake.Calls)
-        $publishIndex = [Array]::FindIndex($allCalls, [Predicate[object]]{ param($call) $call.Executable -ceq 'gh' -and $call.Arguments[0] -ceq 'api' -and $call.Arguments -contains 'draft=false' })
-        $lastDownloadIndex = [Array]::FindLastIndex($allCalls, [Predicate[object]]{ param($call) $call.Executable -ceq 'gh' -and $call.Arguments[0] -ceq 'release' -and $call.Arguments[1] -ceq 'download' })
+        $downloads = @($fake.HttpCalls | Where-Object { $_.Method -ceq 'GET' -and $_.Accept -ceq 'application/octet-stream' })
+        $downloads.Count | Should Be 4
+        foreach ($download in $downloads) { $download.Uri | Should Match '^https://api\.github\.com/repos/KaronLabs/ytdlp-korean-interface/releases/assets/[0-9]+$' }
+        (($fake.Operations | ConvertTo-Json -Depth 8) -join '') | Should Not Match 'test-token-not-a-secret'
+        $allCalls = [object[]]@($fake.Operations)
+        $publishIndex = [Array]::FindIndex($allCalls, [Predicate[object]]{ param($call) $call.Kind -ceq 'command' -and $call.Executable -ceq 'gh' -and $call.Arguments -contains 'draft=false' })
+        $lastDownloadIndex = [Array]::FindLastIndex($allCalls, [Predicate[object]]{ param($call) $call.Kind -ceq 'http' -and $call.Method -ceq 'GET' -and $call.Accept -ceq 'application/octet-stream' })
         ($publishIndex -gt $lastDownloadIndex) | Should Be $true
         $fake.State.ReleaseQueries | Should BeGreaterThan 8
     }
@@ -1196,7 +1384,7 @@ Describe 'Draft-first publication, redownload proof, and race gates' {
         $case = New-PackagedPublicationCase 'publish-digest-mismatch'
         $fake = New-FakePublicationRunner $case @{ DigestMode = 'mismatch' }
         (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should Match 'publication_remote_digest_mismatch'
-        $fake.State.Stage | Should Be 'draft-assets'
+        $fake.State.Stage | Should Be 'draft-partial'
     }
 
     It 'fails before create on a remote main or tag race' -TestCases @(
@@ -1235,7 +1423,7 @@ Describe 'Draft-first publication, redownload proof, and race gates' {
     It 'seals every numeric remote asset id after upload' -TestCases @(
         @{ Name = 'post-upload'; Query = 4 },
         @{ Name = 'mid-redownload'; Query = 7 },
-        @{ Name = 'post-stable'; Query = 10 }
+        @{ Name = 'post-stable'; Query = 9 }
     ) {
         param($Name, $Query)
         $case = New-PackagedPublicationCase ('publish-asset-id-race-' + $Name)
@@ -1248,7 +1436,7 @@ Describe 'Draft-first publication, redownload proof, and race gates' {
         $case = New-PackagedPublicationCase 'publish-single-verification-directory'
         $fake = New-FakePublicationRunner $case
         $plan = Invoke-TestPublication $case $fake -PlanOnly
-        $directories = @($plan.Commands | Where-Object Name -like 'download-*' | ForEach-Object { [string]$_.Arguments[8] } | Select-Object -Unique)
+        $directories = @($plan.Commands | Where-Object Name -like 'download-*' | ForEach-Object { [string]$_.Directory } | Select-Object -Unique)
         $directories.Count | Should Be 1
         [IO.Path]::GetFileName($directories[0]) | Should Match '^karon-release-verify-[a-f0-9]{32}$'
     }

@@ -867,6 +867,12 @@ function Get-KaronPackageApplicationProvenance {
     if ($metadataCommit -cne $applicationSourceCommit -or $componentCommit -cne $applicationSourceCommit) { throw 'package_application_source_mismatch' }
     $resolved = @(& git -C $RepositoryRoot rev-parse --verify ($applicationSourceCommit + '^{commit}') 2>&1)
     if ($LASTEXITCODE -ne 0 -or (($resolved | Out-String).Trim()).ToLowerInvariant() -cne $applicationSourceCommit) { throw 'package_application_source_object_invalid' }
+    $null = @(& git -C $RepositoryRoot merge-base --is-ancestor $applicationSourceCommit $packaging 2>&1)
+    if ($LASTEXITCODE -eq 1) { throw 'package_application_source_not_ancestor' }
+    if ($LASTEXITCODE -ne 0) { throw 'package_application_source_object_invalid' }
+    $null = @(& git -C $RepositoryRoot diff --quiet --no-ext-diff --no-textconv $applicationSourceCommit $packaging -- . ':(exclude)release/**' 2>&1)
+    if ($LASTEXITCODE -eq 1) { throw 'package_application_source_delta_invalid' }
+    if ($LASTEXITCODE -ne 0) { throw 'package_application_source_object_invalid' }
     $treeOutput = @(& git -C $RepositoryRoot rev-parse --verify ($applicationSourceCommit + '^{tree}') 2>&1)
     $applicationSourceTree = (($treeOutput | Out-String).Trim()).ToLowerInvariant()
     if ($LASTEXITCODE -ne 0 -or $applicationSourceTree -notmatch '^[a-f0-9]{40}$') { throw 'package_application_source_object_invalid' }
@@ -1167,7 +1173,7 @@ function Assert-KaronPackageSpdxContract {
     Assert-KaronPackageBoundFile $bound $Path $script:KaronPackageSpdxName 'package_spdx_lock_mismatch'
     $json = ConvertFrom-KaronPackageJsonStrict ([IO.File]::ReadAllText($Path, [Text.UTF8Encoding]::new($false, $true))) 'package_spdx_invalid'
     $schema = Get-KaronPackageTrackedFileRecord $RepositoryRoot 'tests/powershell/fixtures/spdx-2.3-schema-aadf3b0b.json' 'spdx-2.3-schema-aadf3b0b.json' 'package_spdx_schema_untracked'
-    if ($schema.length -ne 45313L -or $schema.sha256 -cne '3ec6cd5b8ba0c9a3e821da48536fa1b814567dc7e4376efe98d3e7b2a7a8d230') { throw 'package_spdx_schema_pin_mismatch' }
+    if ($schema.length -ne 45312L -or $schema.sha256 -cne '239208b7ac287b3cf5d9a9af23f9d69863971102a5e1587a27a398b43490b89b') { throw 'package_spdx_schema_pin_mismatch' }
     try {
         if (-not (Test-Json -LiteralPath $Path -SchemaFile $schema.localPath -ErrorAction Stop)) { throw 'invalid' }
     }
