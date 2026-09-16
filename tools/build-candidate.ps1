@@ -474,9 +474,29 @@ function Get-ReleaseX64DependencyPlan {
     $jpegOutput = Join-Path $source 'libjpeg-turbo-3.1.2\out\build\x64-Release'
     return @(
         [pscustomobject]@{
-            Name = 'bit7z'; SourceDirectory = (Join-Path $source 'bit7z'); FilePath = $MsBuildPath
-            Arguments = @((Join-Path $source 'bit7z\bit7z.sln')) + $release
-            LibraryPath = (Join-Path $source 'bit7z\bin\x64\bit7z64.lib'); BuildArguments = @()
+            Name = 'bit7z'; SourceDirectory = (Join-Path $source 'bit7z'); FilePath = $CmakePath
+            Arguments = @(
+                '-S', (Join-Path $source 'bit7z'),
+                '-B', (Join-Path $source 'bit7z\out\build\x64-Release'),
+                '-G', 'Visual Studio 17 2022',
+                '-A', 'x64',
+                '-T', 'v143',
+                $CmakeVsGlobalsArgument,
+                "-DBIT7Z_CUSTOM_7ZIP_PATH=$(Join-Path $source 'bit7z\lib\7zSDK')",
+                '-DBIT7Z_USE_NATIVE_STRING=ON',
+                '-DBIT7Z_PATH_SANITIZATION=ON',
+                '-DBIT7Z_REGEX_MATCHING=ON',
+                '-DBIT7Z_STATIC_RUNTIME=ON',
+                '-DCMAKE_CXX_FLAGS=/utf-8',
+                "-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE=$(Join-Path $source 'bit7z\bin\x64')"
+            )
+            LibraryPath = (Join-Path $source 'bit7z\bin\x64\bit7z.lib')
+            BuildArguments = @(
+                '--build', (Join-Path $source 'bit7z\out\build\x64-Release'),
+                '--config', 'Release',
+                '--target', 'bit7z',
+                '--', '/m', '/p:PlatformToolset=v143'
+            )
         },
         [pscustomobject]@{
             Name = 'Nana'; SourceDirectory = (Join-Path $source 'nana'); FilePath = $MsBuildPath

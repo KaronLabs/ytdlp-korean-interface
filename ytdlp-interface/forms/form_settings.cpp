@@ -146,7 +146,7 @@ void GUI::fm_settings()
 	widgets::Label l_nana {about, i18n::tr("about.nana", "Nana C++ GUI library")}, l_jpeg {about, "libjpeg-turbo"}, l_bit7z {about, "bit7z"},
 		l_png {about, "libpng"}, l_json {about, "JSON for Modern C++"}, l_ctrls {about, "Ctrl+S"}, l_ctrlc {about, "Ctrl+C"}, l_ctrlf {about, "Ctrl+F"},
 		l_ctrltab {about, "Ctrl+Tab"}, l_f2 {about, "F2"}, l_del {about, i18n::tr("common.delete", "Delete")}, l_esc {about, "Esc"}, l_ctrlnum0 {about, "Ctrl+Num0"};
-	widgets::Text l_nana_ver {about, "v1.8 (custom)"}, l_jpeg_ver {about, "v3.1.2"}, l_bit7z_ver {about, "v3.1.3"},
+	widgets::Text l_nana_ver {about, "v1.8 (custom)"}, l_jpeg_ver {about, "v3.1.2"}, l_bit7z_ver {about, "v4.1.0 (MPL-2.0) / 7-Zip v26.01 (LGPL-2.1-or-later, BSD-2-Clause, BSD-3-Clause; RAR disabled)"},
 		l_png_ver {about, "v1.6.37"}, l_json_ver {about, "v3.12.0"}, l_settings {about, i18n::tr("about.settings", "Settings")}, l_formats {about, i18n::tr("about.formats", "Formats")},
 		l_view {about, i18n::tr("about.switch_view", "Switch view (queue/output)")}, l_fname {about, i18n::tr("about.set_filename", "Set file name of queue item")}, l_copy {about, i18n::tr("about.copy_urls", "Copy selected URL(s)")},
 		l_delitem {about, i18n::tr("about.delete_items", "Delete queue item(s)")}, l_close {about, i18n::tr("about.close_window", "Close window")}, l_winpos {about, i18n::tr("about.reset_window", "Reset window size and position")};
