@@ -841,6 +841,10 @@ function Assert-UniqueCandidateInventoryIdentityProperties {
             if ($index -ge $JsonText.Length) { throw 'bundle_candidate_inventory_mismatch' }
             if ($JsonText[$index] -eq ',') {
                 $index++
+                Skip-EvidenceJsonWhitespace -Text $JsonText -Index ([ref]$index)
+                if ($index -ge $JsonText.Length -or $JsonText[$index] -eq '}') {
+                    throw 'bundle_candidate_inventory_mismatch'
+                }
                 continue
             }
             if ($JsonText[$index] -eq '}') {

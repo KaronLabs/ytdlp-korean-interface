@@ -1317,6 +1317,39 @@ Describe 'completed evidence ZIP candidate inventory cross-binding' {
         $failureToken | Should BeNullOrEmpty
     }
 
+    It 'rejects a trailing comma after the candidate identity fields' {
+        $tokens = $null
+        $parseErrors = $null
+        $collectorAst = [Management.Automation.Language.Parser]::ParseFile($collectorPath, [ref]$tokens, [ref]$parseErrors)
+        @($parseErrors).Count | Should Be 0
+        foreach ($functionAst in @($collectorAst.FindAll({
+            param($node)
+            $node -is [Management.Automation.Language.FunctionDefinitionAst]
+        }, $true))) {
+            Invoke-Expression $functionAst.Extent.Text
+        }
+
+        $candidateBytes = [Text.Encoding]::UTF8.GetBytes('{}')
+        $candidateSha256 = Get-TestBytesSha256 $candidateBytes
+        $inventoryJson = '{"candidateManifestSha256":"' + $candidateSha256 + '","candidateManifestLength":2,}' + "`n"
+        $inventoryBytes = [Text.Encoding]::UTF8.GetBytes($inventoryJson)
+        $zipPath = Join-Path $TestDrive 'candidate-trailing-comma.zip'
+        New-TestZip -Path $zipPath -Entries @{
+            'source-cache-inventory.json' = $inventoryBytes
+            'evidence/candidate-manifest.json' = $candidateBytes
+        }
+        $callerExpectedEntries = @(
+            [ordered]@{ name = 'source-cache-inventory.json'; expectedSha256 = Get-TestBytesSha256 $inventoryBytes; expectedLength = [long]$inventoryBytes.Length },
+            [ordered]@{ name = 'evidence/candidate-manifest.json'; expectedSha256 = $candidateSha256; expectedLength = [long]$candidateBytes.Length }
+        )
+
+        $failureToken = $null
+        try { Assert-CompletedEvidenceZip $zipPath $callerExpectedEntries }
+        catch { $failureToken = $_.Exception.Message }
+
+        $failureToken | Should Be 'bundle_candidate_inventory_mismatch'
+    }
+
     It 'accepts a lowercase 64-hex SHA string after normalization' {
         $tokens = $null
         $parseErrors = $null
