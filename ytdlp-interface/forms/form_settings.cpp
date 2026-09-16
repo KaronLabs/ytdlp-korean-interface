@@ -46,7 +46,7 @@ void GUI::fm_settings()
 	unsigned initial_maxdl {conf.max_concurrent_downloads};
 
 	themed_form fm {nullptr, *this, {}, appear::decorate<appear::minimize, appear::sizable>{}};
-	fm.center(820, 656);
+	fm.center(820, 720);
 	auto settings_caption {i18n::tr("settings.title", "{title} - settings")};
 	settings_caption.replace(settings_caption.find("{title}"), 7, title);
 	fm.caption(settings_caption);
@@ -115,30 +115,32 @@ void GUI::fm_settings()
 	fm["presets"] << presets.actual_handle();
 	fm["about"] << about.actual_handle();
 
-	about.div(R"(vert
-		<pnl_header weight=35> <weight=10> <l_about_ver weight=72> <weight=5>
-		<about_sep1 weight=3> <weight=8> <libtitle weight=28> <weight=13>
-		<weight=28 <l_nana> <weight=20> <l_nana_ver>>
-		<weight=28 <l_json> <weight=20> <l_json_ver>>
-		<weight=28 <l_jpeg> <weight=20> <l_jpeg_ver>>
-		<weight=28 <l_png> <weight=20> <l_png_ver>>
-		<weight=28 <l_bit7z> <weight=20> <l_bit7z_ver>> <weight=18>
-		<about_sep2 weight=3> <weight=20> <kbtitle weight=28> <weight=13>
-		<weight=28 <l_ctrls> <weight=20> <l_settings>>
-		<weight=28 <l_ctrlf> <weight=20> <l_formats>>
-		<weight=28 <l_ctrlc> <weight=20> <l_copy>>
-		<weight=28 <l_ctrltab> <weight=20> <l_view>>
-		<weight=28 <l_f2> <weight=20> <l_fname>>
-		<weight=28 <l_del> <weight=20> <l_delitem>>
-		<weight=28 <l_ctrlnum0> <weight=20> <l_winpos>>
-		<weight=28 <l_esc> <weight=20> <l_close>>
-	)");
+	const auto about_summary_height {fm.dpi_scale(64)}, about_action_height {fm.dpi_scale(34)}, about_gap {fm.dpi_scale(8)};
+	about.div("vert "
+		"<pnl_header weight=35> <weight=10> <l_about_ver weight=" + std::to_string(about_summary_height) + "> "
+		"<weight=" + std::to_string(about_gap) + "> <btn_license_details weight=" + std::to_string(about_action_height) + "> "
+		"<weight=" + std::to_string(about_gap) + "> <about_sep1 weight=3> <weight=8> <libtitle weight=28> <weight=13> "
+		"<weight=28 <l_nana> <weight=20> <l_nana_ver>> "
+		"<weight=28 <l_json> <weight=20> <l_json_ver>> "
+		"<weight=28 <l_jpeg> <weight=20> <l_jpeg_ver>> "
+		"<weight=28 <l_png> <weight=20> <l_png_ver>> "
+		"<weight=28 <l_bit7z> <weight=20> <l_bit7z_ver>> <weight=4> "
+		"<about_sep2 weight=3> <weight=20> <kbtitle weight=28> <weight=13> "
+		"<weight=28 <l_ctrls> <weight=20> <l_settings>> "
+		"<weight=28 <l_ctrlf> <weight=20> <l_formats>> "
+		"<weight=28 <l_ctrlc> <weight=20> <l_copy>> "
+		"<weight=28 <l_ctrltab> <weight=20> <l_view>> "
+		"<weight=28 <l_f2> <weight=20> <l_fname>> "
+		"<weight=28 <l_del> <weight=20> <l_delitem>> "
+		"<weight=28 <l_ctrlnum0> <weight=20> <l_winpos>> "
+		"<weight=28 <l_esc> <weight=20> <l_close>>");
 
 	std::string vertext {display_ver_tag + " (" + (X64 ? "64-bit)" : "32-bit)") +
-		"\n" + i18n::tr("about.license_summary", "KaronLabs application code is MIT; third-party components have their own licenses.") +
-		"\n" + i18n::tr("about.notices_summary", "See bundled THIRD-PARTY-NOTICES.txt and the corresponding-sources release asset.") +
-		"\n" + i18n::tr("about.source_details_hint", "Click here for exact upstream/source locations.")};
+		"\n" + i18n::tr("about.license_summary", "KaronLabs application code is MIT. Third-party components have their own licenses.") +
+		"\n" + i18n::tr("about.notices_summary", "Use Licenses and source details for bundled notices and corresponding sources.")};
 	std::string source_details {i18n::tr("about.source_details_body",
+		"Bundled notices: THIRD-PARTY-NOTICES.txt\n"
+		"Corresponding sources: ytdlp-korean-interface-v2.19.1-karon.2-corresponding-sources.zip\n\n"
 		"yt-dlp: https://github.com/yt-dlp/yt-dlp\n"
 		"FFmpeg: https://github.com/FFmpeg/FFmpeg/commit/9258bacca50d7ca28bcb6d797e8952123e35105b\n"
 		"BtbN build scripts: https://github.com/BtbN/FFmpeg-Builds/tree/3e6685eda92f9288c15ac320139622dcedca09a4\n"
@@ -149,6 +151,7 @@ void GUI::fm_settings()
 
 	about_label l_about_ver {about, ""};
 	nana::panel<true> pnl_header {about.handle()};
+	widgets::Button btn_license_details {about, i18n::tr("about.license_details_action", "Licenses and source details")};
 	widgets::Separator about_sep1 {about}, about_sep2 {about};
 	widgets::Title libtitle {about, i18n::tr("about.libraries", "*  Libraries used  *")},
 		kbtitle {about, i18n::tr("about.shortcuts", "*  Keyboard shortcuts  *")};
@@ -163,6 +166,7 @@ void GUI::fm_settings()
 	//about["title"] << title;
 	about["pnl_header"] << pnl_header;
 	about["l_about_ver"] << l_about_ver;
+	about["btn_license_details"] << btn_license_details;
 	about["about_sep1"] << about_sep1;
 	about["libtitle"] << libtitle;
 	about["l_nana"] << l_nana;
@@ -194,7 +198,7 @@ void GUI::fm_settings()
 	about["l_ctrlnum0"] << l_ctrlnum0;
 	about["l_winpos"] << l_winpos;
 
-	l_about_ver.events().click([&]
+	btn_license_details.events().click([&]
 	{
 		(widgets::msgbox {fm, i18n::tr("about.source_details_title", "Upstream and source locations")} << source_details)();
 	});
