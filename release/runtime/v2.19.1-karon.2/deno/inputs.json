@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "deno-third-party-inputs/v1",
+  "closureClassification": "verified-conservative-superset",
+  "releaseIdentity": {
+    "release": "v2.19.1-karon.2",
+    "component": "deno",
+    "version": "2.7.14",
+    "target": "x86_64-pc-windows-msvc",
+    "denoExeSha256": "b6e83993f1f1ab97075a77043de61118966d719b5450bc631251d47c3a34230b",
+    "denoSourceCommit": "2d674b25625bcc367853d00fe86f6e84390f88cb",
+    "rustyV8Version": "147.4.0",
+    "rustyV8Commit": "348006707529fa4559d931169ad985b3ce518460",
+    "v8Commit": "708fc9b76e540c03e9a7c5e1d4f768b279517589"
+  },
+  "officialBuildEvidence": {
+    "command": "cargo build --release --locked --bin deno --bin denort --bin test_server --features=panic-trace",
+    "profile": "release",
+    "cargoFeatures": ["default", "panic-trace"],
+    "rustyV8DefaultFeatures": false,
+    "rustyV8Features": ["simdutf"],
+    "staticLibraryAsset": "rusty_v8_simdutf_release_x86_64-pc-windows-msvc.lib.gz",
+    "exactObjectToNativeComponentMap": "NOT_VERIFIED"
+  },
+  "observedClosureCounts": {
+    "officialProfilePackages": 996,
+    "allFeaturesPackages": 1008,
+    "cargoLockPackages": 1127,
+    "registryPackages": 1051,
+    "nativeGitlinksIncludingV8": 20
+  },
+  "sourceArtifacts": [
+    {
+      "id": "denoSource",
+      "fileName": "deno-source-2d674b25625bcc367853d00fe86f6e84390f88cb.zip",
+      "sourceUrl": "https://codeload.github.com/denoland/deno/zip/2d674b25625bcc367853d00fe86f6e84390f88cb",
+      "length": 33443763,
+      "sha256": "0fb1aac72af419d8f7de0d623eee7713571d841736d1c01eac97363afd3996dd"
+    },
+    {
+      "id": "rustyV8Source",
+      "fileName": "rusty_v8-source-348006707529fa4559d931169ad985b3ce518460.zip",
+      "sourceUrl": "https://codeload.github.com/denoland/rusty_v8/zip/348006707529fa4559d931169ad985b3ce518460",
+      "length": 413094,
+      "sha256": "dce45911e50f44987b231859503bd79d26e81a08d747b2240423e539d7a60c22"
+    },
+    {
+      "id": "v8Source",
+      "fileName": "v8-source-708fc9b76e540c03e9a7c5e1d4f768b279517589.zip",
+      "sourceUrl": "https://codeload.github.com/denoland/v8/zip/708fc9b76e540c03e9a7c5e1d4f768b279517589",
+      "length": 43687550,
+      "sha256": "f0b7e4660c732b081efdae8c93a931a9de1993c569ab2668b684eea9b2904afc"
+    },
+    {
+      "id": "rustyV8StaticLibrary",
+      "fileName": "rusty_v8_simdutf_release_x86_64-pc-windows-msvc.lib.gz",
+      "sourceUrl": "https://github.com/denoland/rusty_v8/releases/download/v147.4.0/rusty_v8_simdutf_release_x86_64-pc-windows-msvc.lib.gz",
+      "length": 33953406,
+      "sha256": "ec03511a71d1f36c04b9d93b5617436e2354a6d3b32e47fcf7537287ce82e07a"
+    }
+  ],
+  "pinnedSourceFiles": [
+    {"root": "deno", "path": "Cargo.lock", "sha256": "cd92e0d811875629992acd08ec4e6d1ca3abd34161e68168212b38bca4a39668"},
+    {"root": "deno", "path": "Cargo.toml", "sha256": "c96958c83ea6ffcca9d6e2c888108d0c5915b2a0f5d303f1afacb1fd9a790874"},
+    {"root": "deno", "path": "cli/Cargo.toml", "sha256": "e7e9005262766d7e43ff6434528bd708588dfd92b346707b35269df7f60179f4"},
+    {"root": "deno", "path": ".github/workflows/ci.generated.yml", "sha256": "b1c53315f5c6ad4343cfebe4a674ceb9bac97fe2e1a553278b33bb85ec27c56f"},
+    {"root": "deno", "path": ".github/workflows/promote_to_release.ts", "sha256": "c9246651641eec189b1e23a48e4860c3c7cb319ee0908dda3ccb0eac5ff5405f"},
+    {"root": "deno", "path": "rust-toolchain.toml", "sha256": "9084f06a996ac0edec375a19761cfa5f0febfda93a25a40a4f4487fba43bb8ed"},
+    {"root": "deno", "path": "LICENSE.md", "sha256": "f62497fffecc0852960c8d3e6934b9db86d16396e9b604072e923892cae3a588"},
+    {"root": "rusty_v8", "path": "Cargo.toml", "sha256": "be93be92290aee9572d3a394dc4846a90ec7f239efdd2ed04a1b8d6bf59299e5"},
+    {"root": "rusty_v8", "path": "build.rs", "sha256": "503f3a616f13f649672e2df1f6c4afb413d5875b968c2077f5aaed97792e6558"},
+    {"root": "rusty_v8", "path": ".gitmodules", "sha256": "64abd45978444b338c5d3816cfbec508f68d6877c0c26ece649b9593d2665054"},
+    {"root": "rusty_v8", "path": "LICENSE", "sha256": "1c6356fb751d45f0c53093ebf8a7f5e580e802f51999178e19d60f3ec39e147d"},
+    {"root": "v8", "path": "DEPS", "sha256": "9145c5cf645a9ea954baccf6615a1095710ebbeac02d7464fda68c0febe18ea4"},
+    {"root": "v8", "path": "LICENSE", "sha256": "6ab33af8774a0f396ee3aeeb761e3229057682d6f9fa7f572e390c2cb3a6e509"},
+    {"root": "v8", "path": "LICENSE.fdlibm", "sha256": "e7115e18444dae09d17f361ddc365fb1d342640fe500796209c63f7c80dfae10"},
+    {"root": "v8", "path": "LICENSE.strongtalk", "sha256": "6a585a9f466654abc8fc0829d56b1bc987e3a073d31faa03bba37d33640a23cd"}
+  ]
+}

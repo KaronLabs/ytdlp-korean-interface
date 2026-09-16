@@ -1,0 +1,12 @@
+Deno 2.7.14 Third-Party Notices
+=================================
+
+Release binding: KaronLabs/ytdlp-korean-interface v2.19.1-karon.2
+Runtime target: x86_64-pc-windows-msvc
+Closure classification: verified-conservative-superset
+
+This corpus intentionally over-includes pinned Cargo.lock/workspace and
+rusty_v8/V8 native sources because the published static library does not expose
+an exact object-to-component link map. It is not an assertion that every listed
+component is linked into deno.exe. It must not be used to claim an overall
+release PASS.
