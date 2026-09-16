@@ -67,7 +67,7 @@ private:
 		thr_qitem_data, thr_queue_remove, thr_ver_deno, thr_releases_deno, thr_updater_deno;
 	ITaskbarList3 *i_taskbar {nullptr};
 	UINT WM_TASKBAR_BUTTON_CREATED {0};
-	const std::string ver_tag {"v2.19.1"}, title {"ytdlp-interface " + ver_tag + "-karon.2"};
+	const std::string ver_tag {"v2.19.1"}, display_ver_tag {"v2.19.1-karon.2"}, title {"ytdlp-interface " + display_ver_tag};
 	const unsigned MINW {900}, MINH {700}; // min client area size
 	nana::drawerbase::listbox::item_proxy *last_selected {nullptr};
 	nana::timer tmsg, tqueue, t_load_qitem_data, t_url_flash;

@@ -116,8 +116,8 @@ void GUI::fm_settings()
 	fm["about"] << about.actual_handle();
 
 	about.div(R"(vert
-		<pnl_header weight=35> <weight=10> <l_about_ver weight=50> <weight=15>
-		<about_sep1 weight=3> <weight=20> <libtitle weight=28> <weight=13>
+		<pnl_header weight=35> <weight=10> <l_about_ver weight=72> <weight=5>
+		<about_sep1 weight=3> <weight=8> <libtitle weight=28> <weight=13>
 		<weight=28 <l_nana> <weight=20> <l_nana_ver>>
 		<weight=28 <l_json> <weight=20> <l_json_ver>>
 		<weight=28 <l_jpeg> <weight=20> <l_jpeg_ver>>
@@ -134,8 +134,17 @@ void GUI::fm_settings()
 		<weight=28 <l_esc> <weight=20> <l_close>>
 	)");
 
-	std::string vertext {ver_tag + " (" + (X64 ? "64-bit)" : "32-bit)") +
-		"\n<color=0x url=\"https://github.com/ErrorFlynn/ytdlp-interface\">https://github.com/ErrorFlynn/ytdlp-interface</>"};
+	std::string vertext {display_ver_tag + " (" + (X64 ? "64-bit)" : "32-bit)") +
+		"\n" + i18n::tr("about.license_summary", "KaronLabs application code is MIT; third-party components have their own licenses.") +
+		"\n" + i18n::tr("about.notices_summary", "See bundled THIRD-PARTY-NOTICES.txt and the corresponding-sources release asset.") +
+		"\n" + i18n::tr("about.source_details_hint", "Click here for exact upstream/source locations.")};
+	std::string source_details {i18n::tr("about.source_details_body",
+		"yt-dlp: https://github.com/yt-dlp/yt-dlp\n"
+		"FFmpeg: https://github.com/FFmpeg/FFmpeg/commit/9258bacca50d7ca28bcb6d797e8952123e35105b\n"
+		"BtbN build scripts: https://github.com/BtbN/FFmpeg-Builds/tree/3e6685eda92f9288c15ac320139622dcedca09a4\n"
+		"bit7z v4.1.0: https://github.com/rikyoz/bit7z/tree/c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742\n"
+		"7-Zip 26.01: https://github.com/ip7z/7zip/tree/8c63d71ff886bda90c86db28466287f977374237\n"
+		"Deno 2.7.14: https://github.com/denoland/deno/tree/2d674b25625bcc367853d00fe86f6e84390f88cb")};
 	std::string about_text {""};
 
 	about_label l_about_ver {about, ""};
@@ -184,6 +193,11 @@ void GUI::fm_settings()
 	about["l_close"] << l_close;
 	about["l_ctrlnum0"] << l_ctrlnum0;
 	about["l_winpos"] << l_winpos;
+
+	l_about_ver.events().click([&]
+	{
+		(widgets::msgbox {fm, i18n::tr("about.source_details_title", "Upstream and source locations")} << source_details)();
+	});
 
 	libtitle.format(true);
 
