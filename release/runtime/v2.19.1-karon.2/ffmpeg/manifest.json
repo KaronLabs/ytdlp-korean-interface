@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "release": "v2.19.1-karon.2",
-  "closureStatus": "incomplete",
+  "closureStatus": "complete",
   "binary": {
     "repository": "BtbN/FFmpeg-Builds",
     "releaseTag": "autobuild-2026-09-15-13-18",
@@ -31,7 +31,11 @@
     "sourceCacheCanonicalArchiveCount": 122,
     "targetBaseImage": "ghcr.io/btbn/ffmpeg-builds/base-win64@sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be",
     "authenticatedTargetImageLogSha256": "FFB2BEC78A50C9DD9203F6EBD4C8EF916B9D8D8A9321E935811652C7F96339BC",
-    "authenticatedBinaryBuildLogSha256": "CAA811263C2165348FA337DC6377C4BDFEC61AC7E7D9838EDAF391EB539F5348"
+    "authenticatedBinaryBuildLogSha256": "CAA811263C2165348FA337DC6377C4BDFEC61AC7E7D9838EDAF391EB539F5348",
+    "baseImageJobId": 104378132452,
+    "crosstoolCommit": "b1a94f65c5187d99037a4e2f57aefbdf995a9677",
+    "gccVersion": "16.2.0",
+    "libgompSource": "gcc-16.2.0/libgomp"
   },
   "sourceSets": {
     "ffmpeg": {
@@ -59,11 +63,22 @@
       "artifactUrl": "https://api.github.com/repos/BtbN/FFmpeg-Builds/actions/artifacts/10396032837/zip",
       "artifactDigest": "sha256:89219a2bad8686b27a2b10907c290fe1ec87088e86869a0c6433d96c6a5832c8",
       "innerTarGzSha256": "F5859AA90C962360FAA4593BFED1618D94C1190CEF720303D996693EEBA7B189",
-      "componentGraphPath": "component-graph.json"
+      "componentGraphPath": "component-graph.json",
+      "componentCount": 122
     },
     "rav1eCrates": {
       "manifestPath": "rav1e-crates.json",
       "componentCount": 270
+    },
+    "toolchain": {
+      "manifestPath": "toolchain-components.json",
+      "componentCount": 12
+    },
+    "licenseCorpus": {
+      "manifestPath": "license-corpus.json",
+      "textRoot": "licenses/extracted",
+      "textObjectCount": 628,
+      "licenseFileReferenceCount": 1258
     }
   },
   "includedPaths": [
@@ -71,8 +86,14 @@
     "component-graph.json",
     "evidence/artifact-10396032837.metadata.json",
     "evidence/asset-565742558.metadata.json",
+    "evidence/crosstool-ng-b1a94f65c5187d99037a4e2f57aefbdf995a9677.commit.json",
     "evidence/evaluated-recipes.txt",
     "evidence/evidence-inventory.json",
+    "evidence/ffmpeg-9258bacca50d7ca28bcb6d797e8952123e35105b.commit.json",
+    "evidence/ffmpeg-source-identity.json",
+    "evidence/ghcr-base-win64-manifest-fetch.failure.json",
+    "evidence/job-104378132452.log",
+    "evidence/job-104378132452.metadata.json",
     "evidence/job-104378764705.log",
     "evidence/job-104378764705.log.initial.stderr.txt",
     "evidence/job-104378764705.metadata.json",
@@ -82,9 +103,12 @@
     "evidence/release-389161663.metadata.json",
     "evidence/resolved-revisions.json",
     "evidence/root-license-fingerprints.json",
+    "evidence/run-34967781095.jobs.json",
     "evidence/run-34967781095.metadata.json",
     "evidence/spdx-commit-main.json",
+    "evidence/toolchain-source-checksums.json",
     "evidence/upstream-license-api-inventory.json",
+    "license-corpus.json",
     "licenses/spdx/Apache-2.0.txt",
     "licenses/spdx/CC0-1.0.txt",
     "licenses/spdx/LGPL-2.1-or-later.txt",
@@ -93,7 +117,8 @@
     "NOTICE.md",
     "provenance-evidence.json",
     "rav1e-crates.json",
-    "source-cache-inventory.json"
+    "source-cache-inventory.json",
+    "toolchain-components.json"
   ],
   "enabledExternalLibraries": [
     {
@@ -325,10 +350,17 @@
       "componentId": "20-zlib"
     }
   ],
-  "unresolvedItems": [
-    "The authenticated target-image log pins base-win64 image digest sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be, but neither the 122-archive download cache nor the retained jobs provide the exact source package set for that image's GCC/libgomp and other toolchain binaries. The final FFmpeg link command includes -lgomp, so toolchain corresponding-source applicability cannot be closed honestly.",
-    "Nineteen cache stage archives contain git submodules or nested source trees. Their bytes and all discovered license files are retained, but an exact per-linked-subcomponent commit, applicability, and license-expression graph has not yet been established for every nested tree; aggregate LicenseRef expressions are used only as fail-closed evidence, not as a closure claim.",
-    "The binary-build log records a release/9.0 branch clone and the packaged git-describe name n9.0.1-30-g9258bacca5, but it does not print a full git rev-parse for the FFmpeg checkout. Commit 9258bacca50d7ca28bcb6d797e8952123e35105b is pinned by the supplied input and source archive, not independently exposed as 40 hex characters in the retained job log."
-  ],
-  "verifiedSourceRecordCount": 358
+  "unresolvedItems": [],
+  "verifiedSourceRecordCount": 407,
+  "closurePolicy": "verified-conservative-superset",
+  "counts": {
+    "directSourceArchives": 3,
+    "btbnCacheArchives": 122,
+    "rav1eCrates": 270,
+    "toolchainSourceArchives": 12,
+    "totalSourceArchives": 407,
+    "licenseTextObjects": 628,
+    "licenseFileReferences": 1258,
+    "nestedSubmoduleArchives": 19
+  }
 }

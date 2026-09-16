@@ -1,0 +1,1566 @@
+﻿2026-09-15T12:21:11.8475388Z Current runner version: '2.337.0'
+2026-09-15T12:21:11.8500119Z ##[group]Runner Image Provisioner
+2026-09-15T12:21:11.8501194Z Hosted Compute Agent
+2026-09-15T12:21:11.8501914Z Version: 20260828.587
+2026-09-15T12:21:11.8502630Z Commit: abac92662cab4cc7352de4f9f9d2e2419aad9c29
+2026-09-15T12:21:11.8503365Z Build Date: 2026-08-28T16:44:25Z
+2026-09-15T12:21:11.8504150Z Worker ID: {8d46ed1e-8de4-4179-b63f-5f2ef2bdf798}
+2026-09-15T12:21:11.8504916Z Azure Region: westus
+2026-09-15T12:21:11.8505577Z ##[endgroup]
+2026-09-15T12:21:11.8507201Z ##[group]Operating System
+2026-09-15T12:21:11.8507855Z Ubuntu
+2026-09-15T12:21:11.8508523Z 24.04.5
+2026-09-15T12:21:11.8509052Z LTS
+2026-09-15T12:21:11.8509606Z ##[endgroup]
+2026-09-15T12:21:11.8510193Z ##[group]Runner Image
+2026-09-15T12:21:11.8511029Z Image: ubuntu-24.04
+2026-09-15T12:21:11.8511749Z Version: 20260907.300.1
+2026-09-15T12:21:11.8513016Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260907.300/images/ubuntu/Ubuntu2404-Readme.md
+2026-09-15T12:21:11.8515018Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260907.300
+2026-09-15T12:21:11.8516001Z ##[endgroup]
+2026-09-15T12:21:11.8519230Z ##[group]GITHUB_TOKEN Permissions
+2026-09-15T12:21:11.8521979Z Actions: write
+2026-09-15T12:21:11.8522701Z ArtifactMetadata: write
+2026-09-15T12:21:11.8523324Z Attestations: write
+2026-09-15T12:21:11.8523995Z Checks: write
+2026-09-15T12:21:11.8524562Z CodeQuality: write
+2026-09-15T12:21:11.8525115Z Contents: write
+2026-09-15T12:21:11.8525749Z CopilotRequests: write
+2026-09-15T12:21:11.8526346Z Deployments: write
+2026-09-15T12:21:11.8526978Z Discussions: write
+2026-09-15T12:21:11.8527565Z Drives: write
+2026-09-15T12:21:11.8528130Z Issues: write
+2026-09-15T12:21:11.8528725Z Metadata: read
+2026-09-15T12:21:11.8529358Z Models: read
+2026-09-15T12:21:11.8529975Z Packages: write
+2026-09-15T12:21:11.8530544Z Pages: write
+2026-09-15T12:21:11.8531327Z PullRequests: write
+2026-09-15T12:21:11.8532009Z RepositoryProjects: write
+2026-09-15T12:21:11.8532653Z SecurityEvents: write
+2026-09-15T12:21:11.8533347Z Statuses: write
+2026-09-15T12:21:11.8533937Z VulnerabilityAlerts: read
+2026-09-15T12:21:11.8534545Z ##[endgroup]
+2026-09-15T12:21:11.8536672Z Secret source: Actions
+2026-09-15T12:21:11.8537602Z Cache mode: write
+2026-09-15T12:21:11.8538640Z Prepare workflow directory
+2026-09-15T12:21:11.8926592Z Prepare all required actions
+2026-09-15T12:21:11.8975952Z Getting action download info
+2026-09-15T12:21:12.2811491Z Download action repository 'actions/checkout@v7' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
+2026-09-15T12:21:12.3973237Z Download action repository 'docker/setup-buildx-action@v4' (SHA:594f3bf4285d9ea8dc53c9a0c9c4092420091003)
+2026-09-15T12:21:12.8974951Z Download action repository 'docker/login-action@v4' (SHA:dbcb813823bdd20940b903addbd779551569679f)
+2026-09-15T12:21:13.3649913Z Download action repository 'docker/build-push-action@v7' (SHA:c3c9e263c25d99ce0380d002d59b67737d91b0dc)
+2026-09-15T12:21:13.8771065Z Download action repository 'BtbN/delete-untagged-ghcr-action@main' (SHA:79f27c09227ba426d0588966adef0717f8dd0424)
+2026-09-15T12:21:14.2316827Z Getting action download info
+2026-09-15T12:21:14.4562765Z Download action repository 'actions/setup-python@v6' (SHA:ece7cb06caefa5fff74198d8649806c4678c61a1)
+2026-09-15T12:21:14.6259903Z Complete job name: Build target base image (ubuntu-latest, win64)
+2026-09-15T12:21:14.7166560Z ##[group]Run df -h && sudo apt-get clean && docker system prune -a -f && sudo rm -rf /opt/ghc /usr/local/.ghcup /usr/local/lib/android && df -h
+2026-09-15T12:21:14.7169696Z [36;1mdf -h && sudo apt-get clean && docker system prune -a -f && sudo rm -rf /opt/ghc /usr/local/.ghcup /usr/local/lib/android && df -h[0m
+2026-09-15T12:21:14.7214540Z shell: /usr/bin/bash -e {0}
+2026-09-15T12:21:14.7215691Z env:
+2026-09-15T12:21:14.7216404Z   DOCKER_BUILDKIT: 1
+2026-09-15T12:21:14.7217201Z ##[endgroup]
+2026-09-15T12:21:14.7461129Z Filesystem      Size  Used Avail Use% Mounted on
+2026-09-15T12:21:14.7463031Z /dev/root       145G   59G   87G  41% /
+2026-09-15T12:21:14.7465031Z tmpfs           7.9G   84K  7.9G   1% /dev/shm
+2026-09-15T12:21:14.7466811Z tmpfs           3.2G 1020K  3.2G   1% /run
+2026-09-15T12:21:14.7468640Z tmpfs           5.0M     0  5.0M   0% /run/lock
+2026-09-15T12:21:14.7470711Z efivarfs        128M   32K  128M   1% /sys/firmware/efi/efivars
+2026-09-15T12:21:14.7473054Z /dev/sda16      881M   64M  756M   8% /boot
+2026-09-15T12:21:14.7474824Z /dev/sda15      105M  6.2M   99M   6% /boot/efi
+2026-09-15T12:21:14.7476677Z tmpfs           1.6G   12K  1.6G   1% /run/user/1001
+2026-09-15T12:21:32.5116455Z Deleted Images:
+2026-09-15T12:21:32.5117034Z untagged: ghcr.io/github/github-mcp-server:latest
+2026-09-15T12:21:32.5118112Z untagged: ghcr.io/github/github-mcp-server@sha256:46cdbbd810faf6f7aed1745ea04057443f5cb9fcadc15c7308add18cf9a83e33
+2026-09-15T12:21:32.5119320Z deleted: sha256:3e165e25be8d461c06268b9fb30e93cf91f791acf7e3889f41b20f4896357dc0
+2026-09-15T12:21:32.5120232Z deleted: sha256:e6795b1026263703aab7615e3710f9506ec5f018544150b68778c93b75375b85
+2026-09-15T12:21:32.5121159Z deleted: sha256:1e1cabb4a65e50fb84bc4612619b0025e4a1d06d5e38699d1e67e5a8e4f333db
+2026-09-15T12:21:32.5122068Z deleted: sha256:86766d6a6e947f4a599c6e23307470f8f75732fc3d143ec1f3260e4406202bee
+2026-09-15T12:21:32.5122930Z deleted: sha256:2944471a0bbdfb4985f84f8d287edb5cd982d1060589e707a6cb0cbe82cdfe89
+2026-09-15T12:21:32.5123928Z deleted: sha256:5e555e7975e2202f21fb93d460d701a340ade876f3afccb70d702f1dc5ab80db
+2026-09-15T12:21:32.5124631Z deleted: sha256:2a080d78a1c5e3615170178f1c6f4c726340da9d5ff2926cb66e2fd97851da9d
+2026-09-15T12:21:32.5125216Z deleted: sha256:af4a114029fbf94a3cf75c5cfaa5e947019cd6faae4b800c9306ac9079363def
+2026-09-15T12:21:32.5125756Z deleted: sha256:c7b875d3de914680ec64ba55be5865955ec595e7370812894ee68a502e2e8391
+2026-09-15T12:21:32.5126304Z deleted: sha256:85d9b4c1ef131ee259952a35027e942f79626303ab143eff7ef00d55201bd06f
+2026-09-15T12:21:32.5126838Z deleted: sha256:492c6420fd79f4cd4e761bec1e74db6044d45adb5b073a82289af68aa3162e3f
+2026-09-15T12:21:32.5127454Z deleted: sha256:14b282df61c0316a80216cec27e753777da93de1d7e062072ef3b517f984fcf1
+2026-09-15T12:21:32.5128035Z deleted: sha256:fdaace00fc3f072b9060f703047b30a2c14d8bde7dbbf31a396802c032923732
+2026-09-15T12:21:32.5128577Z deleted: sha256:7f73eafc455b691b504d4d3c3f3c7be90e135c1d0ba4988b2cac29579cd6b567
+2026-09-15T12:21:32.5129135Z deleted: sha256:32a12b65383df6b6553c8d59f691675ca1980f8cec9c51cce163c3c8f7665a41
+2026-09-15T12:21:32.5129663Z deleted: sha256:5217b01660b515ac25ea055a8bd04a20790c7d6bd6085374b59b9081283911af
+2026-09-15T12:21:32.5130200Z deleted: sha256:7223ea1323e8c1159ec17f07d35acc27bdd1cc2bc3ed425b44ef21dac9915db0
+2026-09-15T12:21:32.5131250Z untagged: ghcr.io/dependabot/dependabot-updater-core:latest
+2026-09-15T12:21:32.5132398Z untagged: ghcr.io/dependabot/dependabot-updater-core@sha256:2fba19978e4b0b2a9829597be4a15fb1fe19878b241e97a9b4d1317692940c45
+2026-09-15T12:21:32.5133156Z deleted: sha256:5c1f9f1da87f5427dd6e2ec5a1ab97d0748fdbafcf57eb9055a943a414b545d8
+2026-09-15T12:21:32.5133947Z deleted: sha256:a658acc81f7c03694e92f11ffe3716ab1e1828fefcd8c38e16b0baf9e7dd855e
+2026-09-15T12:21:32.5134591Z deleted: sha256:3deacaf32289cd96e22b8c126f3b6798c10b13e95573345a6541e0f2e06dbf1a
+2026-09-15T12:21:32.5135238Z deleted: sha256:6de7bde6a77f7425104bebf13d2245e8c979466b5950850850bb2b59e2a446ef
+2026-09-15T12:21:32.5136225Z deleted: sha256:801974b9383c04d0b062eabda4fa89aea90d7f81014a5132bea9ad5af432e63a
+2026-09-15T12:21:32.5136824Z deleted: sha256:f4f67dbe94c5027b91e62a87b484094ec5edf89c6500d22a5db8fa4eec67175c
+2026-09-15T12:21:32.5137614Z deleted: sha256:ca382568e43dbf58df9081d87644fe890c310ca466d7dc521182e9ffbdc7b114
+2026-09-15T12:21:32.5138300Z deleted: sha256:86729f28930c476a1c6e36572c8868f9e040f26ded9dbf3a95280883a792c9ac
+2026-09-15T12:21:32.5139037Z deleted: sha256:0a693f8c5976fbc1ff090ea7c2a54a5956d68ae24bea0bd7398f66ad8037b0a1
+2026-09-15T12:21:32.5139762Z deleted: sha256:52fd024951e481afa63bd5ef23d13c98812d030e58f07f476d5ee729d5be5a99
+2026-09-15T12:21:32.5140322Z deleted: sha256:d4169ad79fb7d65bbcd18dc7612d3535f417ef5d6b352bdece28ca9bd4f5645e
+2026-09-15T12:21:32.5141434Z deleted: sha256:e1f9b984a3f8762d623f4fbbf0b14bdeb4b68aafb0bdaaa89bc6c374e0ce9265
+2026-09-15T12:21:32.5142123Z deleted: sha256:b9a65b3c65ab22d490085bd0bf5490e2409da8748b406870f2463bdc41cd6795
+2026-09-15T12:21:32.5142653Z untagged: ghcr.io/github/gh-aw-mcpg:latest
+2026-09-15T12:21:32.5143309Z untagged: ghcr.io/github/gh-aw-mcpg@sha256:85b940556a8faa4e1fdbef124bfd75f2c4ebd855a10b88a1c3b6f3e97f6f1a53
+2026-09-15T12:21:32.5144100Z deleted: sha256:5f22df3c4a888854cfd7514774684e882b961e11d319d1f4039684ad541d054c
+2026-09-15T12:21:32.5144860Z deleted: sha256:6c37d32d6b128c746188851ba4212d149ce39981c0b766b2d3c447b8490d7a04
+2026-09-15T12:21:32.5145431Z deleted: sha256:3ca287a3624a33e972668a5d6b7700a8c8dc3041aeadb0fcfe3848f38b2f668a
+2026-09-15T12:21:32.5146156Z deleted: sha256:5c67f508406e6a9bf44788025c431b8006e32ed767e703b025caca793dbfedb1
+2026-09-15T12:21:32.5146703Z deleted: sha256:8dd0a643b90751a901f6982738612594e618ba48ea971098e8d4e7468d9cc450
+2026-09-15T12:21:32.5147618Z deleted: sha256:c48e7d23f5f6b9133896e262a510ef3f4288e11d98705c1f52b8cc19fb7af6f8
+2026-09-15T12:21:32.5148620Z deleted: sha256:09df3d36d3df02c2be99898ac9e632f91e02fb8262d715c6c0e25927ed2e5dd6
+2026-09-15T12:21:32.5149299Z deleted: sha256:6ccd0f9257b0a94f3e50f50a9cdc766408da9d5ded13721abdac5fc34f663f49
+2026-09-15T12:21:32.5150027Z deleted: sha256:4b35d13cdd93533c08ba296080135dfc555c64a3a0a4284ac739b93e53ee63f6
+2026-09-15T12:21:32.5150590Z deleted: sha256:70834cf3bba44803e61e4c9d424992d91e06c34dcbfa92d388fc493c51c26e3a
+2026-09-15T12:21:32.5151586Z deleted: sha256:1a597abbdca4511eb22f2e0b00a5d8b6d6129e7669ed56d751b9d1d611d80bfa
+2026-09-15T12:21:32.5152405Z deleted: sha256:d5c28ed9f7e287d23038493d8b2dbea75a712162b907ec2fab74295d6bbf77fc
+2026-09-15T12:21:32.5153200Z untagged: ghcr.io/github/gh-aw-firewall/api-proxy:latest
+2026-09-15T12:21:32.5154157Z untagged: ghcr.io/github/gh-aw-firewall/api-proxy@sha256:6f95e2234dd9bd6333a8ff28ccea7ecf0204acd4a09108723844dbd2bf6268c5
+2026-09-15T12:21:32.5155235Z deleted: sha256:9d8f8fbebb4891599e5e95a55878c77d12c4c321a715acb61dfbb6560b9a55f7
+2026-09-15T12:21:32.5156054Z deleted: sha256:3f6dbad59a0bd4729965d9c16c261d980e14162bf000dbcafe8ed7db2fedff6a
+2026-09-15T12:21:32.5157167Z deleted: sha256:80b79f0f8bc3d5c3cdf69acd5dce576d05f85a637a80a7c3100757747995da79
+2026-09-15T12:21:32.5157919Z deleted: sha256:a53eb6ed7d6102b7a56089598e8984dccdce769642ab8b7483de9b9ad2f9759b
+2026-09-15T12:21:32.5158967Z deleted: sha256:0f25ce44464c0e2c078afd7b11f2b8858d4723083e360476d0492fed5a43c55e
+2026-09-15T12:21:32.5160083Z deleted: sha256:dc9c32836ca3a5bd64bbd358dddf58538bd478e0b1056d9788811fdefe4760dc
+2026-09-15T12:21:32.5161462Z deleted: sha256:78b6d979c4416462cbea914957db2a0d0ffbbf13ebef0396e96f87f6a04c1c83
+2026-09-15T12:21:32.5162565Z deleted: sha256:dafd7f59462c952a062aee22b121678c09db1270c06099a530ffc0e4f15757d5
+2026-09-15T12:21:32.5164405Z deleted: sha256:34447b7d6e1dbe8676ba1a182208e48cb136db5173a7b4e9db844e8cacfabd01
+2026-09-15T12:21:32.5165426Z deleted: sha256:5da802879903f2d623b671bd10f7b817b6f35c8bec8adaebfd89a117e42f5781
+2026-09-15T12:21:32.5166377Z deleted: sha256:a696aa1bb46d54f27a28325e84b65909a50b909fc457649fbc8301a7aca37895
+2026-09-15T12:21:32.5167431Z deleted: sha256:3d64c014648b8444862bc8607a2495744e9a5ed3b0f900a312000966a0c1b848
+2026-09-15T12:21:32.5168617Z deleted: sha256:3cb5ff4e2dd3664e916daf13ba79b8104cae6c95e940f30b22eba2e1c9700055
+2026-09-15T12:21:32.5169596Z deleted: sha256:67ff5491d21a37e76f730c473545e7d4143c28cf7ee18a80d44fd9e21780b860
+2026-09-15T12:21:32.5170394Z untagged: ghcr.io/github/gh-aw-firewall/agent:latest
+2026-09-15T12:21:32.5171681Z untagged: ghcr.io/github/gh-aw-firewall/agent@sha256:f7df036c86575527b61f3f7df91c4412349a12b2a74988d929eafa2999230c98
+2026-09-15T12:21:32.5172852Z deleted: sha256:bd7acdea59363f831eae4896982d7476af675c9d5c281ebc9b739af5fc72f561
+2026-09-15T12:21:32.5173871Z deleted: sha256:835524e93c1a21bb17de1be07498df8d9871fc242bf9e75d990bdc56575672ef
+2026-09-15T12:21:32.5174877Z deleted: sha256:30707983df40fb4ab43c2cc153cdcfea8188eb564e21860b2df0b8126e02d191
+2026-09-15T12:21:32.5176074Z deleted: sha256:89f02a183f5fcabb96e9ffc11f0af77c566e6a25a0c69835a869897ca6fe5e37
+2026-09-15T12:21:32.5177086Z deleted: sha256:a7fb1fe985b36be7d31d4323c87dca4e179fc6ca3c74b5f687ea91a09487c34c
+2026-09-15T12:21:32.5178107Z deleted: sha256:14310bdf1e1c5dbd600be902d4d3aadbf17b69f5f098cf6a78e63b36ea0fe968
+2026-09-15T12:21:32.5179097Z deleted: sha256:a688db3e7bd99824d7a8d208d1bfbbadfe138f7da289ffaa0be99b340d5f7791
+2026-09-15T12:21:32.5179973Z deleted: sha256:bbd6fa1ee3c6cb08bdedaf327da02cffa2de419399df715530156c65c828dd9d
+2026-09-15T12:21:32.5181046Z deleted: sha256:ae5095c15a582692fe26c98943591c570c8e01ecade1fbc1afbeb91fc5b30083
+2026-09-15T12:21:32.5182025Z deleted: sha256:48607de80178970f04b8070234715afcb462d1ebae0e35d7706e90e363fad8f1
+2026-09-15T12:21:32.5183086Z deleted: sha256:e36cc363bb33bde2cb93c5453d4102143425469dbe4235bceb7838c3f3884087
+2026-09-15T12:21:32.5184298Z deleted: sha256:fe127748fc7c38aca97b5d62ea80f1a94d595b1d507034d16c50fa0edf34a3f9
+2026-09-15T12:21:32.5185324Z deleted: sha256:76b449524758f19bbee8ab573533946790535760522180774a52ff4a9ab3ced6
+2026-09-15T12:21:32.5186292Z deleted: sha256:8704049c6b08fb4b480f629085bdcc79048f5cda6f1fadb0f93699371b34bb0d
+2026-09-15T12:21:32.5187275Z deleted: sha256:b612b26fad33bce77de9e47ebdf2b07b5cbe468fa5860b74c1ff635c9194c74a
+2026-09-15T12:21:32.5188264Z deleted: sha256:328120eca40f8b857f0e1a3cd8f3d8fd9bcd5c2c0f4776647796eb37f24a40d7
+2026-09-15T12:21:32.5189192Z deleted: sha256:9d26eb37d23413f641be146794b1b8ecdd9b1fcd9a8f110842c0038f5f440206
+2026-09-15T12:21:32.5190166Z deleted: sha256:c0359c5b6ede84d4a083d06d35ee77f0b338dfb17423771854d007d89953fb3e
+2026-09-15T12:21:32.5191239Z untagged: ghcr.io/github/gh-aw-firewall/squid:latest
+2026-09-15T12:21:32.5192307Z untagged: ghcr.io/github/gh-aw-firewall/squid@sha256:2ce8df3abf3e9b76e9c0cf5863da41f1ab3f89b20ad14b988806ab89e7bf2cd5
+2026-09-15T12:21:32.5193532Z deleted: sha256:ebc9c9e5ccbd12daa23000ec1af4118fe64bc6ac61a25a39552e86f2941ec108
+2026-09-15T12:21:32.5194508Z deleted: sha256:985778c0df7e26510751d7fca1e46b01ec5cd13716dfb4ebaa293b6e617da6ce
+2026-09-15T12:21:32.5195430Z deleted: sha256:801a15b59b64ce9d2896f9e9f9dab7e99be9e94e56ad8e75df7113dbae5d461b
+2026-09-15T12:21:32.5196363Z deleted: sha256:8b7ce8ae5ead69d566b03fa43c47d34fcd3081bb208ef7c4619b82f54d882c1a
+2026-09-15T12:21:32.5197346Z deleted: sha256:a8913d3fe0eda67eda6a098eedb907e803a207157ddf88c54da79d8ac15ce580
+2026-09-15T12:21:32.5198290Z deleted: sha256:34884abbe92863fce933ed7c39c0e045631af0ed86d5cc0dfbdf9fdca426ce3c
+2026-09-15T12:21:32.5198780Z 
+2026-09-15T12:21:32.5199075Z Total reclaimed space: 1.88GB
+2026-09-15T12:21:57.3574177Z Filesystem      Size  Used Avail Use% Mounted on
+2026-09-15T12:21:57.3574832Z /dev/root       145G   42G  103G  29% /
+2026-09-15T12:21:57.3575292Z tmpfs           7.9G   84K  7.9G   1% /dev/shm
+2026-09-15T12:21:57.3575741Z tmpfs           3.2G 1012K  3.2G   1% /run
+2026-09-15T12:21:57.3576184Z tmpfs           5.0M     0  5.0M   0% /run/lock
+2026-09-15T12:21:57.3576770Z efivarfs        128M   32K  128M   1% /sys/firmware/efi/efivars
+2026-09-15T12:21:57.3577170Z /dev/sda16      881M   64M  756M   8% /boot
+2026-09-15T12:21:57.3577518Z /dev/sda15      105M  6.2M   99M   6% /boot/efi
+2026-09-15T12:21:57.3577879Z tmpfs           1.6G   12K  1.6G   1% /run/user/1001
+2026-09-15T12:21:57.3977372Z ##[group]Run actions/checkout@v7
+2026-09-15T12:21:57.3977703Z with:
+2026-09-15T12:21:57.3977926Z   repository: BtbN/FFmpeg-Builds
+2026-09-15T12:21:57.3980422Z   token: ***
+2026-09-15T12:21:57.3980646Z   ssh-strict: true
+2026-09-15T12:21:57.3981033Z   ssh-user: git
+2026-09-15T12:21:57.3981248Z   persist-credentials: true
+2026-09-15T12:21:57.3981488Z   clean: true
+2026-09-15T12:21:57.3981703Z   sparse-checkout-cone-mode: true
+2026-09-15T12:21:57.3981967Z   fetch-depth: 1
+2026-09-15T12:21:57.3982170Z   fetch-tags: false
+2026-09-15T12:21:57.3982377Z   show-progress: true
+2026-09-15T12:21:57.3982582Z   lfs: false
+2026-09-15T12:21:57.3982771Z   submodules: false
+2026-09-15T12:21:57.3983210Z   set-safe-directory: true
+2026-09-15T12:21:57.3983464Z   allow-unsafe-pr-checkout: false
+2026-09-15T12:21:57.3983724Z env:
+2026-09-15T12:21:57.3983909Z   DOCKER_BUILDKIT: 1
+2026-09-15T12:21:57.3984115Z ##[endgroup]
+2026-09-15T12:21:57.5034144Z Syncing repository: BtbN/FFmpeg-Builds
+2026-09-15T12:21:57.5036059Z ##[group]Getting Git version info
+2026-09-15T12:21:57.5036810Z Working directory is '/home/runner/work/FFmpeg-Builds/FFmpeg-Builds'
+2026-09-15T12:21:57.5037792Z [command]/usr/bin/git version
+2026-09-15T12:21:57.5114592Z git version 2.55.0
+2026-09-15T12:21:57.5144463Z ##[endgroup]
+2026-09-15T12:21:57.5156841Z Temporarily overriding HOME='/home/runner/work/_temp/4d6e6e0c-c8fc-4eec-8619-72c42a1e5eae' before making global git config changes
+2026-09-15T12:21:57.5157882Z Adding repository directory to the temporary git global config as a safe directory
+2026-09-15T12:21:57.5163668Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/FFmpeg-Builds/FFmpeg-Builds
+2026-09-15T12:21:57.5216452Z Deleting the contents of '/home/runner/work/FFmpeg-Builds/FFmpeg-Builds'
+2026-09-15T12:21:57.5219983Z ##[group]Determining repository object format
+2026-09-15T12:21:57.5221614Z ##[endgroup]
+2026-09-15T12:21:57.5222340Z ##[group]Initializing the repository
+2026-09-15T12:21:57.5226666Z [command]/usr/bin/git init /home/runner/work/FFmpeg-Builds/FFmpeg-Builds
+2026-09-15T12:21:57.5347270Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-09-15T12:21:57.5348314Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-09-15T12:21:57.5349317Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-09-15T12:21:57.5349988Z hint: call:
+2026-09-15T12:21:57.5350361Z hint:
+2026-09-15T12:21:57.5351080Z hint: 	git config --global init.defaultBranch <name>
+2026-09-15T12:21:57.5351738Z hint:
+2026-09-15T12:21:57.5352234Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-09-15T12:21:57.5353187Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-09-15T12:21:57.5353914Z hint:
+2026-09-15T12:21:57.5354310Z hint: 	git branch -m <name>
+2026-09-15T12:21:57.5354706Z hint:
+2026-09-15T12:21:57.5355329Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-09-15T12:21:57.5366540Z Initialized empty Git repository in /home/runner/work/FFmpeg-Builds/FFmpeg-Builds/.git/
+2026-09-15T12:21:57.5377183Z [command]/usr/bin/git remote add origin https://github.com/BtbN/FFmpeg-Builds
+2026-09-15T12:21:57.5421469Z ##[endgroup]
+2026-09-15T12:21:57.5422196Z ##[group]Disabling automatic garbage collection
+2026-09-15T12:21:57.5428097Z [command]/usr/bin/git config --local gc.auto 0
+2026-09-15T12:21:57.5462705Z ##[endgroup]
+2026-09-15T12:21:57.5463411Z ##[group]Setting up auth
+2026-09-15T12:21:57.5463913Z Removing SSH command configuration
+2026-09-15T12:21:57.5470103Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-09-15T12:21:57.5506357Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-09-15T12:21:57.5862236Z Removing HTTP extra header
+2026-09-15T12:21:57.5867247Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-09-15T12:21:57.5914046Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-09-15T12:21:57.6116176Z Removing includeIf entries pointing to credentials config files
+2026-09-15T12:21:57.6122359Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-09-15T12:21:57.6163140Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-09-15T12:21:57.6379404Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-c3913465-2399-4a7f-8359-24515e475178.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-09-15T12:21:57.6415904Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/FFmpeg-Builds/FFmpeg-Builds/.git.path /home/runner/work/_temp/git-credentials-c3913465-2399-4a7f-8359-24515e475178.config
+2026-09-15T12:21:57.6444457Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/FFmpeg-Builds/FFmpeg-Builds/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-c3913465-2399-4a7f-8359-24515e475178.config
+2026-09-15T12:21:57.6475693Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-c3913465-2399-4a7f-8359-24515e475178.config
+2026-09-15T12:21:57.6504503Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-c3913465-2399-4a7f-8359-24515e475178.config
+2026-09-15T12:21:57.6530113Z ##[endgroup]
+2026-09-15T12:21:57.6530516Z ##[group]Fetching the repository
+2026-09-15T12:21:57.6538452Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +3e6685eda92f9288c15ac320139622dcedca09a4:refs/remotes/origin/master
+2026-09-15T12:21:58.4319201Z From https://github.com/BtbN/FFmpeg-Builds
+2026-09-15T12:21:58.4320050Z  * [new ref]         3e6685eda92f9288c15ac320139622dcedca09a4 -> origin/master
+2026-09-15T12:21:58.4329226Z [command]/usr/bin/git branch --list --remote origin/master
+2026-09-15T12:21:58.4354547Z   origin/master
+2026-09-15T12:21:58.4362853Z [command]/usr/bin/git rev-parse refs/remotes/origin/master
+2026-09-15T12:21:58.4384873Z 3e6685eda92f9288c15ac320139622dcedca09a4
+2026-09-15T12:21:58.4388804Z ##[endgroup]
+2026-09-15T12:21:58.4389229Z ##[group]Determining the checkout info
+2026-09-15T12:21:58.4389811Z ##[endgroup]
+2026-09-15T12:21:58.4394086Z [command]/usr/bin/git sparse-checkout disable
+2026-09-15T12:21:58.4440708Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-09-15T12:21:58.4468466Z ##[group]Checking out the ref
+2026-09-15T12:21:58.4472070Z [command]/usr/bin/git checkout --progress --force -B master refs/remotes/origin/master
+2026-09-15T12:21:58.4630352Z Reset branch 'master'
+2026-09-15T12:21:58.4636977Z branch 'master' set up to track 'origin/master'.
+2026-09-15T12:21:58.4643013Z ##[endgroup]
+2026-09-15T12:21:58.4683276Z [command]/usr/bin/git log -1 --format=%H
+2026-09-15T12:21:58.4706688Z 3e6685eda92f9288c15ac320139622dcedca09a4
+2026-09-15T12:21:58.4862697Z ##[group]Run docker/setup-buildx-action@v4
+2026-09-15T12:21:58.4863011Z with:
+2026-09-15T12:21:58.4863223Z   buildkitd-config: .github/buildkit.toml
+2026-09-15T12:21:58.4863503Z   driver: docker-container
+2026-09-15T12:21:58.4863734Z   use: true
+2026-09-15T12:21:58.4863916Z   keep-state: false
+2026-09-15T12:21:58.4864119Z   cache-binary: true
+2026-09-15T12:21:58.4864329Z   cleanup: true
+2026-09-15T12:21:58.4864536Z env:
+2026-09-15T12:21:58.4864711Z   DOCKER_BUILDKIT: 1
+2026-09-15T12:21:58.4864908Z ##[endgroup]
+2026-09-15T12:21:58.6923516Z ##[group]Docker info
+2026-09-15T12:21:58.6951519Z [command]/usr/bin/docker version
+2026-09-15T12:21:58.7240976Z Client: Docker Engine - Community
+2026-09-15T12:21:58.7241494Z  Version:           28.0.4
+2026-09-15T12:21:58.7241945Z  API version:       1.48
+2026-09-15T12:21:58.7242356Z  Go version:        go1.23.7
+2026-09-15T12:21:58.7242695Z  Git commit:        b8034c0
+2026-09-15T12:21:58.7243127Z  Built:             Tue Mar 25 15:07:16 2025
+2026-09-15T12:21:58.7243564Z  OS/Arch:           linux/amd64
+2026-09-15T12:21:58.7243808Z  Context:           default
+2026-09-15T12:21:58.7243956Z 
+2026-09-15T12:21:58.7244066Z Server: Docker Engine - Community
+2026-09-15T12:21:58.7244307Z  Engine:
+2026-09-15T12:21:58.7244498Z   Version:          28.0.4
+2026-09-15T12:21:58.7244753Z   API version:      1.48 (minimum version 1.24)
+2026-09-15T12:21:58.7245039Z   Go version:       go1.23.7
+2026-09-15T12:21:58.7245630Z   Git commit:       6430e49
+2026-09-15T12:21:58.7245890Z   Built:            Tue Mar 25 15:07:16 2025
+2026-09-15T12:21:58.7246188Z   OS/Arch:          linux/amd64
+2026-09-15T12:21:58.7246428Z   Experimental:     false
+2026-09-15T12:21:58.7246648Z  containerd:
+2026-09-15T12:21:58.7246837Z   Version:          v2.3.4
+2026-09-15T12:21:58.7247118Z   GitCommit:        db8809540e1a7a9da5d518876894933ff55692ab
+2026-09-15T12:21:58.7247420Z  runc:
+2026-09-15T12:21:58.7247605Z   Version:          1.5.1
+2026-09-15T12:21:58.7247840Z   GitCommit:        v1.5.1-0-g8f2685a4
+2026-09-15T12:21:58.7248093Z  docker-init:
+2026-09-15T12:21:58.7248286Z   Version:          0.19.0
+2026-09-15T12:21:58.7248507Z   GitCommit:        de40ad0
+2026-09-15T12:21:58.7297335Z [command]/usr/bin/docker info
+2026-09-15T12:21:58.9862087Z Client: Docker Engine - Community
+2026-09-15T12:21:58.9862827Z  Version:    28.0.4
+2026-09-15T12:21:58.9863293Z  Context:    default
+2026-09-15T12:21:58.9863677Z  Debug Mode: false
+2026-09-15T12:21:58.9864100Z  Plugins:
+2026-09-15T12:21:58.9864491Z   buildx: Docker Buildx (Docker Inc.)
+2026-09-15T12:21:58.9864976Z     Version:  v0.37.0
+2026-09-15T12:21:58.9865484Z     Path:     /usr/libexec/docker/cli-plugins/docker-buildx
+2026-09-15T12:21:58.9866064Z   compose: Docker Compose (Docker Inc.)
+2026-09-15T12:21:58.9866423Z     Version:  v2.38.2
+2026-09-15T12:21:58.9866716Z     Path:     /usr/libexec/docker/cli-plugins/docker-compose
+2026-09-15T12:21:58.9866966Z 
+2026-09-15T12:21:58.9867054Z Server:
+2026-09-15T12:21:58.9867244Z  Containers: 0
+2026-09-15T12:21:58.9867459Z   Running: 0
+2026-09-15T12:21:58.9867655Z   Paused: 0
+2026-09-15T12:21:58.9867839Z   Stopped: 0
+2026-09-15T12:21:58.9868023Z  Images: 0
+2026-09-15T12:21:58.9868215Z  Server Version: 28.0.4
+2026-09-15T12:21:58.9868442Z  Storage Driver: overlay2
+2026-09-15T12:21:58.9868685Z   Backing Filesystem: extfs
+2026-09-15T12:21:58.9868921Z   Supports d_type: true
+2026-09-15T12:21:58.9869141Z   Using metacopy: false
+2026-09-15T12:21:58.9869363Z   Native Overlay Diff: false
+2026-09-15T12:21:58.9869605Z   userxattr: false
+2026-09-15T12:21:58.9869820Z  Logging Driver: json-file
+2026-09-15T12:21:58.9870060Z  Cgroup Driver: systemd
+2026-09-15T12:21:58.9870274Z  Cgroup Version: 2
+2026-09-15T12:21:58.9870473Z  Plugins:
+2026-09-15T12:21:58.9870662Z   Volume: local
+2026-09-15T12:21:58.9871447Z   Network: bridge host ipvlan macvlan null overlay
+2026-09-15T12:21:58.9872176Z   Log: awslogs fluentd gcplogs gelf journald json-file local splunk syslog
+2026-09-15T12:21:58.9872692Z  Swarm: inactive
+2026-09-15T12:21:58.9873300Z  Runtimes: io.containerd.runc.v2 runc
+2026-09-15T12:21:58.9873584Z  Default Runtime: runc
+2026-09-15T12:21:58.9873807Z  Init Binary: docker-init
+2026-09-15T12:21:58.9874106Z  containerd version: db8809540e1a7a9da5d518876894933ff55692ab
+2026-09-15T12:21:58.9874452Z  runc version: v1.5.1-0-g8f2685a4
+2026-09-15T12:21:58.9874702Z  init version: de40ad0
+2026-09-15T12:21:58.9874920Z  Security Options:
+2026-09-15T12:21:58.9875122Z   apparmor
+2026-09-15T12:21:58.9875309Z   seccomp
+2026-09-15T12:21:58.9875506Z    Profile: builtin
+2026-09-15T12:21:58.9875708Z   cgroupns
+2026-09-15T12:21:58.9875903Z  Kernel Version: 6.17.0-1022-azure
+2026-09-15T12:21:58.9876166Z  Operating System: Ubuntu 24.04.5 LTS
+2026-09-15T12:21:58.9876451Z  OSType: linux
+2026-09-15T12:21:58.9876653Z  Architecture: x86_64
+2026-09-15T12:21:58.9876862Z  CPUs: 4
+2026-09-15T12:21:58.9877047Z  Total Memory: 15.61GiB
+2026-09-15T12:21:58.9877263Z  Name: runnervmlun5p
+2026-09-15T12:21:58.9877492Z  ID: a4efb8b6-20f9-46f4-b827-91ac0547be3a
+2026-09-15T12:21:58.9877775Z  Docker Root Dir: /var/lib/docker
+2026-09-15T12:21:58.9878020Z  Debug Mode: false
+2026-09-15T12:21:58.9878226Z  Username: githubactions
+2026-09-15T12:21:58.9878453Z  Experimental: false
+2026-09-15T12:21:58.9878661Z  Insecure Registries:
+2026-09-15T12:21:58.9883114Z   ::1/128
+2026-09-15T12:21:58.9883331Z   127.0.0.0/8
+2026-09-15T12:21:58.9883552Z  Live Restore Enabled: false
+2026-09-15T12:21:58.9883726Z 
+2026-09-15T12:21:58.9901704Z ##[endgroup]
+2026-09-15T12:21:59.0567635Z ##[group]Buildx version
+2026-09-15T12:21:59.0593426Z [command]/usr/bin/docker buildx version
+2026-09-15T12:21:59.1137256Z github.com/docker/buildx v0.37.0 ac30b249211430b85fb8f37b6e7154b5c47ba0b6
+2026-09-15T12:21:59.1174232Z ##[endgroup]
+2026-09-15T12:21:59.1327704Z ##[group]Inspecting default docker context
+2026-09-15T12:21:59.1467139Z [
+2026-09-15T12:21:59.1467444Z   {
+2026-09-15T12:21:59.1467667Z     "Name": "default",
+2026-09-15T12:21:59.1467950Z     "Metadata": {},
+2026-09-15T12:21:59.1468204Z     "Endpoints": {
+2026-09-15T12:21:59.1468468Z       "docker": {
+2026-09-15T12:21:59.1468745Z         "Host": "unix:///var/run/docker.sock",
+2026-09-15T12:21:59.1469106Z         "SkipTLSVerify": false
+2026-09-15T12:21:59.1469400Z       }
+2026-09-15T12:21:59.1469706Z     },
+2026-09-15T12:21:59.1470036Z     "TLSMaterial": {},
+2026-09-15T12:21:59.1470300Z     "Storage": {
+2026-09-15T12:21:59.1470560Z       "MetadataPath": "<IN MEMORY>",
+2026-09-15T12:21:59.1471234Z       "TLSPath": "<IN MEMORY>"
+2026-09-15T12:21:59.1471565Z     }
+2026-09-15T12:21:59.1471881Z   }
+2026-09-15T12:21:59.1472187Z ]
+2026-09-15T12:21:59.1472905Z ##[endgroup]
+2026-09-15T12:21:59.2080564Z ##[group]Pulling BuildKit image(s)
+2026-09-15T12:21:59.2109804Z [command]/usr/bin/docker pull moby/buildkit:buildx-stable-1
+2026-09-15T12:22:00.1041616Z buildx-stable-1: Pulling from moby/buildkit
+2026-09-15T12:22:00.3711709Z e6f31ffc071e: Pulling fs layer
+2026-09-15T12:22:00.3712226Z 58699b5d8a46: Pulling fs layer
+2026-09-15T12:22:00.3712656Z 79330c0ded89: Pulling fs layer
+2026-09-15T12:22:00.3712962Z 524a9b2a3071: Pulling fs layer
+2026-09-15T12:22:00.3713215Z da08d5134795: Pulling fs layer
+2026-09-15T12:22:00.3713458Z c83f748d995d: Pulling fs layer
+2026-09-15T12:22:00.3713698Z 9a6fe4fcb2cb: Pulling fs layer
+2026-09-15T12:22:00.3713928Z da08d5134795: Waiting
+2026-09-15T12:22:00.3714136Z 524a9b2a3071: Waiting
+2026-09-15T12:22:00.3714343Z c83f748d995d: Waiting
+2026-09-15T12:22:00.3714549Z 9a6fe4fcb2cb: Waiting
+2026-09-15T12:22:00.5869675Z 79330c0ded89: Verifying Checksum
+2026-09-15T12:22:00.5870259Z 79330c0ded89: Download complete
+2026-09-15T12:22:00.6130704Z e6f31ffc071e: Download complete
+2026-09-15T12:22:00.6451272Z 58699b5d8a46: Verifying Checksum
+2026-09-15T12:22:00.6451795Z 58699b5d8a46: Download complete
+2026-09-15T12:22:00.7321837Z e6f31ffc071e: Pull complete
+2026-09-15T12:22:00.8128580Z 524a9b2a3071: Verifying Checksum
+2026-09-15T12:22:00.8129088Z 524a9b2a3071: Download complete
+2026-09-15T12:22:00.8559241Z c83f748d995d: Verifying Checksum
+2026-09-15T12:22:00.8561626Z c83f748d995d: Download complete
+2026-09-15T12:22:01.0229510Z 9a6fe4fcb2cb: Verifying Checksum
+2026-09-15T12:22:01.0230163Z 9a6fe4fcb2cb: Download complete
+2026-09-15T12:22:01.0563921Z 58699b5d8a46: Pull complete
+2026-09-15T12:22:01.0786052Z 79330c0ded89: Pull complete
+2026-09-15T12:22:01.0930127Z 524a9b2a3071: Pull complete
+2026-09-15T12:22:01.2639521Z da08d5134795: Verifying Checksum
+2026-09-15T12:22:01.2640273Z da08d5134795: Download complete
+2026-09-15T12:22:02.3759451Z da08d5134795: Pull complete
+2026-09-15T12:22:02.3876634Z c83f748d995d: Pull complete
+2026-09-15T12:22:02.3998154Z 9a6fe4fcb2cb: Pull complete
+2026-09-15T12:22:02.4035837Z Digest: sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8
+2026-09-15T12:22:02.4046510Z Status: Downloaded newer image for moby/buildkit:buildx-stable-1
+2026-09-15T12:22:02.4053370Z docker.io/moby/buildkit:buildx-stable-1
+2026-09-15T12:22:02.4070618Z ##[endgroup]
+2026-09-15T12:22:02.4071485Z ##[group]Creating a new builder instance
+2026-09-15T12:22:02.4813000Z [command]/usr/bin/docker buildx create --name builder-a629543c-67f0-4c7b-9e58-25563bd14450 --driver docker-container --buildkitd-flags --allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host --use --config /home/runner/work/_temp/docker-actions-toolkit-DTRWNP/tmp-2298-CPFuOxt41xHU
+2026-09-15T12:22:02.5418332Z builder-a629543c-67f0-4c7b-9e58-25563bd14450
+2026-09-15T12:22:02.5450322Z ##[endgroup]
+2026-09-15T12:22:02.5451514Z ##[group]Booting builder
+2026-09-15T12:22:02.5495553Z [command]/usr/bin/docker buildx inspect --bootstrap --builder builder-a629543c-67f0-4c7b-9e58-25563bd14450
+2026-09-15T12:22:02.6047154Z #1 [internal] booting buildkit
+2026-09-15T12:22:02.7554589Z #1 pulling image moby/buildkit:buildx-stable-1
+2026-09-15T12:22:03.2177746Z #1 pulling image moby/buildkit:buildx-stable-1 0.6s done
+2026-09-15T12:22:03.3694449Z #1 creating container buildx_buildkit_builder-a629543c-67f0-4c7b-9e58-25563bd144500
+2026-09-15T12:22:03.5181731Z #1 creating container buildx_buildkit_builder-a629543c-67f0-4c7b-9e58-25563bd144500 0.3s done
+2026-09-15T12:22:03.5468532Z #1 DONE 0.9s
+2026-09-15T12:22:03.5760110Z Name:          builder-a629543c-67f0-4c7b-9e58-25563bd14450
+2026-09-15T12:22:03.5764042Z Driver:        docker-container
+2026-09-15T12:22:03.5764764Z Last Activity: 2026-09-15 12:22:02 +0000 UTC
+2026-09-15T12:22:03.5764997Z 
+2026-09-15T12:22:03.5765074Z Nodes:
+2026-09-15T12:22:03.5765343Z Name:                  builder-a629543c-67f0-4c7b-9e58-25563bd144500
+2026-09-15T12:22:03.5765901Z Endpoint:              unix:///var/run/docker.sock
+2026-09-15T12:22:03.5766224Z Status:                running
+2026-09-15T12:22:03.5766749Z BuildKit daemon flags: --allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host
+2026-09-15T12:22:03.5767439Z BuildKit version:      v0.32.2
+2026-09-15T12:22:03.5767774Z Platforms:             linux/amd64, linux/amd64/v2, linux/amd64/v3, linux/386
+2026-09-15T12:22:03.5768263Z Labels:
+2026-09-15T12:22:03.5768539Z  org.mobyproject.buildkit.worker.executor:         oci
+2026-09-15T12:22:03.5768950Z  org.mobyproject.buildkit.worker.hostname:         df0d0a795366
+2026-09-15T12:22:03.5769531Z  org.mobyproject.buildkit.worker.network:          host
+2026-09-15T12:22:03.5769937Z  org.mobyproject.buildkit.worker.oci.process-mode: sandbox
+2026-09-15T12:22:03.5770387Z  org.mobyproject.buildkit.worker.selinux.enabled:  false
+2026-09-15T12:22:03.5771027Z  org.mobyproject.buildkit.worker.snapshotter:      overlayfs
+2026-09-15T12:22:03.5771374Z GC Policy rule#0:
+2026-09-15T12:22:03.5771726Z  All:            false
+2026-09-15T12:22:03.5772148Z  Filters:        type==source.local type==exec.cachemount type==source.git.checkout
+2026-09-15T12:22:03.5772553Z  Keep Duration:  48h0m0s
+2026-09-15T12:22:03.5772834Z  Max Used Space: 488.3MiB
+2026-09-15T12:22:03.5773149Z GC Policy rule#1:
+2026-09-15T12:22:03.5773348Z  All:            false
+2026-09-15T12:22:03.5773568Z  Keep Duration:  1440h0m0s
+2026-09-15T12:22:03.5773796Z  Reserved Space: 9.313GiB
+2026-09-15T12:22:03.5774622Z  Max Used Space: 93.13GiB
+2026-09-15T12:22:03.5775022Z  Min Free Space: 27.01GiB
+2026-09-15T12:22:03.5775398Z GC Policy rule#2:
+2026-09-15T12:22:03.5775708Z  All:            false
+2026-09-15T12:22:03.5776032Z  Reserved Space: 9.313GiB
+2026-09-15T12:22:03.5776390Z  Max Used Space: 93.13GiB
+2026-09-15T12:22:03.5776734Z  Min Free Space: 27.01GiB
+2026-09-15T12:22:03.5777060Z GC Policy rule#3:
+2026-09-15T12:22:03.5777359Z  All:            true
+2026-09-15T12:22:03.5777772Z  Reserved Space: 9.313GiB
+2026-09-15T12:22:03.5778049Z  Max Used Space: 93.13GiB
+2026-09-15T12:22:03.5778278Z  Min Free Space: 27.01GiB
+2026-09-15T12:22:03.5778510Z File#buildkitd.toml:
+2026-09-15T12:22:03.5778863Z  > [worker]
+2026-09-15T12:22:03.5779078Z  > [worker.oci]
+2026-09-15T12:22:03.5779286Z  > max-parallelism = 2
+2026-09-15T12:22:03.5779499Z  > 
+2026-09-15T12:22:03.5779713Z File#provenance.d/github_actions_context.json:
+2026-09-15T12:22:03.5819419Z  > {"github_actor":"BtbN","github_actor_id":"294293","github_event_name":"schedule","github_event_payload":{"repository":{"allow_forking":true,"archive_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/{archive_format}{/ref}","archived":false,"assignees_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/assignees{/user}","blobs_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/git/blobs{/sha}","branches_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/branches{/branch}","clone_url":"https://github.com/BtbN/FFmpeg-Builds.git","collaborators_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/collaborators{/collaborator}","comments_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/comments{/number}","commits_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/commits{/sha}","compare_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/compare/{base}...{head}","contents_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/contents/{+path}","contributors_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/contributors","created_at":"2020-09-01T19:19:40Z","default_branch":"master","deployments_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/deployments","description":null,"disabled":false,"downloads_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/downloads","events_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/events","fork":false,"forks":1530,"forks_count":1530,"forks_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/forks","full_name":"BtbN/FFmpeg-Builds","git_commits_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/git/commits{/sha}","git_refs_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/git/refs{/sha}","git_tags_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/git/tags{/sha}","git_url":"git://github.com/BtbN/FFmpeg-Builds.git","has_discussions":false,"has_downloads":false,"has_issues":true,"has_pages":false,"has_projects":false,"has_pull_requests":true,"has_wiki":true,"homepage":null,"hooks_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/hooks","html_url":"https://github.com/BtbN/FFmpeg-Builds","id":292087234,"is_template":false,"issue_comment_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/issues/comments{/number}","issue_events_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/issues/events{/number}","issues_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/issues{/number}","keys_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/keys{/key_id}","labels_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/labels{/name}","language":"Shell","languages_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/languages","license":{"key":"mit","name":"MIT License","node_id":"MDc6TGljZW5zZTEz","spdx_id":"MIT","url":"https://api.github.com/licenses/mit"},"merges_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/merges","milestones_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/milestones{/number}","mirror_url":null,"name":"FFmpeg-Builds","node_id":"MDEwOlJlcG9zaXRvcnkyOTIwODcyMzQ=","notifications_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/notifications{?since,all,participating}","open_issues":27,"open_issues_count":27,"owner":{"avatar_url":"https://avatars.githubusercontent.com/u/294293?v=4","events_url":"https://api.github.com/users/BtbN/events{/privacy}","followers_url":"https://api.github.com/users/BtbN/followers","following_url":"https://api.github.com/users/BtbN/following{/other_user}","gists_url":"https://api.github.com/users/BtbN/gists{/gist_id}","gravatar_id":"","html_url":"https://github.com/BtbN","id":294293,"login":"BtbN","node_id":"MDQ6VXNlcjI5NDI5Mw==","organizations_url":"https://api.github.com/users/BtbN/orgs","received_events_url":"https://api.github.com/users/BtbN/received_events","repos_url":"https://api.github.com/users/BtbN/repos","site_admin":false,"starred_url":"https://api.github.com/users/BtbN/starred{/owner}{/repo}","subscriptions_url":"https://api.github.com/users/BtbN/subscriptions","type":"User","url":"https://api.github.com/users/BtbN","user_view_type":"public"},"private":false,"pull_request_creation_policy":"all","pulls_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/pulls{/number}","pushed_at":"2026-09-14T13:38:48Z","releases_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/releases{/id}","size":1673,"ssh_url":"git@github.com:BtbN/FFmpeg-Builds.git","stargazers_count":11670,"stargazers_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/stargazers","statuses_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/statuses/{sha}","subscribers_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/subscribers","subscription_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/subscription","svn_url":"https://github.com/BtbN/FFmpeg-Builds","tags_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/tags","teams_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/teams","topics":[],"trees_url":"https://api.github.com/repos/BtbN/FFmpeg-Builds/git/trees{/sha}","updated_at":"2026-09-15T09:28:21Z","url":"https://api.github.com/repos/BtbN/FFmpeg-Builds","visibility":"public","watchers":11670,"watchers_count":11670,"web_commit_signoff_required":false},"schedule":"0 12 * * *","workflow":".github/workflows/build.yml"},"github_job":"build_target_bases","github_ref":"refs/heads/master","github_ref_name":"master","github_ref_protected":"false","github_ref_type":"branch","github_repository":"BtbN/FFmpeg-Builds","github_repository_id":"292087234","github_repository_owner":"BtbN","github_repository_owner_id":"294293","github_run_attempt":"1","github_run_id":"34967781095","github_run_number":"3118","github_runner_arch":"X64","github_runner_environment":"github-hosted","github_runner_image_os":"ubuntu24","github_runner_image_version":"20260907.300.1","github_runner_name":"GitHub Actions 1000086420","github_runner_os":"Linux","github_runner_tracking_id":"github_6bccc0fd-31b5-4771-8c6b-9547ea0d4d21","github_server_url":"https://github.com","github_triggering_actor":"BtbN","github_workflow":"Build FFmpeg","github_workflow_ref":"BtbN/FFmpeg-Builds/.github/workflows/build.yml@refs/heads/master","github_workflow_sha":"3e6685eda92f9288c15ac320139622dcedca09a4"}
+2026-09-15T12:22:03.5860110Z ##[endgroup]
+2026-09-15T12:22:03.6687134Z ##[group]Inspect builder
+2026-09-15T12:22:03.6689383Z {
+2026-09-15T12:22:03.6689770Z   "nodes": [
+2026-09-15T12:22:03.6690108Z     {
+2026-09-15T12:22:03.6690587Z       "name": "builder-a629543c-67f0-4c7b-9e58-25563bd144500",
+2026-09-15T12:22:03.6691803Z       "endpoint": "unix:///var/run/docker.sock",
+2026-09-15T12:22:03.6692682Z       "status": "running",
+2026-09-15T12:22:03.6693995Z       "buildkitd-flags": "--allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host",
+2026-09-15T12:22:03.6695372Z       "buildkit": "v0.32.2",
+2026-09-15T12:22:03.6696221Z       "platforms": "linux/amd64,linux/amd64/v2,linux/amd64/v3,linux/386",
+2026-09-15T12:22:03.6697083Z       "features": {
+2026-09-15T12:22:03.6697750Z         "Automatically load images to the Docker Engine image store": true,
+2026-09-15T12:22:03.6698551Z         "Cache export": true,
+2026-09-15T12:22:03.6699166Z         "Direct push": true,
+2026-09-15T12:22:03.6700080Z         "Docker exporter": true,
+2026-09-15T12:22:03.6701388Z         "Multi-platform build": true,
+2026-09-15T12:22:03.6702257Z         "OCI exporter": true
+2026-09-15T12:22:03.6702763Z       },
+2026-09-15T12:22:03.6703190Z       "labels": {
+2026-09-15T12:22:03.6703888Z         "org.mobyproject.buildkit.worker.executor": "oci",
+2026-09-15T12:22:03.6704849Z         "org.mobyproject.buildkit.worker.hostname": "df0d0a795366",
+2026-09-15T12:22:03.6705700Z         "org.mobyproject.buildkit.worker.network": "host",
+2026-09-15T12:22:03.6706809Z         "org.mobyproject.buildkit.worker.oci.process-mode": "sandbox",
+2026-09-15T12:22:03.6707937Z         "org.mobyproject.buildkit.worker.selinux.enabled": "false",
+2026-09-15T12:22:03.6708947Z         "org.mobyproject.buildkit.worker.snapshotter": "overlayfs"
+2026-09-15T12:22:03.6709791Z       },
+2026-09-15T12:22:03.6710316Z       "gcPolicy": [
+2026-09-15T12:22:03.6711109Z         {
+2026-09-15T12:22:03.6711591Z           "all": false,
+2026-09-15T12:22:03.6712149Z           "filter": [
+2026-09-15T12:22:03.6712885Z             "type==source.local type==exec.cachemount type==source.git.checkout"
+2026-09-15T12:22:03.6713966Z           ],
+2026-09-15T12:22:03.6714529Z           "keepDuration": "48h0m0s",
+2026-09-15T12:22:03.6715206Z           "maxUsedSpace": "488.3MiB"
+2026-09-15T12:22:03.6715811Z         },
+2026-09-15T12:22:03.6716350Z         {
+2026-09-15T12:22:03.6716872Z           "all": false,
+2026-09-15T12:22:03.6717458Z           "keepDuration": "1440h0m0s",
+2026-09-15T12:22:03.6718563Z           "reservedSpace": "9.313GiB",
+2026-09-15T12:22:03.6719261Z           "maxUsedSpace": "93.13GiB",
+2026-09-15T12:22:03.6719938Z           "minFreeSpace": "27.01GiB"
+2026-09-15T12:22:03.6720593Z         },
+2026-09-15T12:22:03.6721333Z         {
+2026-09-15T12:22:03.6721565Z           "all": false,
+2026-09-15T12:22:03.6721846Z           "reservedSpace": "9.313GiB",
+2026-09-15T12:22:03.6722149Z           "maxUsedSpace": "93.13GiB",
+2026-09-15T12:22:03.6722439Z           "minFreeSpace": "27.01GiB"
+2026-09-15T12:22:03.6722703Z         },
+2026-09-15T12:22:03.6722902Z         {
+2026-09-15T12:22:03.6723078Z           "all": true,
+2026-09-15T12:22:03.6723321Z           "reservedSpace": "9.313GiB",
+2026-09-15T12:22:03.6723622Z           "maxUsedSpace": "93.13GiB",
+2026-09-15T12:22:03.6723932Z           "minFreeSpace": "27.01GiB"
+2026-09-15T12:22:03.6724205Z         }
+2026-09-15T12:22:03.6724408Z       ],
+2026-09-15T12:22:03.6724618Z       "files": {
+2026-09-15T12:22:03.6724988Z         "buildkitd.toml": "[worker]\n[worker.oci]\nmax-parallelism = 2\n"
+2026-09-15T12:22:03.6725411Z       }
+2026-09-15T12:22:03.6725590Z     }
+2026-09-15T12:22:03.6725775Z   ],
+2026-09-15T12:22:03.6726034Z   "name": "builder-a629543c-67f0-4c7b-9e58-25563bd14450",
+2026-09-15T12:22:03.6726377Z   "driver": "docker-container",
+2026-09-15T12:22:03.6726655Z   "lastActivity": "2026-09-15T12:22:02.000Z"
+2026-09-15T12:22:03.6726933Z }
+2026-09-15T12:22:03.6727352Z ##[endgroup]
+2026-09-15T12:22:03.6727716Z ##[group]BuildKit version
+2026-09-15T12:22:03.6728041Z builder-a629543c-67f0-4c7b-9e58-25563bd144500: v0.32.2
+2026-09-15T12:22:03.6728502Z ##[endgroup]
+2026-09-15T12:22:03.6842743Z ##[group]Run docker/login-action@v4
+2026-09-15T12:22:03.6843031Z with:
+2026-09-15T12:22:03.6843220Z   registry: ghcr.io
+2026-09-15T12:22:03.6843429Z   username: BtbN
+2026-09-15T12:22:03.6845946Z   password: ***
+2026-09-15T12:22:03.6846166Z   logout: true
+2026-09-15T12:22:03.6846356Z env:
+2026-09-15T12:22:03.6846546Z   DOCKER_BUILDKIT: 1
+2026-09-15T12:22:03.6846753Z ##[endgroup]
+2026-09-15T12:22:03.8884598Z Logging into ghcr.io...
+2026-09-15T12:22:04.3259078Z Login Succeeded!
+2026-09-15T12:22:04.3408271Z ##[group]Run IMG="${GITHUB_REPOSITORY,,}/base-win64"
+2026-09-15T12:22:04.3408705Z [36;1mIMG="${GITHUB_REPOSITORY,,}/base-win64"[0m
+2026-09-15T12:22:04.3409019Z [36;1mIMG="${IMG// /-}"[0m
+2026-09-15T12:22:04.3409308Z [36;1mecho "name=ghcr.io/${IMG}" >> $GITHUB_OUTPUT[0m
+2026-09-15T12:22:04.3409658Z [36;1mecho "rawname=${IMG#*/}" >> $GITHUB_OUTPUT[0m
+2026-09-15T12:22:04.3410019Z [36;1mecho "gh_repo=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT[0m
+2026-09-15T12:22:04.3443740Z shell: /usr/bin/bash -e {0}
+2026-09-15T12:22:04.3443990Z env:
+2026-09-15T12:22:04.3444193Z   DOCKER_BUILDKIT: 1
+2026-09-15T12:22:04.3444411Z ##[endgroup]
+2026-09-15T12:22:04.3543077Z ##[group]Run T="$(echo -n *** | sha256sum | head -c 64)" && echo -e "::add-mask::${T}\n::stop-commands::${T}"
+2026-09-15T12:22:04.3546027Z [36;1mT="$(echo -n *** | sha256sum | head -c 64)" && echo -e "::add-mask::${T}\n::stop-commands::${T}"[0m
+2026-09-15T12:22:04.3575833Z shell: /usr/bin/bash -e {0}
+2026-09-15T12:22:04.3576078Z env:
+2026-09-15T12:22:04.3576270Z   DOCKER_BUILDKIT: 1
+2026-09-15T12:22:04.3576487Z ##[endgroup]
+2026-09-15T12:22:04.3656728Z ::stop-commands::***
+2026-09-15T12:22:04.3748359Z ##[group]Run docker/build-push-action@v7
+2026-09-15T12:22:04.3748672Z with:
+2026-09-15T12:22:04.3748876Z   context: images/base-win64
+2026-09-15T12:22:04.3749113Z   pull: true
+2026-09-15T12:22:04.3749303Z   push: true
+2026-09-15T12:22:04.3749491Z   provenance: false
+2026-09-15T12:22:04.3749749Z   tags: ghcr.io/btbn/ffmpeg-builds/base-win64:latest
+2026-09-15T12:22:04.3750193Z   cache-to: type=registry,mode=max,ref=ghcr.io/btbn/ffmpeg-builds/base-win64:cache
+2026-09-15T12:22:04.3750704Z   cache-from: type=registry,ref=ghcr.io/btbn/ffmpeg-builds/base-win64:cache
+2026-09-15T12:22:04.3751483Z   build-args: GH_REPO=ghcr.io/btbn/ffmpeg-builds
+BASE_TAG_SUFFIX=
+
+2026-09-15T12:22:04.3752025Z   load: false
+2026-09-15T12:22:04.3752221Z   no-cache: false
+2026-09-15T12:22:04.3754632Z   github-token: ***
+2026-09-15T12:22:04.3754839Z env:
+2026-09-15T12:22:04.3755030Z   DOCKER_BUILDKIT: 1
+2026-09-15T12:22:04.3755239Z ##[endgroup]
+2026-09-15T12:22:04.6318583Z ##[group]GitHub Actions runtime token ACs
+2026-09-15T12:22:04.6326218Z refs/heads/master: read/write
+2026-09-15T12:22:04.6327195Z ##[endgroup]
+2026-09-15T12:22:04.6327813Z ##[group]Docker info
+2026-09-15T12:22:04.6368982Z [command]/usr/bin/docker version
+2026-09-15T12:22:04.6565611Z Client: Docker Engine - Community
+2026-09-15T12:22:04.6566000Z  Version:           28.0.4
+2026-09-15T12:22:04.6566255Z  API version:       1.48
+2026-09-15T12:22:04.6566639Z  Go version:        go1.23.7
+2026-09-15T12:22:04.6566885Z  Git commit:        b8034c0
+2026-09-15T12:22:04.6567180Z  Built:             Tue Mar 25 15:07:16 2025
+2026-09-15T12:22:04.6567513Z  OS/Arch:           linux/amd64
+2026-09-15T12:22:04.6567766Z  Context:           default
+2026-09-15T12:22:04.6567979Z 
+2026-09-15T12:22:04.6569301Z Server: Docker Engine - Community
+2026-09-15T12:22:04.6569573Z  Engine:
+2026-09-15T12:22:04.6569770Z   Version:          28.0.4
+2026-09-15T12:22:04.6570037Z   API version:      1.48 (minimum version 1.24)
+2026-09-15T12:22:04.6570356Z   Go version:       go1.23.7
+2026-09-15T12:22:04.6570609Z   Git commit:       6430e49
+2026-09-15T12:22:04.6571153Z   Built:            Tue Mar 25 15:07:16 2025
+2026-09-15T12:22:04.6571432Z   OS/Arch:          linux/amd64
+2026-09-15T12:22:04.6571673Z   Experimental:     false
+2026-09-15T12:22:04.6571908Z  containerd:
+2026-09-15T12:22:04.6572114Z   Version:          v2.3.4
+2026-09-15T12:22:04.6572399Z   GitCommit:        db8809540e1a7a9da5d518876894933ff55692ab
+2026-09-15T12:22:04.6572715Z  runc:
+2026-09-15T12:22:04.6572903Z   Version:          1.5.1
+2026-09-15T12:22:04.6573136Z   GitCommit:        v1.5.1-0-g8f2685a4
+2026-09-15T12:22:04.6573401Z  docker-init:
+2026-09-15T12:22:04.6573601Z   Version:          0.19.0
+2026-09-15T12:22:04.6573847Z   GitCommit:        de40ad0
+2026-09-15T12:22:04.6613814Z [command]/usr/bin/docker info
+2026-09-15T12:22:04.7048077Z Client: Docker Engine - Community
+2026-09-15T12:22:04.7048661Z  Version:    28.0.4
+2026-09-15T12:22:04.7060141Z  Context:    default
+2026-09-15T12:22:04.7060639Z  Debug Mode: false
+2026-09-15T12:22:04.7061408Z  Plugins:
+2026-09-15T12:22:04.7061784Z   buildx: Docker Buildx (Docker Inc.)
+2026-09-15T12:22:04.7062202Z     Version:  v0.37.0
+2026-09-15T12:22:04.7062626Z     Path:     /usr/libexec/docker/cli-plugins/docker-buildx
+2026-09-15T12:22:04.7063120Z   compose: Docker Compose (Docker Inc.)
+2026-09-15T12:22:04.7063537Z     Version:  v2.38.2
+2026-09-15T12:22:04.7063951Z     Path:     /usr/libexec/docker/cli-plugins/docker-compose
+2026-09-15T12:22:04.7064331Z 
+2026-09-15T12:22:04.7064538Z Server:
+2026-09-15T12:22:04.7064869Z  Containers: 1
+2026-09-15T12:22:04.7065201Z   Running: 1
+2026-09-15T12:22:04.7065520Z   Paused: 0
+2026-09-15T12:22:04.7065838Z   Stopped: 0
+2026-09-15T12:22:04.7066165Z  Images: 1
+2026-09-15T12:22:04.7066483Z  Server Version: 28.0.4
+2026-09-15T12:22:04.7066843Z  Storage Driver: overlay2
+2026-09-15T12:22:04.7067213Z   Backing Filesystem: extfs
+2026-09-15T12:22:04.7068620Z   Supports d_type: true
+2026-09-15T12:22:04.7069057Z   Using metacopy: false
+2026-09-15T12:22:04.7069801Z   Native Overlay Diff: false
+2026-09-15T12:22:04.7070214Z   userxattr: false
+2026-09-15T12:22:04.7070575Z  Logging Driver: json-file
+2026-09-15T12:22:04.7071317Z  Cgroup Driver: systemd
+2026-09-15T12:22:04.7072043Z  Cgroup Version: 2
+2026-09-15T12:22:04.7072540Z  Plugins:
+2026-09-15T12:22:04.7073032Z   Volume: local
+2026-09-15T12:22:04.7073729Z   Network: bridge host ipvlan macvlan null overlay
+2026-09-15T12:22:04.7074642Z   Log: awslogs fluentd gcplogs gelf journald json-file local splunk syslog
+2026-09-15T12:22:04.7075469Z  Swarm: inactive
+2026-09-15T12:22:04.7076041Z  Runtimes: io.containerd.runc.v2 runc
+2026-09-15T12:22:04.7076686Z  Default Runtime: runc
+2026-09-15T12:22:04.7077266Z  Init Binary: docker-init
+2026-09-15T12:22:04.7078295Z  containerd version: db8809540e1a7a9da5d518876894933ff55692ab
+2026-09-15T12:22:04.7079051Z  runc version: v1.5.1-0-g8f2685a4
+2026-09-15T12:22:04.7079655Z  init version: de40ad0
+2026-09-15T12:22:04.7080217Z  Security Options:
+2026-09-15T12:22:04.7080625Z   apparmor
+2026-09-15T12:22:04.7081517Z   seccomp
+2026-09-15T12:22:04.7081885Z    Profile: builtin
+2026-09-15T12:22:04.7082221Z   cgroupns
+2026-09-15T12:22:04.7082549Z  Kernel Version: 6.17.0-1022-azure
+2026-09-15T12:22:04.7082903Z  Operating System: Ubuntu 24.04.5 LTS
+2026-09-15T12:22:04.7083169Z  OSType: linux
+2026-09-15T12:22:04.7083371Z  Architecture: x86_64
+2026-09-15T12:22:04.7083575Z  CPUs: 4
+2026-09-15T12:22:04.7083759Z  Total Memory: 15.61GiB
+2026-09-15T12:22:04.7083971Z  Name: runnervmlun5p
+2026-09-15T12:22:04.7084204Z  ID: a4efb8b6-20f9-46f4-b827-91ac0547be3a
+2026-09-15T12:22:04.7084489Z  Docker Root Dir: /var/lib/docker
+2026-09-15T12:22:04.7084730Z  Debug Mode: false
+2026-09-15T12:22:04.7084935Z  Username: githubactions
+2026-09-15T12:22:04.7085244Z  Experimental: false
+2026-09-15T12:22:04.7085606Z  Insecure Registries:
+2026-09-15T12:22:04.7085850Z   ::1/128
+2026-09-15T12:22:04.7086032Z   127.0.0.0/8
+2026-09-15T12:22:04.7086231Z  Live Restore Enabled: false
+2026-09-15T12:22:04.7086380Z 
+2026-09-15T12:22:04.7086706Z ##[endgroup]
+2026-09-15T12:22:04.7087057Z ##[group]Proxy configuration
+2026-09-15T12:22:04.7087296Z No proxy configuration found
+2026-09-15T12:22:04.7087643Z ##[endgroup]
+2026-09-15T12:22:04.7723724Z ##[group]Buildx version
+2026-09-15T12:22:04.7755800Z [command]/usr/bin/docker buildx version
+2026-09-15T12:22:04.8230098Z github.com/docker/buildx v0.37.0 ac30b249211430b85fb8f37b6e7154b5c47ba0b6
+2026-09-15T12:22:04.8261968Z ##[endgroup]
+2026-09-15T12:22:04.8262695Z ##[group]Builder info
+2026-09-15T12:22:04.9139199Z {
+2026-09-15T12:22:04.9139586Z   "nodes": [
+2026-09-15T12:22:04.9139919Z     {
+2026-09-15T12:22:04.9140352Z       "name": "builder-a629543c-67f0-4c7b-9e58-25563bd144500",
+2026-09-15T12:22:04.9141262Z       "endpoint": "unix:///var/run/docker.sock",
+2026-09-15T12:22:04.9141796Z       "status": "running",
+2026-09-15T12:22:04.9142700Z       "buildkitd-flags": "--allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host",
+2026-09-15T12:22:04.9143655Z       "buildkit": "v0.32.2",
+2026-09-15T12:22:04.9144257Z       "platforms": "linux/amd64,linux/amd64/v2,linux/amd64/v3,linux/386",
+2026-09-15T12:22:04.9144860Z       "features": {
+2026-09-15T12:22:04.9145381Z         "Automatically load images to the Docker Engine image store": true,
+2026-09-15T12:22:04.9146012Z         "Cache export": true,
+2026-09-15T12:22:04.9146420Z         "Direct push": true,
+2026-09-15T12:22:04.9146822Z         "Docker exporter": true,
+2026-09-15T12:22:04.9147247Z         "Multi-platform build": true,
+2026-09-15T12:22:04.9147685Z         "OCI exporter": true
+2026-09-15T12:22:04.9148053Z       },
+2026-09-15T12:22:04.9148351Z       "labels": {
+2026-09-15T12:22:04.9148795Z         "org.mobyproject.buildkit.worker.executor": "oci",
+2026-09-15T12:22:04.9149486Z         "org.mobyproject.buildkit.worker.hostname": "df0d0a795366",
+2026-09-15T12:22:04.9150158Z         "org.mobyproject.buildkit.worker.network": "host",
+2026-09-15T12:22:04.9151359Z         "org.mobyproject.buildkit.worker.oci.process-mode": "sandbox",
+2026-09-15T12:22:04.9152318Z         "org.mobyproject.buildkit.worker.selinux.enabled": "false",
+2026-09-15T12:22:04.9152797Z         "org.mobyproject.buildkit.worker.snapshotter": "overlayfs"
+2026-09-15T12:22:04.9153135Z       },
+2026-09-15T12:22:04.9153316Z       "gcPolicy": [
+2026-09-15T12:22:04.9153519Z         {
+2026-09-15T12:22:04.9153706Z           "all": false,
+2026-09-15T12:22:04.9153922Z           "filter": [
+2026-09-15T12:22:04.9154244Z             "type==source.local type==exec.cachemount type==source.git.checkout"
+2026-09-15T12:22:04.9154619Z           ],
+2026-09-15T12:22:04.9154822Z           "keepDuration": "48h0m0s",
+2026-09-15T12:22:04.9155081Z           "maxUsedSpace": "488.3MiB"
+2026-09-15T12:22:04.9155454Z         },
+2026-09-15T12:22:04.9155627Z         {
+2026-09-15T12:22:04.9155801Z           "all": false,
+2026-09-15T12:22:04.9156030Z           "keepDuration": "1440h0m0s",
+2026-09-15T12:22:04.9156290Z           "reservedSpace": "9.313GiB",
+2026-09-15T12:22:04.9156549Z           "maxUsedSpace": "93.13GiB",
+2026-09-15T12:22:04.9156802Z           "minFreeSpace": "27.01GiB"
+2026-09-15T12:22:04.9157039Z         },
+2026-09-15T12:22:04.9157215Z         {
+2026-09-15T12:22:04.9157392Z           "all": false,
+2026-09-15T12:22:04.9157619Z           "reservedSpace": "9.313GiB",
+2026-09-15T12:22:04.9157872Z           "maxUsedSpace": "93.13GiB",
+2026-09-15T12:22:04.9158122Z           "minFreeSpace": "27.01GiB"
+2026-09-15T12:22:04.9158354Z         },
+2026-09-15T12:22:04.9158521Z         {
+2026-09-15T12:22:04.9158697Z           "all": true,
+2026-09-15T12:22:04.9158919Z           "reservedSpace": "9.313GiB",
+2026-09-15T12:22:04.9159272Z           "maxUsedSpace": "93.13GiB",
+2026-09-15T12:22:04.9159735Z           "minFreeSpace": "27.01GiB"
+2026-09-15T12:22:04.9160143Z         }
+2026-09-15T12:22:04.9160431Z       ],
+2026-09-15T12:22:04.9160722Z       "files": {
+2026-09-15T12:22:04.9161419Z         "buildkitd.toml": "[worker]\n[worker.oci]\nmax-parallelism = 2\n"
+2026-09-15T12:22:04.9162023Z       }
+2026-09-15T12:22:04.9162317Z     }
+2026-09-15T12:22:04.9162598Z   ],
+2026-09-15T12:22:04.9162983Z   "name": "builder-a629543c-67f0-4c7b-9e58-25563bd14450",
+2026-09-15T12:22:04.9163522Z   "driver": "docker-container",
+2026-09-15T12:22:04.9163802Z   "lastActivity": "2026-09-15T12:22:02.000Z"
+2026-09-15T12:22:04.9164064Z }
+2026-09-15T12:22:04.9164494Z ##[endgroup]
+2026-09-15T12:22:04.9760465Z [command]/usr/bin/docker buildx build --build-arg GH_REPO=ghcr.io/btbn/ffmpeg-builds --build-arg BASE_TAG_SUFFIX= --cache-from type=registry,ref=ghcr.io/btbn/ffmpeg-builds/base-win64:cache --cache-to type=registry,mode=max,ref=ghcr.io/btbn/ffmpeg-builds/base-win64:cache --iidfile /home/runner/work/_temp/docker-actions-toolkit-7XrxAz/build-iidfile-d458c01bfc.txt --attest type=provenance,disabled=true --tag ghcr.io/btbn/ffmpeg-builds/base-win64:latest --metadata-file /home/runner/work/_temp/docker-actions-toolkit-7XrxAz/build-metadata-ecbaad9ada.json --pull --push images/base-win64
+2026-09-15T12:22:05.2297678Z #0 building with "builder-a629543c-67f0-4c7b-9e58-25563bd14450" instance using docker-container driver
+2026-09-15T12:22:05.2298722Z 
+2026-09-15T12:22:05.2298992Z #1 [internal] load build definition from Dockerfile
+2026-09-15T12:22:05.2299363Z #1 transferring dockerfile: 2.43kB done
+2026-09-15T12:22:05.2299645Z #1 DONE 0.0s
+2026-09-15T12:22:05.2299893Z 
+2026-09-15T12:22:05.2300143Z #2 [auth] btbn/ffmpeg-builds/base:pull token for ghcr.io
+2026-09-15T12:22:05.3801163Z #2 DONE 0.0s
+2026-09-15T12:22:05.3801767Z 
+2026-09-15T12:22:05.3802379Z #3 [internal] load metadata for ghcr.io/btbn/ffmpeg-builds/base:latest
+2026-09-15T12:22:05.8851619Z #3 DONE 0.8s
+2026-09-15T12:22:06.0143601Z 
+2026-09-15T12:22:06.0144255Z #4 [internal] load .dockerignore
+2026-09-15T12:22:06.0144829Z #4 transferring context: 2B done
+2026-09-15T12:22:06.0145110Z #4 DONE 0.0s
+2026-09-15T12:22:06.0145248Z 
+2026-09-15T12:22:06.0145340Z #5 [internal] load build context
+2026-09-15T12:22:06.0145574Z #5 DONE 0.0s
+2026-09-15T12:22:06.0145689Z 
+2026-09-15T12:22:06.0146383Z #6 [stage-0 1/7] FROM ghcr.io/btbn/ffmpeg-builds/base:latest@sha256:6ca7e979f8bf9bd54b83c3e5c94c08f251f9c0f73b9398d2d9e5c44e30c88744
+2026-09-15T12:22:06.0147253Z #6 resolve ghcr.io/btbn/ffmpeg-builds/base:latest@sha256:6ca7e979f8bf9bd54b83c3e5c94c08f251f9c0f73b9398d2d9e5c44e30c88744 done
+2026-09-15T12:22:06.0147802Z #6 DONE 0.0s
+2026-09-15T12:22:06.0147920Z 
+2026-09-15T12:22:06.0148094Z #7 [auth] btbn/ffmpeg-builds/base-win64:pull token for ghcr.io
+2026-09-15T12:22:06.1652380Z #7 DONE 0.0s
+2026-09-15T12:22:06.1652633Z 
+2026-09-15T12:22:06.1652919Z #8 importing cache manifest from ghcr.io/btbn/ffmpeg-builds/base-win64:cache
+2026-09-15T12:22:06.4168013Z #8 inferred cache manifest type: application/vnd.oci.image.manifest.v1+json done
+2026-09-15T12:22:06.5996411Z #8 DONE 0.7s
+2026-09-15T12:22:06.7348499Z 
+2026-09-15T12:22:06.7349136Z #5 [internal] load build context
+2026-09-15T12:22:06.7350000Z #5 transferring context: 24.25kB done
+2026-09-15T12:22:06.7350644Z #5 DONE 0.0s
+2026-09-15T12:22:06.7350863Z 
+2026-09-15T12:22:06.7352059Z #9 [stage-0 4/7] RUN     apt-get -y update &&     apt-get -y install --no-install-recommends wine &&     apt-get -y clean autoclean &&     rm -rf /var/lib/apt/lists/*
+2026-09-15T12:22:06.7353356Z #9 CACHED
+2026-09-15T12:22:06.7353537Z 
+2026-09-15T12:22:06.7354602Z #10 [stage-0 5/7] RUN     rustup target add "x86_64-pc-windows-gnu" &&     echo "[target.x86_64-pc-windows-gnu]\nlinker = "x86_64-w64-mingw32-gcc"\nar = "x86_64-w64-mingw32-gcc-ar"\n" > "/opt/cargo"/config.toml
+2026-09-15T12:22:06.7355946Z #10 CACHED
+2026-09-15T12:22:06.7356138Z 
+2026-09-15T12:22:06.7356374Z #11 [stage-0 6/7] ADD toolchain.cmake /toolchain.cmake
+2026-09-15T12:22:06.7356895Z #11 CACHED
+2026-09-15T12:22:06.7357089Z 
+2026-09-15T12:22:06.7358718Z #12 [stage-0 2/7] RUN --mount=src=ct-ng-config,dst=/.config     git clone --filter=blob:none https://github.com/crosstool-ng/crosstool-ng.git /ct-ng && cd /ct-ng &&     ./bootstrap &&     ./configure --enable-local &&     make -j$(nproc) &&     cp /.config .config &&     ./ct-ng build &&     cd / &&     rm -rf ct-ng
+2026-09-15T12:22:06.7360621Z #12 CACHED
+2026-09-15T12:22:06.7361015Z 
+2026-09-15T12:22:06.7361583Z #13 [stage-0 3/7] RUN     find /opt/ct-ng (         -name "*.dll"         -or -name "*.dll.a"         ) -delete &&     mkdir /opt/ffbuild
+2026-09-15T12:22:06.7362420Z #13 CACHED
+2026-09-15T12:22:06.7362595Z 
+2026-09-15T12:22:06.7362794Z #14 [stage-0 7/7] ADD cross.meson /cross.meson
+2026-09-15T12:22:06.7363264Z #14 CACHED
+2026-09-15T12:22:06.7363445Z 
+2026-09-15T12:22:06.7363590Z #15 exporting to image
+2026-09-15T12:22:06.7363962Z #15 exporting layers done
+2026-09-15T12:22:06.7364722Z #15 exporting manifest sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be done
+2026-09-15T12:22:06.7365888Z #15 exporting config sha256:548c348ebe911aac409043aa274ac43ef7046c4ec53c6b060e271723c40b30ac done
+2026-09-15T12:22:06.7366684Z #15 pushing layers
+2026-09-15T12:22:06.9143155Z #15 ...
+2026-09-15T12:22:06.9143381Z 
+2026-09-15T12:22:06.9143676Z #16 [auth] btbn/ffmpeg-builds/base-win64:pull,push token for ghcr.io
+2026-09-15T12:22:06.9144129Z #16 DONE 0.0s
+2026-09-15T12:22:07.0645154Z 
+2026-09-15T12:22:07.0645674Z #17 exporting cache to registry
+2026-09-15T12:22:07.0646104Z #17 preparing build cache for export 0.0s done
+2026-09-15T12:22:07.0646495Z #17 sending cache export
+2026-09-15T12:22:07.0647024Z #17 writing layer sha256:2880b575b2c0305ef29b874726246d84e775031e0fa9bdcf761075e56691c37a
+2026-09-15T12:22:07.0647800Z #17 writing layer sha256:0a08583b9b930fb472883cabc92b6c3a33fecb3c96e2188a73bd132ee01b153e
+2026-09-15T12:22:07.0648580Z #17 writing layer sha256:08f5f5b2a2b0d2a960804adef3bd1783c5f2c20f42db5e290dc05d9529d11ae2
+2026-09-15T12:22:07.0649351Z #17 writing layer sha256:0e4ac1414efd8a9794c3f9c4846d98e136ca4bd66de75732bd517034b5833da3
+2026-09-15T12:22:07.0927185Z #17 writing layer sha256:0e4ac1414efd8a9794c3f9c4846d98e136ca4bd66de75732bd517034b5833da3 0.4s done
+2026-09-15T12:22:07.0928655Z #17 writing layer sha256:5eec61f5a023d9a780c20838c05d7c6c81e1af461857e4644b840fb152443fee
+2026-09-15T12:22:07.2073709Z #17 writing layer sha256:2880b575b2c0305ef29b874726246d84e775031e0fa9bdcf761075e56691c37a 0.4s done
+2026-09-15T12:22:07.2074886Z #17 writing layer sha256:0a08583b9b930fb472883cabc92b6c3a33fecb3c96e2188a73bd132ee01b153e 0.4s done
+2026-09-15T12:22:07.2075644Z #17 writing layer sha256:08f5f5b2a2b0d2a960804adef3bd1783c5f2c20f42db5e290dc05d9529d11ae2 0.4s done
+2026-09-15T12:22:07.2076569Z #17 writing layer sha256:5eec61f5a023d9a780c20838c05d7c6c81e1af461857e4644b840fb152443fee 0.1s done
+2026-09-15T12:22:07.2077433Z #17 writing layer sha256:5fe51573ed66fd052af35d4bf256ae56e573177901fe5b3d80350de619c1ce3d
+2026-09-15T12:22:07.2078094Z #17 writing layer sha256:612630c430ac0ae44b8b3802af5399b690e7af6d91d45793258d0f7df53373da 0.1s done
+2026-09-15T12:22:07.2079103Z #17 writing layer sha256:6a7c4f6d8c3863707c14af40aad062db2bb477271491c7d3e99e03394dd261e3
+2026-09-15T12:22:07.2079863Z #17 writing layer sha256:a68a245d9debc1254919426b251adfc4ba62e90a43eee65b0cf036f11eb6f4ee
+2026-09-15T12:22:07.2080452Z #17 writing layer sha256:aa0dbb51786a9c7a9544810cac087e1a1e5f8ee824d7cf4ee05ce5ee8bbe2bee
+2026-09-15T12:22:07.3406621Z #17 writing layer sha256:5fe51573ed66fd052af35d4bf256ae56e573177901fe5b3d80350de619c1ce3d 0.1s done
+2026-09-15T12:22:07.3407693Z #17 writing layer sha256:6a7c4f6d8c3863707c14af40aad062db2bb477271491c7d3e99e03394dd261e3 0.1s done
+2026-09-15T12:22:07.3408442Z #17 writing layer sha256:a68a245d9debc1254919426b251adfc4ba62e90a43eee65b0cf036f11eb6f4ee 0.1s done
+2026-09-15T12:22:07.3409196Z #17 writing layer sha256:aa0dbb51786a9c7a9544810cac087e1a1e5f8ee824d7cf4ee05ce5ee8bbe2bee 0.1s done
+2026-09-15T12:22:07.3409950Z #17 writing layer sha256:b728637e1a8755007b6010b2bde0863dc7360f6ef5b69aff3bf21ac808db4768 0.1s done
+2026-09-15T12:22:07.3410660Z #17 writing layer sha256:b74d1b21fb9605007fee7003b19e08e5979618fc687143e72ec8d516c242e858 0.1s done
+2026-09-15T12:22:07.3411873Z #17 writing layer sha256:c0fb1797710794b02191ceed9de46d2594b6ddc0ad48cd67fb64df56c6ee9a48
+2026-09-15T12:22:07.5436694Z #17 sending cache export 0.8s done
+2026-09-15T12:22:07.5437496Z #17 writing layer sha256:c0fb1797710794b02191ceed9de46d2594b6ddc0ad48cd67fb64df56c6ee9a48 0.1s done
+2026-09-15T12:22:07.5438346Z #17 writing config sha256:2b2ccb6cb792f142477f493c2cab760c21db3f5bb3bfa154f5699e9aa26b9cd2 0.1s done
+2026-09-15T12:22:07.5439235Z #17 writing cache image manifest sha256:ab45828816a712de973510dc61d4c053e2d62d572cdee9b5470a696f5afdf0df 0.1s done
+2026-09-15T12:22:07.5439867Z #17 DONE 0.9s
+2026-09-15T12:22:07.5440012Z 
+2026-09-15T12:22:07.5440118Z #15 exporting to image
+2026-09-15T12:22:07.5440389Z #15 pushing layers 0.7s done
+2026-09-15T12:22:07.5441312Z #15 pushing manifest for ghcr.io/btbn/ffmpeg-builds/base-win64:latest@sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be
+2026-09-15T12:22:07.9212772Z #15 pushing manifest for ghcr.io/btbn/ffmpeg-builds/base-win64:latest@sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be 0.6s done
+2026-09-15T12:22:07.9213946Z #15 DONE 1.2s
+2026-09-15T12:22:07.9471375Z 
+2026-09-15T12:22:07.9471888Z #18 resolving provenance for metadata file
+2026-09-15T12:22:07.9472402Z #18 DONE 0.0s
+2026-09-15T12:22:07.9604950Z ##[group]ImageID
+2026-09-15T12:22:07.9605402Z sha256:548c348ebe911aac409043aa274ac43ef7046c4ec53c6b060e271723c40b30ac
+2026-09-15T12:22:07.9606299Z ##[endgroup]
+2026-09-15T12:22:07.9606867Z ##[group]Digest
+2026-09-15T12:22:07.9607382Z sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be
+2026-09-15T12:22:07.9608321Z ##[endgroup]
+2026-09-15T12:22:07.9609044Z ##[group]Metadata
+2026-09-15T12:22:07.9612107Z ::stop-commands::***
+2026-09-15T12:22:07.9612577Z {
+2026-09-15T12:22:07.9612906Z   "buildx.build.provenance": {
+2026-09-15T12:22:07.9613347Z     "builder": {
+2026-09-15T12:22:07.9613660Z       "id": ""
+2026-09-15T12:22:07.9613863Z     },
+2026-09-15T12:22:07.9614141Z     "buildType": "https://mobyproject.org/buildkit@v1",
+2026-09-15T12:22:07.9614466Z     "materials": [
+2026-09-15T12:22:07.9614671Z       {
+2026-09-15T12:22:07.9615375Z         "uri": "pkg:docker/ghcr.io/btbn/ffmpeg-builds/base@latest?platform=linux%2Famd64",
+2026-09-15T12:22:07.9616133Z         "digest": {
+2026-09-15T12:22:07.9616573Z           "sha256": "6ca7e979f8bf9bd54b83c3e5c94c08f251f9c0f73b9398d2d9e5c44e30c88744"
+2026-09-15T12:22:07.9617188Z         }
+2026-09-15T12:22:07.9617469Z       }
+2026-09-15T12:22:07.9617746Z     ],
+2026-09-15T12:22:07.9618048Z     "invocation": {
+2026-09-15T12:22:07.9618377Z       "configSource": {
+2026-09-15T12:22:07.9618736Z         "entryPoint": "Dockerfile"
+2026-09-15T12:22:07.9619107Z       },
+2026-09-15T12:22:07.9619389Z       "parameters": {
+2026-09-15T12:22:07.9619753Z         "frontend": "dockerfile.v0",
+2026-09-15T12:22:07.9620489Z         "args": {
+2026-09-15T12:22:07.9621216Z           "build-arg:BASE_TAG_SUFFIX": "",
+2026-09-15T12:22:07.9621774Z           "build-arg:GH_REPO": "ghcr.io/btbn/ffmpeg-builds"
+2026-09-15T12:22:07.9622300Z         },
+2026-09-15T12:22:07.9622607Z         "locals": [
+2026-09-15T12:22:07.9622951Z           {
+2026-09-15T12:22:07.9623288Z             "name": "context"
+2026-09-15T12:22:07.9623677Z           },
+2026-09-15T12:22:07.9623993Z           {
+2026-09-15T12:22:07.9624234Z             "name": "dockerfile"
+2026-09-15T12:22:07.9624473Z           }
+2026-09-15T12:22:07.9624650Z         ],
+2026-09-15T12:22:07.9624971Z         "root": {
+2026-09-15T12:22:07.9625327Z           "configSource": {
+2026-09-15T12:22:07.9625722Z             "path": "Dockerfile"
+2026-09-15T12:22:07.9626120Z           },
+2026-09-15T12:22:07.9626435Z           "request": {
+2026-09-15T12:22:07.9626769Z             "args": {
+2026-09-15T12:22:07.9627141Z               "build-arg:BASE_TAG_SUFFIX": "",
+2026-09-15T12:22:07.9627710Z               "build-arg:GH_REPO": "ghcr.io/btbn/ffmpeg-builds",
+2026-09-15T12:22:07.9628290Z               "vcs:localdir:context": "images/base-win64",
+2026-09-15T12:22:07.9628853Z               "vcs:localdir:dockerfile": "images/base-win64",
+2026-09-15T12:22:07.9629456Z               "vcs:revision": "3e6685eda92f9288c15ac320139622dcedca09a4",
+2026-09-15T12:22:07.9630096Z               "vcs:source": "https://github.com/BtbN/FFmpeg-Builds"
+2026-09-15T12:22:07.9630617Z             }
+2026-09-15T12:22:07.9631927Z           }
+2026-09-15T12:22:07.9632234Z         },
+2026-09-15T12:22:07.9632611Z         "compatibilityVersion": 30
+2026-09-15T12:22:07.9633070Z       },
+2026-09-15T12:22:07.9633397Z       "environment": {
+2026-09-15T12:22:07.9633794Z         "dockerfileVersion": "1.26.0",
+2026-09-15T12:22:07.9634237Z         "github_actor": "BtbN",
+2026-09-15T12:22:07.9634644Z         "github_actor_id": "294293",
+2026-09-15T12:22:07.9635074Z         "github_event_name": "schedule",
+2026-09-15T12:22:07.9635524Z         "github_event_payload": {
+2026-09-15T12:22:07.9635947Z           "repository": {
+2026-09-15T12:22:07.9636331Z             "allow_forking": true,
+2026-09-15T12:22:07.9637034Z             "archive_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/{archive_format}{/ref}",
+2026-09-15T12:22:07.9637791Z             "archived": false,
+2026-09-15T12:22:07.9638441Z             "assignees_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/assignees{/user}",
+2026-09-15T12:22:07.9639049Z             "blobs_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/git/blobs{/sha}",
+2026-09-15T12:22:07.9639603Z             "branches_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/branches{/branch}",
+2026-09-15T12:22:07.9640280Z             "clone_url": "https://github.com/BtbN/FFmpeg-Builds.git",
+2026-09-15T12:22:07.9641483Z             "collaborators_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/collaborators{/collaborator}",
+2026-09-15T12:22:07.9642531Z             "comments_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/comments{/number}",
+2026-09-15T12:22:07.9643100Z             "commits_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/commits{/sha}",
+2026-09-15T12:22:07.9643662Z             "compare_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/compare/{base}...{head}",
+2026-09-15T12:22:07.9644501Z             "contents_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/contents/{+path}",
+2026-09-15T12:22:07.9645124Z             "contributors_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/contributors",
+2026-09-15T12:22:07.9645597Z             "created_at": "2020-09-01T19:19:40Z",
+2026-09-15T12:22:07.9645903Z             "default_branch": "master",
+2026-09-15T12:22:07.9646351Z             "deployments_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/deployments",
+2026-09-15T12:22:07.9646765Z             "description": null,
+2026-09-15T12:22:07.9647017Z             "disabled": false,
+2026-09-15T12:22:07.9647443Z             "downloads_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/downloads",
+2026-09-15T12:22:07.9648154Z             "events_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/events",
+2026-09-15T12:22:07.9648578Z             "fork": false,
+2026-09-15T12:22:07.9648830Z             "forks": 1530,
+2026-09-15T12:22:07.9649054Z             "forks_count": 1530,
+2026-09-15T12:22:07.9649432Z             "forks_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/forks",
+2026-09-15T12:22:07.9649867Z             "full_name": "BtbN/FFmpeg-Builds",
+2026-09-15T12:22:07.9650360Z             "git_commits_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/git/commits{/sha}",
+2026-09-15T12:22:07.9651298Z             "git_refs_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/git/refs{/sha}",
+2026-09-15T12:22:07.9651924Z             "git_tags_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/git/tags{/sha}",
+2026-09-15T12:22:07.9652405Z             "git_url": "git://github.com/BtbN/FFmpeg-Builds.git",
+2026-09-15T12:22:07.9652738Z             "has_discussions": false,
+2026-09-15T12:22:07.9653026Z             "has_downloads": false,
+2026-09-15T12:22:07.9653280Z             "has_issues": true,
+2026-09-15T12:22:07.9653512Z             "has_pages": false,
+2026-09-15T12:22:07.9653746Z             "has_projects": false,
+2026-09-15T12:22:07.9654008Z             "has_pull_requests": true,
+2026-09-15T12:22:07.9654287Z             "has_wiki": true,
+2026-09-15T12:22:07.9654563Z             "homepage": null,
+2026-09-15T12:22:07.9654988Z             "hooks_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/hooks",
+2026-09-15T12:22:07.9655463Z             "html_url": "https://github.com/BtbN/FFmpeg-Builds",
+2026-09-15T12:22:07.9655803Z             "id": 292087234,
+2026-09-15T12:22:07.9656052Z             "is_template": false,
+2026-09-15T12:22:07.9656511Z             "issue_comment_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/issues/comments{/number}",
+2026-09-15T12:22:07.9657206Z             "issue_events_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/issues/events{/number}",
+2026-09-15T12:22:07.9657839Z             "issues_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/issues{/number}",
+2026-09-15T12:22:07.9658403Z             "keys_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/keys{/key_id}",
+2026-09-15T12:22:07.9658960Z             "labels_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/labels{/name}",
+2026-09-15T12:22:07.9659402Z             "language": "Shell",
+2026-09-15T12:22:07.9659787Z             "languages_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/languages",
+2026-09-15T12:22:07.9660222Z             "license": {
+2026-09-15T12:22:07.9660460Z               "key": "mit",
+2026-09-15T12:22:07.9660705Z               "name": "MIT License",
+2026-09-15T12:22:07.9661289Z               "node_id": "MDc6TGljZW5zZTEz",
+2026-09-15T12:22:07.9661582Z               "spdx_id": "MIT",
+2026-09-15T12:22:07.9661875Z               "url": "https://api.github.com/licenses/mit"
+2026-09-15T12:22:07.9662185Z             },
+2026-09-15T12:22:07.9662527Z             "merges_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/merges",
+2026-09-15T12:22:07.9663257Z             "milestones_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/milestones{/number}",
+2026-09-15T12:22:07.9663833Z             "mirror_url": null,
+2026-09-15T12:22:07.9664239Z             "name": "FFmpeg-Builds",
+2026-09-15T12:22:07.9664578Z             "node_id": "MDEwOlJlcG9zaXRvcnkyOTIwODcyMzQ=",
+2026-09-15T12:22:07.9665218Z             "notifications_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/notifications{?since,all,participating}",
+2026-09-15T12:22:07.9665874Z             "open_issues": 27,
+2026-09-15T12:22:07.9666173Z             "open_issues_count": 27,
+2026-09-15T12:22:07.9666446Z             "owner": {
+2026-09-15T12:22:07.9666820Z               "avatar_url": "https://avatars.githubusercontent.com/u/294293?v=4",
+2026-09-15T12:22:07.9667345Z               "events_url": "https://api.github.com/users/BtbN/events{/privacy}",
+2026-09-15T12:22:07.9667982Z               "followers_url": "https://api.github.com/users/BtbN/followers",
+2026-09-15T12:22:07.9668509Z               "following_url": "https://api.github.com/users/BtbN/following{/other_user}",
+2026-09-15T12:22:07.9669027Z               "gists_url": "https://api.github.com/users/BtbN/gists{/gist_id}",
+2026-09-15T12:22:07.9669431Z               "gravatar_id": "",
+2026-09-15T12:22:07.9669712Z               "html_url": "https://github.com/BtbN",
+2026-09-15T12:22:07.9670038Z               "id": 294293,
+2026-09-15T12:22:07.9670286Z               "login": "BtbN",
+2026-09-15T12:22:07.9670563Z               "node_id": "MDQ6VXNlcjI5NDI5Mw==",
+2026-09-15T12:22:07.9671228Z               "organizations_url": "https://api.github.com/users/BtbN/orgs",
+2026-09-15T12:22:07.9671789Z               "received_events_url": "https://api.github.com/users/BtbN/received_events",
+2026-09-15T12:22:07.9672844Z               "repos_url": "https://api.github.com/users/BtbN/repos",
+2026-09-15T12:22:07.9673539Z               "site_admin": false,
+2026-09-15T12:22:07.9674301Z               "starred_url": "https://api.github.com/users/BtbN/starred{/owner}{/repo}",
+2026-09-15T12:22:07.9675135Z               "subscriptions_url": "https://api.github.com/users/BtbN/subscriptions",
+2026-09-15T12:22:07.9675560Z               "type": "User",
+2026-09-15T12:22:07.9675864Z               "url": "https://api.github.com/users/BtbN",
+2026-09-15T12:22:07.9676217Z               "user_view_type": "public"
+2026-09-15T12:22:07.9676474Z             },
+2026-09-15T12:22:07.9676696Z             "private": false,
+2026-09-15T12:22:07.9676975Z             "pull_request_creation_policy": "all",
+2026-09-15T12:22:07.9677433Z             "pulls_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/pulls{/number}",
+2026-09-15T12:22:07.9677880Z             "pushed_at": "2026-09-14T13:38:48Z",
+2026-09-15T12:22:07.9678352Z             "releases_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases{/id}",
+2026-09-15T12:22:07.9678802Z             "size": 1673,
+2026-09-15T12:22:07.9679108Z             "ssh_url": "git@github.com:BtbN/FFmpeg-Builds.git",
+2026-09-15T12:22:07.9679459Z             "stargazers_count": 11670,
+2026-09-15T12:22:07.9679878Z             "stargazers_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/stargazers",
+2026-09-15T12:22:07.9680489Z             "statuses_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/statuses/{sha}",
+2026-09-15T12:22:07.9681380Z             "subscribers_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/subscribers",
+2026-09-15T12:22:07.9682035Z             "subscription_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/subscription",
+2026-09-15T12:22:07.9682559Z             "svn_url": "https://github.com/BtbN/FFmpeg-Builds",
+2026-09-15T12:22:07.9683014Z             "tags_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/tags",
+2026-09-15T12:22:07.9683525Z             "teams_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/teams",
+2026-09-15T12:22:07.9683938Z             "topics": [],
+2026-09-15T12:22:07.9684360Z             "trees_url": "https://api.github.com/repos/BtbN/FFmpeg-Builds/git/trees{/sha}",
+2026-09-15T12:22:07.9684862Z             "updated_at": "2026-09-15T09:28:21Z",
+2026-09-15T12:22:07.9685207Z             "url": "https://api.github.com/repos/BtbN/FFmpeg-Builds",
+2026-09-15T12:22:07.9685757Z             "visibility": "public",
+2026-09-15T12:22:07.9686032Z             "watchers": 11670,
+2026-09-15T12:22:07.9686297Z             "watchers_count": 11670,
+2026-09-15T12:22:07.9686574Z             "web_commit_signoff_required": false
+2026-09-15T12:22:07.9686837Z           },
+2026-09-15T12:22:07.9687034Z           "schedule": "0 12 * * *",
+2026-09-15T12:22:07.9687328Z           "workflow": ".github/workflows/build.yml"
+2026-09-15T12:22:07.9687602Z         },
+2026-09-15T12:22:07.9687819Z         "github_job": "build_target_bases",
+2026-09-15T12:22:07.9688253Z         "github_ref": "refs/heads/master",
+2026-09-15T12:22:07.9689696Z         "github_ref_name": "master",
+2026-09-15T12:22:07.9690185Z         "github_ref_protected": "false",
+2026-09-15T12:22:07.9690467Z         "github_ref_type": "branch",
+2026-09-15T12:22:07.9690992Z         "github_repository": "BtbN/FFmpeg-Builds",
+2026-09-15T12:22:07.9691339Z         "github_repository_id": "292087234",
+2026-09-15T12:22:07.9691627Z         "github_repository_owner": "BtbN",
+2026-09-15T12:22:07.9691913Z         "github_repository_owner_id": "294293",
+2026-09-15T12:22:07.9692195Z         "github_run_attempt": "1",
+2026-09-15T12:22:07.9692451Z         "github_run_id": "34967781095",
+2026-09-15T12:22:07.9692706Z         "github_run_number": "3118",
+2026-09-15T12:22:07.9692954Z         "github_runner_arch": "X64",
+2026-09-15T12:22:07.9693237Z         "github_runner_environment": "github-hosted",
+2026-09-15T12:22:07.9693546Z         "github_runner_image_os": "ubuntu24",
+2026-09-15T12:22:07.9693854Z         "github_runner_image_version": "20260907.300.1",
+2026-09-15T12:22:07.9694183Z         "github_runner_name": "GitHub Actions 1000086420",
+2026-09-15T12:22:07.9694487Z         "github_runner_os": "Linux",
+2026-09-15T12:22:07.9694852Z         "github_runner_tracking_id": "github_6bccc0fd-31b5-4771-8c6b-9547ea0d4d21",
+2026-09-15T12:22:07.9695276Z         "github_server_url": "https://github.com",
+2026-09-15T12:22:07.9695583Z         "github_triggering_actor": "BtbN",
+2026-09-15T12:22:07.9695856Z         "github_workflow": "Build FFmpeg",
+2026-09-15T12:22:07.9696288Z         "github_workflow_ref": "BtbN/FFmpeg-Builds/.github/workflows/build.yml@refs/heads/master",
+2026-09-15T12:22:07.9696804Z         "github_workflow_sha": "3e6685eda92f9288c15ac320139622dcedca09a4",
+2026-09-15T12:22:07.9697159Z         "platform": "linux/amd64"
+2026-09-15T12:22:07.9697403Z       }
+2026-09-15T12:22:07.9697572Z     }
+2026-09-15T12:22:07.9697738Z   },
+2026-09-15T12:22:07.9698284Z   "buildx.build.ref": "builder-a629543c-67f0-4c7b-9e58-25563bd14450/builder-a629543c-67f0-4c7b-9e58-25563bd144500/n2rcynj6lv0xazr6cu0p258tm",
+2026-09-15T12:22:07.9699372Z   "cache.manifest": "{\"mediaType\":\"application/vnd.oci.image.manifest.v1+json\",\"digest\":\"sha256:ab45828816a712de973510dc61d4c053e2d62d572cdee9b5470a696f5afdf0df\",\"size\":5526}",
+2026-09-15T12:22:07.9700335Z   "containerimage.config.digest": "sha256:548c348ebe911aac409043aa274ac43ef7046c4ec53c6b060e271723c40b30ac",
+2026-09-15T12:22:07.9701186Z   "containerimage.descriptor": {
+2026-09-15T12:22:07.9701813Z     "mediaType": "application/vnd.oci.image.manifest.v1+json",
+2026-09-15T12:22:07.9702368Z     "digest": "sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be",
+2026-09-15T12:22:07.9702810Z     "size": 2775,
+2026-09-15T12:22:07.9703008Z     "platform": {
+2026-09-15T12:22:07.9703217Z       "architecture": "amd64",
+2026-09-15T12:22:07.9703459Z       "os": "linux"
+2026-09-15T12:22:07.9703655Z     }
+2026-09-15T12:22:07.9703827Z   },
+2026-09-15T12:22:07.9704213Z   "containerimage.digest": "sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be",
+2026-09-15T12:22:07.9704759Z   "image.name": "ghcr.io/btbn/ffmpeg-builds/base-win64:latest"
+2026-09-15T12:22:07.9705092Z }
+2026-09-15T12:22:07.9705656Z ::***::
+2026-09-15T12:22:07.9706029Z ##[endgroup]
+2026-09-15T12:22:07.9706388Z ##[group]Reference
+2026-09-15T12:22:07.9707050Z builder-a629543c-67f0-4c7b-9e58-25563bd14450/builder-a629543c-67f0-4c7b-9e58-25563bd144500/n2rcynj6lv0xazr6cu0p258tm
+2026-09-15T12:22:07.9707740Z ##[endgroup]
+2026-09-15T12:22:07.9708078Z ##[group]Check build summary support
+2026-09-15T12:22:07.9708484Z Build summary supported!
+2026-09-15T12:22:07.9708834Z ##[endgroup]
+2026-09-15T12:22:07.9865148Z ##[group]Run BtbN/delete-untagged-ghcr-action@main
+2026-09-15T12:22:07.9865504Z with:
+2026-09-15T12:22:07.9867960Z   token: ***
+2026-09-15T12:22:07.9868210Z   package_name: ffmpeg-builds/base-win64
+2026-09-15T12:22:07.9868511Z   repository_owner: BtbN
+2026-09-15T12:22:07.9868759Z   repository: BtbN/FFmpeg-Builds
+2026-09-15T12:22:07.9869006Z   owner_type: user
+2026-09-15T12:22:07.9869220Z   untagged_only: true
+2026-09-15T12:22:07.9869635Z   except_untagged_multiplatform: true
+2026-09-15T12:22:07.9869899Z   with_sigs: false
+2026-09-15T12:22:07.9870099Z   keep_latest: 0
+2026-09-15T12:22:07.9870293Z env:
+2026-09-15T12:22:07.9870480Z   DOCKER_BUILDKIT: 1
+2026-09-15T12:22:07.9870685Z ##[endgroup]
+2026-09-15T12:22:07.9929297Z ##[start-action display=Setup Python;id=__BtbN_delete-untagged-ghcr-action.__actions_setup-python]
+2026-09-15T12:22:07.9994749Z ##[group]Run actions/setup-python@v6
+2026-09-15T12:22:07.9995022Z with:
+2026-09-15T12:22:07.9995220Z   python-version: 3.14
+2026-09-15T12:22:07.9995483Z   check-latest: false
+2026-09-15T12:22:07.9997873Z   token: ***
+2026-09-15T12:22:07.9998094Z   update-environment: true
+2026-09-15T12:22:07.9998340Z   allow-prereleases: false
+2026-09-15T12:22:07.9998571Z   freethreaded: false
+2026-09-15T12:22:07.9998782Z env:
+2026-09-15T12:22:07.9998966Z   DOCKER_BUILDKIT: 1
+2026-09-15T12:22:07.9999181Z ##[endgroup]
+2026-09-15T12:22:08.1299471Z ##[group]Installed versions
+2026-09-15T12:22:08.1391175Z Successfully set up CPython (3.14.7)
+2026-09-15T12:22:08.1392011Z ##[endgroup]
+2026-09-15T12:22:08.1475981Z ##[end-action id=__BtbN_delete-untagged-ghcr-action.__actions_setup-python;outcome=success;conclusion=success;duration_ms=154]
+2026-09-15T12:22:08.1478572Z ##[start-action display=Install Python dependencies;id=__BtbN_delete-untagged-ghcr-action.__run]
+2026-09-15T12:22:08.1495302Z ##[group]Run pip install -r /home/runner/work/_actions/BtbN/delete-untagged-ghcr-action/main/requirements.txt
+2026-09-15T12:22:08.1496074Z [36;1mpip install -r /home/runner/work/_actions/BtbN/delete-untagged-ghcr-action/main/requirements.txt[0m
+2026-09-15T12:22:08.1540483Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-15T12:22:08.1541050Z env:
+2026-09-15T12:22:08.1541255Z   DOCKER_BUILDKIT: 1
+2026-09-15T12:22:08.1541552Z   pythonLocation: /opt/hostedtoolcache/Python/3.14.7/x64
+2026-09-15T12:22:08.1542004Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.14.7/x64/lib/pkgconfig
+2026-09-15T12:22:08.1542439Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.14.7/x64
+2026-09-15T12:22:08.1542839Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.14.7/x64
+2026-09-15T12:22:08.1543216Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.14.7/x64
+2026-09-15T12:22:08.1543599Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.14.7/x64/lib
+2026-09-15T12:22:08.1543933Z ##[endgroup]
+2026-09-15T12:22:09.0627294Z Collecting requests (from -r /home/runner/work/_actions/BtbN/delete-untagged-ghcr-action/main/requirements.txt (line 1))
+2026-09-15T12:22:09.1642105Z   Downloading requests-2.34.2-py3-none-any.whl.metadata (4.8 kB)
+2026-09-15T12:22:09.2944697Z Collecting charset_normalizer<4,>=2 (from requests->-r /home/runner/work/_actions/BtbN/delete-untagged-ghcr-action/main/requirements.txt (line 1))
+2026-09-15T12:22:09.3159790Z   Downloading charset_normalizer-3.5.1-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (45 kB)
+2026-09-15T12:22:09.3515279Z Collecting idna<4,>=2.5 (from requests->-r /home/runner/work/_actions/BtbN/delete-untagged-ghcr-action/main/requirements.txt (line 1))
+2026-09-15T12:22:09.3743269Z   Downloading idna-3.19-py3-none-any.whl.metadata (9.2 kB)
+2026-09-15T12:22:09.3952860Z Collecting urllib3<3,>=1.26 (from requests->-r /home/runner/work/_actions/BtbN/delete-untagged-ghcr-action/main/requirements.txt (line 1))
+2026-09-15T12:22:09.4159151Z   Downloading urllib3-2.7.0-py3-none-any.whl.metadata (6.9 kB)
+2026-09-15T12:22:09.4325881Z Collecting certifi>=2023.5.7 (from requests->-r /home/runner/work/_actions/BtbN/delete-untagged-ghcr-action/main/requirements.txt (line 1))
+2026-09-15T12:22:09.4537124Z   Downloading certifi-2026.7.22-py3-none-any.whl.metadata (2.5 kB)
+2026-09-15T12:22:09.4796071Z Downloading requests-2.34.2-py3-none-any.whl (73 kB)
+2026-09-15T12:22:09.5127110Z Downloading charset_normalizer-3.5.1-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (251 kB)
+2026-09-15T12:22:09.5731865Z Downloading idna-3.19-py3-none-any.whl (68 kB)
+2026-09-15T12:22:09.5981682Z Downloading urllib3-2.7.0-py3-none-any.whl (131 kB)
+2026-09-15T12:22:09.6245415Z Downloading certifi-2026.7.22-py3-none-any.whl (136 kB)
+2026-09-15T12:22:09.6817741Z Installing collected packages: urllib3, idna, charset_normalizer, certifi, requests
+2026-09-15T12:22:09.9580648Z 
+2026-09-15T12:22:09.9597254Z Successfully installed certifi-2026.7.22 charset_normalizer-3.5.1 idna-3.19 requests-2.34.2 urllib3-2.7.0
+2026-09-15T12:22:10.0243289Z ##[end-action id=__BtbN_delete-untagged-ghcr-action.__run;outcome=success;conclusion=success;duration_ms=1876]
+2026-09-15T12:22:10.0246087Z ##[start-action display=Set up Docker Buildx;id=__BtbN_delete-untagged-ghcr-action.__docker_setup-buildx-action]
+2026-09-15T12:22:10.0286267Z ##[group]Run docker/setup-buildx-action@v4
+2026-09-15T12:22:10.0286566Z with:
+2026-09-15T12:22:10.0286770Z   driver: docker-container
+2026-09-15T12:22:10.0287008Z   use: true
+2026-09-15T12:22:10.0287206Z   keep-state: false
+2026-09-15T12:22:10.0287418Z   cache-binary: true
+2026-09-15T12:22:10.0287656Z   cleanup: true
+2026-09-15T12:22:10.0287849Z env:
+2026-09-15T12:22:10.0288034Z   DOCKER_BUILDKIT: 1
+2026-09-15T12:22:10.0288315Z   pythonLocation: /opt/hostedtoolcache/Python/3.14.7/x64
+2026-09-15T12:22:10.0288752Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.14.7/x64/lib/pkgconfig
+2026-09-15T12:22:10.0289179Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.14.7/x64
+2026-09-15T12:22:10.0289565Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.14.7/x64
+2026-09-15T12:22:10.0289957Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.14.7/x64
+2026-09-15T12:22:10.0290339Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.14.7/x64/lib
+2026-09-15T12:22:10.0290671Z ##[endgroup]
+2026-09-15T12:22:10.2158159Z ##[group]Docker info
+2026-09-15T12:22:10.2186568Z [command]/usr/bin/docker version
+2026-09-15T12:22:10.2378217Z Client: Docker Engine - Community
+2026-09-15T12:22:10.2378750Z  Version:           28.0.4
+2026-09-15T12:22:10.2380592Z  API version:       1.48
+2026-09-15T12:22:10.2381228Z  Go version:        go1.23.7
+2026-09-15T12:22:10.2381691Z  Git commit:        b8034c0
+2026-09-15T12:22:10.2382117Z  Built:             Tue Mar 25 15:07:16 2025
+2026-09-15T12:22:10.2382593Z  OS/Arch:           linux/amd64
+2026-09-15T12:22:10.2382998Z  Context:           default
+2026-09-15T12:22:10.2383252Z 
+2026-09-15T12:22:10.2383433Z Server: Docker Engine - Community
+2026-09-15T12:22:10.2383849Z  Engine:
+2026-09-15T12:22:10.2384172Z   Version:          28.0.4
+2026-09-15T12:22:10.2384562Z   API version:      1.48 (minimum version 1.24)
+2026-09-15T12:22:10.2384902Z   Go version:       go1.23.7
+2026-09-15T12:22:10.2385158Z   Git commit:       6430e49
+2026-09-15T12:22:10.2385411Z   Built:            Tue Mar 25 15:07:16 2025
+2026-09-15T12:22:10.2385693Z   OS/Arch:          linux/amd64
+2026-09-15T12:22:10.2385939Z   Experimental:     false
+2026-09-15T12:22:10.2386177Z  containerd:
+2026-09-15T12:22:10.2386376Z   Version:          v2.3.4
+2026-09-15T12:22:10.2386665Z   GitCommit:        db8809540e1a7a9da5d518876894933ff55692ab
+2026-09-15T12:22:10.2386983Z  runc:
+2026-09-15T12:22:10.2387171Z   Version:          1.5.1
+2026-09-15T12:22:10.2387416Z   GitCommit:        v1.5.1-0-g8f2685a4
+2026-09-15T12:22:10.2387673Z  docker-init:
+2026-09-15T12:22:10.2387873Z   Version:          0.19.0
+2026-09-15T12:22:10.2388101Z   GitCommit:        de40ad0
+2026-09-15T12:22:10.2429587Z [command]/usr/bin/docker info
+2026-09-15T12:22:10.2954547Z Client: Docker Engine - Community
+2026-09-15T12:22:10.2955007Z  Version:    28.0.4
+2026-09-15T12:22:10.2955385Z  Context:    default
+2026-09-15T12:22:10.2956194Z  Debug Mode: false
+2026-09-15T12:22:10.2956607Z  Plugins:
+2026-09-15T12:22:10.2956983Z   buildx: Docker Buildx (Docker Inc.)
+2026-09-15T12:22:10.2957429Z     Version:  v0.37.0
+2026-09-15T12:22:10.2957858Z     Path:     /usr/libexec/docker/cli-plugins/docker-buildx
+2026-09-15T12:22:10.2958226Z   compose: Docker Compose (Docker Inc.)
+2026-09-15T12:22:10.2958497Z     Version:  v2.38.2
+2026-09-15T12:22:10.2958791Z     Path:     /usr/libexec/docker/cli-plugins/docker-compose
+2026-09-15T12:22:10.2959211Z 
+2026-09-15T12:22:10.2959294Z Server:
+2026-09-15T12:22:10.2959482Z  Containers: 1
+2026-09-15T12:22:10.2959677Z   Running: 1
+2026-09-15T12:22:10.2959871Z   Paused: 0
+2026-09-15T12:22:10.2960052Z   Stopped: 0
+2026-09-15T12:22:10.2960234Z  Images: 1
+2026-09-15T12:22:10.2960427Z  Server Version: 28.0.4
+2026-09-15T12:22:10.2960665Z  Storage Driver: overlay2
+2026-09-15T12:22:10.2961324Z   Backing Filesystem: extfs
+2026-09-15T12:22:10.2961579Z   Supports d_type: true
+2026-09-15T12:22:10.2961817Z   Using metacopy: false
+2026-09-15T12:22:10.2962042Z   Native Overlay Diff: false
+2026-09-15T12:22:10.2962284Z   userxattr: false
+2026-09-15T12:22:10.2962500Z  Logging Driver: json-file
+2026-09-15T12:22:10.2962739Z  Cgroup Driver: systemd
+2026-09-15T12:22:10.2962954Z  Cgroup Version: 2
+2026-09-15T12:22:10.2963152Z  Plugins:
+2026-09-15T12:22:10.2963345Z   Volume: local
+2026-09-15T12:22:10.2963584Z   Network: bridge host ipvlan macvlan null overlay
+2026-09-15T12:22:10.2963997Z   Log: awslogs fluentd gcplogs gelf journald json-file local splunk syslog
+2026-09-15T12:22:10.2964375Z  Swarm: inactive
+2026-09-15T12:22:10.2964602Z  Runtimes: io.containerd.runc.v2 runc
+2026-09-15T12:22:10.2964935Z  Default Runtime: runc
+2026-09-15T12:22:10.2965173Z  Init Binary: docker-init
+2026-09-15T12:22:10.2965487Z  containerd version: db8809540e1a7a9da5d518876894933ff55692ab
+2026-09-15T12:22:10.2965836Z  runc version: v1.5.1-0-g8f2685a4
+2026-09-15T12:22:10.2966094Z  init version: de40ad0
+2026-09-15T12:22:10.2966312Z  Security Options:
+2026-09-15T12:22:10.2966519Z   apparmor
+2026-09-15T12:22:10.2966704Z   seccomp
+2026-09-15T12:22:10.2966893Z    Profile: builtin
+2026-09-15T12:22:10.2967093Z   cgroupns
+2026-09-15T12:22:10.2967291Z  Kernel Version: 6.17.0-1022-azure
+2026-09-15T12:22:10.2967562Z  Operating System: Ubuntu 24.04.5 LTS
+2026-09-15T12:22:10.2967819Z  OSType: linux
+2026-09-15T12:22:10.2968026Z  Architecture: x86_64
+2026-09-15T12:22:10.2968234Z  CPUs: 4
+2026-09-15T12:22:10.2968423Z  Total Memory: 15.61GiB
+2026-09-15T12:22:10.2968650Z  Name: runnervmlun5p
+2026-09-15T12:22:10.2968883Z  ID: a4efb8b6-20f9-46f4-b827-91ac0547be3a
+2026-09-15T12:22:10.2969212Z  Docker Root Dir: /var/lib/docker
+2026-09-15T12:22:10.2969464Z  Debug Mode: false
+2026-09-15T12:22:10.2969681Z  Username: githubactions
+2026-09-15T12:22:10.2969915Z  Experimental: false
+2026-09-15T12:22:10.2970135Z  Insecure Registries:
+2026-09-15T12:22:10.2970378Z   ::1/128
+2026-09-15T12:22:10.2970555Z   127.0.0.0/8
+2026-09-15T12:22:10.2971030Z  Live Restore Enabled: false
+2026-09-15T12:22:10.2971214Z 
+2026-09-15T12:22:10.2979083Z ##[endgroup]
+2026-09-15T12:22:10.3509051Z ##[group]Buildx version
+2026-09-15T12:22:10.3540347Z [command]/usr/bin/docker buildx version
+2026-09-15T12:22:10.4071662Z github.com/docker/buildx v0.37.0 ac30b249211430b85fb8f37b6e7154b5c47ba0b6
+2026-09-15T12:22:10.4101750Z ##[endgroup]
+2026-09-15T12:22:10.4252294Z ##[group]Inspecting default docker context
+2026-09-15T12:22:10.4395512Z [
+2026-09-15T12:22:10.4395904Z   {
+2026-09-15T12:22:10.4396279Z     "Name": "default",
+2026-09-15T12:22:10.4396687Z     "Metadata": {},
+2026-09-15T12:22:10.4397063Z     "Endpoints": {
+2026-09-15T12:22:10.4397462Z       "docker": {
+2026-09-15T12:22:10.4397877Z         "Host": "unix:///var/run/docker.sock",
+2026-09-15T12:22:10.4398399Z         "SkipTLSVerify": false
+2026-09-15T12:22:10.4398836Z       }
+2026-09-15T12:22:10.4399182Z     },
+2026-09-15T12:22:10.4399548Z     "TLSMaterial": {},
+2026-09-15T12:22:10.4399952Z     "Storage": {
+2026-09-15T12:22:10.4400378Z       "MetadataPath": "<IN MEMORY>",
+2026-09-15T12:22:10.4401586Z       "TLSPath": "<IN MEMORY>"
+2026-09-15T12:22:10.4402084Z     }
+2026-09-15T12:22:10.4402423Z   }
+2026-09-15T12:22:10.4402743Z ]
+2026-09-15T12:22:10.4403617Z ##[endgroup]
+2026-09-15T12:22:10.4923746Z ##[group]Pulling BuildKit image(s)
+2026-09-15T12:22:10.4950665Z [command]/usr/bin/docker pull moby/buildkit:buildx-stable-1
+2026-09-15T12:22:11.1128184Z buildx-stable-1: Pulling from moby/buildkit
+2026-09-15T12:22:11.1186128Z Digest: sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8
+2026-09-15T12:22:11.1187837Z Status: Image is up to date for moby/buildkit:buildx-stable-1
+2026-09-15T12:22:11.1192355Z docker.io/moby/buildkit:buildx-stable-1
+2026-09-15T12:22:11.1210578Z ##[endgroup]
+2026-09-15T12:22:11.1211367Z ##[group]Creating a new builder instance
+2026-09-15T12:22:11.1787268Z [command]/usr/bin/docker buildx create --name builder-a0e78744-422e-423f-9657-91878288d777 --driver docker-container --buildkitd-flags --allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host --use
+2026-09-15T12:22:11.2291814Z builder-a0e78744-422e-423f-9657-91878288d777
+2026-09-15T12:22:11.2324765Z ##[endgroup]
+2026-09-15T12:22:11.2325385Z ##[group]Booting builder
+2026-09-15T12:22:11.2362252Z [command]/usr/bin/docker buildx inspect --bootstrap --builder builder-a0e78744-422e-423f-9657-91878288d777
+2026-09-15T12:22:11.2844049Z #1 [internal] booting buildkit
+2026-09-15T12:22:11.4349091Z #1 pulling image moby/buildkit:buildx-stable-1
+2026-09-15T12:22:11.8855969Z #1 pulling image moby/buildkit:buildx-stable-1 0.6s done
+2026-09-15T12:22:12.0373578Z #1 creating container buildx_buildkit_builder-a0e78744-422e-423f-9657-91878288d7770
+2026-09-15T12:22:12.1516403Z #1 creating container buildx_buildkit_builder-a0e78744-422e-423f-9657-91878288d7770 0.3s done
+2026-09-15T12:22:12.1811477Z #1 DONE 0.9s
+2026-09-15T12:22:12.2120812Z Name:          builder-a0e78744-422e-423f-9657-91878288d777
+2026-09-15T12:22:12.2122294Z Driver:        docker-container
+2026-09-15T12:22:12.2123290Z Last Activity: 2026-09-15 12:22:11 +0000 UTC
+2026-09-15T12:22:12.2123687Z 
+2026-09-15T12:22:12.2123975Z Nodes:
+2026-09-15T12:22:12.2124753Z Name:                  builder-a0e78744-422e-423f-9657-91878288d7770
+2026-09-15T12:22:12.2125372Z Endpoint:              unix:///var/run/docker.sock
+2026-09-15T12:22:12.2125980Z Status:                running
+2026-09-15T12:22:12.2126514Z BuildKit daemon flags: --allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host
+2026-09-15T12:22:12.2127355Z BuildKit version:      v0.32.2
+2026-09-15T12:22:12.2127716Z Platforms:             linux/amd64, linux/amd64/v2, linux/amd64/v3, linux/386
+2026-09-15T12:22:12.2128084Z Labels:
+2026-09-15T12:22:12.2128350Z  org.mobyproject.buildkit.worker.executor:         oci
+2026-09-15T12:22:12.2128771Z  org.mobyproject.buildkit.worker.hostname:         705fcacb00df
+2026-09-15T12:22:12.2129185Z  org.mobyproject.buildkit.worker.network:          host
+2026-09-15T12:22:12.2129600Z  org.mobyproject.buildkit.worker.oci.process-mode: sandbox
+2026-09-15T12:22:12.2130018Z  org.mobyproject.buildkit.worker.selinux.enabled:  false
+2026-09-15T12:22:12.2130428Z  org.mobyproject.buildkit.worker.snapshotter:      overlayfs
+2026-09-15T12:22:12.2131049Z GC Policy rule#0:
+2026-09-15T12:22:12.2131432Z  All:            false
+2026-09-15T12:22:12.2132011Z  Filters:        type==source.local type==exec.cachemount type==source.git.checkout
+2026-09-15T12:22:12.2132446Z  Keep Duration:  48h0m0s
+2026-09-15T12:22:12.2132708Z  Max Used Space: 488.3MiB
+2026-09-15T12:22:12.2132932Z GC Policy rule#1:
+2026-09-15T12:22:12.2133136Z  All:            false
+2026-09-15T12:22:12.2133350Z  Keep Duration:  1440h0m0s
+2026-09-15T12:22:12.2133579Z  Reserved Space: 9.313GiB
+2026-09-15T12:22:12.2133816Z  Max Used Space: 93.13GiB
+2026-09-15T12:22:12.2134038Z  Min Free Space: 27.01GiB
+2026-09-15T12:22:12.2134255Z GC Policy rule#2:
+2026-09-15T12:22:12.2134453Z  All:            false
+2026-09-15T12:22:12.2134679Z  Reserved Space: 9.313GiB
+2026-09-15T12:22:12.2135191Z  Max Used Space: 93.13GiB
+2026-09-15T12:22:12.2135422Z  Min Free Space: 27.01GiB
+2026-09-15T12:22:12.2135635Z GC Policy rule#3:
+2026-09-15T12:22:12.2135830Z  All:            true
+2026-09-15T12:22:12.2136053Z  Reserved Space: 9.313GiB
+2026-09-15T12:22:12.2136273Z  Max Used Space: 93.13GiB
+2026-09-15T12:22:12.2136488Z  Min Free Space: 27.01GiB
+2026-09-15T12:22:12.2177501Z ##[endgroup]
+2026-09-15T12:22:12.3123907Z ##[group]Inspect builder
+2026-09-15T12:22:12.3126245Z {
+2026-09-15T12:22:12.3127082Z   "nodes": [
+2026-09-15T12:22:12.3127425Z     {
+2026-09-15T12:22:12.3127856Z       "name": "builder-a0e78744-422e-423f-9657-91878288d7770",
+2026-09-15T12:22:12.3128317Z       "endpoint": "unix:///var/run/docker.sock",
+2026-09-15T12:22:12.3128628Z       "status": "running",
+2026-09-15T12:22:12.3129375Z       "buildkitd-flags": "--allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host",
+2026-09-15T12:22:12.3130223Z       "buildkit": "v0.32.2",
+2026-09-15T12:22:12.3131347Z       "platforms": "linux/amd64,linux/amd64/v2,linux/amd64/v3,linux/386",
+2026-09-15T12:22:12.3131988Z       "features": {
+2026-09-15T12:22:12.3132526Z         "Automatically load images to the Docker Engine image store": true,
+2026-09-15T12:22:12.3132942Z         "Cache export": true,
+2026-09-15T12:22:12.3133197Z         "Direct push": true,
+2026-09-15T12:22:12.3133462Z         "Docker exporter": true,
+2026-09-15T12:22:12.3133734Z         "Multi-platform build": true,
+2026-09-15T12:22:12.3134010Z         "OCI exporter": true
+2026-09-15T12:22:12.3134230Z       },
+2026-09-15T12:22:12.3134406Z       "labels": {
+2026-09-15T12:22:12.3134677Z         "org.mobyproject.buildkit.worker.executor": "oci",
+2026-09-15T12:22:12.3135086Z         "org.mobyproject.buildkit.worker.hostname": "705fcacb00df",
+2026-09-15T12:22:12.3135553Z         "org.mobyproject.buildkit.worker.network": "host",
+2026-09-15T12:22:12.3136003Z         "org.mobyproject.buildkit.worker.oci.process-mode": "sandbox",
+2026-09-15T12:22:12.3136464Z         "org.mobyproject.buildkit.worker.selinux.enabled": "false",
+2026-09-15T12:22:12.3136930Z         "org.mobyproject.buildkit.worker.snapshotter": "overlayfs"
+2026-09-15T12:22:12.3137272Z       },
+2026-09-15T12:22:12.3137457Z       "gcPolicy": [
+2026-09-15T12:22:12.3137657Z         {
+2026-09-15T12:22:12.3137843Z           "all": false,
+2026-09-15T12:22:12.3138083Z           "filter": [
+2026-09-15T12:22:12.3138432Z             "type==source.local type==exec.cachemount type==source.git.checkout"
+2026-09-15T12:22:12.3138835Z           ],
+2026-09-15T12:22:12.3139060Z           "keepDuration": "48h0m0s",
+2026-09-15T12:22:12.3139347Z           "maxUsedSpace": "488.3MiB"
+2026-09-15T12:22:12.3139583Z         },
+2026-09-15T12:22:12.3139759Z         {
+2026-09-15T12:22:12.3139942Z           "all": false,
+2026-09-15T12:22:12.3140176Z           "keepDuration": "1440h0m0s",
+2026-09-15T12:22:12.3140461Z           "reservedSpace": "9.313GiB",
+2026-09-15T12:22:12.3141112Z           "maxUsedSpace": "93.13GiB",
+2026-09-15T12:22:12.3141461Z           "minFreeSpace": "27.01GiB"
+2026-09-15T12:22:12.3141728Z         },
+2026-09-15T12:22:12.3141932Z         {
+2026-09-15T12:22:12.3142117Z           "all": false,
+2026-09-15T12:22:12.3142366Z           "reservedSpace": "9.313GiB",
+2026-09-15T12:22:12.3142649Z           "maxUsedSpace": "93.13GiB",
+2026-09-15T12:22:12.3142925Z           "minFreeSpace": "27.01GiB"
+2026-09-15T12:22:12.3143169Z         },
+2026-09-15T12:22:12.3143365Z         {
+2026-09-15T12:22:12.3143558Z           "all": true,
+2026-09-15T12:22:12.3143801Z           "reservedSpace": "9.313GiB",
+2026-09-15T12:22:12.3144075Z           "maxUsedSpace": "93.13GiB",
+2026-09-15T12:22:12.3144340Z           "minFreeSpace": "27.01GiB"
+2026-09-15T12:22:12.3144600Z         }
+2026-09-15T12:22:12.3144794Z       ]
+2026-09-15T12:22:12.3144983Z     }
+2026-09-15T12:22:12.3145175Z   ],
+2026-09-15T12:22:12.3145413Z   "name": "builder-a0e78744-422e-423f-9657-91878288d777",
+2026-09-15T12:22:12.3145759Z   "driver": "docker-container",
+2026-09-15T12:22:12.3146228Z   "lastActivity": "2026-09-15T12:22:11.000Z"
+2026-09-15T12:22:12.3146514Z }
+2026-09-15T12:22:12.3146989Z ##[endgroup]
+2026-09-15T12:22:12.3147417Z ##[group]BuildKit version
+2026-09-15T12:22:12.3147721Z builder-a0e78744-422e-423f-9657-91878288d7770: v0.32.2
+2026-09-15T12:22:12.3148204Z ##[endgroup]
+2026-09-15T12:22:12.3235608Z ##[end-action id=__BtbN_delete-untagged-ghcr-action.__docker_setup-buildx-action;outcome=success;conclusion=success;duration_ms=2298]
+2026-09-15T12:22:12.3238817Z ##[start-action display=Login to GitHub Container Registry with PAT_TOKEN;id=__BtbN_delete-untagged-ghcr-action.__docker_login-action]
+2026-09-15T12:22:12.3269233Z ##[group]Run docker/login-action@v4
+2026-09-15T12:22:12.3269496Z with:
+2026-09-15T12:22:12.3269686Z   registry: ghcr.io
+2026-09-15T12:22:12.3269900Z   username: BtbN
+2026-09-15T12:22:12.3272967Z   password: ***
+2026-09-15T12:22:12.3273206Z   logout: true
+2026-09-15T12:22:12.3273407Z env:
+2026-09-15T12:22:12.3273601Z   DOCKER_BUILDKIT: 1
+2026-09-15T12:22:12.3273907Z   pythonLocation: /opt/hostedtoolcache/Python/3.14.7/x64
+2026-09-15T12:22:12.3274347Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.14.7/x64/lib/pkgconfig
+2026-09-15T12:22:12.3274776Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.14.7/x64
+2026-09-15T12:22:12.3275162Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.14.7/x64
+2026-09-15T12:22:12.3275539Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.14.7/x64
+2026-09-15T12:22:12.3275923Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.14.7/x64/lib
+2026-09-15T12:22:12.3276253Z ##[endgroup]
+2026-09-15T12:22:12.5406268Z Logging into ghcr.io...
+2026-09-15T12:22:12.9665746Z Login Succeeded!
+2026-09-15T12:22:12.9765612Z ##[end-action id=__BtbN_delete-untagged-ghcr-action.__docker_login-action;outcome=success;conclusion=success;duration_ms=652]
+2026-09-15T12:22:12.9769896Z ##[start-action display=Run action;id=__BtbN_delete-untagged-ghcr-action.delete-untagged-ghcr-action]
+2026-09-15T12:22:12.9801350Z ##[group]Run args=( "--token" "***" )
+2026-09-15T12:22:12.9806408Z [36;1margs=( "--token" "***" )[0m
+2026-09-15T12:22:12.9806970Z [36;1margs+=( "--repository_owner" "BtbN" )[0m
+2026-09-15T12:22:12.9807600Z [36;1mif [[ -n "BtbN/FFmpeg-Builds" ]]; then[0m
+2026-09-15T12:22:12.9808196Z [36;1m  args+=( "--repository" "BtbN/FFmpeg-Builds" )[0m
+2026-09-15T12:22:12.9808756Z [36;1mfi[0m
+2026-09-15T12:22:12.9809195Z [36;1mif [[ -n "ffmpeg-builds/base-win64" ]]; then[0m
+2026-09-15T12:22:12.9809868Z [36;1m  args+=( "--package_names" "ffmpeg-builds/base-win64" )[0m
+2026-09-15T12:22:12.9810481Z [36;1mfi[0m
+2026-09-15T12:22:12.9811666Z [36;1margs+=( "--untagged_only" "true" )[0m
+2026-09-15T12:22:12.9812332Z [36;1margs+=( "--except_untagged_multiplatform" "true" )[0m
+2026-09-15T12:22:12.9812958Z [36;1margs+=( "--with_sigs" "false")[0m
+2026-09-15T12:22:12.9813515Z [36;1margs+=( "--owner_type" "user" )[0m
+2026-09-15T12:22:12.9814010Z [36;1mecho "args: ${args[@]}"[0m
+2026-09-15T12:22:12.9814879Z [36;1mpython /home/runner/work/_actions/BtbN/delete-untagged-ghcr-action/main/clean_ghcr.py "${args[@]}"[0m
+2026-09-15T12:22:12.9865438Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-09-15T12:22:12.9866054Z env:
+2026-09-15T12:22:12.9866428Z   DOCKER_BUILDKIT: 1
+2026-09-15T12:22:12.9866935Z   pythonLocation: /opt/hostedtoolcache/Python/3.14.7/x64
+2026-09-15T12:22:12.9867710Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.14.7/x64/lib/pkgconfig
+2026-09-15T12:22:12.9868522Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.14.7/x64
+2026-09-15T12:22:12.9869231Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.14.7/x64
+2026-09-15T12:22:12.9869923Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.14.7/x64
+2026-09-15T12:22:12.9870689Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.14.7/x64/lib
+2026-09-15T12:22:12.9871581Z ##[endgroup]
+2026-09-15T12:22:12.9941973Z args: --token *** --repository_owner BtbN --repository BtbN/FFmpeg-Builds --package_names ffmpeg-builds/base-win64 --untagged_only true --except_untagged_multiplatform true --with_sigs false --owner_type user
+2026-09-15T12:22:13.7341793Z WARNING! Using --password via the CLI is insecure. Use --password-stdin.
+2026-09-15T12:22:14.1598617Z 
+2026-09-15T12:22:14.1599164Z Login Succeeded
+2026-09-15T12:22:14.1600076Z WARNING! Your credentials are stored unencrypted in '/home/runner/.docker/config.json'.
+2026-09-15T12:22:14.1601478Z Configure a credential helper to remove this warning. See
+2026-09-15T12:22:14.1602162Z https://docs.docker.com/go/credential-store/
+2026-09-15T12:22:14.1602797Z 
+2026-09-15T12:22:15.5557466Z Deleted 0 package
+2026-09-15T12:22:15.5797527Z ##[end-action id=__BtbN_delete-untagged-ghcr-action.delete-untagged-ghcr-action;outcome=success;conclusion=success;duration_ms=2602]
+2026-09-15T12:22:15.5919875Z Post job cleanup.
+2026-09-15T12:22:15.5924849Z ##[start-action display=Login to GitHub Container Registry with PAT_TOKEN;id=__432e3f24-451f-48cb-93d7-43dc7380e8f0.__docker_login-action]
+2026-09-15T12:22:15.5951338Z Post job cleanup.
+2026-09-15T12:22:15.8151401Z ##[group]Logout from ghcr.io
+2026-09-15T12:22:15.8207512Z [command]/usr/bin/docker logout ghcr.io
+2026-09-15T12:22:15.8351486Z Removing login credentials for ghcr.io
+2026-09-15T12:22:15.8382644Z ##[endgroup]
+2026-09-15T12:22:15.8383048Z ##[group]Post cache
+2026-09-15T12:22:15.8384324Z State not set
+2026-09-15T12:22:15.8385221Z ##[endgroup]
+2026-09-15T12:22:15.8486409Z ##[end-action id=__432e3f24-451f-48cb-93d7-43dc7380e8f0.__docker_login-action;outcome=success;conclusion=success;duration_ms=256]
+2026-09-15T12:22:15.8489107Z ##[start-action display=Set up Docker Buildx;id=__432e3f24-451f-48cb-93d7-43dc7380e8f0.__docker_setup-buildx-action]
+2026-09-15T12:22:15.8529038Z Post job cleanup.
+2026-09-15T12:22:16.0418031Z ##[group]Removing builder
+2026-09-15T12:22:16.1367384Z [command]/usr/bin/docker buildx rm builder-a0e78744-422e-423f-9657-91878288d777
+2026-09-15T12:22:16.2830642Z builder-a0e78744-422e-423f-9657-91878288d777 removed
+2026-09-15T12:22:16.2863753Z ##[endgroup]
+2026-09-15T12:22:16.2864436Z ##[group]Cleaning up certificates
+2026-09-15T12:22:16.2867277Z ##[endgroup]
+2026-09-15T12:22:16.2868079Z ##[group]Post cache
+2026-09-15T12:22:16.2868870Z State not set
+2026-09-15T12:22:16.2869718Z ##[endgroup]
+2026-09-15T12:22:16.2975706Z ##[end-action id=__432e3f24-451f-48cb-93d7-43dc7380e8f0.__docker_setup-buildx-action;outcome=success;conclusion=success;duration_ms=448]
+2026-09-15T12:22:16.2978300Z ##[start-action display=Setup Python;id=__432e3f24-451f-48cb-93d7-43dc7380e8f0.__actions_setup-python]
+2026-09-15T12:22:16.3021057Z Post job cleanup.
+2026-09-15T12:22:16.4340229Z ##[end-action id=__432e3f24-451f-48cb-93d7-43dc7380e8f0.__actions_setup-python;outcome=success;conclusion=success;duration_ms=136]
+2026-09-15T12:22:16.4410552Z Post job cleanup.
+2026-09-15T12:22:16.6898870Z ##[group]Generating build summary
+2026-09-15T12:22:16.7511792Z exporting build record to /home/runner/work/_temp/docker-actions-toolkit-xAZrSE/export
+2026-09-15T12:22:16.8562242Z [command]/usr/bin/docker buildx history export --builder builder-a629543c-67f0-4c7b-9e58-25563bd14450 --output /home/runner/work/_temp/docker-actions-toolkit-xAZrSE/export/BtbN~FFmpeg-Builds~N2RCYN.dockerbuild n2rcynj6lv0xazr6cu0p258tm --finalize
+2026-09-15T12:22:17.0478041Z Build record written to /home/runner/work/_temp/docker-actions-toolkit-xAZrSE/export/BtbN~FFmpeg-Builds~N2RCYN.dockerbuild (35.21 KB)
+2026-09-15T12:22:17.0479890Z Uploading BtbN~FFmpeg-Builds~N2RCYN.dockerbuild as an artifact
+2026-09-15T12:22:17.0486569Z Artifact name is valid!
+2026-09-15T12:22:17.0487441Z Root directory input is valid!
+2026-09-15T12:22:17.4409257Z Uploading artifact: BtbN~FFmpeg-Builds~N2RCYN.dockerbuild
+2026-09-15T12:22:17.4454309Z Beginning upload of artifact content to blob storage
+2026-09-15T12:22:17.7980410Z Uploaded bytes 36055
+2026-09-15T12:22:17.8734172Z Finished uploading artifact content to blob storage!
+2026-09-15T12:22:17.8735294Z SHA256 digest of uploaded artifact is f2abd86936cacf0be960d27d9ab0364260e671bba0e9b069fad65662884b808d
+2026-09-15T12:22:17.8736289Z Finalizing artifact upload
+2026-09-15T12:22:18.3093569Z Artifact BtbN~FFmpeg-Builds~N2RCYN.dockerbuild successfully finalized. Artifact ID 10396013091
+2026-09-15T12:22:18.3094769Z Artifact download URL: https://github.com/BtbN/FFmpeg-Builds/actions/runs/34967781095/artifacts/10396013091
+2026-09-15T12:22:18.3128435Z Writing summary
+2026-09-15T12:22:18.3140925Z ##[endgroup]
+2026-09-15T12:22:18.3141984Z ##[group]Removing temp folder /home/runner/work/_temp/docker-actions-toolkit-7XrxAz
+2026-09-15T12:22:18.3144424Z ##[endgroup]
+2026-09-15T12:22:18.3144993Z ##[group]Post cache
+2026-09-15T12:22:18.3145620Z State not set
+2026-09-15T12:22:18.3238995Z ##[endgroup]
+2026-09-15T12:22:18.3295380Z Post job cleanup.
+2026-09-15T12:22:18.5426879Z ##[group]Logout from ghcr.io
+2026-09-15T12:22:18.5475063Z [command]/usr/bin/docker logout ghcr.io
+2026-09-15T12:22:18.5618204Z Removing login credentials for ghcr.io
+2026-09-15T12:22:18.5652845Z ##[endgroup]
+2026-09-15T12:22:18.5653788Z ##[group]Post cache
+2026-09-15T12:22:18.5654499Z State not set
+2026-09-15T12:22:18.5655358Z ##[endgroup]
+2026-09-15T12:22:18.5815456Z Post job cleanup.
+2026-09-15T12:22:18.7622829Z ##[group]Removing builder
+2026-09-15T12:22:18.8571886Z [command]/usr/bin/docker buildx rm builder-a629543c-67f0-4c7b-9e58-25563bd14450
+2026-09-15T12:22:18.9833357Z builder-a629543c-67f0-4c7b-9e58-25563bd14450 removed
+2026-09-15T12:22:18.9866816Z ##[endgroup]
+2026-09-15T12:22:18.9867572Z ##[group]Post cache
+2026-09-15T12:22:18.9869713Z State not set
+2026-09-15T12:22:18.9870351Z ##[endgroup]
+2026-09-15T12:22:19.0042358Z Post job cleanup.
+2026-09-15T12:22:19.0851324Z [command]/usr/bin/git version
+2026-09-15T12:22:19.0892765Z git version 2.55.0
+2026-09-15T12:22:19.0937092Z Temporarily overriding HOME='/home/runner/work/_temp/f8f5a67a-a5bc-4cf1-ad05-08c8ae944485' before making global git config changes
+2026-09-15T12:22:19.0938481Z Adding repository directory to the temporary git global config as a safe directory
+2026-09-15T12:22:19.0943629Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/FFmpeg-Builds/FFmpeg-Builds
+2026-09-15T12:22:19.0974530Z Removing SSH command configuration
+2026-09-15T12:22:19.0981620Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-09-15T12:22:19.1016522Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-09-15T12:22:19.1253105Z Removing HTTP extra header
+2026-09-15T12:22:19.1258115Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-09-15T12:22:19.1292997Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-09-15T12:22:19.1513063Z Removing includeIf entries pointing to credentials config files
+2026-09-15T12:22:19.1519168Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-09-15T12:22:19.1545656Z includeif.gitdir:/home/runner/work/FFmpeg-Builds/FFmpeg-Builds/.git.path
+2026-09-15T12:22:19.1546747Z includeif.gitdir:/home/runner/work/FFmpeg-Builds/FFmpeg-Builds/.git/worktrees/*.path
+2026-09-15T12:22:19.1547650Z includeif.gitdir:/github/workspace/.git.path
+2026-09-15T12:22:19.1548360Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-09-15T12:22:19.1554271Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/FFmpeg-Builds/FFmpeg-Builds/.git.path
+2026-09-15T12:22:19.1575479Z /home/runner/work/_temp/git-credentials-c3913465-2399-4a7f-8359-24515e475178.config
+2026-09-15T12:22:19.1585791Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/FFmpeg-Builds/FFmpeg-Builds/.git.path \/home\/runner\/work\/_temp\/git\-credentials\-c3913465\-2399\-4a7f\-8359\-24515e475178\.config
+2026-09-15T12:22:19.1619340Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/FFmpeg-Builds/FFmpeg-Builds/.git/worktrees/*.path
+2026-09-15T12:22:19.1641190Z /home/runner/work/_temp/git-credentials-c3913465-2399-4a7f-8359-24515e475178.config
+2026-09-15T12:22:19.1650142Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/FFmpeg-Builds/FFmpeg-Builds/.git/worktrees/*.path \/home\/runner\/work\/_temp\/git\-credentials\-c3913465\-2399\-4a7f\-8359\-24515e475178\.config
+2026-09-15T12:22:19.1717466Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+2026-09-15T12:22:19.1737964Z /github/runner_temp/git-credentials-c3913465-2399-4a7f-8359-24515e475178.config
+2026-09-15T12:22:19.1745502Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path \/github\/runner_temp\/git\-credentials\-c3913465\-2399\-4a7f\-8359\-24515e475178\.config
+2026-09-15T12:22:19.1775585Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-09-15T12:22:19.1795778Z /github/runner_temp/git-credentials-c3913465-2399-4a7f-8359-24515e475178.config
+2026-09-15T12:22:19.1803539Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-c3913465\-2399\-4a7f\-8359\-24515e475178\.config
+2026-09-15T12:22:19.1835564Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-09-15T12:22:19.2057646Z Removing credentials config '/home/runner/work/_temp/git-credentials-c3913465-2399-4a7f-8359-24515e475178.config'
+2026-09-15T12:22:19.2201268Z Cleaning up orphan processes

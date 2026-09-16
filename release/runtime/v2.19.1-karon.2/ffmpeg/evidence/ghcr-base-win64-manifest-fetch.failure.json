@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "checkedAtUtc": "2026-09-16T03:36:21.2919837Z",
+  "repository": "btbn/ffmpeg-builds",
+  "digest": "sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be",
+  "requestUrl": "https://ghcr.io/v2/btbn/ffmpeg-builds/manifests/sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be",
+  "authenticated": true,
+  "errorType": "Microsoft.PowerShell.Commands.HttpResponseException",
+  "statusCode": 404,
+  "rawFailure": "\r\n{\r\n  \"errors\": [\r\n    {\r\n      \"code\": \"MANIFEST_UNKNOWN\",\r\n      \"message\": \"manifest unknown\"\r\n    }\r\n  ]\r\n}"
+}

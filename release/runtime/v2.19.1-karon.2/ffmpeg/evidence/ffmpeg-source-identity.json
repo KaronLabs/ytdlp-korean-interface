@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "binaryArchiveSha256": "39697D69681A09BD55A0F0224360A9A4285BC12127DF807D7242592B0E144A7B",
+  "ffmpegExeSha256": "41482EABC1A33F9D1E4334CA32EC9259AA34A3EC2493FCC9F214BFE54301CE38",
+  "binaryVersion": "n9.0.1-30-g9258bacca5",
+  "binaryAbbreviatedCommit": "9258bacca5",
+  "resolvedFullCommit": "9258bacca50d7ca28bcb6d797e8952123e35105b",
+  "resolution": "The published binary identity's unique hexadecimal prefix is resolved by the official FFmpeg GitHub commit API; the full-commit codeload archive is included and hash-pinned.",
+  "retainedJobLogLimitation": "Job 104384912273 prints BUILD_NAME with the abbreviated git-describe identity but no git rev-parse full hash.",
+  "fullSourceArchive": {
+    "url": "https://codeload.github.com/FFmpeg/FFmpeg/zip/9258bacca50d7ca28bcb6d797e8952123e35105b",
+    "sha256": "5A486A7A20FDF673D0FE9314B41897725ABE34AA8BB63C5C440F2B017935644C",
+    "bytes": 23725274
+  },
+  "commitMetadataPath": "evidence/ffmpeg-9258bacca50d7ca28bcb6d797e8952123e35105b.commit.json",
+  "jobLogPath": "evidence/job-104384912273.log"
+}

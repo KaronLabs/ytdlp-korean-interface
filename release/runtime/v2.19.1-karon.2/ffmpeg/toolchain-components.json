@@ -1,0 +1,1367 @@
+{
+  "schemaVersion": 1,
+  "policy": "verified-conservative-superset",
+  "baseImage": {
+    "name": "ghcr.io/btbn/ffmpeg-builds/base-win64",
+    "digest": "sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be",
+    "actionsRunId": 34967781095,
+    "jobId": 104378132452,
+    "baseImageDigest": "sha256:6ca7e979f8bf9bd54b83c3e5c94c08f251f9c0f73b9398d2d9e5c44e30c88744",
+    "configDigestFromLog": "sha256:548c348ebe911aac409043aa274ac43ef7046c4ec53c6b060e271723c40b30ac",
+    "provenanceAttestationEnabled": false
+  },
+  "crosstool": {
+    "commit": "b1a94f65c5187d99037a4e2f57aefbdf995a9677",
+    "configHeader": "crosstool-NG 1.29.0.7_b1a94f6",
+    "libgompEnabled": true,
+    "allBundledPatchCount": 1071,
+    "exactSelectedVersionPatchCount": 31
+  },
+  "componentCount": 12,
+  "components": [
+    {
+      "applicability": "conservative-superset",
+      "id": "toolchain-binutils-2.47",
+      "source": {
+        "url": "https://ftp.gnu.org/gnu/binutils/binutils-2.47.tar.xz",
+        "archiveName": "binutils-2.47.tar.xz",
+        "bytes": 29034716,
+        "sha256": "154AB23B60070E8F27013C22977F1129425D67D1E8ACD6E13010E617811E4CFF"
+      },
+      "license": {
+        "expression": "LicenseRef-048be075e2f6468c AND LicenseRef-231f7edcc7352d77 AND LicenseRef-32434afcc8666ba0 AND LicenseRef-36266a8fd0735683 AND LicenseRef-56bdea73b6145ef6 AND LicenseRef-845efc77857d485d AND LicenseRef-8ceb4b9ee5adedde",
+        "files": [
+          {
+            "sha256": "8CEB4B9EE5ADEDDE47B31E975C1D90C73AD27B6B165A1DCD80C7C545EB65B903",
+            "licenseRef": "LicenseRef-8ceb4b9ee5adedde",
+            "bytes": 35147,
+            "bundlePath": "licenses/extracted/8CEB4B9EE5ADEDDE47B31E975C1D90C73AD27B6B165A1DCD80C7C545EB65B903.txt",
+            "memberPath": "binutils-2.47/bfd/COPYING"
+          },
+          {
+            "sha256": "231F7EDCC7352D7734A96EEF0B8030F77982678C516876FCB81E25B32D68564C",
+            "licenseRef": "LicenseRef-231f7edcc7352d77",
+            "bytes": 18002,
+            "bundlePath": "licenses/extracted/231F7EDCC7352D7734A96EEF0B8030F77982678C516876FCB81E25B32D68564C.txt",
+            "memberPath": "binutils-2.47/COPYING"
+          },
+          {
+            "sha256": "56BDEA73B6145EF6AC5259B3DA390B981D840C24CB03B8E1CBC678DE7ECFA18D",
+            "licenseRef": "LicenseRef-56bdea73b6145ef6",
+            "bytes": 25291,
+            "bundlePath": "licenses/extracted/56BDEA73B6145EF6AC5259B3DA390B981D840C24CB03B8E1CBC678DE7ECFA18D.txt",
+            "memberPath": "binutils-2.47/COPYING.LIB"
+          },
+          {
+            "sha256": "8CEB4B9EE5ADEDDE47B31E975C1D90C73AD27B6B165A1DCD80C7C545EB65B903",
+            "licenseRef": "LicenseRef-8ceb4b9ee5adedde",
+            "bytes": 35147,
+            "bundlePath": "licenses/extracted/8CEB4B9EE5ADEDDE47B31E975C1D90C73AD27B6B165A1DCD80C7C545EB65B903.txt",
+            "memberPath": "binutils-2.47/gas/COPYING"
+          },
+          {
+            "sha256": "231F7EDCC7352D7734A96EEF0B8030F77982678C516876FCB81E25B32D68564C",
+            "licenseRef": "LicenseRef-231f7edcc7352d77",
+            "bytes": 18002,
+            "bundlePath": "licenses/extracted/231F7EDCC7352D7734A96EEF0B8030F77982678C516876FCB81E25B32D68564C.txt",
+            "memberPath": "binutils-2.47/include/COPYING"
+          },
+          {
+            "sha256": "048BE075E2F6468C1F32840499D9970240306FD401570D876AAFC4F81327B4D3",
+            "licenseRef": "LicenseRef-048be075e2f6468c",
+            "bytes": 26755,
+            "bundlePath": "licenses/extracted/048BE075E2F6468C1F32840499D9970240306FD401570D876AAFC4F81327B4D3.txt",
+            "memberPath": "binutils-2.47/libiberty/copying-lib.texi"
+          },
+          {
+            "sha256": "32434AFCC8666BA060E111D715BFDB6C2D5DD8A35FA4D3AB8AD67D8F850D2F2B",
+            "licenseRef": "LicenseRef-32434afcc8666ba0",
+            "bytes": 26440,
+            "bundlePath": "licenses/extracted/32434AFCC8666BA060E111D715BFDB6C2D5DD8A35FA4D3AB8AD67D8F850D2F2B.txt",
+            "memberPath": "binutils-2.47/libiberty/COPYING.LIB"
+          },
+          {
+            "sha256": "36266A8FD073568394CB81CDB2B124F7FDAE2C64C1A7ED09DB34B4D22EFA2951",
+            "licenseRef": "LicenseRef-36266a8fd0735683",
+            "bytes": 1359,
+            "bundlePath": "licenses/extracted/36266A8FD073568394CB81CDB2B124F7FDAE2C64C1A7ED09DB34B4D22EFA2951.txt",
+            "memberPath": "binutils-2.47/zlib/contrib/dotzlib/LICENSE_1_0.txt"
+          },
+          {
+            "sha256": "845EFC77857D485D91FB3E0B884AAA929368C717AE8186B66FE1ED2495753243",
+            "licenseRef": "LicenseRef-845efc77857d485d",
+            "bytes": 1002,
+            "bundlePath": "licenses/extracted/845EFC77857D485D91FB3E0B884AAA929368C717AE8186B66FE1ED2495753243.txt",
+            "memberPath": "binutils-2.47/zlib/LICENSE"
+          }
+        ]
+      },
+      "recipe": {
+        "builderCommit": "3e6685eda92f9288c15ac320139622dcedca09a4",
+        "baseImageDigest": "sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be",
+        "dockerfilePath": "images/base-win64/Dockerfile",
+        "configPath": "images/base-win64/ct-ng-config",
+        "crosstoolCommit": "b1a94f65c5187d99037a4e2f57aefbdf995a9677",
+        "checksum": {
+          "path": "packages/binutils/2.47/chksum",
+          "fileSha256": "855B4256CB262C463E29A71A74D69ED33E494265EB53B5361445EB82BB2D0526",
+          "line": "sha256 binutils-2.47.tar.xz 154ab23b60070e8f27013c22977f1129425d67d1e8acd6e13010e617811e4cff"
+        },
+        "patches": [
+          {
+            "path": "packages/binutils/2.47/0000-sh-conf.patch",
+            "sha256": "0CA7DA56B210E74F33650D8C15079BDCA63AD793568CAB2C56B969662F07BD92",
+            "bytes": 887
+          },
+          {
+            "path": "packages/binutils/2.47/0001-check_ldrunpath_length.patch",
+            "sha256": "98E5DC5D79638DEB90BA77C3DADDD7C44AA6175624249ECB3DA916240CB69037",
+            "bytes": 1055
+          },
+          {
+            "path": "packages/binutils/2.47/0002-Don-t-link-to-libfl-as-it-s-unnecessary.patch",
+            "sha256": "1016491C50570C3330E539D964B0FFCDE2B9CC86BDCDE87008CCDCDF3F73B5C0",
+            "bytes": 3145
+          },
+          {
+            "path": "packages/binutils/2.47/0003-Fix-darwin-build.patch",
+            "sha256": "CDBC6BBDA57C431373F30CF70EC3F2BB3096929CFEADA402AE29165707D613E7",
+            "bytes": 1303
+          },
+          {
+            "path": "packages/binutils/2.47/0004-sysroot.patch",
+            "sha256": "AAEA26E2A6E89272C0886BB8FA22E53D1332856921906073F47C4002B8382AB6",
+            "bytes": 1571
+          },
+          {
+            "path": "packages/binutils/2.47/0005-poison-system-directories.patch",
+            "sha256": "4A72169714F643FBBAA84051D29DD75CDF42337E7EF58CB187FB6922C186EBD8",
+            "bytes": 10588
+          }
+        ]
+      }
+    },
+    {
+      "applicability": "conservative-superset",
+      "id": "toolchain-crosstool-ng-b1a94f65",
+      "source": {
+        "url": "https://codeload.github.com/crosstool-ng/crosstool-ng/zip/b1a94f65c5187d99037a4e2f57aefbdf995a9677",
+        "archiveName": "crosstool-ng-b1a94f65c5187d99037a4e2f57aefbdf995a9677.zip",
+        "bytes": 6972578,
+        "sha256": "3654FCECA73EA405E34ADC072DC38DB1C73256435F138C5D5CECA86CE68A363B"
+      },
+      "license": {
+        "expression": "LicenseRef-07bc0ccd386469c7 AND LicenseRef-400d38e5cfee1812 AND LicenseRef-fb2a94e37b5cfa67",
+        "files": [
+          {
+            "sha256": "07BC0CCD386469C748C4CF6C8FACA5667FBF8C4400386714287FA233ACFD68BA",
+            "licenseRef": "LicenseRef-07bc0ccd386469c7",
+            "bytes": 2517,
+            "bundlePath": "licenses/extracted/07BC0CCD386469C748C4CF6C8FACA5667FBF8C4400386714287FA233ACFD68BA.txt",
+            "memberPath": "crosstool-ng-b1a94f65c5187d99037a4e2f57aefbdf995a9677/COPYING"
+          },
+          {
+            "sha256": "FB2A94E37B5CFA679F96B9CFC8F16EE1A665281FFD1658B0E3A8506E6237CCB6",
+            "licenseRef": "LicenseRef-fb2a94e37b5cfa67",
+            "bytes": 2916,
+            "bundlePath": "licenses/extracted/FB2A94E37B5CFA679F96B9CFC8F16EE1A665281FFD1658B0E3A8506E6237CCB6.txt",
+            "memberPath": "crosstool-ng-b1a94f65c5187d99037a4e2f57aefbdf995a9677/debian/copyright"
+          },
+          {
+            "sha256": "400D38E5CFEE181230373A8B02D38F50271A5BF62C62410382EFDDB8E8B19E22",
+            "licenseRef": "LicenseRef-400d38e5cfee1812",
+            "bytes": 7,
+            "bundlePath": "licenses/extracted/400D38E5CFEE181230373A8B02D38F50271A5BF62C62410382EFDDB8E8B19E22.txt",
+            "memberPath": "crosstool-ng-b1a94f65c5187d99037a4e2f57aefbdf995a9677/LICENSE"
+          }
+        ]
+      },
+      "recipe": {
+        "builderCommit": "3e6685eda92f9288c15ac320139622dcedca09a4",
+        "baseImageDigest": "sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be",
+        "dockerfilePath": "images/base-win64/Dockerfile",
+        "configPath": "images/base-win64/ct-ng-config",
+        "crosstoolCommit": "b1a94f65c5187d99037a4e2f57aefbdf995a9677",
+        "checksum": null,
+        "patches": []
+      }
+    },
+    {
+      "applicability": "conservative-superset",
+      "id": "toolchain-gcc-16.2.0",
+      "source": {
+        "url": "https://ftp.gnu.org/gnu/gcc/gcc-16.2.0/gcc-16.2.0.tar.xz",
+        "archiveName": "gcc-16.2.0.tar.xz",
+        "bytes": 107200820,
+        "sha256": "E6738E29597F733270731AA90600F37FFDC045079DFC27EC7E8192CC81085C3E"
+      },
+      "license": {
+        "expression": "LicenseRef-048be075e2f6468c AND LicenseRef-0bf700c6654f3e72 AND LicenseRef-0ca8cbe9219a841f AND LicenseRef-0fb317cfe0260cc7 AND LicenseRef-145aeebbfd1eda3e AND LicenseRef-231f7edcc7352d77 AND LicenseRef-23860c2a7b5d96b2 AND LicenseRef-23f18e03dc49df91 AND LicenseRef-29662666b44dff84 AND LicenseRef-2d36597f7117c38b AND LicenseRef-32434afcc8666ba0 AND LicenseRef-36266a8fd0735683 AND LicenseRef-4887b107e3d1ace1 AND LicenseRef-4919cfb14a73cd64 AND LicenseRef-62c7a1e35f564068 AND LicenseRef-6485b8ed310d3f03 AND LicenseRef-685fba36bb54ab01 AND LicenseRef-6ef2606fad7fce5b AND LicenseRef-74c2b24539a53c34 AND LicenseRef-7b63ecd5f1902af1 AND LicenseRef-845efc77857d485d AND LicenseRef-84d554e7a5d139b7 AND LicenseRef-9d6b43ce4d8de0c8 AND LicenseRef-a60eea8175145316 AND LicenseRef-a61d06e8f7be5792 AND LicenseRef-a8d47ff51ca256f5 AND LicenseRef-a9bdde5616ecdd1e AND LicenseRef-c0a2678e14049ef3 AND LicenseRef-c71d239df91726fc AND LicenseRef-c9bff75738922193 AND LicenseRef-e234bf4bc7276b6f AND LicenseRef-e67978cd18816c0c",
+        "files": [
+          {
+            "sha256": "231F7EDCC7352D7734A96EEF0B8030F77982678C516876FCB81E25B32D68564C",
+            "licenseRef": "LicenseRef-231f7edcc7352d77",
+            "bytes": 18002,
+            "bundlePath": "licenses/extracted/231F7EDCC7352D7734A96EEF0B8030F77982678C516876FCB81E25B32D68564C.txt",
+            "memberPath": "gcc-16.2.0/COPYING"
+          },
+          {
+            "sha256": "A9BDDE5616ECDD1E980B44F360600EE8783B1F99B8CC83A2BEB163A0A390E861",
+            "licenseRef": "LicenseRef-a9bdde5616ecdd1e",
+            "bytes": 26527,
+            "bundlePath": "licenses/extracted/A9BDDE5616ECDD1E980B44F360600EE8783B1F99B8CC83A2BEB163A0A390E861.txt",
+            "memberPath": "gcc-16.2.0/COPYING.LIB"
+          },
+          {
+            "sha256": "9D6B43CE4D8DE0C878BF16B54D8E7A10D9BD42B75178153E3AF6A815BDC90F74",
+            "licenseRef": "LicenseRef-9d6b43ce4d8de0c8",
+            "bytes": 3324,
+            "bundlePath": "licenses/extracted/9D6B43CE4D8DE0C878BF16B54D8E7A10D9BD42B75178153E3AF6A815BDC90F74.txt",
+            "memberPath": "gcc-16.2.0/COPYING.RUNTIME"
+          },
+          {
+            "sha256": "C0A2678E14049EF3D4BA0D9DD7ABF8B0DBB8335D6E2311B2D2F568035321F2B7",
+            "licenseRef": "LicenseRef-c0a2678e14049ef3",
+            "bytes": 695,
+            "bundlePath": "licenses/extracted/C0A2678E14049EF3D4BA0D9DD7ABF8B0DBB8335D6E2311B2D2F568035321F2B7.txt",
+            "memberPath": "gcc-16.2.0/gcc/ada/doc/share/copyright.tex"
+          },
+          {
+            "sha256": "231F7EDCC7352D7734A96EEF0B8030F77982678C516876FCB81E25B32D68564C",
+            "licenseRef": "LicenseRef-231f7edcc7352d77",
+            "bytes": 18002,
+            "bundlePath": "licenses/extracted/231F7EDCC7352D7734A96EEF0B8030F77982678C516876FCB81E25B32D68564C.txt",
+            "memberPath": "gcc-16.2.0/gcc/COPYING"
+          },
+          {
+            "sha256": "32434AFCC8666BA060E111D715BFDB6C2D5DD8A35FA4D3AB8AD67D8F850D2F2B",
+            "licenseRef": "LicenseRef-32434afcc8666ba0",
+            "bytes": 26440,
+            "bundlePath": "licenses/extracted/32434AFCC8666BA060E111D715BFDB6C2D5DD8A35FA4D3AB8AD67D8F850D2F2B.txt",
+            "memberPath": "gcc-16.2.0/gcc/COPYING.LIB"
+          },
+          {
+            "sha256": "2D36597F7117C38B006835AE7F537487207D8EC407AA9D9980794B2030CBC067",
+            "licenseRef": "LicenseRef-2d36597f7117c38b",
+            "bytes": 1479,
+            "bundlePath": "licenses/extracted/2D36597F7117C38B006835AE7F537487207D8EC407AA9D9980794B2030CBC067.txt",
+            "memberPath": "gcc-16.2.0/gcc/go/gofrontend/LICENSE"
+          },
+          {
+            "sha256": "4887B107E3D1ACE106AA293FE73B4AA9BE52EDBC5B96E5A9B672C8916FEDE722",
+            "licenseRef": "LicenseRef-4887b107e3d1ace1",
+            "bytes": 20355,
+            "bundlePath": "licenses/extracted/4887B107E3D1ACE106AA293FE73B4AA9BE52EDBC5B96E5A9B672C8916FEDE722.txt",
+            "memberPath": "gcc-16.2.0/gcc/m2/COPYING.FDL"
+          },
+          {
+            "sha256": "145AEEBBFD1EDA3E31353158311B12478AAD06BCE8BFFC22184F33CE2FFCE64F",
+            "licenseRef": "LicenseRef-145aeebbfd1eda3e",
+            "bytes": 3329,
+            "bundlePath": "licenses/extracted/145AEEBBFD1EDA3E31353158311B12478AAD06BCE8BFFC22184F33CE2FFCE64F.txt",
+            "memberPath": "gcc-16.2.0/gcc/m2/COPYING.RUNTIME"
+          },
+          {
+            "sha256": "E234BF4BC7276B6F48A0EE9EFCBC652EF3072573D996DD590287110ADC2F1922",
+            "licenseRef": "LicenseRef-e234bf4bc7276b6f",
+            "bytes": 762,
+            "bundlePath": "licenses/extracted/E234BF4BC7276B6F48A0EE9EFCBC652EF3072573D996DD590287110ADC2F1922.txt",
+            "memberPath": "gcc-16.2.0/gcc/m2/images/LICENSE.IMG"
+          },
+          {
+            "sha256": "A60EEA817514531668D7E00765731449FE14D059D3249E0BC93B36DE45F759F2",
+            "licenseRef": "LicenseRef-a60eea8175145316",
+            "bytes": 10847,
+            "bundlePath": "licenses/extracted/A60EEA817514531668D7E00765731449FE14D059D3249E0BC93B36DE45F759F2.txt",
+            "memberPath": "gcc-16.2.0/gcc/rust/checks/errors/borrowck/ffi-polonius/vendor/datafrog/LICENSE-APACHE"
+          },
+          {
+            "sha256": "23F18E03DC49DF91622FE2A76176497404E46CED8A715D9D2B67A7446571CCA3",
+            "licenseRef": "LicenseRef-23f18e03dc49df91",
+            "bytes": 1023,
+            "bundlePath": "licenses/extracted/23F18E03DC49DF91622FE2A76176497404E46CED8A715D9D2B67A7446571CCA3.txt",
+            "memberPath": "gcc-16.2.0/gcc/rust/checks/errors/borrowck/ffi-polonius/vendor/datafrog/LICENSE-MIT"
+          },
+          {
+            "sha256": "A60EEA817514531668D7E00765731449FE14D059D3249E0BC93B36DE45F759F2",
+            "licenseRef": "LicenseRef-a60eea8175145316",
+            "bytes": 10847,
+            "bundlePath": "licenses/extracted/A60EEA817514531668D7E00765731449FE14D059D3249E0BC93B36DE45F759F2.txt",
+            "memberPath": "gcc-16.2.0/gcc/rust/checks/errors/borrowck/ffi-polonius/vendor/log/LICENSE-APACHE"
+          },
+          {
+            "sha256": "6485B8ED310D3F0340BF1AD1F47645069CE4069DCC6BB46C7D5C6FAF41DE1FDB",
+            "licenseRef": "LicenseRef-6485b8ed310d3f03",
+            "bytes": 1071,
+            "bundlePath": "licenses/extracted/6485B8ED310D3F0340BF1AD1F47645069CE4069DCC6BB46C7D5C6FAF41DE1FDB.txt",
+            "memberPath": "gcc-16.2.0/gcc/rust/checks/errors/borrowck/ffi-polonius/vendor/log/LICENSE-MIT"
+          },
+          {
+            "sha256": "A60EEA817514531668D7E00765731449FE14D059D3249E0BC93B36DE45F759F2",
+            "licenseRef": "LicenseRef-a60eea8175145316",
+            "bytes": 10847,
+            "bundlePath": "licenses/extracted/A60EEA817514531668D7E00765731449FE14D059D3249E0BC93B36DE45F759F2.txt",
+            "memberPath": "gcc-16.2.0/gcc/rust/checks/errors/borrowck/ffi-polonius/vendor/rustc-hash/LICENSE-APACHE"
+          },
+          {
+            "sha256": "23F18E03DC49DF91622FE2A76176497404E46CED8A715D9D2B67A7446571CCA3",
+            "licenseRef": "LicenseRef-23f18e03dc49df91",
+            "bytes": 1023,
+            "bundlePath": "licenses/extracted/23F18E03DC49DF91622FE2A76176497404E46CED8A715D9D2B67A7446571CCA3.txt",
+            "memberPath": "gcc-16.2.0/gcc/rust/checks/errors/borrowck/ffi-polonius/vendor/rustc-hash/LICENSE-MIT"
+          },
+          {
+            "sha256": "0FB317CFE0260CC7DC89216BD69F38117A37636EB9AABE68A7DFA03C854E2360",
+            "licenseRef": "LicenseRef-0fb317cfe0260cc7",
+            "bytes": 798,
+            "bundlePath": "licenses/extracted/0FB317CFE0260CC7DC89216BD69F38117A37636EB9AABE68A7DFA03C854E2360.txt",
+            "memberPath": "gcc-16.2.0/gcc/rust/checks/errors/feature/contrib/copyright-stub.h"
+          },
+          {
+            "sha256": "4919CFB14A73CD64FCEF67B107613970CF1659A09AA675DBA31314F373BC7204",
+            "licenseRef": "LicenseRef-4919cfb14a73cd64",
+            "bytes": 1901,
+            "bundlePath": "licenses/extracted/4919CFB14A73CD64FCEF67B107613970CF1659A09AA675DBA31314F373BC7204.txt",
+            "memberPath": "gcc-16.2.0/gcc/testsuite/gcc.dg/params/LICENSE"
+          },
+          {
+            "sha256": "0BF700C6654F3E72308035D7EBB60ABCC486E673EE8A72D19101F80812288F1C",
+            "licenseRef": "LicenseRef-0bf700c6654f3e72",
+            "bytes": 1738,
+            "bundlePath": "licenses/extracted/0BF700C6654F3E72308035D7EBB60ABCC486E673EE8A72D19101F80812288F1C.txt",
+            "memberPath": "gcc-16.2.0/gcc/testsuite/gcc.dg/vect/tsvc/license.txt"
+          },
+          {
+            "sha256": "231F7EDCC7352D7734A96EEF0B8030F77982678C516876FCB81E25B32D68564C",
+            "licenseRef": "LicenseRef-231f7edcc7352d77",
+            "bytes": 18002,
+            "bundlePath": "licenses/extracted/231F7EDCC7352D7734A96EEF0B8030F77982678C516876FCB81E25B32D68564C.txt",
+            "memberPath": "gcc-16.2.0/include/COPYING"
+          },
+          {
+            "sha256": "C71D239DF91726FC519C6EB72D318EC65820627232B2F796219E87DCF35D0AB4",
+            "licenseRef": "LicenseRef-c71d239df91726fc",
+            "bytes": 11357,
+            "bundlePath": "licenses/extracted/C71D239DF91726FC519C6EB72D318EC65820627232B2F796219E87DCF35D0AB4.txt",
+            "memberPath": "gcc-16.2.0/libcody/LICENSE"
+          },
+          {
+            "sha256": "A61D06E8F7BE57928E71E800EB9273B05CB8868C484108AFE41E4305BB320DDE",
+            "licenseRef": "LicenseRef-a61d06e8f7be5792",
+            "bytes": 1132,
+            "bundlePath": "licenses/extracted/A61D06E8F7BE57928E71E800EB9273B05CB8868C484108AFE41E4305BB320DDE.txt",
+            "memberPath": "gcc-16.2.0/libffi/LICENSE"
+          },
+          {
+            "sha256": "E67978CD18816C0CB7D29AAAACDE7B7447402C2FB321A051698890A8EAEDDA94",
+            "licenseRef": "LicenseRef-e67978cd18816c0c",
+            "bytes": 18698,
+            "bundlePath": "licenses/extracted/E67978CD18816C0CB7D29AAAACDE7B7447402C2FB321A051698890A8EAEDDA94.txt",
+            "memberPath": "gcc-16.2.0/libffi/LICENSE-BUILDTOOLS"
+          },
+          {
+            "sha256": "685FBA36BB54AB016D4665E3A7EEA9807509B091C27F4E3172AD5B45D9F8EE64",
+            "licenseRef": "LicenseRef-685fba36bb54ab01",
+            "bytes": 1478,
+            "bundlePath": "licenses/extracted/685FBA36BB54AB016D4665E3A7EEA9807509B091C27F4E3172AD5B45D9F8EE64.txt",
+            "memberPath": "gcc-16.2.0/libgcobol/LICENSE"
+          },
+          {
+            "sha256": "2D36597F7117C38B006835AE7F537487207D8EC407AA9D9980794B2030CBC067",
+            "licenseRef": "LicenseRef-2d36597f7117c38b",
+            "bytes": 1479,
+            "bundlePath": "licenses/extracted/2D36597F7117C38B006835AE7F537487207D8EC407AA9D9980794B2030CBC067.txt",
+            "memberPath": "gcc-16.2.0/libgo/go/golang.org/x/mod/LICENSE"
+          },
+          {
+            "sha256": "2D36597F7117C38B006835AE7F537487207D8EC407AA9D9980794B2030CBC067",
+            "licenseRef": "LicenseRef-2d36597f7117c38b",
+            "bytes": 1479,
+            "bundlePath": "licenses/extracted/2D36597F7117C38B006835AE7F537487207D8EC407AA9D9980794B2030CBC067.txt",
+            "memberPath": "gcc-16.2.0/libgo/go/golang.org/x/sync/LICENSE"
+          },
+          {
+            "sha256": "2D36597F7117C38B006835AE7F537487207D8EC407AA9D9980794B2030CBC067",
+            "licenseRef": "LicenseRef-2d36597f7117c38b",
+            "bytes": 1479,
+            "bundlePath": "licenses/extracted/2D36597F7117C38B006835AE7F537487207D8EC407AA9D9980794B2030CBC067.txt",
+            "memberPath": "gcc-16.2.0/libgo/go/golang.org/x/tools/LICENSE"
+          },
+          {
+            "sha256": "84D554E7A5D139B7C7B5D6EF0670AE556C4CDCFA354EAAD72A1C07C08012C96F",
+            "licenseRef": "LicenseRef-84d554e7a5d139b7",
+            "bytes": 1479,
+            "bundlePath": "licenses/extracted/84D554E7A5D139B7C7B5D6EF0670AE556C4CDCFA354EAAD72A1C07C08012C96F.txt",
+            "memberPath": "gcc-16.2.0/libgo/go/golang.org/x/xerrors/LICENSE"
+          },
+          {
+            "sha256": "2D36597F7117C38B006835AE7F537487207D8EC407AA9D9980794B2030CBC067",
+            "licenseRef": "LicenseRef-2d36597f7117c38b",
+            "bytes": 1479,
+            "bundlePath": "licenses/extracted/2D36597F7117C38B006835AE7F537487207D8EC407AA9D9980794B2030CBC067.txt",
+            "memberPath": "gcc-16.2.0/libgo/LICENSE"
+          },
+          {
+            "sha256": "62C7A1E35F56406896D7AA7CA52D0CC0D272AC022B5D2796E7D6905DB8A3636A",
+            "licenseRef": "LicenseRef-62c7a1e35f564068",
+            "bytes": 9723,
+            "bundlePath": "licenses/extracted/62C7A1E35F56406896D7AA7CA52D0CC0D272AC022B5D2796E7D6905DB8A3636A.txt",
+            "memberPath": "gcc-16.2.0/libgrust/libformat_parser/vendor/libc/LICENSE-APACHE"
+          },
+          {
+            "sha256": "A8D47FF51CA256F56A8932DBA07660672DBFE3004257CA8DE708AAC1415937A1",
+            "licenseRef": "LicenseRef-a8d47ff51ca256f5",
+            "bytes": 1076,
+            "bundlePath": "licenses/extracted/A8D47FF51CA256F56A8932DBA07660672DBFE3004257CA8DE708AAC1415937A1.txt",
+            "memberPath": "gcc-16.2.0/libgrust/libformat_parser/vendor/libc/LICENSE-MIT"
+          },
+          {
+            "sha256": "23860C2A7B5D96B21569AFEDF033469BAB9FE14A1B24A35068B8641C578CE24D",
+            "licenseRef": "LicenseRef-23860c2a7b5d96b2",
+            "bytes": 321,
+            "bundlePath": "licenses/extracted/23860C2A7B5D96B21569AFEDF033469BAB9FE14A1B24A35068B8641C578CE24D.txt",
+            "memberPath": "gcc-16.2.0/libgrust/libformat_parser/vendor/unicode-xid/COPYRIGHT"
+          },
+          {
+            "sha256": "A60EEA817514531668D7E00765731449FE14D059D3249E0BC93B36DE45F759F2",
+            "licenseRef": "LicenseRef-a60eea8175145316",
+            "bytes": 10847,
+            "bundlePath": "licenses/extracted/A60EEA817514531668D7E00765731449FE14D059D3249E0BC93B36DE45F759F2.txt",
+            "memberPath": "gcc-16.2.0/libgrust/libformat_parser/vendor/unicode-xid/LICENSE-APACHE"
+          },
+          {
+            "sha256": "7B63ECD5F1902AF1B63729947373683C32745C16A10E8E6292E2E2DCD7E90AE0",
+            "licenseRef": "LicenseRef-7b63ecd5f1902af1",
+            "bytes": 1071,
+            "bundlePath": "licenses/extracted/7B63ECD5F1902AF1B63729947373683C32745C16A10E8E6292E2E2DCD7E90AE0.txt",
+            "memberPath": "gcc-16.2.0/libgrust/libformat_parser/vendor/unicode-xid/LICENSE-MIT"
+          },
+          {
+            "sha256": "62C7A1E35F56406896D7AA7CA52D0CC0D272AC022B5D2796E7D6905DB8A3636A",
+            "licenseRef": "LicenseRef-62c7a1e35f564068",
+            "bytes": 9723,
+            "bundlePath": "licenses/extracted/62C7A1E35F56406896D7AA7CA52D0CC0D272AC022B5D2796E7D6905DB8A3636A.txt",
+            "memberPath": "gcc-16.2.0/libgrust/rustc-lib/LICENSE-APACHE"
+          },
+          {
+            "sha256": "23F18E03DC49DF91622FE2A76176497404E46CED8A715D9D2B67A7446571CCA3",
+            "licenseRef": "LicenseRef-23f18e03dc49df91",
+            "bytes": 1023,
+            "bundlePath": "licenses/extracted/23F18E03DC49DF91622FE2A76176497404E46CED8A715D9D2B67A7446571CCA3.txt",
+            "memberPath": "gcc-16.2.0/libgrust/rustc-lib/LICENSE-MIT"
+          },
+          {
+            "sha256": "A60EEA817514531668D7E00765731449FE14D059D3249E0BC93B36DE45F759F2",
+            "licenseRef": "LicenseRef-a60eea8175145316",
+            "bytes": 10847,
+            "bundlePath": "licenses/extracted/A60EEA817514531668D7E00765731449FE14D059D3249E0BC93B36DE45F759F2.txt",
+            "memberPath": "gcc-16.2.0/libgrust/rustc-lib/stdarch/crates/core_arch/LICENSE-APACHE"
+          },
+          {
+            "sha256": "29662666B44DFF84977B46E05642CDEF910BC3A93A17B5FD86E632BAFA59CF21",
+            "licenseRef": "LicenseRef-29662666b44dff84",
+            "bytes": 1071,
+            "bundlePath": "licenses/extracted/29662666B44DFF84977B46E05642CDEF910BC3A93A17B5FD86E632BAFA59CF21.txt",
+            "memberPath": "gcc-16.2.0/libgrust/rustc-lib/stdarch/crates/core_arch/LICENSE-MIT"
+          },
+          {
+            "sha256": "A60EEA817514531668D7E00765731449FE14D059D3249E0BC93B36DE45F759F2",
+            "licenseRef": "LicenseRef-a60eea8175145316",
+            "bytes": 10847,
+            "bundlePath": "licenses/extracted/A60EEA817514531668D7E00765731449FE14D059D3249E0BC93B36DE45F759F2.txt",
+            "memberPath": "gcc-16.2.0/libgrust/rustc-lib/stdarch/crates/std_detect/LICENSE-APACHE"
+          },
+          {
+            "sha256": "29662666B44DFF84977B46E05642CDEF910BC3A93A17B5FD86E632BAFA59CF21",
+            "licenseRef": "LicenseRef-29662666b44dff84",
+            "bytes": 1071,
+            "bundlePath": "licenses/extracted/29662666B44DFF84977B46E05642CDEF910BC3A93A17B5FD86E632BAFA59CF21.txt",
+            "memberPath": "gcc-16.2.0/libgrust/rustc-lib/stdarch/crates/std_detect/LICENSE-MIT"
+          },
+          {
+            "sha256": "A60EEA817514531668D7E00765731449FE14D059D3249E0BC93B36DE45F759F2",
+            "licenseRef": "LicenseRef-a60eea8175145316",
+            "bytes": 10847,
+            "bundlePath": "licenses/extracted/A60EEA817514531668D7E00765731449FE14D059D3249E0BC93B36DE45F759F2.txt",
+            "memberPath": "gcc-16.2.0/libgrust/rustc-lib/stdarch/LICENSE-APACHE"
+          },
+          {
+            "sha256": "29662666B44DFF84977B46E05642CDEF910BC3A93A17B5FD86E632BAFA59CF21",
+            "licenseRef": "LicenseRef-29662666b44dff84",
+            "bytes": 1071,
+            "bundlePath": "licenses/extracted/29662666B44DFF84977B46E05642CDEF910BC3A93A17B5FD86E632BAFA59CF21.txt",
+            "memberPath": "gcc-16.2.0/libgrust/rustc-lib/stdarch/LICENSE-MIT"
+          },
+          {
+            "sha256": "048BE075E2F6468C1F32840499D9970240306FD401570D876AAFC4F81327B4D3",
+            "licenseRef": "LicenseRef-048be075e2f6468c",
+            "bytes": 26755,
+            "bundlePath": "licenses/extracted/048BE075E2F6468C1F32840499D9970240306FD401570D876AAFC4F81327B4D3.txt",
+            "memberPath": "gcc-16.2.0/libiberty/copying-lib.texi"
+          },
+          {
+            "sha256": "32434AFCC8666BA060E111D715BFDB6C2D5DD8A35FA4D3AB8AD67D8F850D2F2B",
+            "licenseRef": "LicenseRef-32434afcc8666ba0",
+            "bytes": 26440,
+            "bundlePath": "licenses/extracted/32434AFCC8666BA060E111D715BFDB6C2D5DD8A35FA4D3AB8AD67D8F850D2F2B.txt",
+            "memberPath": "gcc-16.2.0/libiberty/COPYING.LIB"
+          },
+          {
+            "sha256": "C9BFF75738922193E67FA726FA225535870D2AA1059F91452C411736284AD566",
+            "licenseRef": "LicenseRef-c9bff75738922193",
+            "bytes": 1338,
+            "bundlePath": "licenses/extracted/C9BFF75738922193E67FA726FA225535870D2AA1059F91452C411736284AD566.txt",
+            "memberPath": "gcc-16.2.0/libphobos/libdruntime/LICENSE.txt"
+          },
+          {
+            "sha256": "C9BFF75738922193E67FA726FA225535870D2AA1059F91452C411736284AD566",
+            "licenseRef": "LicenseRef-c9bff75738922193",
+            "bytes": 1338,
+            "bundlePath": "licenses/extracted/C9BFF75738922193E67FA726FA225535870D2AA1059F91452C411736284AD566.txt",
+            "memberPath": "gcc-16.2.0/libphobos/src/LICENSE_1_0.txt"
+          },
+          {
+            "sha256": "32434AFCC8666BA060E111D715BFDB6C2D5DD8A35FA4D3AB8AD67D8F850D2F2B",
+            "licenseRef": "LicenseRef-32434afcc8666ba0",
+            "bytes": 26440,
+            "bundlePath": "licenses/extracted/32434AFCC8666BA060E111D715BFDB6C2D5DD8A35FA4D3AB8AD67D8F850D2F2B.txt",
+            "memberPath": "gcc-16.2.0/libquadmath/COPYING.LIB"
+          },
+          {
+            "sha256": "74C2B24539A53C34ABDDB559266D89CB653B0198CD2FAF9C04763D3223DB7F6D",
+            "licenseRef": "LicenseRef-74c2b24539a53c34",
+            "bytes": 4506,
+            "bundlePath": "licenses/extracted/74C2B24539A53C34ABDDB559266D89CB653B0198CD2FAF9C04763D3223DB7F6D.txt",
+            "memberPath": "gcc-16.2.0/libsanitizer/LICENSE.TXT"
+          },
+          {
+            "sha256": "6EF2606FAD7FCE5BA388FEF9D8D137178D0135F3D2C538B664229B58EAE5CE06",
+            "licenseRef": "LicenseRef-6ef2606fad7fce5b",
+            "bytes": 8434,
+            "bundlePath": "licenses/extracted/6EF2606FAD7FCE5BA388FEF9D8D137178D0135F3D2C538B664229B58EAE5CE06.txt",
+            "memberPath": "gcc-16.2.0/libstdc++-v3/doc/html/manual/license.html"
+          },
+          {
+            "sha256": "0CA8CBE9219A841F9BC8FBB1F8ECDF5E39B1B0E23EE10FB6B0C090D8987DD1EB",
+            "licenseRef": "LicenseRef-0ca8cbe9219a841f",
+            "bytes": 16700,
+            "bundlePath": "licenses/extracted/0CA8CBE9219A841F9BC8FBB1F8ECDF5E39B1B0E23EE10FB6B0C090D8987DD1EB.txt",
+            "memberPath": "gcc-16.2.0/libstdc++-v3/include/pstl/LICENSE.txt"
+          },
+          {
+            "sha256": "36266A8FD073568394CB81CDB2B124F7FDAE2C64C1A7ED09DB34B4D22EFA2951",
+            "licenseRef": "LicenseRef-36266a8fd0735683",
+            "bytes": 1359,
+            "bundlePath": "licenses/extracted/36266A8FD073568394CB81CDB2B124F7FDAE2C64C1A7ED09DB34B4D22EFA2951.txt",
+            "memberPath": "gcc-16.2.0/zlib/contrib/dotzlib/LICENSE_1_0.txt"
+          },
+          {
+            "sha256": "845EFC77857D485D91FB3E0B884AAA929368C717AE8186B66FE1ED2495753243",
+            "licenseRef": "LicenseRef-845efc77857d485d",
+            "bytes": 1002,
+            "bundlePath": "licenses/extracted/845EFC77857D485D91FB3E0B884AAA929368C717AE8186B66FE1ED2495753243.txt",
+            "memberPath": "gcc-16.2.0/zlib/LICENSE"
+          }
+        ]
+      },
+      "recipe": {
+        "builderCommit": "3e6685eda92f9288c15ac320139622dcedca09a4",
+        "baseImageDigest": "sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be",
+        "dockerfilePath": "images/base-win64/Dockerfile",
+        "configPath": "images/base-win64/ct-ng-config",
+        "crosstoolCommit": "b1a94f65c5187d99037a4e2f57aefbdf995a9677",
+        "checksum": {
+          "path": "packages/gcc/16.2.0/chksum",
+          "fileSha256": "65A9A1474BAEB547362279CC226D74673E027F26216E0DA921925377750373F0",
+          "line": "sha256 gcc-16.2.0.tar.xz e6738e29597f733270731aa90600f37ffdc045079dfc27ec7e8192cc81085c3e"
+        },
+        "patches": [
+          {
+            "path": "packages/gcc/16.2.0/0000-libtool-leave-framework-alone.patch",
+            "sha256": "FB9E03429AD0070DFF4048C96B4718F69944695AE13E9B1FD57C7852D4628361",
+            "bytes": 511
+          },
+          {
+            "path": "packages/gcc/16.2.0/0001-gcc-plugin-POSIX-include-sys-select-h.patch",
+            "sha256": "5CDB599A69BBC2DBA5C90BDD83EFA2391FC67F0274BE749691A665AEFDDD613F",
+            "bytes": 333
+          },
+          {
+            "path": "packages/gcc/16.2.0/0002-arm-softfloat-libgcc.patch",
+            "sha256": "E5F5E25AA41D807EDC54B52FA712E5D1BF842D9C1048C91CB1D76EE313AA02F7",
+            "bytes": 1018
+          },
+          {
+            "path": "packages/gcc/16.2.0/0003-libgcc-disable-split-stack-nothreads.patch",
+            "sha256": "BDF04FDAEED235FA18DD90A43FCCAAF2D6DD5F9A952F31B4455E002D207A7AD9",
+            "bytes": 508
+          },
+          {
+            "path": "packages/gcc/16.2.0/0004-Remove-use-of-include_next-from-c-headers.patch",
+            "sha256": "BBE298EE90449E89B4C9D149D76084ABC0EAF76073BC23BF6DDFD3CD2CC3BB24",
+            "bytes": 7541
+          },
+          {
+            "path": "packages/gcc/16.2.0/0005-Allow-default-libc-to-be-specified-to-configure.patch",
+            "sha256": "3F280619FF4BA26552F964603FDD07AEF439B4D3229E48AF721DA39F7E8A5A10",
+            "bytes": 3922
+          },
+          {
+            "path": "packages/gcc/16.2.0/0006-driver-Extend-getenv-function-to-allow-default-value.patch",
+            "sha256": "D3D7416E8C0E11EC863BE30163163FF24E5C814DCD4290089EE78834EE49C270",
+            "bytes": 3968
+          },
+          {
+            "path": "packages/gcc/16.2.0/0007-Add-newlib-and-picolibc-as-default-C-library-choices.patch",
+            "sha256": "214132C7C6567E9653E20D5558981FF43400EABB8C52EBC487FB379654EC2054",
+            "bytes": 1051
+          },
+          {
+            "path": "packages/gcc/16.2.0/0008-Support-picolibc-targets.patch",
+            "sha256": "1442113744C4DE38253A32024EAE7E1E0FC730487BA9E7C9F8935A2E045183AE",
+            "bytes": 922
+          },
+          {
+            "path": "packages/gcc/16.2.0/0009-gcc-Allow-g-to-work-differently-from-gcc.patch",
+            "sha256": "235361995CF9E5C5D4D811DDA38733DCAC18ACC27C94383EE0A8F839201375E0",
+            "bytes": 2151
+          },
+          {
+            "path": "packages/gcc/16.2.0/0010-libgcc-Exclude-UCLIBC-from-GLIBC-thread-check.patch",
+            "sha256": "36074E02850416C7F82349E23D951C132CE672F63692B33BBEEF0E9B690E8EAD",
+            "bytes": 1228
+          },
+          {
+            "path": "packages/gcc/16.2.0/0020-aarch64-mingw-disable-libbid-binary80.patch",
+            "sha256": "79642BF0205C42070EFEFC4AE367112C8FC0F358A86F33081B0B589F4CBEABFB",
+            "bytes": 789
+          },
+          {
+            "path": "packages/gcc/16.2.0/0021-libstdc++-guard-cstdlib-module-exports.patch",
+            "sha256": "42A7518A7378FF4CFD59099DBF0557B782AA94E5D12CDA9846520D755C6A806B",
+            "bytes": 2193
+          },
+          {
+            "path": "packages/gcc/16.2.0/0022-libstdc++-mingw-disable-cdtor-decloning.patch",
+            "sha256": "FB5D0795A0F77FC4AFFD1CEA44F12362BED56C700D8FA1BD1E63C89E125F8B79",
+            "bytes": 1213
+          },
+          {
+            "path": "packages/gcc/16.2.0/0023-aarch64-mingw-fix-support-for-posix-threading.patch",
+            "sha256": "677680D2306BA32C197EFFA38DDFC2650221FA7425F629683B25A606C915AD2A",
+            "bytes": 2282
+          },
+          {
+            "path": "packages/gcc/16.2.0/0026-fix-clang-print-multi-os-directory.patch",
+            "sha256": "FEF631B87430994EC22AEE3941E2847B42A653B4FC1619B9EC86214AD1B4B308",
+            "bytes": 9818
+          },
+          {
+            "path": "packages/gcc/16.2.0/experimental/0001-picolibc-Add-custom-spec-file-fragments-for-using-pi.patch",
+            "sha256": "0800C3F946161E668DF666C5B9CAB5EDD9D78C2A8077B69D98BC094EF9A19B0B",
+            "bytes": 4358
+          }
+        ]
+      },
+      "provides": [
+        "libgcc",
+        "libstdc++",
+        "libgomp"
+      ],
+      "sourceSubtree": "gcc-16.2.0/libgomp"
+    },
+    {
+      "applicability": "conservative-superset",
+      "id": "toolchain-gettext-0.26",
+      "source": {
+        "url": "https://ftp.gnu.org/gnu/gettext/gettext-0.26.tar.xz",
+        "archiveName": "gettext-0.26.tar.xz",
+        "bytes": 10061740,
+        "sha256": "D1FB86E260CFE7DA6031F94D2E44C0DA55903DBAE0A2FA0FAE78C91AE1B56F00"
+      },
+      "license": {
+        "expression": "LicenseRef-03133addae5b99a6 AND LicenseRef-20e50fe7aae3e563 AND LicenseRef-2e0110e07abef7c2 AND LicenseRef-31d5b6f4243d5c7c AND LicenseRef-49bf33cf78ef5897 AND LicenseRef-5d4cff30d5038f82 AND LicenseRef-5f9cf9fb6acb1972 AND LicenseRef-6a18c5fac70d7860 AND LicenseRef-7ef2cdfe58e0c046 AND LicenseRef-c5c63674f8a83c4d AND LicenseRef-e79e9c8a0c85d735 AND LicenseRef-ecf206b1a27e8e4e",
+        "files": [
+          {
+            "sha256": "E79E9C8A0C85D735FF98185918EC94ED7D175EFC377012787AEBCF3B80F0D90B",
+            "licenseRef": "LicenseRef-e79e9c8a0c85d735",
+            "bytes": 35151,
+            "bundlePath": "licenses/extracted/E79E9C8A0C85D735FF98185918EC94ED7D175EFC377012787AEBCF3B80F0D90B.txt",
+            "memberPath": "gettext-0.26/COPYING"
+          },
+          {
+            "sha256": "7EF2CDFE58E0C0460657B6598B49AF29D4E03C1E41CBAF0E1DA1EB8AD74B95D0",
+            "licenseRef": "LicenseRef-7ef2cdfe58e0c046",
+            "bytes": 495,
+            "bundlePath": "licenses/extracted/7EF2CDFE58E0C0460657B6598B49AF29D4E03C1E41CBAF0E1DA1EB8AD74B95D0.txt",
+            "memberPath": "gettext-0.26/gettext-runtime/COPYING"
+          },
+          {
+            "sha256": "20E50FE7AAE3E56378EBF0417D9DE904F55A0E61E4DF315333E632A4D3555D95",
+            "licenseRef": "LicenseRef-20e50fe7aae3e563",
+            "bytes": 26419,
+            "bundlePath": "licenses/extracted/20E50FE7AAE3E56378EBF0417D9DE904F55A0E61E4DF315333E632A4D3555D95.txt",
+            "memberPath": "gettext-0.26/gettext-runtime/intl/COPYING.LIB"
+          },
+          {
+            "sha256": "03133ADDAE5B99A6148C538300E6D97074453089BE1423B741BD081F18E2B298",
+            "licenseRef": "LicenseRef-03133addae5b99a6",
+            "bytes": 65,
+            "bundlePath": "licenses/extracted/03133ADDAE5B99A6148C538300E6D97074453089BE1423B741BD081F18E2B298.txt",
+            "memberPath": "gettext-0.26/gettext-runtime/libasprintf/COPYING"
+          },
+          {
+            "sha256": "20E50FE7AAE3E56378EBF0417D9DE904F55A0E61E4DF315333E632A4D3555D95",
+            "licenseRef": "LicenseRef-20e50fe7aae3e563",
+            "bytes": 26419,
+            "bundlePath": "licenses/extracted/20E50FE7AAE3E56378EBF0417D9DE904F55A0E61E4DF315333E632A4D3555D95.txt",
+            "memberPath": "gettext-0.26/gettext-runtime/libasprintf/COPYING.LIB"
+          },
+          {
+            "sha256": "5D4CFF30D5038F82A0EDC79798456049B61E1752FDB7E9AB1F4BFB9FAE3A7303",
+            "licenseRef": "LicenseRef-5d4cff30d5038f82",
+            "bytes": 78,
+            "bundlePath": "licenses/extracted/5D4CFF30D5038F82A0EDC79798456049B61E1752FDB7E9AB1F4BFB9FAE3A7303.txt",
+            "memberPath": "gettext-0.26/gettext-tools/COPYING"
+          },
+          {
+            "sha256": "C5C63674F8A83C4D2E385D96D1C670A03CB871BA2927755467017317878574BD",
+            "licenseRef": "LicenseRef-c5c63674f8a83c4d",
+            "bytes": 1289,
+            "bundlePath": "licenses/extracted/C5C63674F8A83C4D2E385D96D1C670A03CB871BA2927755467017317878574BD.txt",
+            "memberPath": "gettext-0.26/gettext-tools/gnulib-lib/libxml/COPYING"
+          },
+          {
+            "sha256": "6A18C5FAC70D7860B57F5B72B4E2C9A1BA6B3D2741EEF7FF9767C5379364F10D",
+            "licenseRef": "LicenseRef-6a18c5fac70d7860",
+            "bytes": 21001,
+            "bundlePath": "licenses/extracted/6A18C5FAC70D7860B57F5B72B4E2C9A1BA6B3D2741EEF7FF9767C5379364F10D.txt",
+            "memberPath": "gettext-0.26/gettext-tools/tree-sitter-0.23.2/lib/src/unicode/LICENSE"
+          },
+          {
+            "sha256": "5F9CF9FB6ACB1972B35AE29119CE563BB60EC097656BC4B69B9BAC2D04C7A147",
+            "licenseRef": "LicenseRef-5f9cf9fb6acb1972",
+            "bytes": 1085,
+            "bundlePath": "licenses/extracted/5F9CF9FB6ACB1972B35AE29119CE563BB60EC097656BC4B69B9BAC2D04C7A147.txt",
+            "memberPath": "gettext-0.26/gettext-tools/tree-sitter-0.23.2/LICENSE"
+          },
+          {
+            "sha256": "ECF206B1A27E8E4EA07F1E1529CB111B4BE5CE8420BD27B8269981D9C0C389F8",
+            "licenseRef": "LicenseRef-ecf206b1a27e8e4e",
+            "bytes": 1040,
+            "bundlePath": "licenses/extracted/ECF206B1A27E8E4EA07F1E1529CB111B4BE5CE8420BD27B8269981D9C0C389F8.txt",
+            "memberPath": "gettext-0.26/gettext-tools/tree-sitter-d-0.8.2/LICENSE"
+          },
+          {
+            "sha256": "2E0110E07ABEF7C2548B26EC9D6969775617CA539A0DC8DBEEB14D6452C711D1",
+            "licenseRef": "LicenseRef-2e0110e07abef7c2",
+            "bytes": 1080,
+            "bundlePath": "licenses/extracted/2E0110E07ABEF7C2548B26EC9D6969775617CA539A0DC8DBEEB14D6452C711D1.txt",
+            "memberPath": "gettext-0.26/gettext-tools/tree-sitter-go-0.23.4/LICENSE"
+          },
+          {
+            "sha256": "31D5B6F4243D5C7C6E1C4EBBBB9F6407BD1457A08BCC4F706521710341ACBA36",
+            "licenseRef": "LicenseRef-31d5b6f4243d5c7c",
+            "bytes": 1080,
+            "bundlePath": "licenses/extracted/31D5B6F4243D5C7C6E1C4EBBBB9F6407BD1457A08BCC4F706521710341ACBA36.txt",
+            "memberPath": "gettext-0.26/gettext-tools/tree-sitter-rust-0.23.2/LICENSE"
+          },
+          {
+            "sha256": "49BF33CF78EF5897E4E161CE1517DF7DE1AE5042A65B6BCFD44401E0FC606559",
+            "licenseRef": "LicenseRef-49bf33cf78ef5897",
+            "bytes": 1080,
+            "bundlePath": "licenses/extracted/49BF33CF78EF5897E4E161CE1517DF7DE1AE5042A65B6BCFD44401E0FC606559.txt",
+            "memberPath": "gettext-0.26/gettext-tools/tree-sitter-typescript-0.23.2/LICENSE"
+          },
+          {
+            "sha256": "C5C63674F8A83C4D2E385D96D1C670A03CB871BA2927755467017317878574BD",
+            "licenseRef": "LicenseRef-c5c63674f8a83c4d",
+            "bytes": 1289,
+            "bundlePath": "licenses/extracted/C5C63674F8A83C4D2E385D96D1C670A03CB871BA2927755467017317878574BD.txt",
+            "memberPath": "gettext-0.26/gnulib-local/lib/libxml/COPYING"
+          },
+          {
+            "sha256": "E79E9C8A0C85D735FF98185918EC94ED7D175EFC377012787AEBCF3B80F0D90B",
+            "licenseRef": "LicenseRef-e79e9c8a0c85d735",
+            "bytes": 35151,
+            "bundlePath": "licenses/extracted/E79E9C8A0C85D735FF98185918EC94ED7D175EFC377012787AEBCF3B80F0D90B.txt",
+            "memberPath": "gettext-0.26/libtextstyle/COPYING"
+          },
+          {
+            "sha256": "C5C63674F8A83C4D2E385D96D1C670A03CB871BA2927755467017317878574BD",
+            "licenseRef": "LicenseRef-c5c63674f8a83c4d",
+            "bytes": 1289,
+            "bundlePath": "licenses/extracted/C5C63674F8A83C4D2E385D96D1C670A03CB871BA2927755467017317878574BD.txt",
+            "memberPath": "gettext-0.26/libtextstyle/lib/libxml/COPYING"
+          }
+        ]
+      },
+      "recipe": {
+        "builderCommit": "3e6685eda92f9288c15ac320139622dcedca09a4",
+        "baseImageDigest": "sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be",
+        "dockerfilePath": "images/base-win64/Dockerfile",
+        "configPath": "images/base-win64/ct-ng-config",
+        "crosstoolCommit": "b1a94f65c5187d99037a4e2f57aefbdf995a9677",
+        "checksum": {
+          "path": "packages/gettext/0.26/chksum",
+          "fileSha256": "D025C5FAC657B4F5E416979818588D38937AA8A061ADCF2E18C69EC7AA6249D3",
+          "line": "sha256 gettext-0.26.tar.xz d1fb86e260cfe7da6031f94d2e44c0da55903dbae0a2fa0fae78c91ae1b56f00"
+        },
+        "patches": []
+      }
+    },
+    {
+      "applicability": "conservative-superset",
+      "id": "toolchain-gmp-6.3.0",
+      "source": {
+        "url": "https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz",
+        "archiveName": "gmp-6.3.0.tar.xz",
+        "bytes": 2094196,
+        "sha256": "A3C2B80201B89E68616F4AD30BC66AEE4927C3CE50E33929CA819D5C43538898"
+      },
+      "license": {
+        "expression": "LicenseRef-8ceb4b9ee5adedde AND LicenseRef-a853c2ffec170578",
+        "files": [
+          {
+            "sha256": "8CEB4B9EE5ADEDDE47B31E975C1D90C73AD27B6B165A1DCD80C7C545EB65B903",
+            "licenseRef": "LicenseRef-8ceb4b9ee5adedde",
+            "bytes": 35147,
+            "bundlePath": "licenses/extracted/8CEB4B9EE5ADEDDE47B31E975C1D90C73AD27B6B165A1DCD80C7C545EB65B903.txt",
+            "memberPath": "gmp-6.3.0/COPYING"
+          },
+          {
+            "sha256": "A853C2FFEC17057872340EEE242AE4D96CBF2B520AE27D903E1B2FEF1A5F9D1C",
+            "licenseRef": "LicenseRef-a853c2ffec170578",
+            "bytes": 7639,
+            "bundlePath": "licenses/extracted/A853C2FFEC17057872340EEE242AE4D96CBF2B520AE27D903E1B2FEF1A5F9D1C.txt",
+            "memberPath": "gmp-6.3.0/COPYING.LESSERv3"
+          }
+        ]
+      },
+      "recipe": {
+        "builderCommit": "3e6685eda92f9288c15ac320139622dcedca09a4",
+        "baseImageDigest": "sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be",
+        "dockerfilePath": "images/base-win64/Dockerfile",
+        "configPath": "images/base-win64/ct-ng-config",
+        "crosstoolCommit": "b1a94f65c5187d99037a4e2f57aefbdf995a9677",
+        "checksum": {
+          "path": "packages/gmp/6.3.0/chksum",
+          "fileSha256": "10FF82909EF431C0B356C75A259C4A9D2BB15A300C4E9DDCAF182E413CCBA488",
+          "line": "sha256 gmp-6.3.0.tar.xz a3c2b80201b89e68616f4ad30bc66aee4927c3ce50e33929ca819d5c43538898"
+        },
+        "patches": [
+          {
+            "path": "packages/gmp/6.3.0/0000-Complete-function-prototype-in-acinclude.patch",
+            "sha256": "91DFA5AA0100F567339244D240F3B6E0EAAFFE02E7C1A200A563BB2A24C98D4F",
+            "bytes": 1008
+          }
+        ]
+      }
+    },
+    {
+      "applicability": "conservative-superset",
+      "id": "toolchain-isl-0.27",
+      "source": {
+        "url": "https://libisl.sourceforge.io/isl-0.27.tar.xz",
+        "archiveName": "isl-0.27.tar.xz",
+        "bytes": 2056436,
+        "sha256": "6D8BABB59E7B672E8CB7870E874F3F7B813B6E00E6AF3F8B04F7579965643D5C"
+      },
+      "license": {
+        "expression": "LicenseRef-3a2c398103f6bca0",
+        "files": [
+          {
+            "sha256": "3A2C398103F6BCA0F50A9A9465DECA9230B370B0212AF5FDF31ED88A36215C30",
+            "licenseRef": "LicenseRef-3a2c398103f6bca0",
+            "bytes": 1042,
+            "bundlePath": "licenses/extracted/3A2C398103F6BCA0F50A9A9465DECA9230B370B0212AF5FDF31ED88A36215C30.txt",
+            "memberPath": "isl-0.27/LICENSE"
+          }
+        ]
+      },
+      "recipe": {
+        "builderCommit": "3e6685eda92f9288c15ac320139622dcedca09a4",
+        "baseImageDigest": "sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be",
+        "dockerfilePath": "images/base-win64/Dockerfile",
+        "configPath": "images/base-win64/ct-ng-config",
+        "crosstoolCommit": "b1a94f65c5187d99037a4e2f57aefbdf995a9677",
+        "checksum": {
+          "path": "packages/isl/0.27/chksum",
+          "fileSha256": "FB814A6D31A693283780FAD64EB1AD0471558FC8C79D84B8DB80D3C8E7DBF869",
+          "line": "sha256 isl-0.27.tar.xz 6d8babb59e7b672e8cb7870e874f3f7b813b6e00e6af3f8b04f7579965643d5c"
+        },
+        "patches": []
+      }
+    },
+    {
+      "applicability": "conservative-superset",
+      "id": "toolchain-mingw-w64-v14.0.0",
+      "source": {
+        "url": "https://downloads.sourceforge.net/project/mingw-w64/mingw-w64/mingw-w64-release/mingw-w64-v14.0.0.tar.bz2",
+        "archiveName": "mingw-w64-v14.0.0.tar.bz2",
+        "bytes": 11163292,
+        "sha256": "6EAF921D9EB987D3820B364EA9775BC19B965EC81490B6FDD716526C28E1995C"
+      },
+      "license": {
+        "expression": "LicenseRef-1db8da07b436c688 AND LicenseRef-5ece225da0c7f0db AND LicenseRef-63263614cdd29f2f AND LicenseRef-8ceb4b9ee5adedde AND LicenseRef-99a69660981156c2 AND LicenseRef-ae7a4090983e6ea0 AND LicenseRef-dcc100d4161cc0b7 AND LicenseRef-f38e6194bd3bfa1b AND LicenseRef-fa7368d1f93d890c",
+        "files": [
+          {
+            "sha256": "99A69660981156C21336FDB5661F89341B013C94E4BF9E1C7467B4745718397F",
+            "licenseRef": "LicenseRef-99a69660981156c2",
+            "bytes": 2326,
+            "bundlePath": "licenses/extracted/99A69660981156C21336FDB5661F89341B013C94E4BF9E1C7467B4745718397F.txt",
+            "memberPath": "mingw-w64-v14.0.0/COPYING"
+          },
+          {
+            "sha256": "1DB8DA07B436C68833C0673FFEE3D9FCB2526047F3820B81661865DFEDC79A1F",
+            "licenseRef": "LicenseRef-1db8da07b436c688",
+            "bytes": 12155,
+            "bundlePath": "licenses/extracted/1DB8DA07B436C68833C0673FFEE3D9FCB2526047F3820B81661865DFEDC79A1F.txt",
+            "memberPath": "mingw-w64-v14.0.0/COPYING.MinGW-w64-runtime/COPYING.MinGW-w64-runtime.txt"
+          },
+          {
+            "sha256": "F38E6194BD3BFA1B654F118E5ACEFE0AEAD437BBE669EEE43957CCC65A7127F1",
+            "licenseRef": "LicenseRef-f38e6194bd3bfa1b",
+            "bytes": 5905,
+            "bundlePath": "licenses/extracted/F38E6194BD3BFA1B654F118E5ACEFE0AEAD437BBE669EEE43957CCC65A7127F1.txt",
+            "memberPath": "mingw-w64-v14.0.0/COPYING.MinGW-w64/COPYING.MinGW-w64.txt"
+          },
+          {
+            "sha256": "DCC100D4161CC0B7177545AB6E47216F84857CDA3843847C792A25289852DCAA",
+            "licenseRef": "LicenseRef-dcc100d4161cc0b7",
+            "bytes": 18007,
+            "bundlePath": "licenses/extracted/DCC100D4161CC0B7177545AB6E47216F84857CDA3843847C792A25289852DCAA.txt",
+            "memberPath": "mingw-w64-v14.0.0/mingw-w64-crt/profile/COPYING"
+          },
+          {
+            "sha256": "AE7A4090983E6EA0780C60C454016FD5E93B414B0DE26AD041608EC66FBB54BB",
+            "licenseRef": "LicenseRef-ae7a4090983e6ea0",
+            "bytes": 1109,
+            "bundlePath": "licenses/extracted/AE7A4090983E6EA0780C60C454016FD5E93B414B0DE26AD041608EC66FBB54BB.txt",
+            "memberPath": "mingw-w64-v14.0.0/mingw-w64-libraries/libmangle/COPYING"
+          },
+          {
+            "sha256": "5ECE225DA0C7F0DBA84DC64D773B5231075E8FEE61CBECEB9F774E939918E638",
+            "licenseRef": "LicenseRef-5ece225da0c7f0db",
+            "bytes": 1062,
+            "bundlePath": "licenses/extracted/5ECE225DA0C7F0DBA84DC64D773B5231075E8FEE61CBECEB9F774E939918E638.txt",
+            "memberPath": "mingw-w64-v14.0.0/mingw-w64-libraries/pseh/COPYING"
+          },
+          {
+            "sha256": "63263614CDD29F2F93CBA85E992F041B31F9FC7B4033692F31269489A8A1B177",
+            "licenseRef": "LicenseRef-63263614cdd29f2f",
+            "bytes": 2883,
+            "bundlePath": "licenses/extracted/63263614CDD29F2F93CBA85E992F041B31F9FC7B4033692F31269489A8A1B177.txt",
+            "memberPath": "mingw-w64-v14.0.0/mingw-w64-libraries/winpthreads/COPYING"
+          },
+          {
+            "sha256": "FA7368D1F93D890C173177475D8EC7AFF265A7D08F1F364D66F74D138978CE36",
+            "licenseRef": "LicenseRef-fa7368d1f93d890c",
+            "bytes": 1099,
+            "bundlePath": "licenses/extracted/FA7368D1F93D890C173177475D8EC7AFF265A7D08F1F364D66F74D138978CE36.txt",
+            "memberPath": "mingw-w64-v14.0.0/mingw-w64-libraries/winstorecompat/COPYING"
+          },
+          {
+            "sha256": "8CEB4B9EE5ADEDDE47B31E975C1D90C73AD27B6B165A1DCD80C7C545EB65B903",
+            "licenseRef": "LicenseRef-8ceb4b9ee5adedde",
+            "bytes": 35147,
+            "bundlePath": "licenses/extracted/8CEB4B9EE5ADEDDE47B31E975C1D90C73AD27B6B165A1DCD80C7C545EB65B903.txt",
+            "memberPath": "mingw-w64-v14.0.0/mingw-w64-tools/gendef/COPYING"
+          },
+          {
+            "sha256": "8CEB4B9EE5ADEDDE47B31E975C1D90C73AD27B6B165A1DCD80C7C545EB65B903",
+            "licenseRef": "LicenseRef-8ceb4b9ee5adedde",
+            "bytes": 35147,
+            "bundlePath": "licenses/extracted/8CEB4B9EE5ADEDDE47B31E975C1D90C73AD27B6B165A1DCD80C7C545EB65B903.txt",
+            "memberPath": "mingw-w64-v14.0.0/mingw-w64-tools/genidl/COPYING"
+          },
+          {
+            "sha256": "8CEB4B9EE5ADEDDE47B31E975C1D90C73AD27B6B165A1DCD80C7C545EB65B903",
+            "licenseRef": "LicenseRef-8ceb4b9ee5adedde",
+            "bytes": 35147,
+            "bundlePath": "licenses/extracted/8CEB4B9EE5ADEDDE47B31E975C1D90C73AD27B6B165A1DCD80C7C545EB65B903.txt",
+            "memberPath": "mingw-w64-v14.0.0/mingw-w64-tools/genpeimg/COPYING"
+          }
+        ]
+      },
+      "recipe": {
+        "builderCommit": "3e6685eda92f9288c15ac320139622dcedca09a4",
+        "baseImageDigest": "sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be",
+        "dockerfilePath": "images/base-win64/Dockerfile",
+        "configPath": "images/base-win64/ct-ng-config",
+        "crosstoolCommit": "b1a94f65c5187d99037a4e2f57aefbdf995a9677",
+        "checksum": {
+          "path": "packages/mingw-w64/v14.0.0/chksum",
+          "fileSha256": "E7336F2D2D4034C53E43BB369925C2EEA0D42A80D2C9C6C9887CAD3ADA8E53AB",
+          "line": "sha256 mingw-w64-v14.0.0.tar.bz2 6eaf921d9eb987d3820b364ea9775bc19b965ec81490b6fdd716526c28e1995c"
+        },
+        "patches": [
+          {
+            "path": "packages/mingw-w64/v14.0.0/0000-mingw64-malloc.patch",
+            "sha256": "7D8C911916D5852110D16D7678B98E0F493F0CB92C88D8CA801B650014A4C872",
+            "bytes": 767
+          },
+          {
+            "path": "packages/mingw-w64/v14.0.0/0001-fix-arm64-fabsl-asm-constraint.patch",
+            "sha256": "7FF7E4E6FC17901738917707AF31FDAAE019A485A951EDCE6BAAF18A2F11C5A1",
+            "bytes": 752
+          },
+          {
+            "path": "packages/mingw-w64/v14.0.0/0002-winpthreads-fix-aarch64-support.patch",
+            "sha256": "247260D22D620556383C1EC84034E0250D5491ABF78E25C79BC05EA25F263DCF",
+            "bytes": 1094
+          },
+          {
+            "path": "packages/mingw-w64/v14.0.0/0003-frexpl-aarch64-support.patch",
+            "sha256": "09AE0654AFAD062EC838EC4F8566E0AEF76F3A17C2FD554BC53B425EFE289D43",
+            "bytes": 2415
+          },
+          {
+            "path": "packages/mingw-w64/v14.0.0/0004-fmal-aarch64-support.patch",
+            "sha256": "C0516A2236C4D93EE5E31C19F05D0669B1509059DFEE119FD52A7EE61AD41F06",
+            "bytes": 717
+          },
+          {
+            "path": "packages/mingw-w64/v14.0.0/0005-truncl-aarch64-support.patch",
+            "sha256": "C03815C50E33BD68D504A125AAA900B93A52A2BCFBAC1B3C3F012236D119FD3F",
+            "bytes": 570
+          },
+          {
+            "path": "packages/mingw-w64/v14.0.0/0006-export-missing-__mingw_strtold.patch",
+            "sha256": "AF0BBCE832D5EC04206E03CD71088784E0C90071974DCCF6A2BC718B69E776B7",
+            "bytes": 1784
+          }
+        ]
+      }
+    },
+    {
+      "applicability": "conservative-superset",
+      "id": "toolchain-mold-2.42.0",
+      "source": {
+        "url": "https://github.com/rui314/mold/archive/refs/tags/v2.42.0.tar.gz",
+        "archiveName": "mold-2.42.0.tar.gz",
+        "bytes": 15290609,
+        "sha256": "6C0F3308C5B3159A369202D970922AD819BAB1BFCB5A3B3C06A723D19F65373E"
+      },
+      "license": {
+        "expression": "LicenseRef-00fcc7a934ddbc9e AND LicenseRef-0bd8f3874af685be AND LicenseRef-23f18e03dc49df91 AND LicenseRef-36266a8fd0735683 AND LicenseRef-62c7a1e35f564068 AND LicenseRef-6ffedbc0f7878612 AND LicenseRef-7055266497633c90 AND LicenseRef-8177f97513213526 AND LicenseRef-82ade5d7d9b02904 AND LicenseRef-a2010f343487d3f7 AND LicenseRef-a5695f57ea0c221e AND LicenseRef-c71d239df91726fc AND LicenseRef-c98a2858469bd3b2 AND LicenseRef-e32ff4e00d9d9493 AND LicenseRef-e3b0c44298fc1c14 AND LicenseRef-f9c375a1be4a41f7 AND LicenseRef-fc686023047ce5ce",
+        "files": [
+          {
+            "sha256": "C98A2858469BD3B231C8865C5B65F80F6FFBF25E850D5D575967E3D9EE080755",
+            "licenseRef": "LicenseRef-c98a2858469bd3b2",
+            "bytes": 1067,
+            "bundlePath": "licenses/extracted/C98A2858469BD3B231C8865C5B65F80F6FFBF25E850D5D575967E3D9EE080755.txt",
+            "memberPath": "mold-2.42.0/LICENSE"
+          },
+          {
+            "sha256": "00FCC7A934DDBC9ECE2A7CC063AC788E284B703B1D705CCBBA72D462AA97921E",
+            "licenseRef": "LicenseRef-00fcc7a934ddbc9e",
+            "bytes": 11361,
+            "bundlePath": "licenses/extracted/00FCC7A934DDBC9ECE2A7CC063AC788E284B703B1D705CCBBA72D462AA97921E.txt",
+            "memberPath": "mold-2.42.0/third-party/blake3/LICENSE_A2"
+          },
+          {
+            "sha256": "A5695F57EA0C221E0E8B7D784FF774C35E88C3D3270353646A925880BB3492CC",
+            "licenseRef": "LicenseRef-a5695f57ea0c221e",
+            "bytes": 12267,
+            "bundlePath": "licenses/extracted/A5695F57EA0C221E0E8B7D784FF774C35E88C3D3270353646A925880BB3492CC.txt",
+            "memberPath": "mold-2.42.0/third-party/blake3/LICENSE_A2LLVM"
+          },
+          {
+            "sha256": "A2010F343487D3F7618AFFE54F789F5487602331C0A8D03F49E9A7C547CF0499",
+            "licenseRef": "LicenseRef-a2010f343487d3f7",
+            "bytes": 7048,
+            "bundlePath": "licenses/extracted/A2010F343487D3F7618AFFE54F789F5487602331C0A8D03F49E9A7C547CF0499.txt",
+            "memberPath": "mold-2.42.0/third-party/blake3/LICENSE_CC0"
+          },
+          {
+            "sha256": "82ADE5D7D9B029044B5FBBC326207FC47C2D44EE4DD71E8A559C36D728217DE9",
+            "licenseRef": "LicenseRef-82ade5d7d9b02904",
+            "bytes": 1096,
+            "bundlePath": "licenses/extracted/82ADE5D7D9B029044B5FBBC326207FC47C2D44EE4DD71E8A559C36D728217DE9.txt",
+            "memberPath": "mold-2.42.0/third-party/mimalloc/LICENSE"
+          },
+          {
+            "sha256": "62C7A1E35F56406896D7AA7CA52D0CC0D272AC022B5D2796E7D6905DB8A3636A",
+            "licenseRef": "LicenseRef-62c7a1e35f564068",
+            "bytes": 9723,
+            "bundlePath": "licenses/extracted/62C7A1E35F56406896D7AA7CA52D0CC0D272AC022B5D2796E7D6905DB8A3636A.txt",
+            "memberPath": "mold-2.42.0/third-party/rust-demangle/LICENSE-APACHE"
+          },
+          {
+            "sha256": "23F18E03DC49DF91622FE2A76176497404E46CED8A715D9D2B67A7446571CCA3",
+            "licenseRef": "LicenseRef-23f18e03dc49df91",
+            "bytes": 1023,
+            "bundlePath": "licenses/extracted/23F18E03DC49DF91622FE2A76176497404E46CED8A715D9D2B67A7446571CCA3.txt",
+            "memberPath": "mold-2.42.0/third-party/rust-demangle/LICENSE-MIT"
+          },
+          {
+            "sha256": "0BD8F3874AF685BEF6F9D6FEA0FA5B668D341C9640B7905279C7EDD56943A010",
+            "licenseRef": "LicenseRef-0bd8f3874af685be",
+            "bytes": 530,
+            "bundlePath": "licenses/extracted/0BD8F3874AF685BEF6F9D6FEA0FA5B668D341C9640B7905279C7EDD56943A010.txt",
+            "memberPath": "mold-2.42.0/third-party/tbb/doc/main/specification/LICENSE.rst"
+          },
+          {
+            "sha256": "C71D239DF91726FC519C6EB72D318EC65820627232B2F796219E87DCF35D0AB4",
+            "licenseRef": "LicenseRef-c71d239df91726fc",
+            "bytes": 11357,
+            "bundlePath": "licenses/extracted/C71D239DF91726FC519C6EB72D318EC65820627232B2F796219E87DCF35D0AB4.txt",
+            "memberPath": "mold-2.42.0/third-party/tbb/LICENSE.txt"
+          },
+          {
+            "sha256": "8177F97513213526DF2CF6184D8FF986C675AFB514D4E68A404010521B880643",
+            "licenseRef": "LicenseRef-8177f97513213526",
+            "bytes": 18092,
+            "bundlePath": "licenses/extracted/8177F97513213526DF2CF6184D8FF986C675AFB514D4E68A404010521B880643.txt",
+            "memberPath": "mold-2.42.0/third-party/xxhash/cli/COPYING"
+          },
+          {
+            "sha256": "6FFEDBC0F7878612D2B23589F1FF2AB15633E1DF7963A5D9FC750EC5500C7E7A",
+            "licenseRef": "LicenseRef-6ffedbc0f7878612",
+            "bytes": 1389,
+            "bundlePath": "licenses/extracted/6FFEDBC0F7878612D2B23589F1FF2AB15633E1DF7963A5D9FC750EC5500C7E7A.txt",
+            "memberPath": "mold-2.42.0/third-party/xxhash/LICENSE"
+          },
+          {
+            "sha256": "8177F97513213526DF2CF6184D8FF986C675AFB514D4E68A404010521B880643",
+            "licenseRef": "LicenseRef-8177f97513213526",
+            "bytes": 18092,
+            "bundlePath": "licenses/extracted/8177F97513213526DF2CF6184D8FF986C675AFB514D4E68A404010521B880643.txt",
+            "memberPath": "mold-2.42.0/third-party/xxhash/tests/bench/LICENSE"
+          },
+          {
+            "sha256": "8177F97513213526DF2CF6184D8FF986C675AFB514D4E68A404010521B880643",
+            "licenseRef": "LicenseRef-8177f97513213526",
+            "bytes": 18092,
+            "bundlePath": "licenses/extracted/8177F97513213526DF2CF6184D8FF986C675AFB514D4E68A404010521B880643.txt",
+            "memberPath": "mold-2.42.0/third-party/xxhash/tests/collisions/LICENSE"
+          },
+          {
+            "sha256": "36266A8FD073568394CB81CDB2B124F7FDAE2C64C1A7ED09DB34B4D22EFA2951",
+            "licenseRef": "LicenseRef-36266a8fd0735683",
+            "bytes": 1359,
+            "bundlePath": "licenses/extracted/36266A8FD073568394CB81CDB2B124F7FDAE2C64C1A7ED09DB34B4D22EFA2951.txt",
+            "memberPath": "mold-2.42.0/third-party/zlib/contrib/dotzlib/LICENSE_1_0.txt"
+          },
+          {
+            "sha256": "FC686023047CE5CE3A18A9B8A777156F0E475929D3DE06BAC279F3C025D2B2CA",
+            "licenseRef": "LicenseRef-fc686023047ce5ce",
+            "bytes": 3509,
+            "bundlePath": "licenses/extracted/FC686023047CE5CE3A18A9B8A777156F0E475929D3DE06BAC279F3C025D2B2CA.txt",
+            "memberPath": "mold-2.42.0/third-party/zlib/contrib/minizip/LICENSE.Info-Zip"
+          },
+          {
+            "sha256": "E32FF4E00D9D94930537635291DA39E7E612703334BF6FDE8C7F1686FE8A45A2",
+            "licenseRef": "LicenseRef-e32ff4e00d9d9493",
+            "bytes": 1002,
+            "bundlePath": "licenses/extracted/E32FF4E00D9D94930537635291DA39E7E612703334BF6FDE8C7F1686FE8A45A2.txt",
+            "memberPath": "mold-2.42.0/third-party/zlib/LICENSE"
+          },
+          {
+            "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+            "licenseRef": "LicenseRef-e3b0c44298fc1c14",
+            "bytes": 0,
+            "bundlePath": "licenses/extracted/E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855.txt",
+            "memberPath": "mold-2.42.0/third-party/zstd/build/LICENSE"
+          },
+          {
+            "sha256": "F9C375A1BE4A41F7B70301DD83C91CB89E41567478859B77EEF375A52D782505",
+            "licenseRef": "LicenseRef-f9c375a1be4a41f7",
+            "bytes": 18091,
+            "bundlePath": "licenses/extracted/F9C375A1BE4A41F7B70301DD83C91CB89E41567478859B77EEF375A52D782505.txt",
+            "memberPath": "mold-2.42.0/third-party/zstd/COPYING"
+          },
+          {
+            "sha256": "7055266497633C9025B777C78EB7235AF13922117480ED5C674677ADC381C9D8",
+            "licenseRef": "LicenseRef-7055266497633c90",
+            "bytes": 1549,
+            "bundlePath": "licenses/extracted/7055266497633C9025B777C78EB7235AF13922117480ED5C674677ADC381C9D8.txt",
+            "memberPath": "mold-2.42.0/third-party/zstd/LICENSE"
+          }
+        ]
+      },
+      "recipe": {
+        "builderCommit": "3e6685eda92f9288c15ac320139622dcedca09a4",
+        "baseImageDigest": "sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be",
+        "dockerfilePath": "images/base-win64/Dockerfile",
+        "configPath": "images/base-win64/ct-ng-config",
+        "crosstoolCommit": "b1a94f65c5187d99037a4e2f57aefbdf995a9677",
+        "checksum": {
+          "path": "packages/mold/2.42.0/chksum",
+          "fileSha256": "D2AEB2A2E256EA404DA7FE5BABD65A23E3250E6A8CF31B00D9D61BEED01BDDB4",
+          "line": "sha256 v2.42.0.tar.gz 6c0f3308c5b3159a369202d970922ad819bab1bfcb5a3b3c06a723d19f65373e"
+        },
+        "patches": []
+      }
+    },
+    {
+      "applicability": "conservative-superset",
+      "id": "toolchain-mpc-1.3.1",
+      "source": {
+        "url": "https://ftp.gnu.org/gnu/mpc/mpc-1.3.1.tar.gz",
+        "archiveName": "mpc-1.3.1.tar.gz",
+        "bytes": 773573,
+        "sha256": "AB642492F5CF882B74AA0CB730CD410A81EDCDBEC895183CE930E706C1C759B8"
+      },
+      "license": {
+        "expression": "LicenseRef-da7eabb7bafdf7d3",
+        "files": [
+          {
+            "sha256": "DA7EABB7BAFDF7D3AE5E9F223AA5BDC1EECE45AC569DC21B3B037520B4464768",
+            "licenseRef": "LicenseRef-da7eabb7bafdf7d3",
+            "bytes": 7651,
+            "bundlePath": "licenses/extracted/DA7EABB7BAFDF7D3AE5E9F223AA5BDC1EECE45AC569DC21B3B037520B4464768.txt",
+            "memberPath": "mpc-1.3.1/COPYING.LESSER"
+          }
+        ]
+      },
+      "recipe": {
+        "builderCommit": "3e6685eda92f9288c15ac320139622dcedca09a4",
+        "baseImageDigest": "sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be",
+        "dockerfilePath": "images/base-win64/Dockerfile",
+        "configPath": "images/base-win64/ct-ng-config",
+        "crosstoolCommit": "b1a94f65c5187d99037a4e2f57aefbdf995a9677",
+        "checksum": {
+          "path": "packages/mpc/1.3.1/chksum",
+          "fileSha256": "38F3EF91970A25AA5A91C982C7CDB0DAB6AEE19E00B14E07C4A193B7A702D9D7",
+          "line": "sha256 mpc-1.3.1.tar.gz ab642492f5cf882b74aa0cb730cd410a81edcdbec895183ce930e706c1c759b8"
+        },
+        "patches": []
+      }
+    },
+    {
+      "applicability": "conservative-superset",
+      "id": "toolchain-mpfr-4.2.2",
+      "source": {
+        "url": "https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.2.tar.xz",
+        "archiveName": "mpfr-4.2.2.tar.xz",
+        "bytes": 1505596,
+        "sha256": "B67BA0383EF7E8A8563734E2E889EF5EC3C3B898A01D00FA0A6869AD81C6CE01"
+      },
+      "license": {
+        "expression": "LicenseRef-3972dc9744f6499f AND LicenseRef-e3a994d82e644b03",
+        "files": [
+          {
+            "sha256": "3972DC9744F6499F0F9B2DBF76696F2AE7AD8AF9B23DDE66D6AF86C9DFB36986",
+            "licenseRef": "LicenseRef-3972dc9744f6499f",
+            "bytes": 35149,
+            "bundlePath": "licenses/extracted/3972DC9744F6499F0F9B2DBF76696F2AE7AD8AF9B23DDE66D6AF86C9DFB36986.txt",
+            "memberPath": "mpfr-4.2.2/COPYING"
+          },
+          {
+            "sha256": "E3A994D82E644B03A792A930F574002658412F62407F5FEE083F2555C5F23118",
+            "licenseRef": "LicenseRef-e3a994d82e644b03",
+            "bytes": 7652,
+            "bundlePath": "licenses/extracted/E3A994D82E644B03A792A930F574002658412F62407F5FEE083F2555C5F23118.txt",
+            "memberPath": "mpfr-4.2.2/COPYING.LESSER"
+          }
+        ]
+      },
+      "recipe": {
+        "builderCommit": "3e6685eda92f9288c15ac320139622dcedca09a4",
+        "baseImageDigest": "sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be",
+        "dockerfilePath": "images/base-win64/Dockerfile",
+        "configPath": "images/base-win64/ct-ng-config",
+        "crosstoolCommit": "b1a94f65c5187d99037a4e2f57aefbdf995a9677",
+        "checksum": {
+          "path": "packages/mpfr/4.2.2/chksum",
+          "fileSha256": "CE242E662C50D74001B285190134655A811B436272ABF8FE96542621541AF1D9",
+          "line": "sha256 mpfr-4.2.2.tar.xz b67ba0383ef7e8a8563734e2e889ef5ec3c3b898a01d00fa0a6869ad81c6ce01"
+        },
+        "patches": []
+      }
+    },
+    {
+      "applicability": "conservative-superset",
+      "id": "toolchain-zlib-1.3.1",
+      "source": {
+        "url": "https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.xz",
+        "archiveName": "zlib-1.3.1.tar.xz",
+        "bytes": 1305740,
+        "sha256": "38EF96B8DFE510D42707D9C781877914792541133E1870841463BFA73F883E32"
+      },
+      "license": {
+        "expression": "LicenseRef-36266a8fd0735683 AND LicenseRef-845efc77857d485d",
+        "files": [
+          {
+            "sha256": "36266A8FD073568394CB81CDB2B124F7FDAE2C64C1A7ED09DB34B4D22EFA2951",
+            "licenseRef": "LicenseRef-36266a8fd0735683",
+            "bytes": 1359,
+            "bundlePath": "licenses/extracted/36266A8FD073568394CB81CDB2B124F7FDAE2C64C1A7ED09DB34B4D22EFA2951.txt",
+            "memberPath": "zlib-1.3.1/contrib/dotzlib/LICENSE_1_0.txt"
+          },
+          {
+            "sha256": "845EFC77857D485D91FB3E0B884AAA929368C717AE8186B66FE1ED2495753243",
+            "licenseRef": "LicenseRef-845efc77857d485d",
+            "bytes": 1002,
+            "bundlePath": "licenses/extracted/845EFC77857D485D91FB3E0B884AAA929368C717AE8186B66FE1ED2495753243.txt",
+            "memberPath": "zlib-1.3.1/LICENSE"
+          }
+        ]
+      },
+      "recipe": {
+        "builderCommit": "3e6685eda92f9288c15ac320139622dcedca09a4",
+        "baseImageDigest": "sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be",
+        "dockerfilePath": "images/base-win64/Dockerfile",
+        "configPath": "images/base-win64/ct-ng-config",
+        "crosstoolCommit": "b1a94f65c5187d99037a4e2f57aefbdf995a9677",
+        "checksum": {
+          "path": "packages/zlib/1.3.1/chksum",
+          "fileSha256": "48E6EDCE10221CEF91B491850F00EA6B39947C8302887E204181CA2A82521DCE",
+          "line": "sha256 zlib-1.3.1.tar.xz 38ef96b8dfe510d42707d9c781877914792541133e1870841463bfa73f883e32"
+        },
+        "patches": []
+      }
+    },
+    {
+      "applicability": "conservative-superset",
+      "id": "toolchain-zstd-1.5.7",
+      "source": {
+        "url": "https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz",
+        "archiveName": "zstd-1.5.7.tar.gz",
+        "bytes": 2434947,
+        "sha256": "EB33E51F49A15E023950CD7825CA74A4A2B43DB8354825AC24FC1B7EE09E6FA3"
+      },
+      "license": {
+        "expression": "LicenseRef-7055266497633c90 AND LicenseRef-e3b0c44298fc1c14 AND LicenseRef-f9c375a1be4a41f7",
+        "files": [
+          {
+            "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+            "licenseRef": "LicenseRef-e3b0c44298fc1c14",
+            "bytes": 0,
+            "bundlePath": "licenses/extracted/E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855.txt",
+            "memberPath": "zstd-1.5.7/build/LICENSE"
+          },
+          {
+            "sha256": "F9C375A1BE4A41F7B70301DD83C91CB89E41567478859B77EEF375A52D782505",
+            "licenseRef": "LicenseRef-f9c375a1be4a41f7",
+            "bytes": 18091,
+            "bundlePath": "licenses/extracted/F9C375A1BE4A41F7B70301DD83C91CB89E41567478859B77EEF375A52D782505.txt",
+            "memberPath": "zstd-1.5.7/COPYING"
+          },
+          {
+            "sha256": "7055266497633C9025B777C78EB7235AF13922117480ED5C674677ADC381C9D8",
+            "licenseRef": "LicenseRef-7055266497633c90",
+            "bytes": 1549,
+            "bundlePath": "licenses/extracted/7055266497633C9025B777C78EB7235AF13922117480ED5C674677ADC381C9D8.txt",
+            "memberPath": "zstd-1.5.7/LICENSE"
+          }
+        ]
+      },
+      "recipe": {
+        "builderCommit": "3e6685eda92f9288c15ac320139622dcedca09a4",
+        "baseImageDigest": "sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be",
+        "dockerfilePath": "images/base-win64/Dockerfile",
+        "configPath": "images/base-win64/ct-ng-config",
+        "crosstoolCommit": "b1a94f65c5187d99037a4e2f57aefbdf995a9677",
+        "checksum": {
+          "path": "packages/zstd/1.5.7/chksum",
+          "fileSha256": "D9A5F19B9B2C8CCBAD1CE59746D8B3563141C0F581B52093CA7C3386FE3E116D",
+          "line": "sha256 zstd-1.5.7.tar.gz eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3"
+        },
+        "patches": []
+      }
+    }
+  ]
+}

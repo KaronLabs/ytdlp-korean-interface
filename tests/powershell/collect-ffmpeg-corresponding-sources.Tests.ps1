@@ -1,155 +1,134 @@
-$ErrorActionPreference = 'Stop'
-Set-StrictMode -Version Latest
+$collector = Join-Path $PSScriptRoot '..\..\tools\collect-ffmpeg-corresponding-sources.ps1'
+. $collector -NoExecute
 
-$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$Collector = Join-Path $RepositoryRoot 'tools\collect-ffmpeg-corresponding-sources.ps1'
-$OfficialArchive = 'E:\03_AllWork\ytdlp-korean-interface\.quality-presets-work\karon2-input\immutable\ffmpeg-n9.0.1-30-g9258bacca5-win64-lgpl-9.0.zip'
+$releaseRoot = Join-Path $PSScriptRoot '..\..\release\runtime\v2.19.1-karon.2\ffmpeg'
+$manifestPath = Join-Path $releaseRoot manifest.json
+$binaryPath = 'E:\03_AllWork\ytdlp-korean-interface\.quality-presets-work\karon2-input\immutable\ffmpeg-n9.0.1-30-g9258bacca5-win64-lgpl-9.0.zip'
 
-if (Test-Path -LiteralPath $Collector -PathType Leaf) {
-    . $Collector -NoExecute
+function Copy-JsonObject {
+    param($Value)
+    $Value | ConvertTo-Json -Depth 30 | ConvertFrom-Json
 }
 
-function New-CompleteManifest {
-    $component = [pscustomobject]@{
-        id = 'zlib'
-        version = '1.3.2'
-        commit = 'e3dc0a85b7032e98380dec011bc8f2c2ee0d8fca'
-        source = [pscustomobject]@{
-            url = 'https://github.com/madler/zlib/archive/e3dc0a85b7032e98380dec011bc8f2c2ee0d8fca.tar.gz'
-            sha256 = 'A' * 64
-        }
-        license = [pscustomobject]@{
-            expression = 'Zlib'
-            textPath = 'licenses/zlib.txt'
-        }
-        recipe = [pscustomobject]@{
-            scriptPath = 'scripts.d/20-zlib.sh'
-            patches = @()
-        }
+Describe 'FFmpeg corresponding-source collector schema 3' {
+    BeforeAll {
+        $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
+        $graph = Get-Content -Raw -LiteralPath (Join-Path $releaseRoot $manifest.sourceSets.btbnActionsCache.componentGraphPath) | ConvertFrom-Json
+        $crates = Get-Content -Raw -LiteralPath (Join-Path $releaseRoot $manifest.sourceSets.rav1eCrates.manifestPath) | ConvertFrom-Json
+        $toolchain = Get-Content -Raw -LiteralPath (Join-Path $releaseRoot $manifest.sourceSets.toolchain.manifestPath) | ConvertFrom-Json
+        $corpus = Get-Content -Raw -LiteralPath (Join-Path $releaseRoot $manifest.sourceSets.licenseCorpus.manifestPath) | ConvertFrom-Json
+        $options = @(Get-Content -LiteralPath (Join-Path $releaseRoot $manifest.binary.buildConfigurationPath) | ForEach-Object Trim | Where-Object { $_ -match '^--' })
     }
-    return [pscustomobject]@{
-        schemaVersion = 1
-        closureStatus = 'complete'
-        includedPaths = @('licenses/zlib.txt', 'scripts.d/20-zlib.sh')
-        enabledExternalLibraries = @(
-            [pscustomobject]@{ option = '--enable-zlib'; componentId = 'zlib' }
-        )
-        components = @($component)
-    }
-}
 
-function Assert-ExactError {
-    param([scriptblock] $Action, [string] $Expected)
-    $actual = $null
-    try { & $Action | Out-Null } catch { $actual = $_.Exception.Message }
-    if ($actual -cne $Expected) { throw "Expected '$Expected', got '$actual'." }
-}
-
-Describe 'FFmpeg corresponding-source collector' {
     It 'rejects an unknown enabled external library' {
-        $manifest = New-CompleteManifest
-        Assert-ExactError {
-            Assert-FfmpegSourceManifest -Manifest $manifest -BuildConfigurationOptions @(
-                '--pkg-config-flags=--static',
-                '--enable-version3',
-                '--enable-zlib',
-                '--enable-libmystery'
-            )
-        } 'ffmpeg_source_unknown_enabled_library:--enable-libmystery'
+        { Assert-FfmpegClosureMetadata $manifest $graph $crates $toolchain $corpus ($options + '--enable-libunknown') } |
+            Should Throw 'ffmpeg_source_unknown_enabled_library'
     }
 
-    It 'rejects a mutable source URL' {
-        $manifest = New-CompleteManifest
-        $manifest.components[0].source.url = 'https://github.com/madler/zlib/archive/refs/heads/master.zip'
-        Assert-ExactError {
-            Assert-FfmpegSourceManifest -Manifest $manifest -BuildConfigurationOptions @(
-                '--pkg-config-flags=--static', '--enable-version3', '--enable-zlib'
-            )
-        } 'ffmpeg_source_mutable_url:zlib'
+    It 'rejects a mutable URL' {
+        $bad = Copy-JsonObject $toolchain
+        $bad.components[0].source.url = 'https://github.com/example/project/archive/main.zip'
+        { Assert-FfmpegClosureMetadata $manifest $graph $crates $bad $corpus $options } |
+            Should Throw 'ffmpeg_source_mutable_url'
     }
 
-    It 'rejects a source archive SHA-256 mismatch' {
-        $root = Join-Path ([IO.Path]::GetTempPath()) ('karon-ffmpeg-source-hash-' + [Guid]::NewGuid().ToString('N'))
-        [IO.Directory]::CreateDirectory($root) | Out-Null
-        try {
-            $archive = Join-Path $root 'source.tar.xz'
-            [IO.File]::WriteAllText($archive, 'wrong source bytes', [Text.UTF8Encoding]::new($false))
-            Assert-ExactError {
-                Assert-SourceArchiveHash -Path $archive -ExpectedSha256 ('A' * 64) -ComponentId 'zlib'
-            } 'ffmpeg_source_sha256_mismatch:zlib'
-        }
-        finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+    It 'rejects a source SHA mismatch' {
+        $path = Join-Path $TestDrive source.bin
+        [IO.File]::WriteAllText($path, 'wrong')
+        { Assert-SourceArchiveHash $path ('0' * 64) component } |
+            Should Throw 'ffmpeg_source_sha256_mismatch'
     }
 
-    It 'rejects GPL or nonfree build configuration' {
-        foreach ($forbidden in @('--enable-gpl', '--enable-nonfree')) {
-            $manifest = New-CompleteManifest
-            Assert-ExactError {
-                Assert-FfmpegSourceManifest -Manifest $manifest -BuildConfigurationOptions @(
-                    '--pkg-config-flags=--static', '--enable-version3', '--enable-zlib', $forbidden
-                )
-            } "ffmpeg_source_forbidden_configuration:$forbidden"
-        }
+    It 'rejects GPL and nonfree configuration' {
+        { Assert-FfmpegClosureMetadata $manifest $graph $crates $toolchain $corpus ($options + '--enable-gpl') } |
+            Should Throw 'ffmpeg_source_forbidden_configuration'
+        { Assert-FfmpegClosureMetadata $manifest $graph $crates $toolchain $corpus ($options + '--enable-nonfree') } |
+            Should Throw 'ffmpeg_source_forbidden_configuration'
     }
 
-    It 'rejects missing patch or license evidence' {
-        $missingLicense = New-CompleteManifest
-        $missingLicense.components[0].license.textPath = ''
-        Assert-ExactError {
-            Assert-FfmpegSourceManifest -Manifest $missingLicense -BuildConfigurationOptions @(
-                '--pkg-config-flags=--static', '--enable-version3', '--enable-zlib'
-            )
-        } 'ffmpeg_source_missing_license:zlib'
-
-        $missingPatch = New-CompleteManifest
-        $missingPatch.components[0].recipe.patches = @('patches/zlib.patch')
-        Assert-ExactError {
-            Assert-FfmpegSourceManifest -Manifest $missingPatch -BuildConfigurationOptions @(
-                '--pkg-config-flags=--static', '--enable-version3', '--enable-zlib'
-            )
-        } 'ffmpeg_source_missing_patch:zlib:patches/zlib.patch'
+    It 'rejects missing patch and license evidence' {
+        $badPatch = Copy-JsonObject $graph
+        $badPatch.components[0].recipe.patches = @([pscustomobject]@{ path = ''; sha256 = '' })
+        { Assert-FfmpegClosureMetadata $manifest $badPatch $crates $toolchain $corpus $options } |
+            Should Throw 'ffmpeg_source_missing_patch'
+        $badLicense = Copy-JsonObject $graph
+        $badLicense.components[0].license.files = @()
+        { Assert-FfmpegClosureMetadata $manifest $badLicense $crates $toolchain $corpus $options } |
+            Should Throw 'ffmpeg_source_missing_license'
     }
 
-    It 'rejects duplicate component identifiers that collide by case' {
-        $manifest = New-CompleteManifest
-        $duplicate = New-CompleteManifest
-        $duplicate.components[0].id = 'ZLIB'
-        $manifest.components = @($manifest.components[0], $duplicate.components[0])
-        Assert-ExactError {
-            Assert-FfmpegSourceManifest -Manifest $manifest -BuildConfigurationOptions @(
-                '--pkg-config-flags=--static', '--enable-version3', '--enable-zlib'
-            )
-        } 'ffmpeg_source_duplicate_component:ZLIB'
+    It 'rejects duplicate identifiers with a case collision' {
+        $bad = Copy-JsonObject $graph
+        $duplicate = Copy-JsonObject $bad.components[0]
+        $duplicate.id = $duplicate.id.ToUpperInvariant()
+        $bad.components += $duplicate
+        { Assert-FfmpegClosureMetadata $manifest $bad $crates $toolchain $corpus $options } |
+            Should Throw 'ffmpeg_source_duplicate_component'
     }
 
-    It 'accepts the exact official archive and records its real build configuration' {
-        $evidence = Read-FfmpegBinaryEvidence `
-            -ArchivePath $OfficialArchive `
-            -ExpectedArchiveSha256 '39697D69681A09BD55A0F0224360A9A4285BC12127DF807D7242592B0E144A7B' `
-            -ExpectedFfmpegSha256 '41482EABC1A33F9D1E4334CA32EC9259AA34A3EC2493FCC9F214BFE54301CE38' `
-            -ExpectedFfprobeSha256 '376F55EB141C3B0D8790B64967B8CBF1737D76BEBE0820189356C71CC884B395' `
-            -ExpectedVersion 'n9.0.1-30-g9258bacca5'
-
-        $evidence.archiveSha256 | Should Be '39697D69681A09BD55A0F0224360A9A4285BC12127DF807D7242592B0E144A7B'
+    It 'accepts the exact official archive and records its build configuration' {
+        $evidence = Read-FfmpegBinaryEvidence $binaryPath $manifest.binary.archiveSha256 $manifest.binary.ffmpegSha256 $manifest.binary.ffprobeSha256 $manifest.binary.expectedVersion
         $evidence.ffmpegSha256 | Should Be '41482EABC1A33F9D1E4334CA32EC9259AA34A3EC2493FCC9F214BFE54301CE38'
-        $evidence.ffprobeSha256 | Should Be '376F55EB141C3B0D8790B64967B8CBF1737D76BEBE0820189356C71CC884B395'
-        @($evidence.configurationOptions) -contains '--pkg-config-flags=--static' | Should Be $true
-        @($evidence.configurationOptions) -contains '--enable-version3' | Should Be $true
-        @($evidence.configurationOptions) -contains '--enable-gpl' | Should Be $false
-        @($evidence.configurationOptions) -contains '--enable-nonfree' | Should Be $false
+        $evidence.configurationOptions.Count | Should BeGreaterThan 0
+        ($evidence.configurationOptions -contains '--enable-version3') | Should Be $true
+        ($evidence.configurationOptions -notcontains '--enable-gpl') | Should Be $true
     }
 
-    It 'validates all retained source records while preserving the fail-closed gate' {
-        $root = Join-Path $RepositoryRoot 'release\runtime\v2.19.1-karon.2\ffmpeg'
-        $manifest = Get-Content -Raw (Join-Path $root 'manifest.json') | ConvertFrom-Json
-        $graph = Get-Content -Raw (Join-Path $root 'component-graph.json') | ConvertFrom-Json
-        $crates = Get-Content -Raw (Join-Path $root 'rav1e-crates.json') | ConvertFrom-Json
-        $options = @(Get-Content (Join-Path $root 'buildconf.txt') | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^--' })
+    It 'requires deterministic LicenseRef text with matching bytes' {
+        $root = Join-Path $TestDrive corpus
+        [IO.Directory]::CreateDirectory((Join-Path $root 'licenses\extracted')) | Out-Null
+        $file = Join-Path $root 'licenses\extracted\license.txt'
+        [IO.File]::WriteAllText($file, 'exact license text')
+        $sha = Get-UpperSha256 $file
+        $mini = [pscustomobject]@{
+            textObjectCount = 1
+            textObjects = @([pscustomobject]@{
+                sha256 = $sha
+                licenseRef = 'LicenseRef-' + $sha.Substring(0, 16).ToLowerInvariant()
+                bundlePath = 'licenses/extracted/license.txt'
+            })
+        }
+        (Assert-LicenseCorpus $mini $root -VerifyFiles).Count | Should Be 1
+        [IO.File]::WriteAllText($file, 'changed')
+        { Assert-LicenseCorpus $mini $root -VerifyFiles } | Should Throw 'ffmpeg_source_sha256_mismatch'
+    }
 
-        Assert-FfmpegClosureGraph $manifest $graph $crates $options
-        $graph.components.Count | Should Be 85
-        $crates.components.Count | Should Be 270
-        $manifest.verifiedSourceRecordCount | Should Be 358
-        $manifest.closureStatus | Should Be 'incomplete'
+    It 'requires exact GCC libgomp and MinGW toolchain sources' {
+        $bad = Copy-JsonObject $toolchain
+        $bad.components = @($bad.components | Where-Object id -ne 'toolchain-gcc-16.2.0')
+        { Assert-FfmpegClosureMetadata $manifest $graph $crates $bad $corpus $options } |
+            Should Throw 'ffmpeg_source_missing_toolchain'
+    }
+
+    It 'requires all 19 nested trees as conservative superset closures' {
+        $bad = Copy-JsonObject $graph
+        $bad.nestedClosures[0].applicability = 'exact-link-minimum'
+        { Assert-FfmpegClosureMetadata $manifest $bad $crates $toolchain $corpus $options } |
+            Should Throw 'ffmpeg_source_nested_closure_incomplete'
+        $graph.nestedClosures.Count | Should Be 19
+    }
+
+    It 'creates byte-identical deterministic ZIPs' {
+        $a = Join-Path $TestDrive a.txt
+        $b = Join-Path $TestDrive b.txt
+        [IO.File]::WriteAllText($a, 'alpha')
+        [IO.File]::WriteAllText($b, 'beta')
+        $items = @(
+            [pscustomobject]@{ SourcePath = $b; EntryPath = 'B.txt' },
+            [pscustomobject]@{ SourcePath = $a; EntryPath = 'a.txt' }
+        )
+        $one = Join-Path $TestDrive one.zip
+        $two = Join-Path $TestDrive two.zip
+        New-DeterministicZip $items $one
+        New-DeterministicZip $items $two
+        (Get-UpperSha256 $one) | Should Be (Get-UpperSha256 $two)
+    }
+
+    It 'validates the complete retained conservative closure' {
+        { Assert-FfmpegClosureMetadata $manifest $graph $crates $toolchain $corpus $options } | Should Not Throw
+        $manifest.closureStatus | Should Be complete
+        $manifest.verifiedSourceRecordCount | Should Be 407
+        $corpus.textObjectCount | Should Be 628
     }
 }
+

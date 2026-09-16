@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 1,
+  "crosstoolCommit": "b1a94f65c5187d99037a4e2f57aefbdf995a9677",
+  "allConfiguredArchivesMatch": true,
+  "sources": [
+    {
+      "archiveName": "binutils-2.47.tar.xz",
+      "url": "https://ftp.gnu.org/gnu/binutils/binutils-2.47.tar.xz",
+      "bytes": 29034716,
+      "sha256": "154AB23B60070E8F27013C22977F1129425D67D1E8ACD6E13010E617811E4CFF",
+      "crosstoolChecksums": [
+        {
+          "path": "packages/binutils/2.47/chksum",
+          "fileSha256": "855B4256CB262C463E29A71A74D69ED33E494265EB53B5361445EB82BB2D0526",
+          "line": "sha256 binutils-2.47.tar.xz 154ab23b60070e8f27013c22977f1129425d67d1e8acd6e13010e617811e4cff"
+        }
+      ]
+    },
+    {
+      "archiveName": "crosstool-ng-b1a94f65c5187d99037a4e2f57aefbdf995a9677.zip",
+      "url": "https://codeload.github.com/crosstool-ng/crosstool-ng/zip/b1a94f65c5187d99037a4e2f57aefbdf995a9677",
+      "bytes": 6972578,
+      "sha256": "3654FCECA73EA405E34ADC072DC38DB1C73256435F138C5D5CECA86CE68A363B",
+      "crosstoolChecksums": []
+    },
+    {
+      "archiveName": "gcc-16.2.0.tar.xz",
+      "url": "https://ftp.gnu.org/gnu/gcc/gcc-16.2.0/gcc-16.2.0.tar.xz",
+      "bytes": 107200820,
+      "sha256": "E6738E29597F733270731AA90600F37FFDC045079DFC27EC7E8192CC81085C3E",
+      "crosstoolChecksums": [
+        {
+          "path": "packages/gcc/16.2.0/chksum",
+          "fileSha256": "65A9A1474BAEB547362279CC226D74673E027F26216E0DA921925377750373F0",
+          "line": "sha256 gcc-16.2.0.tar.xz e6738e29597f733270731aa90600f37ffdc045079dfc27ec7e8192cc81085c3e"
+        }
+      ]
+    },
+    {
+      "archiveName": "gettext-0.26.tar.xz",
+      "url": "https://ftp.gnu.org/gnu/gettext/gettext-0.26.tar.xz",
+      "bytes": 10061740,
+      "sha256": "D1FB86E260CFE7DA6031F94D2E44C0DA55903DBAE0A2FA0FAE78C91AE1B56F00",
+      "crosstoolChecksums": [
+        {
+          "path": "packages/gettext/0.26/chksum",
+          "fileSha256": "D025C5FAC657B4F5E416979818588D38937AA8A061ADCF2E18C69EC7AA6249D3",
+          "line": "sha256 gettext-0.26.tar.xz d1fb86e260cfe7da6031f94d2e44c0da55903dbae0a2fa0fae78c91ae1b56f00"
+        }
+      ]
+    },
+    {
+      "archiveName": "gmp-6.3.0.tar.xz",
+      "url": "https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz",
+      "bytes": 2094196,
+      "sha256": "A3C2B80201B89E68616F4AD30BC66AEE4927C3CE50E33929CA819D5C43538898",
+      "crosstoolChecksums": [
+        {
+          "path": "packages/gmp/6.3.0/chksum",
+          "fileSha256": "10FF82909EF431C0B356C75A259C4A9D2BB15A300C4E9DDCAF182E413CCBA488",
+          "line": "sha256 gmp-6.3.0.tar.xz a3c2b80201b89e68616f4ad30bc66aee4927c3ce50e33929ca819d5c43538898"
+        }
+      ]
+    },
+    {
+      "archiveName": "isl-0.27.tar.xz",
+      "url": "https://libisl.sourceforge.io/isl-0.27.tar.xz",
+      "bytes": 2056436,
+      "sha256": "6D8BABB59E7B672E8CB7870E874F3F7B813B6E00E6AF3F8B04F7579965643D5C",
+      "crosstoolChecksums": [
+        {
+          "path": "packages/isl/0.27/chksum",
+          "fileSha256": "FB814A6D31A693283780FAD64EB1AD0471558FC8C79D84B8DB80D3C8E7DBF869",
+          "line": "sha256 isl-0.27.tar.xz 6d8babb59e7b672e8cb7870e874f3f7b813b6e00e6af3f8b04f7579965643d5c"
+        }
+      ]
+    },
+    {
+      "archiveName": "mingw-w64-v14.0.0.tar.bz2",
+      "url": "https://downloads.sourceforge.net/project/mingw-w64/mingw-w64/mingw-w64-release/mingw-w64-v14.0.0.tar.bz2",
+      "bytes": 11163292,
+      "sha256": "6EAF921D9EB987D3820B364EA9775BC19B965EC81490B6FDD716526C28E1995C",
+      "crosstoolChecksums": [
+        {
+          "path": "packages/mingw-w64/v14.0.0/chksum",
+          "fileSha256": "E7336F2D2D4034C53E43BB369925C2EEA0D42A80D2C9C6C9887CAD3ADA8E53AB",
+          "line": "sha256 mingw-w64-v14.0.0.tar.bz2 6eaf921d9eb987d3820b364ea9775bc19b965ec81490b6fdd716526c28e1995c"
+        }
+      ]
+    },
+    {
+      "archiveName": "mold-2.42.0.tar.gz",
+      "url": "https://github.com/rui314/mold/archive/refs/tags/v2.42.0.tar.gz",
+      "bytes": 15290609,
+      "sha256": "6C0F3308C5B3159A369202D970922AD819BAB1BFCB5A3B3C06A723D19F65373E",
+      "crosstoolChecksums": [
+        {
+          "path": "packages/mold/2.42.0/chksum",
+          "fileSha256": "D2AEB2A2E256EA404DA7FE5BABD65A23E3250E6A8CF31B00D9D61BEED01BDDB4",
+          "line": "sha256 v2.42.0.tar.gz 6c0f3308c5b3159a369202d970922ad819bab1bfcb5a3b3c06a723d19f65373e"
+        }
+      ]
+    },
+    {
+      "archiveName": "mpc-1.3.1.tar.gz",
+      "url": "https://ftp.gnu.org/gnu/mpc/mpc-1.3.1.tar.gz",
+      "bytes": 773573,
+      "sha256": "AB642492F5CF882B74AA0CB730CD410A81EDCDBEC895183CE930E706C1C759B8",
+      "crosstoolChecksums": [
+        {
+          "path": "packages/mpc/1.3.1/chksum",
+          "fileSha256": "38F3EF91970A25AA5A91C982C7CDB0DAB6AEE19E00B14E07C4A193B7A702D9D7",
+          "line": "sha256 mpc-1.3.1.tar.gz ab642492f5cf882b74aa0cb730cd410a81edcdbec895183ce930e706c1c759b8"
+        }
+      ]
+    },
+    {
+      "archiveName": "mpfr-4.2.2.tar.xz",
+      "url": "https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.2.tar.xz",
+      "bytes": 1505596,
+      "sha256": "B67BA0383EF7E8A8563734E2E889EF5EC3C3B898A01D00FA0A6869AD81C6CE01",
+      "crosstoolChecksums": [
+        {
+          "path": "packages/mpfr/4.2.2/chksum",
+          "fileSha256": "CE242E662C50D74001B285190134655A811B436272ABF8FE96542621541AF1D9",
+          "line": "sha256 mpfr-4.2.2.tar.xz b67ba0383ef7e8a8563734e2e889ef5ec3c3b898a01d00fa0a6869ad81c6ce01"
+        }
+      ]
+    },
+    {
+      "archiveName": "zlib-1.3.1.tar.xz",
+      "url": "https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.xz",
+      "bytes": 1305740,
+      "sha256": "38EF96B8DFE510D42707D9C781877914792541133E1870841463BFA73F883E32",
+      "crosstoolChecksums": [
+        {
+          "path": "packages/zlib/1.3.1/chksum",
+          "fileSha256": "48E6EDCE10221CEF91B491850F00EA6B39947C8302887E204181CA2A82521DCE",
+          "line": "sha256 zlib-1.3.1.tar.xz 38ef96b8dfe510d42707d9c781877914792541133e1870841463bfa73f883e32"
+        }
+      ]
+    },
+    {
+      "archiveName": "zstd-1.5.7.tar.gz",
+      "url": "https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz",
+      "bytes": 2434947,
+      "sha256": "EB33E51F49A15E023950CD7825CA74A4A2B43DB8354825AC24FC1B7EE09E6FA3",
+      "crosstoolChecksums": [
+        {
+          "path": "packages/zstd/1.5.7/chksum",
+          "fileSha256": "D9A5F19B9B2C8CCBAD1CE59746D8B3563141C0F581B52093CA7C3386FE3E116D",
+          "line": "sha256 zstd-1.5.7.tar.gz eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3"
+        }
+      ]
+    }
+  ]
+}
