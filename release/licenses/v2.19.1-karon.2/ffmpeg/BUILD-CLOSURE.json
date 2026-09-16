@@ -1,0 +1,23 @@
+{
+  "verificationStatus": "NOT_VERIFIED",
+  "releaseTag": "autobuild-2026-09-15-13-18",
+  "asset": "ffmpeg-n9.0.1-30-g9258bacca5-win64-lgpl-9.0.zip",
+  "assetSha256": "39697d69681a09bd55a0f0224360a9a4285bc12127df807d7242592b0e144a7b",
+  "ffmpegCommit": "9258bacca50d7ca28bcb6d797e8952123e35105b",
+  "buildScriptsCommit": "3e6685eda92f9288c15ac320139622dcedca09a4",
+  "licenseExpression": "LGPL-3.0-or-later",
+  "enabledIntegrations": [
+    "iconv", "zlib", "libxml2", "libvmaf", "fontconfig", "libharfbuzz",
+    "libfreetype", "libfribidi", "vulkan", "libdav1d", "libvorbis",
+    "librav1e", "librsvg", "gmp", "lzma", "liblcevc-dec", "opencl",
+    "amf", "libaom", "chromaprint", "ffnvcodec", "cuda-llvm", "libgme",
+    "libkvazaar", "libaribb24", "libaribcaption", "libass", "libbluray",
+    "libjxl", "libmp3lame", "libopus", "libplacebo", "librist", "libssh",
+    "libtheora", "libvpx", "libwebp", "libzmq", "lv2", "libvpl", "openal",
+    "liboapv", "libopencore-amrnb", "libopencore-amrwb", "libopenh264",
+    "libopenjpeg", "libopenmpt", "schannel", "sdl2", "libsnappy", "libsoxr",
+    "libsrt", "libsvtav1", "libtwolame", "libuavs3d", "vaapi", "libvvenc",
+    "libzimg", "libzvbi"
+  ],
+  "blocker": "The exact BtbN .cache/downloads source archives are unavailable. download.sh keys cache files by the SHA-256 of each download command string, not by the downloaded source bytes. The FFmpeg and BtbN trees alone therefore do not prove corresponding-source closure for the enabled static external libraries."
+}

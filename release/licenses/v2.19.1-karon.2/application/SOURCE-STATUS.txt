@@ -1,0 +1,9 @@
+Application source:
+https://github.com/KaronLabs/ytdlp-korean-interface/commit/8f776b34cf9e644accb9f5e1230dd7e1b24d3def
+
+The application source is MIT licensed. This statement does not relicense the
+portable bundle or any statically linked or separately shipped dependency.
+
+NOT_VERIFIED: the final candidate manifest for the requested dependency set was
+not supplied. The available sealed-owner candidate contains yt-dlp 2026.08.30,
+7-Zip 21.07, and an older GPL FFmpeg build, so it is not the target candidate.

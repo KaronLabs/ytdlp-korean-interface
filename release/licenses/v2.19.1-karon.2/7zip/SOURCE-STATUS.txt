@@ -1,0 +1,9 @@
+7-Zip 26.01 source commit:
+https://github.com/ip7z/7zip/commit/8c63d71ff886bda90c86db28466287f977374237
+
+Target license expression: LGPL-2.1-or-later AND BSD-3-Clause.
+The target build must omit the unRAR sources and RAR handler.
+
+NOT_VERIFIED: no sealed 7z.dll 26.01 binary, SHA-256, build transcript, or
+link/map evidence proving omission of unRAR was supplied to Task 3. The older
+7z.dll found outside this worktree reports version 21.07 and is not accepted.

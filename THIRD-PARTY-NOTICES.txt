@@ -1,0 +1,56 @@
+KaronLabs ytdlp-korean-interface v2.19.1-karon.2
+THIRD-PARTY NOTICES AND EXACT SOURCE LOCATIONS
+
+This is a technical compliance bundle, not legal advice. The portable package
+is not licensed as a whole under MIT. Each component remains under its own
+license. Full license texts and upstream notices are under
+release/licenses/v2.19.1-karon.2/.
+
+APPLICATION
+ytdlp-interface application; MIT; modified by KaronLabs.
+Source: https://github.com/KaronLabs/ytdlp-korean-interface/archive/8f776b34cf9e644accb9f5e1230dd7e1b24d3def.zip
+Source SHA-256: bd76aaa80c620aa4c8339bb68011c82e1b7fcc72ee7a7dc9dff1602328335586
+
+STATIC APPLICATION DEPENDENCIES
+bit7z 4.1.0; MPL-2.0; commit c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742.
+Source SHA-256: 6af52b2e1b9895e8f1193728880206326161940e7a961e3162ec39752dbb3379
+Nana 1.8; Boost-1.0; upstream baseline 554c4fe87fc31b8ee104228e9117d545d34855b5; locally modified build files.
+Source SHA-256: ef657036a4623bbb5c4e0df4e8aa699dc6ac713ca4a6725b30d3fd8175c4c145
+libpng 1.6.37; Libpng; commit a40189cf881e9f0db80511c382292a5604c3c3d1.
+Source SHA-256: b3af9e92167f9c4233482f49aff02730b7dc3a275871ce637ed668413da6283f
+zlib 1.2.5; Zlib; commit 9712272c78b9d9c93746d9c8e156a3728c65ca72.
+Source SHA-256: 66faa243ea50094c2b399f5644cd4aa6110e739eae26800120124bbd1da00535
+libjpeg-turbo 3.1.2; BSD-3-Clause AND IJG AND Zlib; commit 4e151a4ad91001b3aa8c2ece2205c15f487ce320.
+Source SHA-256: d3c33405b46aa14094ef26cd7b9618162ebcafeed7fb2acf2fda5c7c10b80782
+nlohmann-json 3.12.0; MIT; commit 55f93686c01528224f448c19128836e7df245f72.
+Source SHA-256: 0746352e4e9532e7aeabbcbaa79079b6bc6008e9261e4d459c9486a9b48a172e
+The tracked single header differs byte-for-byte from the upstream amalgamation;
+the lock therefore marks the vendored form as modified.
+
+SEPARATELY SHIPPED COMPONENTS
+7z.dll 26.01 target; LGPL-2.1-or-later AND BSD-3-Clause; unRAR excluded;
+source commit 8c63d71ff886bda90c86db28466287f977374237.
+Source SHA-256: 01589aeda50512955e66d360c6534b961ec95c51111a76e2fa2976a8daa55271
+
+yt-dlp nightly 2026.08.04.234419; source commit
+5d6b8c8cd19785c3086ae3a9ec618c45e25eb3bc; Unlicense plus the complete
+PyInstaller dependency notices in yt-dlp/THIRD-PARTY-LICENSES.txt.
+Source SHA-256: 38184dfb5d8dd435e3bbea24392e55ff47ae31a3cff93918260c00d123b19593
+yt-dlp.exe SHA-256: e78500d301b5de3a9280a418f6dd45604c4d85b718b0a2447c1b0aa9699e2689
+
+Deno 2.7.14; MIT plus dependency licenses; source commit
+2d674b25625bcc367853d00fe86f6e84390f88cb.
+Source SHA-256: 0fb1aac72af419d8f7de0d623eee7713571d841736d1c01eac97363afd3996dd
+deno.exe SHA-256: b6e83993f1f1ab97075a77043de61118966d719b5450bc631251d47c3a34230b
+Status: NOT_VERIFIED pending complete Rust, V8, and native notice corpus.
+
+FFmpeg n9.0.1-30-g9258bacca5; LGPL-3.0-or-later because version3 is enabled;
+FFmpeg commit 9258bacca50d7ca28bcb6d797e8952123e35105b; BtbN build scripts commit
+3e6685eda92f9288c15ac320139622dcedca09a4.
+FFmpeg source SHA-256: 5a486a7a20fdf673d0fe9314b41897725abe34aa8bb63c5c440f2b017935644c
+BtbN scripts SHA-256: 21baace73d2d9599deda5688247cc250dfa7e5d9557a06b12c69c8175618ab92
+Binary archive SHA-256: 39697d69681a09bd55a0f0224360a9a4285bc12127df807d7242592b0e144a7b
+ffmpeg.exe SHA-256: 41482eabc1a33f9d1e4334ca32ec9259aa34a3ec2493fcc9f214bfe54301ce38
+ffprobe.exe SHA-256: 376f55eb141c3b0d8790b64967b8cbf1737d76bebe0820189356c71cc884b395
+Status: NOT_VERIFIED pending source-byte-verified closure for all enabled static
+external libraries listed in ffmpeg/BUILD-CLOSURE.json.

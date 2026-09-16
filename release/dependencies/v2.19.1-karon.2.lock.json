@@ -1,0 +1,243 @@
+{
+  "schemaVersion": "karon-license-lock/v1",
+  "release": {
+    "tag": "v2.19.1-karon.2",
+    "platform": "win-x64",
+    "verificationStatus": "NOT_VERIFIED",
+    "candidateFiles": [
+      { "path": "7z.dll", "sha256": null, "component": "7zip" },
+      { "path": "deno.exe", "sha256": "b6e83993f1f1ab97075a77043de61118966d719b5450bc631251d47c3a34230b", "component": "deno" },
+      { "path": "ffmpeg.exe", "sha256": "41482eabc1a33f9d1e4334ca32ec9259aa34a3ec2493fcc9f214bfe54301ce38", "component": "ffmpeg" },
+      { "path": "ffprobe.exe", "sha256": "376f55eb141c3b0d8790b64967b8cbf1737d76bebe0820189356c71cc884b395", "component": "ffmpeg" },
+      { "path": "locales/ko-KR.json", "sha256": "68e7c7c32a6722e3277671f94c95486e30d8b2985c82928ea9975e38faa95bab", "component": "application" },
+      { "path": "yt-dlp.exe", "sha256": "e78500d301b5de3a9280a418f6dd45604c4d85b718b0a2447c1b0aa9699e2689", "component": "yt-dlp" },
+      { "path": "ytdlp-interface.exe", "sha256": "90ed27899f68c1d0ea1081a5fd625b0793a3f182d2ce612102de8c1737fd932e", "component": "application" },
+      { "path": "ytdlp-interface.json", "sha256": "facf22edb86b0714d3f9dea20fc968b658fd3a44874a2fe0f63c0274c7f2d6f0", "component": "application" },
+      { "path": "candidate-manifest.json", "sha256": null, "component": "application" }
+    ],
+    "blockers": [
+      "No sealed candidate matching the requested 7-Zip, yt-dlp, Deno, and FFmpeg identities was supplied.",
+      "The target 7z.dll 26.01 SHA-256 and no-unRAR build evidence are unavailable.",
+      "The target candidate-manifest.json SHA-256 is unavailable.",
+      "Deno Rust, V8, and native third-party notice closure is unavailable.",
+      "The BtbN source-byte-verified external-library cache is unavailable."
+    ]
+  },
+  "components": [
+    {
+      "id": "application",
+      "name": "ytdlp-interface application",
+      "version": "2.19.1-karon.2",
+      "sourceRepository": "https://github.com/KaronLabs/ytdlp-korean-interface",
+      "sourceCommit": "8f776b34cf9e644accb9f5e1230dd7e1b24d3def",
+      "licenseExpression": "MIT",
+      "verificationStatus": "NOT_VERIFIED",
+      "modified": true,
+      "binaryFiles": [
+        { "path": "ytdlp-interface.exe", "sha256": "90ed27899f68c1d0ea1081a5fd625b0793a3f182d2ce612102de8c1737fd932e" },
+        { "path": "ytdlp-interface.json", "sha256": "facf22edb86b0714d3f9dea20fc968b658fd3a44874a2fe0f63c0274c7f2d6f0" },
+        { "path": "locales/ko-KR.json", "sha256": "68e7c7c32a6722e3277671f94c95486e30d8b2985c82928ea9975e38faa95bab" }
+      ],
+      "noticeFiles": [
+        { "path": "release/licenses/v2.19.1-karon.2/application/LICENSE.txt", "sha256": "2b0d7402ac43d4aa14c812be9527bb5aed7e2db4c02a3f2852b10a17bc836998" },
+        { "path": "release/licenses/v2.19.1-karon.2/application/NOTICE.txt", "sha256": "d56bb5b60b07a61c7c195edc1f603a8ba550b7a7105ffc9131263f500b931573" },
+        { "path": "release/licenses/v2.19.1-karon.2/application/SOURCE-STATUS.txt", "sha256": "679cb19d25ea5f5bad26503631cfc713eee1675e426fc37578279366d7d80c0f" }
+      ],
+      "sourceArchives": [
+        { "fileName": "karon-8f776b34.zip", "commit": "8f776b34cf9e644accb9f5e1230dd7e1b24d3def", "url": "https://github.com/KaronLabs/ytdlp-korean-interface/archive/8f776b34cf9e644accb9f5e1230dd7e1b24d3def.zip", "sha256": "bd76aaa80c620aa4c8339bb68011c82e1b7fcc72ee7a7dc9dff1602328335586" }
+      ],
+      "buildRecipe": "Use tools/build-candidate.ps1 from the pinned source commit and retain its source, dependency, linker-input, toolchain, and command attestation.",
+      "blocker": "The final target candidate and manifest were not supplied."
+    },
+    {
+      "id": "bit7z",
+      "name": "bit7z",
+      "version": "4.1.0",
+      "sourceRepository": "https://github.com/rikyoz/bit7z",
+      "sourceCommit": "c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742",
+      "licenseExpression": "MPL-2.0",
+      "verificationStatus": "NOT_VERIFIED",
+      "modified": true,
+      "binaryFiles": [{ "path": "ytdlp-interface.exe", "sha256": "90ed27899f68c1d0ea1081a5fd625b0793a3f182d2ce612102de8c1737fd932e" }],
+      "noticeFiles": [{ "path": "release/licenses/v2.19.1-karon.2/bit7z/LICENSE.txt", "sha256": "98a94e42e9f8daeef7c0e64b3b3d8958291a337bbfbfa0c9c382eb0b80a6a231" }],
+      "sourceArchives": [
+        { "fileName": "bit7z-c81c6c1c.zip", "commit": "c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742", "url": "https://github.com/rikyoz/bit7z/archive/c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742.zip", "sha256": "6af52b2e1b9895e8f1193728880206326161940e7a961e3162ec39752dbb3379" },
+        { "fileName": "karon-8f776b34.zip", "commit": "8f776b34cf9e644accb9f5e1230dd7e1b24d3def", "url": "https://github.com/KaronLabs/ytdlp-korean-interface/archive/8f776b34cf9e644accb9f5e1230dd7e1b24d3def.zip", "sha256": "bd76aaa80c620aa4c8339bb68011c82e1b7fcc72ee7a7dc9dff1602328335586" }
+      ],
+      "buildRecipe": "Build bit7z.sln Release x64 with MSVC v143 as attested by candidate-manifest.json, then statically link bit7z64.lib into ytdlp-interface.exe.",
+      "blocker": "No matching final target candidate manifest was supplied."
+    },
+    {
+      "id": "nana",
+      "name": "Nana",
+      "version": "1.8",
+      "sourceRepository": "https://github.com/cnjinhao/nana",
+      "sourceCommit": "554c4fe87fc31b8ee104228e9117d545d34855b5",
+      "licenseExpression": "BSL-1.0",
+      "verificationStatus": "NOT_VERIFIED",
+      "modified": true,
+      "binaryFiles": [{ "path": "ytdlp-interface.exe", "sha256": "90ed27899f68c1d0ea1081a5fd625b0793a3f182d2ce612102de8c1737fd932e" }],
+      "noticeFiles": [{ "path": "release/licenses/v2.19.1-karon.2/nana/LICENSE.txt", "sha256": "cfbd5b192dce2dbb591ceffa1adaa8e6e63d45667393c566593eb2f0efc5fb18" }],
+      "sourceArchives": [
+        { "fileName": "nana-554c4fe8.zip", "commit": "554c4fe87fc31b8ee104228e9117d545d34855b5", "url": "https://github.com/cnjinhao/nana/archive/554c4fe87fc31b8ee104228e9117d545d34855b5.zip", "sha256": "ef657036a4623bbb5c4e0df4e8aa699dc6ac713ca4a6725b30d3fd8175c4c145" },
+        { "fileName": "karon-8f776b34.zip", "commit": "8f776b34cf9e644accb9f5e1230dd7e1b24d3def", "url": "https://github.com/KaronLabs/ytdlp-korean-interface/archive/8f776b34cf9e644accb9f5e1230dd7e1b24d3def.zip", "sha256": "bd76aaa80c620aa4c8339bb68011c82e1b7fcc72ee7a7dc9dff1602328335586" }
+      ],
+      "buildRecipe": "Build nana/build/vc2022/nana.sln Release x64 with the modified project from the pinned Karon source archive and statically link nana_v143_Release_x64.lib.",
+      "blocker": "No matching final target candidate manifest was supplied."
+    },
+    {
+      "id": "libpng",
+      "name": "libpng",
+      "version": "1.6.37",
+      "sourceRepository": "https://github.com/pnggroup/libpng",
+      "sourceCommit": "a40189cf881e9f0db80511c382292a5604c3c3d1",
+      "licenseExpression": "Libpng",
+      "verificationStatus": "NOT_VERIFIED",
+      "modified": true,
+      "binaryFiles": [{ "path": "ytdlp-interface.exe", "sha256": "90ed27899f68c1d0ea1081a5fd625b0793a3f182d2ce612102de8c1737fd932e" }],
+      "noticeFiles": [{ "path": "release/licenses/v2.19.1-karon.2/libpng/LICENSE.txt", "sha256": "6babbde41c37a6d9d29ab8e0ff19f2f9ad3e6a6fecbeeb7d6f03eef76943fb1d" }],
+      "sourceArchives": [
+        { "fileName": "libpng-a40189cf.zip", "commit": "a40189cf881e9f0db80511c382292a5604c3c3d1", "url": "https://github.com/pnggroup/libpng/archive/a40189cf881e9f0db80511c382292a5604c3c3d1.zip", "sha256": "b3af9e92167f9c4233482f49aff02730b7dc3a275871ce637ed668413da6283f" },
+        { "fileName": "karon-8f776b34.zip", "commit": "8f776b34cf9e644accb9f5e1230dd7e1b24d3def", "url": "https://github.com/KaronLabs/ytdlp-korean-interface/archive/8f776b34cf9e644accb9f5e1230dd7e1b24d3def.zip", "sha256": "bd76aaa80c620aa4c8339bb68011c82e1b7fcc72ee7a7dc9dff1602328335586" }
+      ],
+      "buildRecipe": "Build the pinned Karon libpng Visual Studio project Release x64 and statically link libpng.lib.",
+      "blocker": "No matching final target candidate manifest was supplied."
+    },
+    {
+      "id": "zlib",
+      "name": "zlib",
+      "version": "1.2.5",
+      "sourceRepository": "https://github.com/madler/zlib",
+      "sourceCommit": "9712272c78b9d9c93746d9c8e156a3728c65ca72",
+      "licenseExpression": "Zlib",
+      "verificationStatus": "NOT_VERIFIED",
+      "modified": true,
+      "binaryFiles": [{ "path": "ytdlp-interface.exe", "sha256": "90ed27899f68c1d0ea1081a5fd625b0793a3f182d2ce612102de8c1737fd932e" }],
+      "noticeFiles": [{ "path": "release/licenses/v2.19.1-karon.2/zlib/LICENSE.txt", "sha256": "fb7e2382286c01a66d9addb69d4b4d357a574f09319acab1d6693d37ce62ea64" }],
+      "sourceArchives": [
+        { "fileName": "zlib-9712272c.zip", "commit": "9712272c78b9d9c93746d9c8e156a3728c65ca72", "url": "https://github.com/madler/zlib/archive/9712272c78b9d9c93746d9c8e156a3728c65ca72.zip", "sha256": "66faa243ea50094c2b399f5644cd4aa6110e739eae26800120124bbd1da00535" },
+        { "fileName": "karon-8f776b34.zip", "commit": "8f776b34cf9e644accb9f5e1230dd7e1b24d3def", "url": "https://github.com/KaronLabs/ytdlp-korean-interface/archive/8f776b34cf9e644accb9f5e1230dd7e1b24d3def.zip", "sha256": "bd76aaa80c620aa4c8339bb68011c82e1b7fcc72ee7a7dc9dff1602328335586" }
+      ],
+      "buildRecipe": "Use zlib.static 1.2.5 from the pinned Karon libpng dependency tree and statically link it through libpng.lib.",
+      "blocker": "No matching final target candidate manifest was supplied."
+    },
+    {
+      "id": "libjpeg-turbo",
+      "name": "libjpeg-turbo",
+      "version": "3.1.2",
+      "sourceRepository": "https://github.com/libjpeg-turbo/libjpeg-turbo",
+      "sourceCommit": "4e151a4ad91001b3aa8c2ece2205c15f487ce320",
+      "licenseExpression": "BSD-3-Clause AND IJG AND Zlib",
+      "verificationStatus": "NOT_VERIFIED",
+      "modified": false,
+      "binaryFiles": [{ "path": "ytdlp-interface.exe", "sha256": "90ed27899f68c1d0ea1081a5fd625b0793a3f182d2ce612102de8c1737fd932e" }],
+      "noticeFiles": [{ "path": "release/licenses/v2.19.1-karon.2/libjpeg-turbo/LICENSE.md", "sha256": "78f61ee3e84489a7a8f0d9040fd46596829ce0b8d7316c885862b8e8491bd6f4" }],
+      "sourceArchives": [
+        { "fileName": "libjpeg-turbo-4e151a4a.zip", "commit": "4e151a4ad91001b3aa8c2ece2205c15f487ce320", "url": "https://github.com/libjpeg-turbo/libjpeg-turbo/archive/4e151a4ad91001b3aa8c2ece2205c15f487ce320.zip", "sha256": "d3c33405b46aa14094ef26cd7b9618162ebcafeed7fb2acf2fda5c7c10b80782" },
+        { "fileName": "karon-8f776b34.zip", "commit": "8f776b34cf9e644accb9f5e1230dd7e1b24d3def", "url": "https://github.com/KaronLabs/ytdlp-korean-interface/archive/8f776b34cf9e644accb9f5e1230dd7e1b24d3def.zip", "sha256": "bd76aaa80c620aa4c8339bb68011c82e1b7fcc72ee7a7dc9dff1602328335586" }
+      ],
+      "buildRecipe": "Configure with CMake for VS 2022 x64, ENABLE_SHARED=OFF, ENABLE_STATIC=ON, WITH_TURBOJPEG=ON, WITH_CRT_DLL=OFF; build turbojpeg-static and link it into the application.",
+      "blocker": "No matching final target candidate manifest was supplied."
+    },
+    {
+      "id": "nlohmann-json",
+      "name": "nlohmann-json",
+      "version": "3.12.0",
+      "sourceRepository": "https://github.com/nlohmann/json",
+      "sourceCommit": "55f93686c01528224f448c19128836e7df245f72",
+      "licenseExpression": "MIT",
+      "verificationStatus": "NOT_VERIFIED",
+      "modified": true,
+      "binaryFiles": [{ "path": "ytdlp-interface.exe", "sha256": "90ed27899f68c1d0ea1081a5fd625b0793a3f182d2ce612102de8c1737fd932e" }],
+      "noticeFiles": [{ "path": "release/licenses/v2.19.1-karon.2/nlohmann-json/LICENSE.txt", "sha256": "5411823fbc8924eb82e3767677834034e74cf342c5f964ad96f8edc59fc8e649" }],
+      "sourceArchives": [
+        { "fileName": "nlohmann-json-55f93686.zip", "commit": "55f93686c01528224f448c19128836e7df245f72", "url": "https://github.com/nlohmann/json/archive/55f93686c01528224f448c19128836e7df245f72.zip", "sha256": "0746352e4e9532e7aeabbcbaa79079b6bc6008e9261e4d459c9486a9b48a172e" },
+        { "fileName": "karon-8f776b34.zip", "commit": "8f776b34cf9e644accb9f5e1230dd7e1b24d3def", "url": "https://github.com/KaronLabs/ytdlp-korean-interface/archive/8f776b34cf9e644accb9f5e1230dd7e1b24d3def.zip", "sha256": "bd76aaa80c620aa4c8339bb68011c82e1b7fcc72ee7a7dc9dff1602328335586" }
+      ],
+      "buildRecipe": "Compile the vendored ytdlp-interface/json.hpp header into ytdlp-interface.exe with the application build.",
+      "blocker": "The vendored header differs byte-for-byte from upstream 3.12.0 and the final target candidate manifest was not supplied."
+    },
+    {
+      "id": "7zip",
+      "name": "7-Zip DLL without unRAR",
+      "version": "26.01",
+      "sourceRepository": "https://github.com/ip7z/7zip",
+      "sourceCommit": "8c63d71ff886bda90c86db28466287f977374237",
+      "licenseExpression": "LGPL-2.1-or-later AND BSD-3-Clause",
+      "verificationStatus": "NOT_VERIFIED",
+      "modified": true,
+      "binaryFiles": [{ "path": "7z.dll", "sha256": null }],
+      "noticeFiles": [
+        { "path": "release/licenses/v2.19.1-karon.2/7zip/LICENSE.txt", "sha256": "69f1a046a0b0068d3ab8ec12d4ce980e66f7df5d9e1a459162e65e0d7844c11b" },
+        { "path": "release/licenses/v2.19.1-karon.2/7zip/SOURCE-STATUS.txt", "sha256": "bdf8720ee1c630b53a4cb59a994bc27c92125883eafbef7ea1efc12f8f30655b" }
+      ],
+      "sourceArchives": [{ "fileName": "7zip-8c63d71f.zip", "commit": "8c63d71ff886bda90c86db28466287f977374237", "url": "https://github.com/ip7z/7zip/archive/8c63d71ff886bda90c86db28466287f977374237.zip", "sha256": "01589aeda50512955e66d360c6534b961ec95c51111a76e2fa2976a8daa55271" }],
+      "buildRecipe": "Build a Windows x64 7z.dll from the pinned commit with the unRAR sources and RAR handler excluded; retain the exact command, map file, and resulting SHA-256.",
+      "blocker": "The target binary and evidence proving unRAR omission were not supplied."
+    },
+    {
+      "id": "yt-dlp",
+      "name": "yt-dlp nightly Windows executable",
+      "version": "2026.08.04.234419",
+      "sourceRepository": "https://github.com/yt-dlp/yt-dlp",
+      "sourceCommit": "5d6b8c8cd19785c3086ae3a9ec618c45e25eb3bc",
+      "licenseExpression": "Unlicense AND LicenseRef-yt-dlp-PyInstaller-Third-Party",
+      "verificationStatus": "verified",
+      "modified": false,
+      "binaryFiles": [{ "path": "yt-dlp.exe", "sha256": "e78500d301b5de3a9280a418f6dd45604c4d85b718b0a2447c1b0aa9699e2689" }],
+      "noticeFiles": [
+        { "path": "release/licenses/v2.19.1-karon.2/yt-dlp/LICENSE.txt", "sha256": "57af9ea6eb648a5145b245428a08a2a5886b7140bd278f527ded5281c3fbd65b" },
+        { "path": "release/licenses/v2.19.1-karon.2/yt-dlp/THIRD-PARTY-LICENSES.txt", "sha256": "4f37260fdf88c990f5d794847020bcef560f1cbfa6a0d523915097bd932ba19e" }
+      ],
+      "sourceArchives": [{ "fileName": "yt-dlp-5d6b8c8c.zip", "commit": "5d6b8c8cd19785c3086ae3a9ec618c45e25eb3bc", "url": "https://github.com/yt-dlp/yt-dlp/archive/5d6b8c8cd19785c3086ae3a9ec618c45e25eb3bc.zip", "sha256": "38184dfb5d8dd435e3bbea24392e55ff47ae31a3cff93918260c00d123b19593" }],
+      "binaryProvenance": { "url": "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/download/2026.08.04.234419/yt-dlp.exe", "sha256": "e78500d301b5de3a9280a418f6dd45604c4d85b718b0a2447c1b0aa9699e2689" },
+      "buildRecipe": "Use the official yt-dlp nightly release workflow for source commit 5d6b8c8cd19785c3086ae3a9ec618c45e25eb3bc and preserve its compiled THIRD_PARTY_LICENSES.txt corpus."
+    },
+    {
+      "id": "deno",
+      "name": "Deno Windows runtime",
+      "version": "2.7.14",
+      "sourceRepository": "https://github.com/denoland/deno",
+      "sourceCommit": "2d674b25625bcc367853d00fe86f6e84390f88cb",
+      "licenseExpression": "MIT AND LicenseRef-Deno-Third-Party",
+      "verificationStatus": "NOT_VERIFIED",
+      "modified": false,
+      "binaryFiles": [{ "path": "deno.exe", "sha256": "b6e83993f1f1ab97075a77043de61118966d719b5450bc631251d47c3a34230b" }],
+      "noticeFiles": [
+        { "path": "release/licenses/v2.19.1-karon.2/deno/LICENSE.md", "sha256": "0ddb68ca7e4fb774dca14baffc44dc6c4a2496440b38168efe0ce007619463fa" },
+        { "path": "release/licenses/v2.19.1-karon.2/deno/SOURCE-AND-NOTICE-STATUS.txt", "sha256": "42d445b7dfeef7a98eee641152b1be5a1625aa98610da72742e8495c7a12df64" }
+      ],
+      "sourceArchives": [{ "fileName": "deno-2d674b25.zip", "commit": "2d674b25625bcc367853d00fe86f6e84390f88cb", "url": "https://github.com/denoland/deno/archive/2d674b25625bcc367853d00fe86f6e84390f88cb.zip", "sha256": "0fb1aac72af419d8f7de0d623eee7713571d841736d1c01eac97363afd3996dd" }],
+      "binaryProvenance": { "url": "https://github.com/denoland/deno/releases/download/v2.7.14/deno-x86_64-pc-windows-msvc.zip", "archiveSha256": "25f9871f5c1d9e999d60071f8069767134495fd601d2e2c7ce1e8c641487bda0", "binarySha256": "b6e83993f1f1ab97075a77043de61118966d719b5450bc631251d47c3a34230b" },
+      "buildRecipe": "Build the pinned Deno source and its Cargo.lock dependency graph for x86_64-pc-windows-msvc, including v8 crate 147.4.0 and V8 14.7.173.20-rusty.",
+      "blocker": "No reproducible complete license corpus for the 1,127 Cargo packages, rusty_v8/V8, and native dependencies was supplied."
+    },
+    {
+      "id": "ffmpeg",
+      "name": "BtbN FFmpeg LGPL static build",
+      "version": "n9.0.1-30-g9258bacca5-20260915",
+      "sourceRepository": "https://github.com/FFmpeg/FFmpeg",
+      "sourceCommit": "9258bacca50d7ca28bcb6d797e8952123e35105b",
+      "licenseExpression": "LGPL-3.0-or-later",
+      "verificationStatus": "NOT_VERIFIED",
+      "modified": true,
+      "binaryFiles": [
+        { "path": "ffmpeg.exe", "sha256": "41482eabc1a33f9d1e4334ca32ec9259aa34a3ec2493fcc9f214bfe54301ce38" },
+        { "path": "ffprobe.exe", "sha256": "376f55eb141c3b0d8790b64967b8cbf1737d76bebe0820189356c71cc884b395" }
+      ],
+      "noticeFiles": [
+        { "path": "release/licenses/v2.19.1-karon.2/ffmpeg/COPYING.GPLv3.txt", "sha256": "ae3923df7456b355e34fe8251bcbf9b2eddc2c234d799a17a1a8626790f24a67" },
+        { "path": "release/licenses/v2.19.1-karon.2/ffmpeg/COPYING.LGPLv3.txt", "sha256": "046f49325a61f67f6dedfbd5070c74024097e6412c8f695d584abf686ab534c4" },
+        { "path": "release/licenses/v2.19.1-karon.2/ffmpeg/BtbN-LICENSE.txt", "sha256": "bb90baed8da576e8abd9f9a1c004be12d063d383cc90c2d99b99f0173617415d" },
+        { "path": "release/licenses/v2.19.1-karon.2/ffmpeg/BUILD-CLOSURE.json", "sha256": "71d0b77799a6c45b0e310bbf5f832c2702f842656ff0561ba35a363cc2a053ef" }
+      ],
+      "sourceArchives": [
+        { "fileName": "ffmpeg-9258bacc.zip", "commit": "9258bacca50d7ca28bcb6d797e8952123e35105b", "url": "https://github.com/FFmpeg/FFmpeg/archive/9258bacca50d7ca28bcb6d797e8952123e35105b.zip", "sha256": "5a486a7a20fdf673d0fe9314b41897725abe34aa8bb63c5c440f2b017935644c" },
+        { "fileName": "btbn-3e6685ed.zip", "commit": "3e6685eda92f9288c15ac320139622dcedca09a4", "url": "https://github.com/BtbN/FFmpeg-Builds/archive/3e6685eda92f9288c15ac320139622dcedca09a4.zip", "sha256": "21baace73d2d9599deda5688247cc250dfa7e5d9557a06b12c69c8175618ab92" }
+      ],
+      "binaryProvenance": { "tag": "autobuild-2026-09-15-13-18", "asset": "ffmpeg-n9.0.1-30-g9258bacca5-win64-lgpl-9.0.zip", "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-15-13-18/ffmpeg-n9.0.1-30-g9258bacca5-win64-lgpl-9.0.zip", "archiveSha256": "39697d69681a09bd55a0f0224360a9a4285bc12127df807d7242592b0e144a7b" },
+      "buildRecipe": "Use BtbN commit 3e6685eda92f9288c15ac320139622dcedca09a4, target win64, variant lgpl, addin 9.0, and the exact configuration inventory in release/licenses/v2.19.1-karon.2/ffmpeg/BUILD-CLOSURE.json.",
+      "blocker": "The source-byte-verified archives for every enabled static external library are unavailable; FFmpeg and BtbN source trees alone are insufficient."
+    }
+  ]
+}

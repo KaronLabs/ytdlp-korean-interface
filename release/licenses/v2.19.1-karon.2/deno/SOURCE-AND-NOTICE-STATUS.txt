@@ -1,0 +1,15 @@
+Deno 2.7.14 source commit:
+https://github.com/denoland/deno/commit/2d674b25625bcc367853d00fe86f6e84390f88cb
+
+Official Windows x64 release archive:
+https://github.com/denoland/deno/releases/download/v2.7.14/deno-x86_64-pc-windows-msvc.zip
+SHA-256: 25f9871f5c1d9e999d60071f8069767134495fd601d2e2c7ce1e8c641487bda0
+
+deno.exe SHA-256:
+b6e83993f1f1ab97075a77043de61118966d719b5450bc631251d47c3a34230b
+
+NOT_VERIFIED: Cargo.lock contains 1,127 packages and pins v8 crate 147.4.0
+(crate checksum 2df8fffd507fb18ed000673a83d937f58e60fb07f3306b2274284125b15137cd),
+but the pinned Deno source archive contains no generated third-party license
+report. The binary reports V8 14.7.173.20-rusty. A complete reproducible Rust,
+rusty_v8/V8, and native dependency notice corpus has not been produced.
