@@ -3,6 +3,7 @@ param(
     [string] $RepositoryRoot = (Join-Path $PSScriptRoot '..'),
     [string] $AssetDirectory,
     [string] $ReleaseNotesPath = (Join-Path $PSScriptRoot '..\release\notes\v2.19.1-karon.2.md'),
+    [string] $ReceiptPath,
     [switch] $PlanOnly
 )
 
@@ -18,6 +19,21 @@ $script:KaronPublishAssetNames = @(
     'ytdlp-korean-interface-v2.19.1-karon.2.spdx.json',
     'SHA256SUMS.txt'
 )
+$script:KaronPublishCliReceiptPath = $ReceiptPath
+
+if ($null -eq (Get-Command Assert-KaronReleaseReceipt -ErrorAction SilentlyContinue)) {
+    $savedRepositoryRoot = $RepositoryRoot
+    $savedAssetDirectory = $AssetDirectory
+    $savedReleaseNotesPath = $ReleaseNotesPath
+    $savedReceiptPath = $ReceiptPath
+    $savedPlanOnly = $PlanOnly
+    . (Join-Path $PSScriptRoot 'package-quality-release.ps1')
+    $RepositoryRoot = $savedRepositoryRoot
+    $AssetDirectory = $savedAssetDirectory
+    $ReleaseNotesPath = $savedReleaseNotesPath
+    $ReceiptPath = $savedReceiptPath
+    $PlanOnly = $savedPlanOnly
+}
 
 function Get-KaronPublishSha256 {
     param([Parameter(Mandatory)] [string] $Path)
@@ -146,7 +162,7 @@ function Get-KaronPublishCommandPlan {
     [pscustomobject]@{ Executable = 'gh'; Arguments = [string[]]$arguments.ToArray() }
 }
 
-function Invoke-QualityReleasePublication {
+function Invoke-QualityReleasePublicationLegacy {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)] [string] $RepositoryRoot,
@@ -253,6 +269,276 @@ function Invoke-QualityReleasePublication {
         Tag = $script:KaronPublishTag
         Assets = [string[]]$script:KaronPublishAssetNames
         DigestsVerified = $digestsVerified
+    }
+}
+
+function Get-KaronPublishRepositorySeal {
+    param(
+        [scriptblock] $CommandRunner,
+        [string] $RepositoryRoot,
+        [object] $Receipt,
+        [object] $Expected
+    )
+    $fetchOrigin = Invoke-KaronPublishChecked $CommandRunner 'git' @('remote', 'get-url', 'origin') $RepositoryRoot 'publication_origin_lookup_failed'
+    $pushOrigin = Invoke-KaronPublishChecked $CommandRunner 'git' @('remote', 'get-url', '--push', 'origin') $RepositoryRoot 'publication_origin_lookup_failed'
+    if ($fetchOrigin -cne $script:KaronPublishOrigin -or $pushOrigin -cne $script:KaronPublishOrigin) { throw 'publication_origin_mismatch' }
+    $status = Invoke-KaronPublishChecked $CommandRunner 'git' @('status', '--porcelain=v1', '--untracked-files=all') $RepositoryRoot 'publication_status_failed'
+    if (-not [string]::IsNullOrWhiteSpace($status)) { throw 'publication_tree_dirty' }
+    $head = Assert-KaronPublishSha (Invoke-KaronPublishChecked $CommandRunner 'git' @('rev-parse', '--verify', 'HEAD^{commit}') $RepositoryRoot 'publication_head_lookup_failed') 'publication_head_invalid'
+    if ($head -cne $Receipt.SourceCommit) { throw 'publication_receipt_head_mismatch' }
+    $remoteMain = Invoke-KaronPublishChecked $CommandRunner 'git' @('ls-remote', 'origin', 'refs/heads/main') $RepositoryRoot 'publication_main_lookup_failed'
+    $mainMatch = [regex]::Match($remoteMain.Trim(), '^([a-fA-F0-9]{40})\s+refs/heads/main$')
+    if (-not $mainMatch.Success -or $mainMatch.Groups[1].Value.ToLowerInvariant() -cne $head) { throw 'publication_main_sha_mismatch' }
+
+    $tagRef = 'refs/tags/' + $script:KaronPublishTag
+    if ((Invoke-KaronPublishChecked $CommandRunner 'git' @('cat-file', '-t', $tagRef) $RepositoryRoot 'publication_tag_lookup_failed') -cne 'tag') {
+        throw 'publication_tag_not_annotated'
+    }
+    $tagObject = Assert-KaronPublishSha (Invoke-KaronPublishChecked $CommandRunner 'git' @('rev-parse', $tagRef) $RepositoryRoot 'publication_tag_lookup_failed') 'publication_tag_lookup_failed'
+    $tagTarget = Assert-KaronPublishSha (Invoke-KaronPublishChecked $CommandRunner 'git' @('rev-parse', ($tagRef + '^{}')) $RepositoryRoot 'publication_tag_lookup_failed') 'publication_tag_lookup_failed'
+    if ($tagTarget -cne $head) { throw 'publication_tag_target_mismatch' }
+    $remoteOutput = Invoke-KaronPublishChecked $CommandRunner 'git' @('ls-remote', 'origin', $tagRef, ($tagRef + '^{}')) $RepositoryRoot 'publication_remote_tag_lookup_failed'
+    $remote = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::Ordinal)
+    foreach ($line in @($remoteOutput -split [char]10)) {
+        $match = [regex]::Match($line.Trim(), '^([a-fA-F0-9]{40})\s+(.+)$')
+        if (-not $match.Success -or -not $remote.TryAdd($match.Groups[2].Value, $match.Groups[1].Value.ToLowerInvariant())) {
+            throw 'publication_remote_tag_lookup_failed'
+        }
+    }
+    if ($remote.Count -ne 2 -or -not $remote.ContainsKey($tagRef) -or -not $remote.ContainsKey($tagRef + '^{}') -or
+        $remote[$tagRef] -cne $tagObject -or $remote[$tagRef + '^{}'] -cne $head) { throw 'publication_remote_tag_mismatch' }
+
+    $treeOutput = Invoke-KaronPublishChecked $CommandRunner 'git' @('ls-tree', 'HEAD', '--', 'release/notes/v2.19.1-karon.2.md') $RepositoryRoot 'publication_notes_tracking_failed'
+    $treeMatch = [regex]::Match($treeOutput.Trim(), '^100644\s+blob\s+([a-fA-F0-9]{40})\s+release/notes/v2\.19\.1-karon\.2\.md$')
+    if (-not $treeMatch.Success -or $treeMatch.Groups[1].Value.ToLowerInvariant() -cne $Receipt.NotesBlobSha1) {
+        throw 'publication_notes_tracking_failed'
+    }
+    $seal = [pscustomobject]@{ Head = $head; TagObject = $tagObject; TagTarget = $tagTarget; NotesBlob = $Receipt.NotesBlobSha1 }
+    if ($null -ne $Expected -and
+        ($seal.Head -cne $Expected.Head -or $seal.TagObject -cne $Expected.TagObject -or
+         $seal.TagTarget -cne $Expected.TagTarget -or $seal.NotesBlob -cne $Expected.NotesBlob)) {
+        throw 'publication_repository_race'
+    }
+    $seal
+}
+
+function Assert-KaronPublishReleaseAbsent {
+    param([scriptblock] $CommandRunner, [string] $RepositoryRoot)
+    $api = 'repos/KaronLabs/ytdlp-korean-interface/releases/tags/' + $script:KaronPublishTag
+    $result = Invoke-KaronPublishRunner $CommandRunner 'gh' @('api', '--method', 'GET', $api) $RepositoryRoot
+    if ($result.ExitCode -eq 0) { throw 'publication_release_exists' }
+    if ($result.Output -notmatch '(?i)(HTTP\s+404|Not Found)') { throw ('publication_release_lookup_failed: ' + $result.Output) }
+}
+
+function Get-KaronPublishRemoteRelease {
+    param([scriptblock] $CommandRunner, [string] $RepositoryRoot)
+    $api = 'repos/KaronLabs/ytdlp-korean-interface/releases/tags/' + $script:KaronPublishTag
+    $text = Invoke-KaronPublishChecked $CommandRunner 'gh' @('api', '--method', 'GET', $api) $RepositoryRoot 'publication_release_lookup_failed'
+    try {
+        $document = [Text.Json.JsonDocument]::Parse($text)
+        $raw = $document.RootElement.Clone()
+        $document.Dispose()
+        $value = $text | ConvertFrom-Json -Depth 16
+    }
+    catch { throw 'publication_release_json_invalid' }
+    if ($raw.ValueKind -ne [Text.Json.JsonValueKind]::Object -or
+        (Get-KaronPackageRawProperty $raw 'draft' 'publication_release_json_invalid').ValueKind -notin @([Text.Json.JsonValueKind]::True, [Text.Json.JsonValueKind]::False) -or
+        (Get-KaronPackageRawProperty $raw 'prerelease' 'publication_release_json_invalid').ValueKind -notin @([Text.Json.JsonValueKind]::True, [Text.Json.JsonValueKind]::False)) {
+        throw 'publication_release_json_invalid'
+    }
+    [void](Get-KaronPackageRawArray (Get-KaronPackageRawProperty $raw 'assets' 'publication_release_json_invalid') 'publication_release_json_invalid')
+    if ([string]$value.tag_name -cne $script:KaronPublishTag) { throw 'publication_release_state_invalid' }
+    $value
+}
+
+function Assert-KaronPublishRemoteAssets {
+    param(
+        [object] $Release,
+        [Collections.Generic.Dictionary[string, object]] $Inventory,
+        [bool] $ExpectedDraft,
+        [bool] $ExpectAssets
+    )
+    if ([bool]$Release.draft -ne $ExpectedDraft -or [bool]$Release.prerelease) { throw 'publication_release_state_invalid' }
+    $assets = @($Release.assets)
+    if (-not $ExpectAssets) {
+        if ($assets.Count -ne 0) { throw 'publication_remote_asset_inventory_invalid' }
+        return
+    }
+    $remote = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($asset in $assets) {
+        if (-not $remote.TryAdd([string]$asset.name, $asset) -or [string]$asset.name -cne [string]$remote[[string]$asset.name].name) {
+            throw 'publication_remote_asset_inventory_invalid'
+        }
+    }
+    if ($remote.Count -ne 4) { throw 'publication_remote_asset_inventory_invalid' }
+    foreach ($name in $script:KaronPublishAssetNames) {
+        if (-not $remote.ContainsKey($name) -or [string]$remote[$name].name -cne $name -or
+            [long]$remote[$name].size -ne [long]$Inventory[$name].Length) { throw 'publication_remote_asset_inventory_invalid' }
+        if ($null -ne $remote[$name].PSObject.Properties['digest'] -and
+            $null -ne $remote[$name].digest -and -not [string]::IsNullOrWhiteSpace([string]$remote[$name].digest)) {
+            if ([string]$remote[$name].digest -cne ('sha256:' + [string]$Inventory[$name].Sha256)) {
+                throw ('publication_remote_digest_mismatch: ' + $name)
+            }
+        }
+    }
+}
+
+function New-KaronPublishDraftPlan {
+    param(
+        [Collections.Generic.Dictionary[string, object]] $Inventory,
+        [string] $NotesPath
+    )
+    $create = [pscustomobject]@{
+        Name = 'create-draft'
+        Executable = 'gh'
+        Arguments = @('release', 'create', $script:KaronPublishTag, '--repo', $script:KaronPublishRepository, '--title', $script:KaronPublishTag, '--notes-file', $NotesPath, '--verify-tag', '--draft')
+    }
+    $uploadArguments = @('release', 'upload', $script:KaronPublishTag)
+    foreach ($name in $script:KaronPublishAssetNames) { $uploadArguments += [string]$Inventory[$name].Path }
+    $uploadArguments += @('--repo', $script:KaronPublishRepository)
+    $upload = [pscustomobject]@{ Name = 'upload'; Executable = 'gh'; Arguments = $uploadArguments }
+    $downloads = @()
+    foreach ($name in $script:KaronPublishAssetNames) {
+        $directory = Join-Path ([IO.Path]::GetTempPath()) ('karon-release-verify-' + [Guid]::NewGuid().ToString('N'))
+        $downloads += [pscustomobject]@{
+            Name = 'download-' + $name
+            Directory = $directory
+            DownloadPath = Join-Path $directory $name
+            Executable = 'gh'
+            Arguments = @('release', 'download', $script:KaronPublishTag, '--repo', $script:KaronPublishRepository, '--pattern', $name, '--dir', $directory)
+        }
+    }
+    $publish = [pscustomobject]@{
+        Name = 'publish-draft'
+        Executable = 'gh'
+        Arguments = @('release', 'edit', $script:KaronPublishTag, '--repo', $script:KaronPublishRepository, '--draft=false')
+    }
+    [pscustomobject]@{
+        Create = $create
+        Upload = $upload
+        Downloads = $downloads
+        Publish = $publish
+        Commands = @($create, $upload) + @($downloads) + @($publish)
+    }
+}
+
+function Remove-KaronPublishVerificationDirectory {
+    param([string] $Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    $full = [IO.Path]::GetFullPath($Path)
+    $temp = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\')
+    if ((Split-Path -Parent $full) -cne $temp -or -not ([IO.Path]::GetFileName($full)).StartsWith('karon-release-verify-', [StringComparison]::Ordinal)) {
+        throw 'publication_verification_directory_invalid'
+    }
+    Remove-Item -LiteralPath $full -Recurse -Force
+}
+
+function Invoke-KaronPublishDownloadVerification {
+    param(
+        [scriptblock] $CommandRunner,
+        [string] $RepositoryRoot,
+        [object] $Plan,
+        [Collections.Generic.Dictionary[string, object]] $Inventory
+    )
+    foreach ($download in $Plan.Downloads) {
+        if (Test-Path -LiteralPath $download.Directory) { throw 'publication_verification_directory_exists' }
+        [void](New-Item -ItemType Directory -Path $download.Directory)
+        try {
+            [void](Invoke-KaronPublishChecked $CommandRunner $download.Executable $download.Arguments $RepositoryRoot 'publication_asset_download_failed')
+            $items = @(Get-ChildItem -LiteralPath $download.Directory -Force)
+            $name = [string]$download.Arguments[6]
+            if ($items.Count -ne 1 -or $items[0].PSIsContainer -or $items[0].Name -cne $name -or
+                ($items[0].Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+                [long]$items[0].Length -ne [long]$Inventory[$name].Length -or
+                (Get-KaronPublishSha256 $items[0].FullName) -cne [string]$Inventory[$name].Sha256) {
+                throw ('publication_redownload_mismatch: ' + $name)
+            }
+        }
+        finally { Remove-KaronPublishVerificationDirectory $download.Directory }
+    }
+}
+
+function Protect-KaronPublishDraft {
+    param([scriptblock] $CommandRunner, [string] $RepositoryRoot)
+    [void](Invoke-KaronPublishChecked $CommandRunner 'gh' @('release', 'edit', $script:KaronPublishTag, '--repo', $script:KaronPublishRepository, '--draft') $RepositoryRoot 'publication_draft_restore_failed')
+    $release = Get-KaronPublishRemoteRelease $CommandRunner $RepositoryRoot
+    if (-not [bool]$release.draft) { throw 'publication_draft_restore_failed' }
+}
+
+function Invoke-QualityReleasePublication {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $RepositoryRoot,
+        [Parameter(Mandatory)] [string] $AssetDirectory,
+        [Parameter(Mandatory)] [string] $ReleaseNotesPath,
+        [string] $ReceiptPath = $script:KaronPublishCliReceiptPath,
+        [switch] $PlanOnly,
+        [scriptblock] $CommandRunner
+    )
+    $root = [IO.Path]::GetFullPath($RepositoryRoot)
+    $assets = [IO.Path]::GetFullPath($AssetDirectory)
+    $notes = [IO.Path]::GetFullPath($ReleaseNotesPath)
+    $expectedNotes = [IO.Path]::GetFullPath((Join-Path $root 'release\notes\v2.19.1-karon.2.md'))
+    if ($notes -cne $expectedNotes -or [string]::IsNullOrWhiteSpace($ReceiptPath)) { throw 'publication_notes_invalid' }
+    $receiptPathFull = [IO.Path]::GetFullPath($ReceiptPath)
+    $receipt = Assert-KaronReleaseReceipt $root $assets $receiptPathFull
+    if ($receipt.NotesPath -cne $notes) { throw 'publication_notes_invalid' }
+    $inventory = Get-KaronPublishAssetInventory $assets
+    Assert-KaronPublishChecksums $inventory
+    if ($null -eq $CommandRunner) {
+        $CommandRunner = { param($Executable, $Arguments, $WorkingDirectory) Invoke-KaronPublishExternal $Executable $Arguments $WorkingDirectory }
+    }
+
+    $seal = Get-KaronPublishRepositorySeal $CommandRunner $root $receipt $null
+    [void](Invoke-KaronPublishChecked $CommandRunner 'gh' @('auth', 'status', '--hostname', 'github.com') $root 'publication_gh_auth_failed')
+    Assert-KaronPublishReleaseAbsent $CommandRunner $root
+    $plan = New-KaronPublishDraftPlan $inventory $notes
+    if ($PlanOnly) {
+        return [pscustomobject]@{ Mode = 'plan'; Commands = @($plan.Commands); Head = $seal.Head; Tag = $script:KaronPublishTag }
+    }
+
+    $releaseCreated = $false
+    try {
+        $preCreateReceipt = Assert-KaronReleaseReceipt $root $assets $receiptPathFull
+        if ($preCreateReceipt.ReceiptSha256 -cne $receipt.ReceiptSha256) { throw 'publication_receipt_changed' }
+        [void](Get-KaronPublishRepositorySeal $CommandRunner $root $preCreateReceipt $seal)
+        Assert-KaronPublishReleaseAbsent $CommandRunner $root
+        [void](Invoke-KaronPublishChecked $CommandRunner $plan.Create.Executable $plan.Create.Arguments $root 'publication_create_failed')
+        $releaseCreated = $true
+        Assert-KaronPublishRemoteAssets (Get-KaronPublishRemoteRelease $CommandRunner $root) $inventory $true $false
+
+        $preUploadReceipt = Assert-KaronReleaseReceipt $root $assets $receiptPathFull
+        if ($preUploadReceipt.ReceiptSha256 -cne $receipt.ReceiptSha256) { throw 'publication_receipt_changed' }
+        $inventory = Get-KaronPublishAssetInventory $assets
+        Assert-KaronPublishChecksums $inventory
+        [void](Get-KaronPublishRepositorySeal $CommandRunner $root $preUploadReceipt $seal)
+        [void](Invoke-KaronPublishChecked $CommandRunner $plan.Upload.Executable $plan.Upload.Arguments $root 'publication_upload_failed')
+        [void](Get-KaronPublishRepositorySeal $CommandRunner $root $preUploadReceipt $seal)
+        Assert-KaronPublishRemoteAssets (Get-KaronPublishRemoteRelease $CommandRunner $root) $inventory $true $true
+        Invoke-KaronPublishDownloadVerification $CommandRunner $root $plan $inventory
+
+        $postUploadReceipt = Assert-KaronReleaseReceipt $root $assets $receiptPathFull
+        if ($postUploadReceipt.ReceiptSha256 -cne $receipt.ReceiptSha256) { throw 'publication_receipt_changed' }
+        [void](Get-KaronPublishRepositorySeal $CommandRunner $root $postUploadReceipt $seal)
+        Assert-KaronPublishRemoteAssets (Get-KaronPublishRemoteRelease $CommandRunner $root) $inventory $true $true
+        [void](Invoke-KaronPublishChecked $CommandRunner $plan.Publish.Executable $plan.Publish.Arguments $root 'publication_publish_failed')
+        Assert-KaronPublishRemoteAssets (Get-KaronPublishRemoteRelease $CommandRunner $root) $inventory $false $true
+        [void](Get-KaronPublishRepositorySeal $CommandRunner $root $postUploadReceipt $seal)
+        [pscustomobject]@{
+            Mode = 'published'
+            Head = $seal.Head
+            Tag = $script:KaronPublishTag
+            Assets = [string[]]$script:KaronPublishAssetNames
+            RedownloadsVerified = 4
+        }
+    }
+    catch {
+        $failure = $_
+        if ($releaseCreated) {
+            try { Protect-KaronPublishDraft $CommandRunner $root }
+            catch { throw ('publication_draft_preservation_failed; original=' + $failure.Exception.Message + '; restore=' + $_.Exception.Message) }
+        }
+        throw $failure
     }
 }
 
