@@ -502,6 +502,69 @@ function Get-DenoStreamDigest {
     return [pscustomobject][ordered]@{ length = [long]$Stream.Length; sha256 = $sha256 }
 }
 
+function Copy-DenoByteArray {
+    param([Parameter(Mandatory)] [byte[]] $Bytes)
+    $copy = [byte[]]::new($Bytes.Length)
+    if ($Bytes.Length -gt 0) { [Buffer]::BlockCopy($Bytes, 0, $copy, 0, $Bytes.Length) }
+    return ,$copy
+}
+
+function Get-DenoByteArraySha256 {
+    param([Parameter(Mandatory)] [byte[]] $Bytes)
+    return ([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($Bytes))).ToLowerInvariant()
+}
+
+function Get-DenoVerifiedIdentityKey {
+    param([Parameter(Mandatory)] $Identity)
+    $fileId = ([string]$Identity.FileId).Replace('-', '').ToLowerInvariant()
+    if ($fileId -notmatch '^[0-9a-f]{32}$') { throw 'deno_input_file_id_invalid' }
+    return ('{0:x16}:{1}' -f [uint64]$Identity.VolumeSerialNumber, $fileId)
+}
+
+function New-DenoMaterialResult {
+    param(
+        [Parameter(Mandatory)] $StoredMaterial,
+        [Parameter(Mandatory)] [string] $RequestedPath,
+        [long] $MaximumLength = 67108864,
+        [string] $ExpectedSha256,
+        [long] $ExpectedLength = -1
+    )
+    $bytes = Copy-DenoByteArray -Bytes ([byte[]]$StoredMaterial.bytes)
+    $actualSha256 = Get-DenoByteArraySha256 -Bytes $bytes
+    if ($bytes.Length -ne [long]$StoredMaterial.length -or $actualSha256 -cne [string]$StoredMaterial.sha256) {
+        throw "deno_cached_material_corrupt:$($StoredMaterial.identityKey)"
+    }
+    if ($bytes.Length -gt $MaximumLength) { throw "deno_input_too_large:$RequestedPath" }
+    if ($ExpectedLength -ge 0 -and $bytes.Length -ne $ExpectedLength) { throw "deno_input_length_mismatch:$RequestedPath" }
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedSha256) -and
+        ($ExpectedSha256 -notmatch '^[0-9a-f]{64}$' -or $actualSha256 -cne $ExpectedSha256)) {
+        throw "deno_input_hash_mismatch:$RequestedPath"
+    }
+    return [pscustomobject][ordered]@{
+        path = [string]$StoredMaterial.path
+        requestedPath = $RequestedPath
+        identityKey = [string]$StoredMaterial.identityKey
+        length = [long]$bytes.Length
+        sha256 = $actualSha256
+        bytes = $bytes
+    }
+}
+
+function Get-DenoCachedVerifiedMaterial {
+    param(
+        [Parameter(Mandatory)] [string] $IdentityKey,
+        [string] $RequestedPath = $IdentityKey,
+        [long] $MaximumLength = 67108864,
+        [string] $ExpectedSha256,
+        [long] $ExpectedLength = -1
+    )
+    $cacheVariable = Get-Variable -Name DenoVerifiedMaterialCache -Scope Script -ErrorAction SilentlyContinue
+    if ($null -eq $cacheVariable -or -not $script:DenoVerifiedMaterialCache.ContainsKey($IdentityKey)) {
+        throw "deno_cached_material_missing:$IdentityKey"
+    }
+    return New-DenoMaterialResult -StoredMaterial $script:DenoVerifiedMaterialCache[$IdentityKey] -RequestedPath $RequestedPath -MaximumLength $MaximumLength -ExpectedSha256 $ExpectedSha256 -ExpectedLength $ExpectedLength
+}
+
 function Get-DenoVerifiedByteMaterial {
     [CmdletBinding()]
     param(
@@ -515,20 +578,17 @@ function Get-DenoVerifiedByteMaterial {
     if ($MaximumLength -lt 0 -or $MaximumLength -gt [int]::MaxValue) { throw 'deno_input_bound_invalid' }
     $cacheVariable = Get-Variable -Name DenoVerifiedMaterialCache -Scope Script -ErrorAction SilentlyContinue
     if ($null -eq $cacheVariable) { $script:DenoVerifiedMaterialCache = @{} }
-    $cacheKey = (ConvertTo-DenoFinalPath $Path).ToLowerInvariant()
-    if ($Cache -and $script:DenoVerifiedMaterialCache.ContainsKey($cacheKey)) {
-        $material = $script:DenoVerifiedMaterialCache[$cacheKey]
-        if ($material.length -gt $MaximumLength) { throw "deno_input_too_large:$Path" }
-        if ($ExpectedLength -ge 0 -and $material.length -ne $ExpectedLength) { throw "deno_input_length_mismatch:$Path" }
-        if (-not [string]::IsNullOrWhiteSpace($ExpectedSha256) -and
-            ($ExpectedSha256 -notmatch '^[0-9a-f]{64}$' -or $material.sha256 -cne $ExpectedSha256)) {
-            throw "deno_input_hash_mismatch:$Path"
-        }
-        return $material
-    }
 
     $verified = Open-DenoVerifiedReadFile -Path $Path
     try {
+        $identityKey = Get-DenoVerifiedIdentityKey -Identity $verified.Chain.Final.Identity
+        if ($Cache -and $script:DenoVerifiedMaterialCache.ContainsKey($identityKey)) {
+            $material = Get-DenoCachedVerifiedMaterial -IdentityKey $identityKey -RequestedPath $Path -MaximumLength $MaximumLength -ExpectedSha256 $ExpectedSha256 -ExpectedLength $ExpectedLength
+            if ($null -ne $AfterHashAction) { [void](& $AfterHashAction) }
+            [void](Assert-DenoVerifiedReadFileUnchanged -VerifiedFile $verified)
+            return $material
+        }
+
         $length = [long]$verified.Stream.Length
         if ($length -gt $MaximumLength) { throw "deno_input_too_large:$Path" }
         if ($ExpectedLength -ge 0 -and $length -ne $ExpectedLength) { throw "deno_input_length_mismatch:$Path" }
@@ -539,16 +599,22 @@ function Get-DenoVerifiedByteMaterial {
             if ($read -eq 0) { throw "deno_input_truncated:$Path" }
             $offset += $read
         }
-        $sha256 = ([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes))).ToLowerInvariant()
+        $sha256 = Get-DenoByteArraySha256 -Bytes $bytes
         if (-not [string]::IsNullOrWhiteSpace($ExpectedSha256) -and
             ($ExpectedSha256 -notmatch '^[0-9a-f]{64}$' -or $sha256 -cne $ExpectedSha256)) {
             throw "deno_input_hash_mismatch:$Path"
         }
         if ($null -ne $AfterHashAction) { [void](& $AfterHashAction) }
         [void](Assert-DenoVerifiedReadFileUnchanged -VerifiedFile $verified)
-        $material = [pscustomobject][ordered]@{ path = $verified.Path; length = $length; sha256 = $sha256; bytes = $bytes }
-        if ($Cache) { $script:DenoVerifiedMaterialCache[$cacheKey] = $material }
-        return $material
+        $stored = [pscustomobject][ordered]@{
+            path = $verified.Path
+            identityKey = $identityKey
+            length = $length
+            sha256 = $sha256
+            bytes = (Copy-DenoByteArray -Bytes $bytes)
+        }
+        if ($Cache) { $script:DenoVerifiedMaterialCache[$identityKey] = $stored }
+        return New-DenoMaterialResult -StoredMaterial $stored -RequestedPath $Path -MaximumLength $MaximumLength -ExpectedSha256 $ExpectedSha256 -ExpectedLength $ExpectedLength
     }
     finally {
         Close-DenoVerifiedReadFile -VerifiedFile $verified
@@ -1377,47 +1443,95 @@ function Assert-DenoVendorAgainstCrate {
     }
 }
 
+function Read-DenoBoundedStreamBytes {
+    param(
+        [Parameter(Mandatory)] [IO.Stream] $Stream,
+        [Parameter(Mandatory)] [long] $MaximumLength,
+        [Parameter(Mandatory)] [string] $ErrorCode
+    )
+    if ($MaximumLength -lt 0 -or $MaximumLength -gt [int]::MaxValue) { throw 'deno_decompressed_bound_invalid' }
+    $buffer = [byte[]]::new(65536)
+    $memory = [IO.MemoryStream]::new([int][Math]::Min($MaximumLength, 65536))
+    try {
+        $total = 0L
+        while (($read = $Stream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+            if ($total + $read -gt $MaximumLength) { throw $ErrorCode }
+            $memory.Write($buffer, 0, $read)
+            $total += $read
+        }
+        return ,$memory.ToArray()
+    }
+    finally { $memory.Dispose() }
+}
+
+function Get-DenoVerifiedZipArchiveMaterial {
+    param(
+        [Parameter(Mandatory)] [string] $Path,
+        [long] $MaximumArchiveLength = 67108864,
+        [string] $ExpectedSha256,
+        [long] $ExpectedLength = -1
+    )
+    return Get-DenoVerifiedByteMaterial -Path $Path -MaximumLength $MaximumArchiveLength -ExpectedSha256 $ExpectedSha256 -ExpectedLength $ExpectedLength -Cache
+}
+
 function Get-DenoZipEntrySha256 {
-    param([Parameter(Mandatory)] [string] $ArchivePath, [Parameter(Mandatory)] [string] $EntryPath)
-    return Get-DenoSha256Bytes (Get-DenoZipEntryBytes -ArchivePath $ArchivePath -EntryPath $EntryPath)
+    [CmdletBinding(DefaultParameterSetName = 'Path')]
+    param(
+        [Parameter(Mandatory, ParameterSetName = 'Path')] [string] $ArchivePath,
+        [Parameter(Mandatory, ParameterSetName = 'Material')] [object] $ArchiveMaterial,
+        [Parameter(Mandatory)] [string] $EntryPath,
+        [long] $MaximumDecompressedLength = 67108864
+    )
+    if ($PSCmdlet.ParameterSetName -ceq 'Material') {
+        return Get-DenoSha256Bytes (Get-DenoZipEntryBytes -ArchiveMaterial $ArchiveMaterial -EntryPath $EntryPath -MaximumDecompressedLength $MaximumDecompressedLength)
+    }
+    return Get-DenoSha256Bytes (Get-DenoZipEntryBytes -ArchivePath $ArchivePath -EntryPath $EntryPath -MaximumDecompressedLength $MaximumDecompressedLength)
 }
 
 function Get-DenoZipEntryBytes {
-    param([Parameter(Mandatory)] [string] $ArchivePath, [Parameter(Mandatory)] [string] $EntryPath)
+    [CmdletBinding(DefaultParameterSetName = 'Path')]
+    param(
+        [Parameter(Mandatory, ParameterSetName = 'Path')] [string] $ArchivePath,
+        [Parameter(Mandatory, ParameterSetName = 'Material')] [object] $ArchiveMaterial,
+        [Parameter(Mandatory)] [string] $EntryPath,
+        [long] $MaximumDecompressedLength = 67108864
+    )
     Assert-DenoUniquePaths @($EntryPath) | Out-Null
-    $verified = Open-DenoVerifiedReadFile -Path $ArchivePath
+    if ($MaximumDecompressedLength -lt 0 -or $MaximumDecompressedLength -gt [int]::MaxValue) { throw 'deno_decompressed_bound_invalid' }
+    if ($PSCmdlet.ParameterSetName -ceq 'Path') { $ArchiveMaterial = Get-DenoVerifiedZipArchiveMaterial -Path $ArchivePath }
+    $archiveBytes = Copy-DenoByteArray -Bytes ([byte[]]$ArchiveMaterial.bytes)
+    if ($archiveBytes.Length -ne [long]$ArchiveMaterial.length -or
+        (Get-DenoByteArraySha256 -Bytes $archiveBytes) -cne [string]$ArchiveMaterial.sha256) {
+        throw 'deno_zip_archive_material_corrupt'
+    }
+    $archiveStream = [IO.MemoryStream]::new($archiveBytes, $false)
     try {
         $zip = [IO.Compression.ZipArchive]::new(
-            $verified.Stream, [IO.Compression.ZipArchiveMode]::Read, $true)
+            $archiveStream, [IO.Compression.ZipArchiveMode]::Read, $true)
         try {
             Assert-DenoUniquePaths @($zip.Entries | Where-Object { -not $_.FullName.EndsWith('/') } | ForEach-Object FullName) | Out-Null
             $entries = @($zip.Entries | Where-Object { $_.FullName -ceq $EntryPath })
             if ($entries.Count -ne 1) { throw "deno_upstream_license_entry_missing:$EntryPath" }
+            if ([long]$entries[0].Length -gt $MaximumDecompressedLength) { throw "deno_zip_member_too_large:$EntryPath" }
             $stream = $entries[0].Open()
-            try {
-                $memory = [IO.MemoryStream]::new()
-                try { $stream.CopyTo($memory); return ,$memory.ToArray() }
-                finally { $memory.Dispose() }
-            }
+            try { return Read-DenoBoundedStreamBytes -Stream $stream -MaximumLength $MaximumDecompressedLength -ErrorCode "deno_zip_member_too_large:$EntryPath" }
             finally { $stream.Dispose() }
         }
         finally { $zip.Dispose() }
     }
-    finally {
-        [void](Assert-DenoVerifiedReadFileUnchanged -VerifiedFile $verified)
-        Close-DenoVerifiedReadFile -VerifiedFile $verified
-    }
+    finally { $archiveStream.Dispose() }
 }
 
 function Copy-DenoZipEntry {
-    param([Parameter(Mandatory)] [string] $ArchivePath, [Parameter(Mandatory)] [string] $EntryPath, [Parameter(Mandatory)] [string] $Destination)
+    param([Parameter(Mandatory)] [string] $ArchivePath, [Parameter(Mandatory)] [string] $EntryPath, [Parameter(Mandatory)] [string] $Destination, [long] $MaximumDecompressedLength = 67108864)
     New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
-    Write-DenoBytes -Path $Destination -Bytes (Get-DenoZipEntryBytes -ArchivePath $ArchivePath -EntryPath $EntryPath)
+    Write-DenoBytes -Path $Destination -Bytes (Get-DenoZipEntryBytes -ArchivePath $ArchivePath -EntryPath $EntryPath -MaximumDecompressedLength $MaximumDecompressedLength)
 }
 
 function Get-DenoTarEntryBytes {
-    param([Parameter(Mandatory)] [string] $ArchivePath, [Parameter(Mandatory)] [string] $EntryPath)
+    param([Parameter(Mandatory)] [string] $ArchivePath, [Parameter(Mandatory)] [string] $EntryPath, [long] $MaximumDecompressedLength = 67108864)
     Assert-DenoUniquePaths @($EntryPath) | Out-Null
+    if ($MaximumDecompressedLength -lt 0 -or $MaximumDecompressedLength -gt [int]::MaxValue) { throw 'deno_decompressed_bound_invalid' }
     $verified = Open-DenoVerifiedReadFile -Path $ArchivePath
     try {
         $gzip = [IO.Compression.GZipStream]::new($verified.Stream, [IO.Compression.CompressionMode]::Decompress, $true)
@@ -1425,12 +1539,12 @@ function Get-DenoTarEntryBytes {
             $reader = [System.Formats.Tar.TarReader]::new($gzip, $true)
             try {
                 $found = $null
-                while ($null -ne ($entry = $reader.GetNextEntry())) {
+                while ($null -ne ($entry = $reader.GetNextEntry($false))) {
                     if ($entry.Name.Replace('\', '/') -cne $EntryPath.Replace('\', '/')) { continue }
                     if ($null -ne $found) { throw "deno_native_license_entry_duplicate:$EntryPath" }
                     if ($entry.EntryType -notin @([System.Formats.Tar.TarEntryType]::RegularFile, [System.Formats.Tar.TarEntryType]::V7RegularFile)) { throw "deno_native_license_entry_not_regular:$EntryPath" }
-                    $memory = [IO.MemoryStream]::new()
-                    try { $entry.DataStream.CopyTo($memory); $found = $memory.ToArray() } finally { $memory.Dispose() }
+                    if ([long]$entry.Length -gt $MaximumDecompressedLength) { throw "deno_tar_member_too_large:$EntryPath" }
+                    $found = Read-DenoBoundedStreamBytes -Stream $entry.DataStream -MaximumLength $MaximumDecompressedLength -ErrorCode "deno_tar_member_too_large:$EntryPath"
                 }
                 if ($null -eq $found) { throw "deno_native_license_entry_missing:$EntryPath" }
                 return ,$found
@@ -1446,9 +1560,37 @@ function Get-DenoTarEntryBytes {
 }
 
 function Copy-DenoTarEntry {
-    param([Parameter(Mandatory)] [string] $ArchivePath, [Parameter(Mandatory)] [string] $EntryPath, [Parameter(Mandatory)] [string] $Destination)
+    param([Parameter(Mandatory)] [string] $ArchivePath, [Parameter(Mandatory)] [string] $EntryPath, [Parameter(Mandatory)] [string] $Destination, [long] $MaximumDecompressedLength = 67108864)
     New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
-    Write-DenoBytes -Path $Destination -Bytes (Get-DenoTarEntryBytes -ArchivePath $ArchivePath -EntryPath $EntryPath)
+    Write-DenoBytes -Path $Destination -Bytes (Get-DenoTarEntryBytes -ArchivePath $ArchivePath -EntryPath $EntryPath -MaximumDecompressedLength $MaximumDecompressedLength)
+}
+
+function Get-DenoCanonicalTreeEvidence {
+    param([Parameter(Mandatory)] [string] $Root)
+    $rootPath = [IO.Path]::GetFullPath($Root).TrimEnd('\')
+    $map = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+    foreach ($file in Get-ChildItem -LiteralPath $rootPath -Recurse -File) {
+        $relative = $file.FullName.Substring($rootPath.Length + 1).Replace('\', '/')
+        if (-not $map.TryAdd($relative, [ordered]@{ path = $relative; length = [long]$file.Length; sha256 = Get-DenoSha256 $file.FullName })) {
+            throw "deno_tree_path_duplicate:$relative"
+        }
+    }
+    $paths = [string[]]@($map.Keys)
+    [Array]::Sort($paths, [StringComparer]::Ordinal)
+    Assert-DenoUniquePaths $paths | Out-Null
+    $records = [Collections.Generic.List[object]]::new()
+    $builder = [Text.StringBuilder]::new()
+    foreach ($path in $paths) {
+        $record = $map[$path]
+        $records.Add($record)
+        $builder.Append($record.path).Append('|').Append($record.length).Append('|').Append(([string]$record.sha256).ToLowerInvariant()).Append("`n") | Out-Null
+    }
+    $serialization = $builder.ToString()
+    return [pscustomobject][ordered]@{
+        records = @($records)
+        serialization = $serialization
+        sha256 = Get-DenoByteArraySha256 -Bytes ([Text.UTF8Encoding]::new($false).GetBytes($serialization))
+    }
 }
 
 function Get-DenoTarArchiveEntries {
@@ -1551,15 +1693,31 @@ function Add-DenoEmbeddedComponent {
     }
 }
 
+function Get-DenoRegisteredUpstreamArchiveMaterial {
+    param([Parameter(Mandatory)] [string] $ArchivePath)
+    $mapVariable = Get-Variable -Name DenoUpstreamArchiveMaterials -Scope Script -ErrorAction SilentlyContinue
+    $key = (ConvertTo-DenoFinalPath $ArchivePath).ToLowerInvariant()
+    if ($null -eq $mapVariable -or -not $script:DenoUpstreamArchiveMaterials.ContainsKey($key)) {
+        throw "deno_upstream_archive_material_missing:$ArchivePath"
+    }
+    $registration = $script:DenoUpstreamArchiveMaterials[$key]
+    return Get-DenoCachedVerifiedMaterial -IdentityKey ([string]$registration.identityKey) -RequestedPath $ArchivePath -ExpectedSha256 ([string]$registration.sha256) -ExpectedLength ([long]$registration.length)
+}
+
 function Resolve-DenoUpstreamFallback {
     param([Parameter(Mandatory)] [object] $Fallback, [Parameter(Mandatory)] [string] $UpstreamSourceRoot)
     $archive = Join-Path $UpstreamSourceRoot ([string]$Fallback.archiveFile)
-    $item = Get-Item -LiteralPath $archive
-    if ($item.Length -ne [long]$Fallback.length) { throw "deno_upstream_archive_length_mismatch:$($Fallback.id)" }
-    Assert-DenoHash $archive ([string]$Fallback.sha256)
+    try {
+        $archiveMaterial = Get-DenoVerifiedZipArchiveMaterial -Path $archive -ExpectedLength ([long]$Fallback.length) -ExpectedSha256 ([string]$Fallback.sha256)
+    }
+    catch { throw "deno_upstream_archive_material_mismatch:$($Fallback.id)" }
+    $mapVariable = Get-Variable -Name DenoUpstreamArchiveMaterials -Scope Script -ErrorAction SilentlyContinue
+    if ($null -eq $mapVariable) { $script:DenoUpstreamArchiveMaterials = @{} }
+    $archiveKey = (ConvertTo-DenoFinalPath $archive).ToLowerInvariant()
+    $script:DenoUpstreamArchiveMaterials[$archiveKey] = [pscustomobject][ordered]@{ identityKey = $archiveMaterial.identityKey; length = $archiveMaterial.length; sha256 = $archiveMaterial.sha256 }
     $files = [Collections.Generic.List[object]]::new()
     foreach ($license in $Fallback.licenseFiles) {
-        $actual = Get-DenoZipEntrySha256 -ArchivePath $archive -EntryPath ([string]$license.path)
+        $actual = Get-DenoZipEntrySha256 -ArchiveMaterial $archiveMaterial -EntryPath ([string]$license.path)
         if ($actual -cne [string]$license.sha256) { throw "deno_upstream_license_hash_mismatch:$($Fallback.id):$($license.path)" }
         $files.Add([ordered]@{ origin = 'upstream-commit'; path = [string]$license.path; length = [long]$license.length; sha256 = $actual; archiveFile = [string]$Fallback.archiveFile })
     }
@@ -1766,6 +1924,7 @@ function Invoke-DenoThirdPartyNoticeCollection {
     $mainGuards = [Collections.Generic.List[object]]::new()
     try {
         $script:DenoVerifiedMaterialCache = @{}
+        $script:DenoUpstreamArchiveMaterials = @{}
         foreach ($inputPath in @($ManifestRoot, $DenoSourceRoot, $RustyV8SourceRoot, $RustyV8GitRepositoryPath,
                 $V8SourceRoot, $VendorRoot, $OfficialMetadataPath, $SupersetMetadataPath, $DenoExePath,
                 $DenoSourceArchivePath, $RustyV8SourceArchivePath, $V8SourceArchivePath,
@@ -1978,7 +2137,7 @@ function Invoke-DenoThirdPartyNoticeCollection {
                     'package-archive' { Get-DenoTarEntryBytes -ArchivePath (Join-Path $CrateArchiveRoot ([string]$record.sourceArchive.fileName)) -EntryPath ([string]$license.archiveEntry) }
                     'spdx-license' { (Get-DenoVerifiedByteMaterial -Path (Join-Path $SpdxRoot ([string]$license.path)) -ExpectedSha256 ([string]$license.sha256) -ExpectedLength ([long]$license.length) -Cache).bytes }
                     'spdx-exception' { (Get-DenoVerifiedByteMaterial -Path (Join-Path $SpdxRoot ([string]$license.path)) -ExpectedSha256 ([string]$license.sha256) -ExpectedLength ([long]$license.length) -Cache).bytes }
-                    'upstream-commit' { Get-DenoZipEntryBytes -ArchivePath (Join-Path $UpstreamSourceRoot ([string]$license.archiveFile)) -EntryPath ([string]$license.path) }
+                    'upstream-commit' { Get-DenoZipEntryBytes -ArchiveMaterial (Get-DenoRegisteredUpstreamArchiveMaterial -ArchivePath (Join-Path $UpstreamSourceRoot ([string]$license.archiveFile))) -EntryPath ([string]$license.path) }
                     'license-ref-extracted' { [Text.UTF8Encoding]::new($false).GetBytes([string]$license.text) }
                     default { throw "deno_license_origin_invalid:$($license.origin)" }
                 }
@@ -2040,19 +2199,27 @@ function Invoke-DenoThirdPartyNoticeCollection {
         $upstreamSourceDestination = Join-Path $sourceRoot 'upstream-license-sources'
         New-Item -ItemType Directory -Path $crateSourceRoot, $upstreamSourceDestination | Out-Null
         foreach ($record in $crateRecords) { Copy-DenoVerifiedFile -SourcePath (Join-Path $CrateArchiveRoot ([string]$record.sourceArchive.fileName)) -DestinationPath (Join-Path $crateSourceRoot ([string]$record.sourceArchive.fileName)) -ExpectedSha256 ([string]$record.sourceArchive.sha256) -ExpectedLength ([long]$record.sourceArchive.length) }
-        foreach ($archiveFile in @($fallbacks.registryFallbacks.archiveFile | Sort-Object -Unique)) { Copy-DenoVerifiedFile -SourcePath (Join-Path $UpstreamSourceRoot $archiveFile) -DestinationPath (Join-Path $upstreamSourceDestination $archiveFile) }
+        foreach ($archiveFile in @($fallbacks.registryFallbacks.archiveFile | Sort-Object -Unique)) {
+            $archivePath = Join-Path $UpstreamSourceRoot $archiveFile
+            $archiveMaterial = Get-DenoRegisteredUpstreamArchiveMaterial -ArchivePath $archivePath
+            Write-DenoBytes -Path (Join-Path $upstreamSourceDestination $archiveFile) -Bytes $archiveMaterial.bytes
+        }
         $noticePath = Join-Path $outputRoot 'THIRD-PARTY-NOTICES.txt'
         Write-DenoUtf8Text $noticePath ($notice.ToString())
         Copy-DenoVerifiedFile -SourcePath $noticePath -DestinationPath (Join-Path $stage 'THIRD-PARTY-NOTICES.txt')
         Write-DenoUtf8Text (Join-Path $outputRoot 'component-manifest.json') (([ordered]@{ schemaVersion = 'deno-third-party-components/v3'; closureClassification = $inputs.closureClassification; releaseIdentity = $identity; spdxLicenseList = $inputs.spdxLicenseList; counts = $counts; embeddedComponents = @($embeddedRecords); crates = @($crateRecords); workspacePackages = @($workspaceRecords); nativeGitTreeEvidence = $nativeTreeEvidence; nativeComponents = @($native.components); overallReleasePass = $false } | ConvertTo-Json -Depth 30) + "`n")
-        $inventory = foreach ($file in Get-ChildItem -LiteralPath $stage -Recurse -File | Sort-Object FullName) { [ordered]@{ path = $file.FullName.Substring($stage.Length + 1).Replace('\', '/'); length = $file.Length; sha256 = Get-DenoSha256 $file.FullName } }
-        Write-DenoUtf8Text (Join-Path $outputRoot 'source-inventory.json') (([ordered]@{ schemaVersion = 'deno-source-inventory/v1'; files = @($inventory) } | ConvertTo-Json -Depth 10) + "`n")
+        $treeEvidence = Get-DenoCanonicalTreeEvidence -Root $stage
+        Write-DenoUtf8Text (Join-Path $outputRoot 'source-inventory.json') (([ordered]@{
+                    schemaVersion = 'deno-source-inventory/v2'
+                    canonicalTreeDigest = [ordered]@{ algorithm = 'SHA-256'; serialization = 'path|length|lowercase-sha256 followed by LF per record including trailing LF'; recordCount = $treeEvidence.records.Count; sha256 = $treeEvidence.sha256 }
+                    files = @($treeEvidence.records)
+                } | ConvertTo-Json -Depth 10) + "`n")
         $zipPath = Join-Path $outputRoot 'deno-2.7.14-verified-conservative-superset-sources.zip'
         $zipSha256 = New-DenoDeterministicZip -SourceRoot $stage -ZipPath $zipPath
         Complete-DenoAtomicDirectory -Source $outputRoot -Destination $finalOutputRoot | Out-Null
         $noticePath = Join-Path $finalOutputRoot 'THIRD-PARTY-NOTICES.txt'
         $zipPath = Join-Path $finalOutputRoot 'deno-2.7.14-verified-conservative-superset-sources.zip'
-        return [pscustomobject]@{ status = 'complete'; closureClassification = $inputs.closureClassification; outputRoot = $finalOutputRoot; noticePath = $noticePath; noticeSha256 = Get-DenoSha256 $noticePath; zipPath = $zipPath; zipSha256 = Get-DenoSha256 $zipPath; counts = $counts; overallReleasePass = $false }
+        return [pscustomobject]@{ status = 'complete'; closureClassification = $inputs.closureClassification; outputRoot = $finalOutputRoot; noticePath = $noticePath; noticeSha256 = Get-DenoSha256 $noticePath; zipPath = $zipPath; zipSha256 = Get-DenoSha256 $zipPath; canonicalTreeSha256 = $treeEvidence.sha256; counts = $counts; overallReleasePass = $false }
     }
     finally {
         $ownedKey = (ConvertTo-DenoFinalPath $workRoot).ToLowerInvariant()

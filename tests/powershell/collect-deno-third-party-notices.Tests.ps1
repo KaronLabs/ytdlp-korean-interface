@@ -596,3 +596,135 @@ Describe 'Deno collector trust-boundary regressions' -Tag 'TrustBoundaryRed' {
         [IO.Directory]::Exists($stage) | Should Be $false
     }
 }
+
+Describe 'Deno immutable archive and canonical tree regressions' -Tag 'TrustBoundaryRed' {
+    BeforeAll {
+        $collectorPath = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'tools/collect-deno-third-party-notices.ps1'
+        . $collectorPath
+
+        function Get-ImmutableError([scriptblock] $Action) {
+            try { $null = & $Action; return '' } catch { return $_.Exception.Message }
+        }
+
+        function Get-ImmutableBytesSha([byte[]] $Bytes) {
+            return ([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($Bytes))).ToLowerInvariant()
+        }
+
+        function New-ImmutableZip([string] $Path, [string] $Text) {
+            $stream = [IO.File]::Open($Path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+            try {
+                $zip = [IO.Compression.ZipArchive]::new($stream, [IO.Compression.ZipArchiveMode]::Create, $true)
+                try {
+                    $entry = $zip.CreateEntry('LICENSE', [IO.Compression.CompressionLevel]::SmallestSize)
+                    $entryStream = $entry.Open()
+                    try {
+                        $bytes = [Text.UTF8Encoding]::new($false).GetBytes($Text)
+                        $entryStream.Write($bytes, 0, $bytes.Length)
+                    }
+                    finally { $entryStream.Dispose() }
+                }
+                finally { $zip.Dispose() }
+            }
+            finally { $stream.Dispose() }
+        }
+
+        function New-ImmutableTarGzip([string] $Root, [string] $Text) {
+            $source = Join-Path $Root 'tar-source'
+            $fixture = Join-Path $source 'fixture'
+            [void][IO.Directory]::CreateDirectory($fixture)
+            [IO.File]::WriteAllText((Join-Path $fixture 'LICENSE'), $Text, [Text.UTF8Encoding]::new($false))
+            $tarPath = Join-Path $Root 'fixture.tar'
+            $gzipPath = Join-Path $Root 'fixture.tar.gz'
+            [System.Formats.Tar.TarFile]::CreateFromDirectory($source, $tarPath, $false)
+            $input = [IO.File]::OpenRead($tarPath)
+            try {
+                $output = [IO.File]::Open($gzipPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+                try {
+                    $gzip = [IO.Compression.GZipStream]::new($output, [IO.Compression.CompressionLevel]::SmallestSize, $true)
+                    try { $input.CopyTo($gzip) } finally { $gzip.Dispose() }
+                }
+                finally { $output.Dispose() }
+            }
+            finally { $input.Dispose() }
+            return $gzipPath
+        }
+    }
+
+    It 'does not let caller byte mutation corrupt a cached verified snapshot' {
+        $script:DenoVerifiedMaterialCache = @{}
+        $path = Join-Path $TestDrive 'cached.txt'
+        [IO.File]::WriteAllText($path, 'TRUSTED', [Text.UTF8Encoding]::new($false))
+        $first = Get-DenoVerifiedByteMaterial -Path $path -Cache
+        $first.bytes[0] = [byte][char]'X'
+
+        $second = Get-DenoVerifiedByteMaterial -Path $path -Cache
+
+        (Get-ImmutableBytesSha $second.bytes) | Should Be $second.sha256
+        [Text.UTF8Encoding]::new($false, $true).GetString($second.bytes) | Should Be 'TRUSTED'
+    }
+
+    It 'maps same-volume hardlink aliases to one immutable native-identity snapshot' {
+        $script:DenoVerifiedMaterialCache = @{}
+        $path = Join-Path $TestDrive 'native-id-a.txt'
+        $alias = Join-Path $TestDrive 'native-id-b.txt'
+        [IO.File]::WriteAllText($path, 'TRUSTED', [Text.UTF8Encoding]::new($false))
+        [void](New-Item -ItemType HardLink -Path $alias -Target $path)
+        $expected = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+        $first = Get-DenoVerifiedByteMaterial -Path $path -ExpectedSha256 $expected -Cache
+        [IO.File]::WriteAllText($alias, 'ALTERED', [Text.UTF8Encoding]::new($false))
+
+        $second = Get-DenoVerifiedByteMaterial -Path $alias -ExpectedSha256 $expected -Cache
+
+        $second.identityKey | Should Be $first.identityKey
+        (Get-ImmutableBytesSha $second.bytes) | Should Be $second.sha256
+        [Text.UTF8Encoding]::new($false, $true).GetString($second.bytes) | Should Be 'TRUSTED'
+    }
+
+    It 'uses one verified upstream ZIP material after the source path is replaced' {
+        $script:DenoVerifiedMaterialCache = @{}
+        $path = Join-Path $TestDrive 'upstream.zip'
+        $tampered = Join-Path $TestDrive 'tampered.zip'
+        New-ImmutableZip -Path $path -Text 'TRUSTED LICENSE'
+        New-ImmutableZip -Path $tampered -Text 'TAMPERED LICENSE'
+        $expected = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+        $expectedLength = (Get-Item -LiteralPath $path).Length
+        $material = Get-DenoVerifiedZipArchiveMaterial -Path $path -ExpectedSha256 $expected -ExpectedLength $expectedLength
+        Move-Item -LiteralPath $path -Destination ($path + '.verified')
+        Move-Item -LiteralPath $tampered -Destination $path
+
+        $member = Get-DenoZipEntryBytes -ArchiveMaterial $material -EntryPath 'LICENSE'
+        $copied = Join-Path $TestDrive 'corresponding-source.zip'
+        Write-DenoBytes -Path $copied -Bytes $material.bytes
+
+        [Text.UTF8Encoding]::new($false, $true).GetString($member) | Should Be 'TRUSTED LICENSE'
+        (Get-FileHash -LiteralPath $copied -Algorithm SHA256).Hash.ToLowerInvariant() | Should Be $expected
+    }
+
+    It 'rejects a compact ZIP member before decompressed output exceeds the bound' {
+        $path = Join-Path $TestDrive 'bomb.zip'
+        New-ImmutableZip -Path $path -Text ('A' * 1048576)
+        (Get-Item -LiteralPath $path).Length | Should BeLessThan 8192
+
+        Get-ImmutableError { Get-DenoZipEntryBytes -ArchivePath $path -EntryPath 'LICENSE' -MaximumDecompressedLength 4096 } | Should Be 'deno_zip_member_too_large:LICENSE'
+    }
+
+    It 'rejects a compact native TAR member before decompressed output exceeds the bound' {
+        $path = New-ImmutableTarGzip -Root $TestDrive -Text ('A' * 1048576)
+        (Get-Item -LiteralPath $path).Length | Should BeLessThan 8192
+
+        Get-ImmutableError { Get-DenoTarEntryBytes -ArchivePath $path -EntryPath 'fixture/LICENSE' -MaximumDecompressedLength 4096 } | Should Be 'deno_tar_member_too_large:fixture/LICENSE'
+    }
+
+    It 'matches the fixed canonical tree serialization and digest vector' {
+        $root = Join-Path $TestDrive 'tree'
+        [void][IO.Directory]::CreateDirectory($root)
+        [IO.File]::WriteAllBytes((Join-Path $root 'Z.txt'), [byte[]]::new(0))
+        [IO.File]::WriteAllText((Join-Path $root 'a.txt'), 'abc', [Text.UTF8Encoding]::new($false))
+
+        $evidence = Get-DenoCanonicalTreeEvidence -Root $root
+
+        $evidence.serialization | Should Be "Z.txt|0|e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`na.txt|3|ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad`n"
+        $evidence.sha256 | Should Be '3045801ba6d98a089a1ff0c8030f9a70f1d1d65f7a066376e041d5a9ae115ff9'
+        @($evidence.records.path) | Should Be @('Z.txt', 'a.txt')
+    }
+}
