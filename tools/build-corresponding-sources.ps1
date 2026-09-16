@@ -401,7 +401,6 @@ try {
 }
 catch {
     if (Test-Path -LiteralPath $partialPath) { Remove-Item -LiteralPath $partialPath -Force }
-    if (Test-Path -LiteralPath $outputPath) { Remove-Item -LiteralPath $outputPath -Force }
     throw
 }
 finally {

@@ -11,6 +11,8 @@ $script:OfficialSchema = Join-Path $PSScriptRoot 'fixtures\spdx-2.3-schema-aadf3
 $script:OfficialSchemaSha256 = '3ec6cd5b8ba0c9a3e821da48536fa1b814567dc7e4376efe98d3e7b2a7a8d230'
 $script:OfficialSchemaUpstreamSha256 = '239208b7ac287b3cf5d9a9af23f9d69863971102a5e1587a27a398b43490b89b'
 $script:ExpectedJsonSchemaVersion = '4.26.0'
+$script:FixtureApplicationVerificationCode = 'd5512016a069e03eb10b95146c23f2983433a39a'
+$script:FixtureMetadataVerificationCode = 'd0a102a87ad65fa323c22d95cb63446323c5fb17'
 
 function Get-TestSha256 {
     param([Parameter(Mandatory)] [string] $Path)
@@ -188,10 +190,65 @@ function Invoke-TestSources {
     Invoke-TestTool $script:SourceTool @('-LockPath', $LockPath, '-SourceRoot', $SourceRoot, '-CandidateRoot', $Case.Candidate, '-CacheDirectory', $Case.Cache, '-OutputDirectory', $Case.Output)
 }
 
-function Get-ExpectedVerificationCode {
-    param([Parameter(Mandatory)] [string[]] $Paths)
-    $sha1Values = @($Paths | ForEach-Object { (Get-FileHash -LiteralPath $_ -Algorithm SHA1).Hash.ToLowerInvariant() } | Sort-Object)
-    [Convert]::ToHexString([Security.Cryptography.SHA1]::HashData([Text.Encoding]::ASCII.GetBytes(($sha1Values -join '')))).ToLowerInvariant()
+function Invoke-TestToolWithFinalInjection {
+    param(
+        [Parameter(Mandatory)] [string] $ScriptPath,
+        [Parameter(Mandatory)] [string[]] $Arguments,
+        [Parameter(Mandatory)] [string] $OutputDirectory,
+        [Parameter(Mandatory)] [string] $SeedPath,
+        [Parameter(Mandatory)] [string] $FinalPath
+    )
+
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = (Get-Command pwsh).Source
+    $startInfo.UseShellExecute = $false
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    foreach ($argument in @('-NoLogo', '-NoProfile', '-File', $ScriptPath) + $Arguments) {
+        [void]$startInfo.ArgumentList.Add($argument)
+    }
+
+    $watcher = [IO.FileSystemWatcher]::new($OutputDirectory, '*.partial')
+    $watcher.NotifyFilter = [IO.NotifyFilters]::FileName
+    $watcher.EnableRaisingEvents = $true
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    $started = $false
+    try {
+        $started = $process.Start()
+        $stdout = $process.StandardOutput.ReadToEndAsync()
+        $stderr = $process.StandardError.ReadToEndAsync()
+        $change = $watcher.WaitForChanged([IO.WatcherChangeTypes]::Created, 30000)
+        if ($change.TimedOut) { throw 'race_partial_timeout' }
+
+        [IO.File]::Copy($SeedPath, $FinalPath, $false)
+        $seedSha256 = Get-TestSha256 $SeedPath
+        $seedLength = (Get-Item -LiteralPath $SeedPath).Length
+        if (-not $process.WaitForExit(30000)) { throw 'race_process_timeout' }
+
+        $output = ($stdout.GetAwaiter().GetResult() + "`n" + $stderr.GetAwaiter().GetResult()).Trim()
+        $finalExists = Test-Path -LiteralPath $FinalPath -PathType Leaf
+        $finalSha256 = if ($finalExists) { Get-TestSha256 $FinalPath } else { $null }
+        $finalLength = if ($finalExists) { (Get-Item -LiteralPath $FinalPath).Length } else { -1 }
+        [pscustomobject]@{
+            ExitCode = $process.ExitCode
+            Output = $output
+            FinalExists = $finalExists
+            SeedSha256 = $seedSha256
+            FinalSha256 = $finalSha256
+            SeedLength = $seedLength
+            FinalLength = $finalLength
+            PartialCount = @(Get-ChildItem -LiteralPath $OutputDirectory -Filter '*.partial' -File -Force).Count
+        }
+    }
+    finally {
+        if ($started -and -not $process.HasExited) {
+            $process.Kill($true)
+            $process.WaitForExit()
+        }
+        $process.Dispose()
+        $watcher.Dispose()
+    }
 }
 
 Describe 'Fail-closed lock and candidate contract' {
@@ -291,6 +348,20 @@ Describe 'Fail-closed lock and candidate contract' {
         $result.Output | Should Match 'spdx_candidate_manifest_(hash|inventory|duplicate)'
     }
 
+    It 'rejects an explicit candidate-manifest length mismatch in both generators' -TestCases @(
+        @{ Tool = 'spdx'; ErrorPrefix = 'spdx' },
+        @{ Tool = 'sources'; ErrorPrefix = 'source' }
+    ) {
+        param($Tool, $ErrorPrefix)
+        $case = New-LicenseBundleCase "manifest-length-$Tool"
+        $case.Manifest.files[0].length = [long]$case.Manifest.files[0].length + 1
+        Save-TestManifest $case
+        $result = if ($Tool -eq 'spdx') { Invoke-TestSpdx $case } else { Invoke-TestSources $case }
+        $result.ExitCode | Should Not Be 0
+        $result.Output | Should Match ($ErrorPrefix + '_candidate_manifest_inventory_mismatch: app\.exe')
+        @(Get-ChildItem -LiteralPath $case.Output -Force).Count | Should Be 0
+    }
+
     It 'rejects NOASSERTION license metadata and missing notice or source metadata' -TestCases @(
         @{ Mutation = 'license' },
         @{ Mutation = 'notice' },
@@ -328,8 +399,8 @@ Describe 'SPDX 2.3 generation semantics' {
         $staticPackage = @($document.packages | Where-Object SPDXID -ceq 'SPDXRef-Package-test-static')[0]
         $metadataPackage = @($document.packages | Where-Object SPDXID -ceq 'SPDXRef-Package-release-metadata')[0]
         $appPackage.filesAnalyzed | Should Be $true
-        $appPackage.packageVerificationCode.packageVerificationCodeValue | Should Be (Get-ExpectedVerificationCode @((Join-Path $case.Candidate 'app.exe'), (Join-Path $case.Candidate 'settings.json')))
-        $metadataPackage.packageVerificationCode.packageVerificationCodeValue | Should Be (Get-ExpectedVerificationCode @($case.ManifestPath))
+        $appPackage.packageVerificationCode.packageVerificationCodeValue | Should Be $script:FixtureApplicationVerificationCode
+        $metadataPackage.packageVerificationCode.packageVerificationCodeValue | Should Be $script:FixtureMetadataVerificationCode
         $staticPackage.filesAnalyzed | Should Be $false
         ($null -eq $staticPackage.PSObject.Properties['packageVerificationCode']) | Should Be $true
 
@@ -441,5 +512,61 @@ Describe 'Atomic corresponding-source bundle generation' {
         $result.ExitCode | Should Not Be 0
         $result.Output | Should Match 'source_candidate_hash_mismatch'
         @(Get-ChildItem -LiteralPath $case.Output -Force).Count | Should Be 0
+    }
+}
+
+Describe 'Atomic output ownership under check-to-move races' {
+    It 'preserves an independently created SPDX artifact byte-for-byte and cleans only its partial' {
+        $case = New-LicenseBundleCase 'spdx-output-race'
+        $largeNotice = "Fixture extracted static license text.`n" + ('x' * (8 * 1024 * 1024))
+        [IO.File]::WriteAllText($case.StaticNoticePath, $largeNotice, [Text.UTF8Encoding]::new($false))
+        $case.Lock.components[1].noticeFiles[0].sha256 = Get-TestSha256 $case.StaticNoticePath
+        Save-TestLock $case
+
+        $seedDirectory = Join-Path $case.Root 'seed-output'
+        $raceDirectory = Join-Path $case.Root 'race-output'
+        New-Item -ItemType Directory -Path $seedDirectory, $raceDirectory | Out-Null
+        $arguments = @('-LockPath', $case.LockPath, '-SourceRoot', $case.Metadata, '-CandidateRoot', $case.Candidate)
+        $seedResult = Invoke-TestTool $script:SpdxTool ($arguments + @('-OutputDirectory', $seedDirectory))
+        if ($seedResult.ExitCode -ne 0) { throw "seed SPDX generation failed: $($seedResult.Output)" }
+
+        $name = 'ytdlp-korean-interface-v2.19.1-karon.2.spdx.json'
+        $seedPath = Join-Path $seedDirectory $name
+        $finalPath = Join-Path $raceDirectory $name
+        $race = Invoke-TestToolWithFinalInjection $script:SpdxTool ($arguments + @('-OutputDirectory', $raceDirectory)) $raceDirectory $seedPath $finalPath
+        Write-Host ('RACE_RESULT generator=spdx ' + (($race | Select-Object ExitCode, FinalExists, SeedSha256, FinalSha256, SeedLength, FinalLength, PartialCount) | ConvertTo-Json -Compress))
+
+        $race.ExitCode | Should Not Be 0
+        $race.FinalExists | Should Be $true
+        $race.FinalSha256 | Should Be $race.SeedSha256
+        $race.FinalLength | Should Be $race.SeedLength
+        $race.PartialCount | Should Be 0
+    }
+
+    It 'preserves an independently created source bundle byte-for-byte and cleans only its partial' {
+        $case = New-LicenseBundleCase 'source-output-race'
+        $largeNotice = "Fixture extracted static license text.`n" + ('x' * (8 * 1024 * 1024))
+        [IO.File]::WriteAllText($case.StaticNoticePath, $largeNotice, [Text.UTF8Encoding]::new($false))
+        $case.Lock.components[1].noticeFiles[0].sha256 = Get-TestSha256 $case.StaticNoticePath
+        Save-TestLock $case
+
+        $seedDirectory = Join-Path $case.Root 'seed-output'
+        $raceDirectory = Join-Path $case.Root 'race-output'
+        New-Item -ItemType Directory -Path $seedDirectory, $raceDirectory | Out-Null
+        $arguments = @('-LockPath', $case.LockPath, '-SourceRoot', $case.Metadata, '-CandidateRoot', $case.Candidate, '-CacheDirectory', $case.Cache)
+        $seedResult = Invoke-TestTool $script:SourceTool ($arguments + @('-OutputDirectory', $seedDirectory))
+        if ($seedResult.ExitCode -ne 0) { throw "seed source generation failed: $($seedResult.Output)" }
+
+        $name = 'ytdlp-korean-interface-v2.19.1-karon.2-corresponding-sources.zip'
+        $seedPath = Join-Path $seedDirectory $name
+        $finalPath = Join-Path $raceDirectory $name
+        $race = Invoke-TestToolWithFinalInjection $script:SourceTool ($arguments + @('-OutputDirectory', $raceDirectory)) $raceDirectory $seedPath $finalPath
+        Write-Host ('RACE_RESULT generator=sources ' + (($race | Select-Object ExitCode, FinalExists, SeedSha256, FinalSha256, SeedLength, FinalLength, PartialCount) | ConvertTo-Json -Compress))
+
+        $race.ExitCode | Should Not Be 0
+        $race.FinalExists | Should Be $true
+        $race.FinalSha256 | Should Be $race.SeedSha256
+        $race.FinalLength | Should Be $race.SeedLength
+        $race.PartialCount | Should Be 0
     }
 }

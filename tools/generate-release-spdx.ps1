@@ -106,7 +106,11 @@ function Get-CandidateFiles {
 
 function Get-PackageVerificationCode {
     param([string[]] $RelativePaths, [Collections.Generic.Dictionary[string, string]] $ActualPaths)
-    $sha1Values = @($RelativePaths | ForEach-Object { Get-FileDigest $ActualPaths[$_] SHA1 } | Sort-Object)
+    $sha1Values = [Collections.Generic.List[string]]::new()
+    foreach ($relativePath in $RelativePaths) {
+        $sha1Values.Add((Get-FileDigest $ActualPaths[$relativePath] SHA1))
+    }
+    $sha1Values.Sort([StringComparer]::Ordinal)
     $bytes = [Text.Encoding]::ASCII.GetBytes(($sha1Values -join ''))
     [Convert]::ToHexString([Security.Cryptography.SHA1]::HashData($bytes)).ToLowerInvariant()
 }
@@ -450,7 +454,6 @@ try {
 }
 catch {
     if (Test-Path -LiteralPath $partialPath) { Remove-Item -LiteralPath $partialPath -Force }
-    if (Test-Path -LiteralPath $outputPath) { Remove-Item -LiteralPath $outputPath -Force }
     throw
 }
 finally {
