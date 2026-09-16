@@ -165,12 +165,17 @@ function Invoke-KaronPublishHttpChecked {
         [Parameter(Mandatory)] [object] $Request,
         [Parameter(Mandatory)] [string] $ErrorId
     )
-    $result = & $HttpRunner $Request
-    if ($null -eq $result -or $null -eq $result.PSObject.Properties['StatusCode'] -or
-        $null -eq $result.PSObject.Properties['Body']) { throw 'publication_http_runner_invalid' }
-    $status = [int]$result.StatusCode
-    if ($status -notin [int[]]$Request.ExpectedStatus) { throw ($ErrorId + ': HTTP ' + $status) }
-    [pscustomobject]@{ StatusCode = $status; Body = [string]$result.Body }
+    try {
+        $result = & $HttpRunner $Request
+        if ($null -eq $result -or $null -eq $result.PSObject.Properties['StatusCode'] -or
+            $null -eq $result.PSObject.Properties['Body']) { throw $ErrorId }
+        $status = [int]$result.StatusCode
+        if ($status -notin [int[]]$Request.ExpectedStatus) { throw $ErrorId }
+        [pscustomobject]@{ StatusCode = $status; Body = [string]$result.Body }
+    }
+    catch {
+        throw $ErrorId
+    }
 }
 
 function ConvertFrom-KaronPublishAssetJson {
@@ -573,7 +578,7 @@ function Invoke-KaronPublishDownloadVerification {
                 DownloadPath = [string]$download.DownloadPath
                 ExpectedStatus = @(200)
             }
-            [void](Invoke-KaronPublishHttpChecked $HttpRunner $request 'publication_asset_download_failed')
+            [void](Invoke-KaronPublishHttpChecked $HttpRunner $request 'publication_download_failed')
             [void](Assert-KaronPublishRemoteAssets (Get-KaronPublishRemoteRelease $CommandRunner $RepositoryRoot $ReleaseSeal.Id) $Inventory $true $true $ReleaseSeal)
         }
         $items = @(Get-ChildItem -LiteralPath $directory -Force)
@@ -691,7 +696,12 @@ function Invoke-QualityReleasePublication {
                 ExpectedStatus = $upload.ExpectedStatus
             }
             $response = Invoke-KaronPublishHttpChecked $HttpRunner $request 'publication_upload_failed'
-            $asset = ConvertFrom-KaronPublishAssetJson $response.Body
+            try {
+                $asset = ConvertFrom-KaronPublishAssetJson $response.Body
+            }
+            catch {
+                throw 'publication_upload_failed'
+            }
             if (-not [string]::IsNullOrWhiteSpace([string]$asset.Digest) -and [string]$asset.Digest -cne ('sha256:' + [string]$upload.ExpectedSha256)) {
                 throw ('publication_remote_digest_mismatch: ' + [string]$upload.AssetName)
             }

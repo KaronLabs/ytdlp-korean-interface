@@ -783,6 +783,51 @@ function Invoke-TestPublication {
     Invoke-QualityReleasePublication @arguments
 }
 
+function Set-TestHttpAttack {
+    param(
+        [Parameter(Mandatory)] [object] $Fake,
+        [ValidateSet('upload', 'download')] [string] $Phase,
+        [ValidateSet('throw', 'malformed-json')] [string] $Mode,
+        [Parameter(Mandatory)] [string] $Sentinel
+    )
+    $inner = $Fake.HttpRunner
+    $Fake.HttpRunner = {
+        param([object] $Request)
+        $uri = [Uri][string]$Request.Uri
+        $isUpload = $Request.Method -ceq 'POST' -and $uri.Host -ceq 'uploads.github.com'
+        $isDownload = $Request.Method -ceq 'GET' -and $uri.AbsolutePath -match '/releases/assets/[0-9]+$'
+        if (($Phase -ceq 'upload' -and $isUpload) -or ($Phase -ceq 'download' -and $isDownload)) {
+            if ($Mode -ceq 'throw') { throw ('Authorization: Bearer ' + $Sentinel) }
+            return [pscustomobject]@{ StatusCode = 201; Body = ('{"authorization":"Bearer ' + $Sentinel) }
+        }
+        & $inner $Request
+    }.GetNewClosure()
+}
+
+function Assert-TestSecretAbsent {
+    param(
+        [Parameter(Mandatory)] [object] $Case,
+        [Parameter(Mandatory)] [object] $Fake,
+        [Parameter(Mandatory)] [object] $Caught,
+        [Parameter(Mandatory)] [string] $Sentinel,
+        [Parameter(Mandatory)] [string] $ErrorId
+    )
+    $Caught | Should Not BeNullOrEmpty
+    $Caught.Exception.Message | Should Be $ErrorId
+    ($Caught | Out-String) | Should Not Match $Sentinel
+    (($Fake.Calls | ConvertTo-Json -Depth 8) -join '') | Should Not Match $Sentinel
+    (($Fake.Operations | ConvertTo-Json -Depth 8) -join '') | Should Not Match $Sentinel
+    $planFake = New-FakePublicationRunner $Case
+    $plan = Invoke-TestPublication $Case $planFake -PlanOnly
+    (($plan.Commands | ConvertTo-Json -Depth 8) -join '') | Should Not Match $Sentinel
+    $treeContainsSentinel = $false
+    foreach ($file in @(Get-ChildItem -LiteralPath $Case.Root -File -Recurse -Force)) {
+        $text = [Text.UTF8Encoding]::new($false, $false).GetString([IO.File]::ReadAllBytes($file.FullName))
+        if ($text.Contains($Sentinel, [StringComparison]::Ordinal)) { $treeContainsSentinel = $true; break }
+    }
+    $treeContainsSentinel | Should Be $false
+}
+
 Describe 'Single production publication entry point' {
     It 'does not expose the legacy publication function or direct stable command builder' {
         ($null -eq (Get-Command Invoke-QualityReleasePublicationLegacy -ErrorAction SilentlyContinue)) | Should Be $true
@@ -1340,6 +1385,67 @@ Describe 'Credential token non-reflection perimeter' {
         $failure | Should Be 'publication_gh_token_failed'
         $fake.HttpCalls.Count | Should Be 0
         $fake.State.Stage | Should Be 'absent'
+    }
+}
+
+Describe 'HTTP transport non-reflection perimeter' {
+    It 'sanitizes a header-bearing transport exception during upload or download' -TestCases @(
+        @{ Phase = 'upload'; ErrorId = 'publication_upload_failed' },
+        @{ Phase = 'download'; ErrorId = 'publication_download_failed' }
+    ) {
+        param($Phase, $ErrorId)
+        $sentinel = 'SECRET_HTTP_HEADER_SENTINEL_' + $Phase
+        $case = New-PackagedPublicationCase ('publish-http-throw-' + $Phase)
+        $fake = New-FakePublicationRunner $case
+        Set-TestHttpAttack $fake $Phase 'throw' $sentinel
+        $caught = $null
+        try { [void](Invoke-TestPublication $case $fake) }
+        catch { $caught = $_ }
+        Assert-TestSecretAbsent $case $fake $caught $sentinel $ErrorId
+    }
+
+    It 'sanitizes bad status malformed status and missing result body at the HTTP boundary' -TestCases @(
+        @{ Name = 'upload-bad-status'; ErrorId = 'publication_upload_failed'; Mode = 'bad-status' },
+        @{ Name = 'download-bad-status'; ErrorId = 'publication_download_failed'; Mode = 'bad-status' },
+        @{ Name = 'upload-malformed-status'; ErrorId = 'publication_upload_failed'; Mode = 'malformed-status' },
+        @{ Name = 'download-malformed-status'; ErrorId = 'publication_download_failed'; Mode = 'malformed-status' },
+        @{ Name = 'upload-missing-body'; ErrorId = 'publication_upload_failed'; Mode = 'missing-body' },
+        @{ Name = 'download-missing-body'; ErrorId = 'publication_download_failed'; Mode = 'missing-body' }
+    ) {
+        param($Name, $ErrorId, $Mode)
+        $sentinel = 'SECRET_HTTP_RESULT_SENTINEL_' + $Name
+        $request = [pscustomobject]@{ ExpectedStatus = @(201) }
+        $runner = {
+            param($ignored)
+            if ($Mode -ceq 'bad-status') { return [pscustomobject]@{ StatusCode = 500; Body = $sentinel } }
+            if ($Mode -ceq 'malformed-status') { return [pscustomobject]@{ StatusCode = $sentinel; Body = $sentinel } }
+            [pscustomobject]@{ StatusCode = 201; Detail = $sentinel }
+        }.GetNewClosure()
+        $caught = $null
+        try { [void](Invoke-KaronPublishHttpChecked $runner $request $ErrorId) }
+        catch { $caught = $_ }
+        $caught | Should Not BeNullOrEmpty
+        $caught.Exception.Message | Should Be $ErrorId
+        ($caught | Out-String) | Should Not Match $sentinel
+    }
+
+    It 'sanitizes malformed upload JSON containing a credential sentinel' {
+        $sentinel = 'SECRET_HTTP_JSON_SENTINEL_851edabc'
+        $case = New-PackagedPublicationCase 'publish-http-malformed-upload-json'
+        $fake = New-FakePublicationRunner $case
+        Set-TestHttpAttack $fake 'upload' 'malformed-json' $sentinel
+        $caught = $null
+        try { [void](Invoke-TestPublication $case $fake) }
+        catch { $caught = $_ }
+        Assert-TestSecretAbsent $case $fake $caught $sentinel 'publication_upload_failed'
+    }
+
+    It 'preserves structured non-secret success data' {
+        $body = '{"id":7000,"state":"uploaded"}'
+        $runner = { param($ignored) [pscustomobject]@{ StatusCode = 201; Body = $body } }.GetNewClosure()
+        $result = Invoke-KaronPublishHttpChecked $runner ([pscustomobject]@{ ExpectedStatus = @(201) }) 'publication_upload_failed'
+        $result.StatusCode | Should Be 201
+        $result.Body | Should Be $body
     }
 }
 
