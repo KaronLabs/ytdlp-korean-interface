@@ -10,3 +10,8 @@ rusty_v8/V8 native sources because the published static library does not expose
 an exact object-to-component link map. It is not an assertion that every listed
 component is linked into deno.exe. It must not be used to claim an overall
 release PASS.
+
+License resolution precedence: package-provided files, canonical text from the
+pinned SPDX License List Data v3.28.0 corpus, then immutable version-tied
+upstream commit files for invalid or custom package expressions. Every fallback
+is recorded per component; no copyright holder is inferred.

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "deno-third-party-inputs/v1",
+  "schemaVersion": "deno-third-party-inputs/v2",
   "closureClassification": "verified-conservative-superset",
   "releaseIdentity": {
     "release": "v2.19.1-karon.2",
@@ -20,6 +20,11 @@
     "rustyV8Features": ["simdutf"],
     "staticLibraryAsset": "rusty_v8_simdutf_release_x86_64-pc-windows-msvc.lib.gz",
     "exactObjectToNativeComponentMap": "NOT_VERIFIED"
+  },
+  "spdxLicenseList": {
+    "version": "3.28.0",
+    "commit": "779ef2e5dff6d4af389c53de5e97116ab0bb52e8",
+    "sourceRepository": "https://github.com/spdx/license-list-data.git"
   },
   "observedClosureCounts": {
     "officialProfilePackages": 996,
@@ -56,6 +61,13 @@
       "sourceUrl": "https://github.com/denoland/rusty_v8/releases/download/v147.4.0/rusty_v8_simdutf_release_x86_64-pc-windows-msvc.lib.gz",
       "length": 33953406,
       "sha256": "ec03511a71d1f36c04b9d93b5617436e2354a6d3b32e47fcf7537287ce82e07a"
+    },
+    {
+      "id": "spdxLicenseListData",
+      "fileName": "spdx-license-list-data-779ef2e5dff6d4af389c53de5e97116ab0bb52e8.zip",
+      "sourceUrl": "https://codeload.github.com/spdx/license-list-data/zip/779ef2e5dff6d4af389c53de5e97116ab0bb52e8",
+      "length": 71528612,
+      "sha256": "b1e1d20115429a5d262e49ce8ba2cbebda8d8191ad9bee44c42cb318bc55f929"
     }
   ],
   "pinnedSourceFiles": [
@@ -73,6 +85,9 @@
     {"root": "v8", "path": "DEPS", "sha256": "9145c5cf645a9ea954baccf6615a1095710ebbeac02d7464fda68c0febe18ea4"},
     {"root": "v8", "path": "LICENSE", "sha256": "6ab33af8774a0f396ee3aeeb761e3229057682d6f9fa7f572e390c2cb3a6e509"},
     {"root": "v8", "path": "LICENSE.fdlibm", "sha256": "e7115e18444dae09d17f361ddc365fb1d342640fe500796209c63f7c80dfae10"},
-    {"root": "v8", "path": "LICENSE.strongtalk", "sha256": "6a585a9f466654abc8fc0829d56b1bc987e3a073d31faa03bba37d33640a23cd"}
+    {"root": "v8", "path": "LICENSE.strongtalk", "sha256": "6a585a9f466654abc8fc0829d56b1bc987e3a073d31faa03bba37d33640a23cd"},
+    {"root": "spdx", "path": "json/licenses.json", "sha256": "f728c534d8bd1044fc515a2ddb2292be99559021d830bfa3281be0bcd36302ee"},
+    {"root": "spdx", "path": "json/exceptions.json", "sha256": "bd145bb558f44432fcd6f0d7e956ed0124dff72af7641a7cfcb1b557dc390a5b"},
+    {"root": "spdx", "path": "README.md", "sha256": "9d5e2eaa0daa05418074f90201d1e320fd3792018fe1a2ffdc3ebf69c9fffc44"}
   ]
 }

@@ -6,8 +6,10 @@ the official rusty_v8 prebuilt library has no public object-to-native-component
 link map.
 
 Run `tools/collect-deno-third-party-notices.ps1 -Run` with all source, metadata,
-vendor, executable, native archive, and scratch parameters. The source archives
-must match `inputs.json`; native archives must match `native-components.json`.
+vendor, crates.io archive, executable, SPDX, upstream fallback, native archive,
+and scratch parameters. Source archives must match `inputs.json`; native archives
+must match `native-components.json`; exceptional upstream license sources must
+match `upstream-license-fallbacks.json`.
 
 The official profile metadata command is:
 
@@ -27,8 +29,13 @@ The source vendor command is:
 cargo vendor --locked --versioned-dirs
 ```
 
-Any missing crate license file, checksum mismatch, mutable source, native
-omission, path collision, or graph mismatch produces
-`deno-collection-blockers.json` and no notice/source bundle. This task does not
-modify the release-wide corresponding-source lock and does not establish an
-overall release PASS.
+Each registry package preserves its exact `.crate` archive and Cargo checksum.
+Package license, notice, and copyright files take precedence. When those files
+are absent, fully valid SPDX expressions resolve to canonical text from pinned
+SPDX License List Data v3.28.0. Invalid or custom expressions require an exact
+version-tied upstream commit license fallback.
+
+Any unresolved expression, checksum mismatch, mutable source, native omission,
+path collision, or graph mismatch produces `deno-collection-blockers.json` and
+no notice/source bundle. This task does not modify the release-wide
+corresponding-source lock and does not establish an overall release PASS.

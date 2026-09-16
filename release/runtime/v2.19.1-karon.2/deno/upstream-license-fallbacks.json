@@ -1,0 +1,113 @@
+{
+  "schemaVersion": "deno-license-fallbacks/v1",
+  "registryFallbacks": [
+    {
+      "id": "asn1-rs-derive@0.4.0",
+      "declaredLicense": "MIT/Apache-2.0",
+      "repository": "https://github.com/rusticata/asn1-rs.git",
+      "commit": "28257314e48d1ad4e62b8159c939518e17caf826",
+      "commitEvidence": "crate-.cargo_vcs_info.json",
+      "archiveFile": "asn1-rs-derive-0.4.0-28257314e48d1ad4e62b8159c939518e17caf826.zip",
+      "length": 155430,
+      "sha256": "8dd8334d342154ff04c7e5edb0aa7581a9a3246a754549fe3c3ea944f7ba4cd7",
+      "licenseFiles": [
+        {"path":"asn1-rs-28257314e48d1ad4e62b8159c939518e17caf826/LICENSE-APACHE","length":10847,"sha256":"a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"},
+        {"path":"asn1-rs-28257314e48d1ad4e62b8159c939518e17caf826/LICENSE-MIT","length":1060,"sha256":"a5c61b93b6ee1d104af9920cf020ff3c7efe818e31fe562c72261847a728f513"}
+      ]
+    },
+    {
+      "id": "asn1-rs-impl@0.1.0",
+      "declaredLicense": "MIT/Apache-2.0",
+      "repository": "https://github.com/rusticata/asn1-rs.git",
+      "commit": "78620ca0954d44ddc57d0280d0072dfbd8566de4",
+      "commitEvidence": "crate-.cargo_vcs_info.json",
+      "archiveFile": "asn1-rs-impl-0.1.0-78620ca0954d44ddc57d0280d0072dfbd8566de4.zip",
+      "length": 115924,
+      "sha256": "1c0a37d77d38cbc0255dfb867c1d11b5038860afb9ade96ebfe462f54ac8ef43",
+      "licenseFiles": [
+        {"path":"asn1-rs-78620ca0954d44ddc57d0280d0072dfbd8566de4/LICENSE-APACHE","length":10847,"sha256":"a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"},
+        {"path":"asn1-rs-78620ca0954d44ddc57d0280d0072dfbd8566de4/LICENSE-MIT","length":1060,"sha256":"a5c61b93b6ee1d104af9920cf020ff3c7efe818e31fe562c72261847a728f513"}
+      ]
+    },
+    {
+      "id": "libffi@5.1.0",
+      "declaredLicense": "MIT/Apache-2.0",
+      "repository": "https://github.com/libffi-rs/libffi-rs.git",
+      "commit": "7b1471ad430dd899046280f79066fc2d9b0fac90",
+      "commitEvidence": "crate-.cargo_vcs_info.json",
+      "archiveFile": "libffi-5.1.0-7b1471ad430dd899046280f79066fc2d9b0fac90.zip",
+      "length": 1937922,
+      "sha256": "1ed31ca6db926338a4c6c701e2faef1260615c01ea7cca2518c6e79581aa2af4",
+      "licenseFiles": [
+        {"path":"libffi-rs-7b1471ad430dd899046280f79066fc2d9b0fac90/LICENSE-APACHE","length":10847,"sha256":"a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"},
+        {"path":"libffi-rs-7b1471ad430dd899046280f79066fc2d9b0fac90/LICENSE-MIT","length":1056,"sha256":"b766d21b534e9303428c16644ef624e264668525fdcd4c2490865ed023dba842"}
+      ]
+    },
+    {
+      "id": "winapi-i686-pc-windows-gnu@0.4.0",
+      "declaredLicense": "MIT/Apache-2.0",
+      "repository": "https://github.com/retep998/winapi-rs.git",
+      "tag": "0.3.9",
+      "commit": "796a8e6c2971dc2ff1bcff166e6671284f9b5b6b",
+      "commitEvidence": "immutable-upstream-tag-containing-i686-0.4.0",
+      "archiveFile": "winapi-targets-0.4.0-796a8e6c2971dc2ff1bcff166e6671284f9b5b6b.zip",
+      "length": 15891339,
+      "sha256": "24d9a5b00f76d5c6a8b9e08ccabf37f777a8c544ce982d4363081b737702909b",
+      "licenseFiles": [
+        {"path":"winapi-rs-796a8e6c2971dc2ff1bcff166e6671284f9b5b6b/i686/LICENSE-APACHE","length":11357,"sha256":"b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"},
+        {"path":"winapi-rs-796a8e6c2971dc2ff1bcff166e6671284f9b5b6b/i686/LICENSE-MIT","length":1073,"sha256":"ce7bc3499fee93d5022ef430d5e4201e79a6d9154f3974e42f41349f0569e09b"}
+      ]
+    },
+    {
+      "id": "winapi-x86_64-pc-windows-gnu@0.4.0",
+      "declaredLicense": "MIT/Apache-2.0",
+      "repository": "https://github.com/retep998/winapi-rs.git",
+      "tag": "0.3.9",
+      "commit": "796a8e6c2971dc2ff1bcff166e6671284f9b5b6b",
+      "commitEvidence": "immutable-upstream-tag-containing-x86_64-0.4.0",
+      "archiveFile": "winapi-targets-0.4.0-796a8e6c2971dc2ff1bcff166e6671284f9b5b6b.zip",
+      "length": 15891339,
+      "sha256": "24d9a5b00f76d5c6a8b9e08ccabf37f777a8c544ce982d4363081b737702909b",
+      "licenseFiles": [
+        {"path":"winapi-rs-796a8e6c2971dc2ff1bcff166e6671284f9b5b6b/x86_64/LICENSE-APACHE","length":11357,"sha256":"b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"},
+        {"path":"winapi-rs-796a8e6c2971dc2ff1bcff166e6671284f9b5b6b/x86_64/LICENSE-MIT","length":1073,"sha256":"ce7bc3499fee93d5022ef430d5e4201e79a6d9154f3974e42f41349f0569e09b"}
+      ]
+    }
+  ],
+  "workspaceFallbacks": [
+    {
+      "id": "build-your-own-js-snapshot@0.1.0",
+      "resolvedLicense": "MIT",
+      "commit": "2d674b25625bcc367853d00fe86f6e84390f88cb",
+      "evidenceFiles": [
+        {"path":"libs/core/examples/snapshot/Cargo.toml","length":536,"sha256":"c3f55e5ea57ce6165ab51d3bb351b5624ef64bd01a0290af17fcf49aff604774"},
+        {"path":"LICENSE.md","length":1074,"sha256":"f62497fffecc0852960c8d3e6934b9db86d16396e9b604072e923892cae3a588"}
+      ]
+    },
+    {
+      "id": "serde_v8_utilities@0.16.0",
+      "resolvedLicense": "MIT",
+      "commit": "2d674b25625bcc367853d00fe86f6e84390f88cb",
+      "evidenceFiles": [
+        {"path":"libs/serde_v8/utilities/Cargo.toml","length":203,"sha256":"68c49817b26bf8e2b1a853617f8a3afc25591bbd39baa443d9db469e63792df3"},
+        {"path":"LICENSE.md","length":1074,"sha256":"f62497fffecc0852960c8d3e6934b9db86d16396e9b604072e923892cae3a588"}
+      ]
+    }
+  ],
+  "unresolved": [
+    {
+      "id": "fxhash@0.2.1",
+      "declaredLicense": "Apache-2.0/MIT",
+      "crateArchiveSha256": "c31b6d751ae2c7f11320402d34e41349dd1016f8d5d45e48c4312bc8625af50c",
+      "repository": "https://github.com/cbreeden/fxhash.git",
+      "packageVcsInfoPresent": false,
+      "matchingVersionTagPresent": false,
+      "exactPublishedCommit": "NOT_VERIFIED",
+      "upstreamVersionCommitsExamined": [
+        "006418ed0a900f6d7ac7bd10df1d032209ffcb03", "04993c86c288c6c6adb4bc67387a9a6876d2ca72", "188de25ed7ee867c9a7a545a9eda89585c921ba5", "3ecb89c56e5d0311b7e3eb26960c8f27048e435c", "45250ac3ede85328bbab16978eecc618b0a2ea51", "537570af68de22d2f4bbdd5bee5d6e07268e6f42", "82a78510276766329bafe2820d40c401899cc61b", "8305f0b49ea6d66d294ca53b378d5c4b96a1a23f", "89b5f7d6485c96efa5e0fc858e56550034fb3ab5", "a03cbf42dde010250adef75908f109be197d982b", "c20bdc3f8ad0d1079869c3468050c19c5fc11fe0", "d038610389eb55e35e9487668b69a1c517f6dde2", "da16347c75087f4b0cc7383518222e9e91e1c65a", "e6f26b4d3c53429e61b826c12365c00cd0e0fb83"
+      ],
+      "licenseFilesFoundInExaminedCommits": 0,
+      "blocker": "invalid legacy slash expression and no immutable version-tied upstream license file"
+    }
+  ]
+}
