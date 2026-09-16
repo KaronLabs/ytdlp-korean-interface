@@ -100,7 +100,10 @@ function New-TestComponent {
 }
 
 function New-TestFixture {
-    param([string] $Name)
+    param(
+        [string] $Name,
+        [switch] $DenoCaseCollision
+    )
     $root = Join-Path $TestDrive $Name
     [IO.Directory]::CreateDirectory($root) | Out-Null
     $repo = Join-Path $root 'repository'
@@ -166,7 +169,19 @@ function New-TestFixture {
     Write-TestText $denoNotices "Deno third-party notices`n"
     Write-TestText $denoLicense "MIT license`n"
     $denoSources = Join-Path $denoOutputRoot 'deno-2.7.14-verified-conservative-superset-sources.zip'
-    New-TestZip $denoSources ([ordered]@{ 'LICENSES/a.txt' = $denoLicense; 'THIRD-PARTY-NOTICES.txt' = $denoNotices })
+    if ($DenoCaseCollision) {
+        New-TestCaseCollisionZip -OutputPath $denoSources -Entries @(
+            [pscustomobject]@{ Path = 'LICENSES/A.TXT'; Source = $denoLicense },
+            [pscustomobject]@{ Path = 'LICENSES/a.txt'; Source = $denoLicense },
+            [pscustomobject]@{ Path = 'THIRD-PARTY-NOTICES.txt'; Source = $denoNotices }
+        )
+    }
+    else {
+        New-TestZip $denoSources ([ordered]@{
+            'LICENSES/a.txt' = $denoLicense
+            'THIRD-PARTY-NOTICES.txt' = $denoNotices
+        })
+    }
     $denoCacheSources = Join-Path $cache (Split-Path -Leaf $denoSources)
     Copy-Item -LiteralPath $denoSources -Destination $denoCacheSources
     $denoInventoryPath = Join-Path $denoOutputRoot 'source-inventory.json'
@@ -174,6 +189,11 @@ function New-TestFixture {
         [ordered]@{ path = 'LICENSES/a.txt'; length = [long](Get-Item $denoLicense).Length; sha256 = Get-TestSha256 $denoLicense },
         [ordered]@{ path = 'THIRD-PARTY-NOTICES.txt'; length = [long](Get-Item $denoNotices).Length; sha256 = Get-TestSha256 $denoNotices }
     )
+    if ($DenoCaseCollision) {
+        $denoInventoryFiles = @(
+            [ordered]@{ path = 'LICENSES/A.TXT'; length = [long](Get-Item $denoLicense).Length; sha256 = Get-TestSha256 $denoLicense }
+        ) + $denoInventoryFiles
+    }
     $serialized = (($denoInventoryFiles | ForEach-Object { $_.path + '|' + $_.length + '|' + $_.sha256 }) -join "`n") + "`n"
     $digestBytes = $script:Utf8.GetBytes($serialized)
     $digest = [Security.Cryptography.SHA256]::Create()
@@ -184,7 +204,7 @@ function New-TestFixture {
         canonicalTreeDigest = [ordered]@{
             algorithm = 'SHA-256'
             serialization = 'path|length|lowercase-sha256 followed by LF per record including trailing LF'
-            recordCount = 2
+            recordCount = $denoInventoryFiles.Count
             sha256 = $treeDigest
         }
         files = $denoInventoryFiles
@@ -486,7 +506,226 @@ function Set-PackageGuiFixture {
     })
 }
 
+function Get-FixtureProperty {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Fixture,
+
+        [Parameter(Mandatory = $true)]
+        [string[]]$Names
+    )
+
+    foreach ($name in $Names) {
+        $matches = @($Fixture.PSObject.Properties | Where-Object { $_.Name -ceq $name })
+        if ($matches.Count -eq 1) {
+            return $matches[0]
+        }
+    }
+    throw "fixture_property_missing_$($Names -join '_')"
+}
+
+function New-TestCaseCollisionZip {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$OutputPath,
+
+        [Parameter(Mandatory = $true)]
+        [object[]]$Entries
+    )
+
+    [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($OutputPath)) | Out-Null
+    $output = [IO.File]::Open($OutputPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    try {
+        $archive = [IO.Compression.ZipArchive]::new($output, [IO.Compression.ZipArchiveMode]::Create, $true, [Text.Encoding]::UTF8)
+        try {
+            foreach ($record in $Entries) {
+                $entry = $archive.CreateEntry([string]$record.Path, [IO.Compression.CompressionLevel]::NoCompression)
+                $entry.LastWriteTime = [DateTimeOffset]::new(1980, 1, 1, 0, 0, 0, [TimeSpan]::Zero)
+                $entryStream = $entry.Open()
+                try {
+                    $bytes = [IO.File]::ReadAllBytes([string]$record.Source)
+                    $entryStream.Write($bytes, 0, $bytes.Length)
+                }
+                finally {
+                    $entryStream.Dispose()
+                }
+            }
+        }
+        finally {
+            $archive.Dispose()
+        }
+    }
+    finally {
+        $output.Dispose()
+    }
+}
+
+function New-TestSevenZipWrapper {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RawPath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$OutputPath
+    )
+
+    [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($OutputPath)) | Out-Null
+    $output = [IO.File]::Open($OutputPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    try {
+        $archive = [IO.Compression.ZipArchive]::new($output, [IO.Compression.ZipArchiveMode]::Create, $true, [Text.Encoding]::UTF8)
+        try {
+            $entry = $archive.CreateEntry('sevenzip/7z2601-x64-no-rar-source.7z', [IO.Compression.CompressionLevel]::NoCompression)
+            $entry.LastWriteTime = [DateTimeOffset]::new(1980, 1, 1, 0, 0, 2, [TimeSpan]::Zero)
+            $entryStream = $entry.Open()
+            try {
+                $bytes = [IO.File]::ReadAllBytes($RawPath)
+                $entryStream.Write($bytes, 0, $bytes.Length)
+            }
+            finally {
+                $entryStream.Dispose()
+            }
+        }
+        finally {
+            $archive.Dispose()
+        }
+    }
+    finally {
+        $output.Dispose()
+    }
+}
+
+function New-SwapInstrumentedBuilder {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('raw', 'wrapper')]
+        [string]$Kind,
+
+        [Parameter(Mandatory = $true)]
+        [string]$TargetPath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$ReplacementPath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$OutputDirectory
+    )
+
+    $builderVariables = @(Get-Variable -Scope Script | Where-Object {
+        $_.Value -is [string] -and [IO.Path]::GetFileName([string]$_.Value) -ceq 'build-release-license-lock.ps1'
+    })
+    if ($builderVariables.Count -ne 1) {
+        throw 'release_lock_builder_variable_missing'
+    }
+    $builderVariable = $builderVariables[0]
+    $text = [IO.File]::ReadAllText([string]$builderVariable.Value)
+    $newLine = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }
+
+    if ($Kind -ceq 'raw') {
+        $unsafePattern = '(?m)^\s*\$rawRecord\s*=\s*Get-IntegratorBoundFileRecord\s+-Path\s+\$SevenZipSourceArchivePath[^\r\n]*$'
+        $safePattern = '(?m)^\s*\$rawSnapshot\s*=\s*Open-IntegratorLockedSnapshot\s+-Path\s+\$SevenZipSourceArchivePath[^\r\n]*$'
+    }
+    else {
+        $unsafePattern = '(?m)^\s*\$wrapperRecord\s*=\s*Get-IntegratorBoundFileRecord\s+-Path\s+\$SevenZipSourceWrapperPath[^\r\n]*$'
+        $safePattern = '(?m)^\s*\$wrapperSnapshot\s*=\s*Open-IntegratorLockedSnapshot\s+-Path\s+\$SevenZipSourceWrapperPath[^\r\n]*$'
+    }
+
+    $pattern = if ([regex]::Matches($text, $unsafePattern).Count -eq 1) { $unsafePattern } else { $safePattern }
+    $matches = [regex]::Matches($text, $pattern)
+    if ($matches.Count -ne 1) {
+        throw "release_lock_${Kind}_swap_boundary_missing"
+    }
+
+    $targetLiteral = $TargetPath.Replace("'", "''")
+    $replacementLiteral = $ReplacementPath.Replace("'", "''")
+    $backupPath = Join-Path $OutputDirectory ("$Kind-before-swap.bin")
+    $backupLiteral = $backupPath.Replace("'", "''")
+    $attack = @(
+        '        try {'
+        "            [IO.File]::Move('$targetLiteral', '$backupLiteral')"
+        "            [IO.File]::Move('$replacementLiteral', '$targetLiteral')"
+        '        }'
+        '        catch {'
+        "            throw 'release_license_lock_input_swap_blocked'"
+        '        }'
+    ) -join $newLine
+
+    $instrumented = Join-Path $OutputDirectory ("build-release-license-lock-$Kind-race.ps1")
+    $rewritten = [regex]::Replace(
+        $text,
+        $pattern,
+        { param($match) $match.Value + $newLine + $attack },
+        [Text.RegularExpressions.RegexOptions]::None,
+        [TimeSpan]::FromSeconds(2)
+    )
+    [IO.File]::WriteAllText($instrumented, $rewritten, [Text.UTF8Encoding]::new($false))
+
+    return [pscustomobject]@{
+        BuilderVariableName = $builderVariable.Name
+        OriginalBuilderPath = [string]$builderVariable.Value
+        InstrumentedBuilderPath = $instrumented
+        BackupPath = $backupPath
+    }
+}
+
 Describe 'final verified release license lock integrator' {
+    It 'rejects a supplied 7z wrapper that differs from the component corresponding source archive' {
+        $fixture = New-TestFixture 'wrapper-binding-remand'
+        $root = (Get-FixtureProperty $fixture @('Root')).Value
+        $raw = (Get-FixtureProperty $fixture @('SevenZipSource', 'SevenZipSourceArchive', 'SevenZipRawSource')).Value
+        $wrapperProperty = Get-FixtureProperty $fixture @('SevenZipWrapper', 'SevenZipSourceWrapper')
+        $boundWrapper = [string]$wrapperProperty.Value
+        $alternateWrapper = Join-Path $root 'alternate-sevenzip\7z2601-x64-no-rar-source.zip'
+        New-TestSevenZipWrapper -RawPath $raw -OutputPath $alternateWrapper
+        (Get-TestSha256 $alternateWrapper) | Should Not Be (Get-TestSha256 $boundWrapper)
+        $wrapperProperty.Value = $alternateWrapper
+
+        Assert-TestRejected $fixture 'release_license_lock_sevenzip_wrapper_binding_mismatch'
+    }
+
+    It 'blocks raw 7z replacement after identity capture and leaves no verified output' {
+        $fixture = New-TestFixture 'raw-swap-remand'
+        $root = (Get-FixtureProperty $fixture @('Root')).Value
+        $raw = [string](Get-FixtureProperty $fixture @('SevenZipSource', 'SevenZipSourceArchive', 'SevenZipRawSource')).Value
+        $replacement = Join-Path $root 'raw-swap-candidate.7z'
+        $replacementBytes = [IO.File]::ReadAllBytes($raw)
+        $replacementBytes[0] = $replacementBytes[0] -bxor 1
+        [IO.File]::WriteAllBytes($replacement, $replacementBytes)
+        $race = New-SwapInstrumentedBuilder -Kind raw -TargetPath $raw -ReplacementPath $replacement -OutputDirectory $root
+
+        Set-Variable -Scope Script -Name $race.BuilderVariableName -Value $race.InstrumentedBuilderPath
+        try {
+            Assert-TestRejected $fixture 'release_license_lock_input_swap_blocked'
+            (Test-Path -LiteralPath $race.BackupPath) | Should Be $false
+        }
+        finally {
+            Set-Variable -Scope Script -Name $race.BuilderVariableName -Value $race.OriginalBuilderPath
+        }
+    }
+
+    It 'blocks wrapper replacement after outer hash capture and leaves no verified output' {
+        $fixture = New-TestFixture 'wrapper-swap-remand'
+        $root = (Get-FixtureProperty $fixture @('Root')).Value
+        $raw = [string](Get-FixtureProperty $fixture @('SevenZipSource', 'SevenZipSourceArchive', 'SevenZipRawSource')).Value
+        $wrapper = [string](Get-FixtureProperty $fixture @('SevenZipWrapper', 'SevenZipSourceWrapper')).Value
+        $replacement = Join-Path $root 'wrapper-swap\7z2601-x64-no-rar-source.zip'
+        New-TestSevenZipWrapper -RawPath $raw -OutputPath $replacement
+        (Get-TestSha256 $replacement) | Should Not Be (Get-TestSha256 $wrapper)
+        $race = New-SwapInstrumentedBuilder -Kind wrapper -TargetPath $wrapper -ReplacementPath $replacement -OutputDirectory $root
+
+        Set-Variable -Scope Script -Name $race.BuilderVariableName -Value $race.InstrumentedBuilderPath
+        try {
+            Assert-TestRejected $fixture 'release_license_lock_input_swap_blocked'
+            (Test-Path -LiteralPath $race.BackupPath) | Should Be $false
+        }
+        finally {
+            Set-Variable -Scope Script -Name $race.BuilderVariableName -Value $race.OriginalBuilderPath
+        }
+    }
+
+    It 'rejects ordinal-ignore-case collisions in self-consistent Deno inventory and ZIP paths' {
+        $fixture = New-TestFixture 'deno-case-collision-remand' -DenoCaseCollision
+        Assert-TestRejected $fixture 'release_license_lock_deno_case_collision'
+    }
     It 'writes deterministic canonical UTF-8 only after deriving verified status' {
         $fixture = New-TestFixture 'happy'
         $second = Join-Path $fixture.Root 'generated-license-lock-second.json'

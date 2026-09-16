@@ -42,6 +42,85 @@ $script:Utf8Strict = New-Object Text.UTF8Encoding($false, $true)
 $script:Utf8NoBom = New-Object Text.UTF8Encoding($false)
 $script:Sha256Pattern = '^[a-fA-F0-9]{64}$'
 $script:CommitPattern = '^[a-fA-F0-9]{40}$'
+$script:HeldInputHandles = New-Object 'Collections.Generic.List[object]'
+
+function Close-IntegratorLockedSnapshots {
+    for ($index = $script:HeldInputHandles.Count - 1; $index -ge 0; $index--) {
+        $script:HeldInputHandles[$index].Dispose()
+    }
+    $script:HeldInputHandles.Clear()
+}
+
+function Open-IntegratorLockedSnapshot {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    if (-not [IO.Path]::IsPathFullyQualified($Path) -or
+        @($Path -split '[\\/]' | Where-Object { $_ -eq '.' -or $_ -eq '..' }).Count -ne 0) {
+        throw "${Context}_path_invalid"
+    }
+
+    $fullPath = [IO.Path]::GetFullPath($Path)
+    if (($OutputPath) -and $fullPath.Equals([IO.Path]::GetFullPath($OutputPath), [StringComparison]::OrdinalIgnoreCase)) {
+        throw "${Context}_output_alias"
+    }
+
+    $cursor = $fullPath
+    while (-not [string]::IsNullOrWhiteSpace($cursor)) {
+        if (Test-Path -LiteralPath $cursor) {
+            $item = Get-Item -LiteralPath $cursor -Force
+            $linkType = $item.PSObject.Properties['LinkType']
+            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+                ($null -ne $linkType -and -not [string]::IsNullOrWhiteSpace([string]$linkType.Value))) {
+                throw "${Context}_path_alias"
+            }
+        }
+        $parent = [IO.Path]::GetDirectoryName($cursor)
+        if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) { break }
+        $cursor = $parent
+    }
+
+    try {
+        $stream = New-Object IO.FileStream(
+            $fullPath,
+            [IO.FileMode]::Open,
+            [IO.FileAccess]::Read,
+            [IO.FileShare]::Read,
+            4096,
+            [IO.FileOptions]::SequentialScan
+        )
+    }
+    catch {
+        throw "${Context}_missing_or_locked"
+    }
+    [void]$script:HeldInputHandles.Add($stream)
+
+    if ($stream.Length -gt [int]::MaxValue) { throw "${Context}_too_large" }
+    $bytes = New-Object byte[] ([int]$stream.Length)
+    $offset = 0
+    while ($offset -lt $bytes.Length) {
+        $read = $stream.Read($bytes, $offset, $bytes.Length - $offset)
+        if ($read -eq 0) { throw "${Context}_short_read" }
+        $offset += $read
+    }
+
+    $sha256 = [Security.Cryptography.SHA256]::Create()
+    try { $digest = [Convert]::ToHexString($sha256.ComputeHash($bytes)).ToLowerInvariant() }
+    finally { $sha256.Dispose() }
+
+    return [pscustomobject][ordered]@{
+        fileName = [IO.Path]::GetFileName($fullPath)
+        length = [long]$bytes.LongLength
+        sha256 = $digest
+        fullPath = $fullPath
+        bytes = $bytes
+    }
+}
 
 function Get-ExactProperty {
     param([Parameter(Mandatory = $true)] [object] $Value, [Parameter(Mandatory = $true)] [string] $Name, [string] $ErrorId = 'release_license_lock_json_invalid')
@@ -211,9 +290,10 @@ function Get-Sha256FromStream {
 }
 
 function Get-ZipInventory {
-    param([string] $Path, [switch] $CaptureBuildConfiguration)
+    param([string] $Path, [switch] $CaptureBuildConfiguration, [string] $CaseCollisionError = 'release_license_lock_archive_duplicate')
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw 'release_license_lock_input_missing' }
     $records = New-Object 'Collections.Generic.Dictionary[string, object]' ([StringComparer]::Ordinal)
+    $caseFoldedNames = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
     try { $archive = [IO.Compression.ZipFile]::OpenRead($Path) }
     catch { throw 'release_license_lock_archive_invalid' }
     try {
@@ -221,6 +301,7 @@ function Get-ZipInventory {
             if ([string]::IsNullOrEmpty($entry.Name)) { continue }
             $name = Assert-RelativePath $entry.FullName.Replace('\', '/')
             if ($records.ContainsKey($name)) { throw 'release_license_lock_archive_duplicate' }
+            if (-not $caseFoldedNames.Add($name)) { throw $CaseCollisionError }
             $stream = $entry.Open()
             try { $sha = Get-Sha256FromStream $stream }
             finally { $stream.Dispose() }
@@ -508,14 +589,17 @@ function Assert-DenoBaseContract {
     $builder = New-Object Text.StringBuilder
     $previous = $null
     $seen = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+    $seenCaseFolded = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
     foreach ($file in $files) {
         $path = Assert-RelativePath ([string](Get-ExactProperty $file 'path'))
         $sha = [string](Get-ExactProperty $file 'sha256')
         $length = 0L
         if ($sha -notmatch '^[a-f0-9]{64}$' -or -not [long]::TryParse([string](Get-ExactProperty $file 'length'), [ref]$length) -or $length -lt 0 -or
-            -not $seen.Add($path) -or ($null -ne $previous -and [StringComparer]::Ordinal.Compare($previous, $path) -ge 0)) {
+            ($null -ne $previous -and [StringComparer]::Ordinal.Compare($previous, $path) -ge 0)) {
             throw 'release_license_lock_deno_tree_mismatch'
         }
+        if (-not $seen.Add($path)) { throw 'release_license_lock_deno_tree_mismatch' }
+        if (-not $seenCaseFolded.Add($path)) { throw 'release_license_lock_deno_case_collision' }
         [void]$builder.Append($path).Append('|').Append($length).Append('|').Append($sha).Append("`n")
         $previous = $path
     }
@@ -524,7 +608,7 @@ function Assert-DenoBaseContract {
     finally { $algorithm.Dispose() }
     if ([string](Get-ExactProperty $digest 'sha256') -cne $actualDigest) { throw 'release_license_lock_deno_tree_mismatch' }
 
-    $zip = Get-ZipInventory $DenoSourcesArchivePath
+    $zip = Get-ZipInventory $DenoSourcesArchivePath -CaseCollisionError 'release_license_lock_deno_case_collision'
     if ($zip.Count -ne $files.Count) { throw 'release_license_lock_deno_artifact_mismatch' }
     foreach ($file in $files) {
         [void](Assert-ZipRecord $zip ([string](Get-ExactProperty $file 'path')) (Get-ExactProperty $file 'sha256') (Get-ExactProperty $file 'length') 'release_license_lock_deno_artifact_mismatch')
@@ -1048,24 +1132,49 @@ function Assert-SevenZipContract {
         [object]$Verification,
 
         [Parameter(Mandatory = $true)]
-        [object]$CandidateRecords
+        [object]$CandidateRecords,
+
+        [Parameter(Mandatory = $true)]
+        [object[]]$LockComponents,
+
+        [Parameter(Mandatory = $true)]
+        [string]$SourceArchiveRoot
     )
+
+    $rawSnapshot = Open-IntegratorLockedSnapshot -Path $SevenZipSourceArchivePath -Context 'sevenzip_raw_source'
+    $wrapperSnapshot = Open-IntegratorLockedSnapshot -Path $SevenZipSourceWrapperPath -Context 'sevenzip_source_wrapper'
 
     $baseEvidence = Assert-SevenZipBaseContract `
         -NonRuntimeManifest $NonRuntimeManifest `
         -Verification $Verification `
         -CandidateRecords $CandidateRecords
 
-    $rawRecord = Get-IntegratorBoundFileRecord -Path $SevenZipSourceArchivePath -Context 'sevenzip_raw_source'
-    $wrapperRecord = Get-IntegratorBoundFileRecord -Path $SevenZipSourceWrapperPath -Context 'sevenzip_source_wrapper'
-    if ($rawRecord.fileName -cne '7z2601-x64-no-rar-source.7z') {
+    if ($rawSnapshot.fileName -cne '7z2601-x64-no-rar-source.7z') {
         throw 'sevenzip_raw_source_name_invalid'
     }
-    if ($wrapperRecord.fileName -cne '7z2601-x64-no-rar-source.zip') {
+    if ($wrapperSnapshot.fileName -cne '7z2601-x64-no-rar-source.zip') {
         throw 'sevenzip_source_wrapper_name_invalid'
     }
 
-    $stream = [IO.File]::Open($wrapperRecord.fullPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    $sevenZipComponent = Get-UniqueById $LockComponents '7zip' 'release_license_lock_sevenzip_wrapper_binding_mismatch'
+    $sourceArchives = @(Get-ExactProperty $sevenZipComponent 'sourceArchives')
+    if ($sourceArchives.Count -ne 1) { throw 'release_license_lock_sevenzip_wrapper_binding_mismatch' }
+    $sourceArchive = $sourceArchives[0]
+    $canonicalWrapperPath = Get-ContainedPath $SourceArchiveRoot '7z2601-x64-no-rar-source.zip'
+    if (-not $wrapperSnapshot.fullPath.Equals($canonicalWrapperPath, [StringComparison]::OrdinalIgnoreCase) -or
+        [string](Get-ExactProperty $sourceArchive 'fileName') -cne $wrapperSnapshot.fileName -or
+        [string](Get-ExactProperty $sourceArchive 'sha256') -cne $wrapperSnapshot.sha256 -or
+        [long](Get-ExactProperty $sourceArchive 'length') -ne $wrapperSnapshot.length) {
+        throw 'release_license_lock_sevenzip_wrapper_binding_mismatch'
+    }
+
+    $baseRawRecord = Get-ExactProperty $baseEvidence 'sourceArchive'
+    if ([string](Get-ExactProperty $baseRawRecord 'sha256') -cne $rawSnapshot.sha256 -or
+        [long](Get-ExactProperty $baseRawRecord 'length') -ne $rawSnapshot.length) {
+        throw 'release_license_lock_sevenzip_binding_mismatch'
+    }
+
+    $stream = [IO.MemoryStream]::new([byte[]]$wrapperSnapshot.bytes, $false)
     $archive = $null
     try {
         $archive = [IO.Compression.ZipArchive]::new($stream, [IO.Compression.ZipArchiveMode]::Read, $false, [Text.Encoding]::UTF8)
@@ -1076,18 +1185,19 @@ function Assert-SevenZipContract {
         $entry = $entries[0]
         if ($entry.FullName -cne 'sevenzip/7z2601-x64-no-rar-source.7z' -or
             $entry.Name -cne '7z2601-x64-no-rar-source.7z' -or
-            $entry.Length -ne $rawRecord.length -or
+            $entry.Length -ne $rawSnapshot.length -or
             $entry.CompressedLength -ne $entry.Length) {
             throw 'release_license_lock_sevenzip_wrapper_mismatch'
         }
 
         $entryStream = $entry.Open()
-        $sha256 = [Security.Cryptography.SHA256]::Create()
+        $innerBuffer = [IO.MemoryStream]::new()
         try {
-            $innerSha256 = [Convert]::ToHexString($sha256.ComputeHash($entryStream)).ToLowerInvariant()
+            $entryStream.CopyTo($innerBuffer)
+            $innerBytes = $innerBuffer.ToArray()
         }
         finally {
-            $sha256.Dispose()
+            $innerBuffer.Dispose()
             $entryStream.Dispose()
         }
     }
@@ -1100,25 +1210,31 @@ function Assert-SevenZipContract {
         }
     }
 
-    if ($innerSha256 -cne $rawRecord.sha256) {
+    if ($innerBytes.Length -ne $rawSnapshot.bytes.Length) {
         throw 'release_license_lock_sevenzip_wrapper_mismatch'
     }
+    for ($index = 0; $index -lt $innerBytes.Length; $index++) {
+        if ($innerBytes[$index] -ne $rawSnapshot.bytes[$index]) {
+            throw 'release_license_lock_sevenzip_wrapper_mismatch'
+        }
+    }
+    $innerSha256 = $rawSnapshot.sha256
 
     $result = [ordered]@{}
     foreach ($property in $baseEvidence.PSObject.Properties) {
         $result[$property.Name] = $property.Value
     }
     $result['rawSourceArchive'] = [pscustomobject][ordered]@{
-        fileName = $rawRecord.fileName
-        length = $rawRecord.length
-        sha256 = $rawRecord.sha256
+        fileName = $rawSnapshot.fileName
+        length = $rawSnapshot.length
+        sha256 = $rawSnapshot.sha256
     }
     $result['sourceWrapper'] = [pscustomobject][ordered]@{
-        fileName = $wrapperRecord.fileName
-        outerLength = $wrapperRecord.length
-        outerSha256 = $wrapperRecord.sha256
+        fileName = $wrapperSnapshot.fileName
+        outerLength = $wrapperSnapshot.length
+        outerSha256 = $wrapperSnapshot.sha256
         entryPath = 'sevenzip/7z2601-x64-no-rar-source.7z'
-        innerLength = $rawRecord.length
+        innerLength = $rawSnapshot.length
         innerSha256 = $innerSha256
     }
     return [pscustomobject]$result
@@ -1240,11 +1356,12 @@ function Write-AtomicOutput {
     finally { if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue } }
 }
 
+try {
 $allInputs = @(
     $TemplateLockPath, $NonRuntimeManifestPath, $NonRuntimeInventoryPath, $NonRuntimeEvidenceBundlePath,
-    $DenoComponentManifestPath, $DenoSourceInventoryPath, $DenoNoticesPath, $DenoSourcesArchivePath,
+    $DenoRunEvidencePath, $DenoComponentManifestPath, $DenoSourceInventoryPath, $DenoNoticesPath, $DenoSourcesArchivePath,
     $FfmpegClosureManifestPath, $FfmpegSourcesArchivePath, $SevenZipRuntimeArchivePath, $SevenZipSourceArchivePath,
-    $SevenZipVerificationPath, $GuiValidationSummaryPath, $GuiValidationEvidenceManifestPath, $GuiValidationSchemaPath,
+    $SevenZipSourceWrapperPath, $SevenZipVerificationPath, $GuiValidationSummaryPath, $GuiValidationEvidenceManifestPath, $GuiValidationSchemaPath,
     $CorrespondingSourcesPath, $SpdxPath, $RootThirdPartyNoticesPath, $ReleaseNotesPath
 )
 foreach ($inputPath in $allInputs) { if (-not (Test-Path -LiteralPath $inputPath -PathType Leaf)) { throw 'release_license_lock_input_missing' } }
@@ -1280,7 +1397,7 @@ $nonRuntimeManifest = Read-StrictJson $NonRuntimeManifestPath
 $nonRuntimeInventory = Read-StrictJson $NonRuntimeInventoryPath
 $sevenZipVerification = Read-StrictJson $SevenZipVerificationPath
 Assert-NonRuntimeContract $nonRuntimeManifest $nonRuntimeInventory $components $candidate.Records $candidate.Commit $SourceArchiveDirectory $NonRuntimeEvidenceBundlePath $NonRuntimeManifestPath $NonRuntimeInventoryPath $candidate.ManifestPath $SevenZipRuntimeArchivePath $SevenZipSourceArchivePath $SevenZipVerificationPath
-$sevenZipEvidence = Assert-SevenZipContract $nonRuntimeManifest $sevenZipVerification $candidate.Records
+$sevenZipEvidence = Assert-SevenZipContract $nonRuntimeManifest $sevenZipVerification $candidate.Records $components $SourceArchiveDirectory
 
 $denoManifest = Read-StrictJson $DenoComponentManifestPath
 $denoInventory = Read-StrictJson $DenoSourceInventoryPath
@@ -1348,3 +1465,7 @@ $json = $canonical | ConvertTo-Json -Depth 100 -Compress
 $bytes = $script:Utf8NoBom.GetBytes($json + "`n")
 Write-AtomicOutput ([IO.Path]::GetFullPath($OutputPath)) $bytes
 Write-Output ([IO.Path]::GetFullPath($OutputPath))
+}
+finally {
+    Close-IntegratorLockedSnapshots
+}
