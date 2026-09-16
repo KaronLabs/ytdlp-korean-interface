@@ -1129,6 +1129,201 @@ Describe 'non-runtime component evidence collector' {
     }
 }
 
+function Invoke-StrictJsonInventoryZipVerifier {
+    param(
+        [string] $InventoryTemplate,
+        [string] $ZipName,
+        [string] $WorkingDirectory
+    )
+
+    $tokens = $null
+    $parseErrors = $null
+    $collectorAst = [Management.Automation.Language.Parser]::ParseFile($collectorPath, [ref]$tokens, [ref]$parseErrors)
+    if (@($parseErrors).Count -ne 0) { throw 'collector parse failed in strict JSON fixture' }
+    foreach ($functionAst in @($collectorAst.FindAll({
+        param($node)
+        $node -is [Management.Automation.Language.FunctionDefinitionAst]
+    }, $true))) {
+        Invoke-Expression $functionAst.Extent.Text
+    }
+
+    $candidateBytes = [Text.Encoding]::UTF8.GetBytes('{}')
+    $candidateSha256 = Get-TestBytesSha256 $candidateBytes
+    $inventoryJson = $InventoryTemplate.Replace('__CANDIDATE_SHA256__', $candidateSha256) + "`n"
+    $inventoryBytes = [Text.Encoding]::UTF8.GetBytes($inventoryJson)
+    $zipPath = Join-Path $WorkingDirectory $ZipName
+    New-TestZip -Path $zipPath -Entries @{
+        'source-cache-inventory.json' = $inventoryBytes
+        'evidence/candidate-manifest.json' = $candidateBytes
+    }
+    $callerExpectedEntries = @(
+        [ordered]@{ name = 'source-cache-inventory.json'; expectedSha256 = Get-TestBytesSha256 $inventoryBytes; expectedLength = [long]$inventoryBytes.Length },
+        [ordered]@{ name = 'evidence/candidate-manifest.json'; expectedSha256 = $candidateSha256; expectedLength = [long]$candidateBytes.Length }
+    )
+
+    try { Assert-CompletedEvidenceZip $zipPath $callerExpectedEntries }
+    catch { return $_.Exception.Message }
+    return $null
+}
+
+Describe 'strict JSON actual ZIP regressions' {
+    $actualNonJsonZipCases = @(
+        @{
+            Name = 'leading-zero-length'
+            Inventory = '{"candidateManifestSha256":"__CANDIDATE_SHA256__","candidateManifestLength":02}'
+        },
+        @{
+            Name = 'nested-object-trailing-comma'
+            Inventory = '{"candidateManifestSha256":"__CANDIDATE_SHA256__","candidateManifestLength":2,"nested":{"value":1,}}'
+        },
+        @{
+            Name = 'nested-array-trailing-comma'
+            Inventory = '{"candidateManifestSha256":"__CANDIDATE_SHA256__","candidateManifestLength":2,"nested":[1,2,]}'
+        }
+    )
+
+    It 'rejects actual ZIP non-JSON <Name>' -TestCases $actualNonJsonZipCases {
+        param($Name, $Inventory)
+
+        $failureToken = Invoke-StrictJsonInventoryZipVerifier -InventoryTemplate $Inventory -ZipName ($Name + '.zip') -WorkingDirectory $TestDrive
+
+        $failureToken | Should Be 'bundle_candidate_inventory_mismatch'
+    }
+}
+
+Describe 'strict JSON syntax corpus' {
+    $validNumberCases = @(
+        @{ Name = 'negative-zero'; Token = '-0' },
+        @{ Name = 'zero'; Token = '0' },
+        @{ Name = 'positive-integer'; Token = '42' },
+        @{ Name = 'negative-integer'; Token = '-42' },
+        @{ Name = 'positive-fraction'; Token = '0.125' },
+        @{ Name = 'negative-fraction'; Token = '-12.50' },
+        @{ Name = 'unsigned-exponent'; Token = '1e3' },
+        @{ Name = 'signed-exponent'; Token = '-2.5E-4' }
+    )
+
+    It 'accepts strict JSON number <Name>' -TestCases $validNumberCases {
+        param($Name, $Token)
+
+        $inventory = '{"candidateManifestSha256":"__CANDIDATE_SHA256__","candidateManifestLength":2,"corpusNumber":' + $Token + '}'
+        $failureToken = Invoke-StrictJsonInventoryZipVerifier -InventoryTemplate $inventory -ZipName ('valid-number-' + $Name + '.zip') -WorkingDirectory $TestDrive
+
+        $failureToken | Should BeNullOrEmpty
+    }
+
+    $malformedNumberCases = @(
+        @{ Name = 'double-zero'; Token = '00' },
+        @{ Name = 'negative-leading-zero'; Token = '-01' },
+        @{ Name = 'missing-integer-part'; Token = '.5' },
+        @{ Name = 'missing-fraction-digits'; Token = '1.' },
+        @{ Name = 'missing-exponent-digits'; Token = '1e' },
+        @{ Name = 'missing-signed-exponent-digits'; Token = '1E+' },
+        @{ Name = 'leading-plus'; Token = '+1' },
+        @{ Name = 'double-minus'; Token = '--1' }
+    )
+
+    It 'rejects malformed JSON number <Name>' -TestCases $malformedNumberCases {
+        param($Name, $Token)
+
+        $inventory = '{"candidateManifestSha256":"__CANDIDATE_SHA256__","candidateManifestLength":2,"corpusNumber":' + $Token + '}'
+        $failureToken = Invoke-StrictJsonInventoryZipVerifier -InventoryTemplate $inventory -ZipName ('invalid-number-' + $Name + '.zip') -WorkingDirectory $TestDrive
+
+        $failureToken | Should Be 'bundle_candidate_inventory_mismatch'
+    }
+
+    $validLiteralCases = @(
+        @{ Name = 'true'; Token = 'true' },
+        @{ Name = 'false'; Token = 'false' },
+        @{ Name = 'null'; Token = 'null' }
+    )
+
+    It 'accepts exact JSON literal <Name>' -TestCases $validLiteralCases {
+        param($Name, $Token)
+
+        $inventory = '{"candidateManifestSha256":"__CANDIDATE_SHA256__","candidateManifestLength":2,"literal":' + $Token + '}'
+        $failureToken = Invoke-StrictJsonInventoryZipVerifier -InventoryTemplate $inventory -ZipName ('valid-literal-' + $Name + '.zip') -WorkingDirectory $TestDrive
+
+        $failureToken | Should BeNullOrEmpty
+    }
+
+    $malformedLiteralCases = @(
+        @{ Name = 'capitalized-true'; Token = 'True' },
+        @{ Name = 'uppercase-false'; Token = 'FALSE' },
+        @{ Name = 'short-null'; Token = 'nul' },
+        @{ Name = 'literal-suffix'; Token = 'nullx' }
+    )
+
+    It 'rejects malformed JSON literal <Name>' -TestCases $malformedLiteralCases {
+        param($Name, $Token)
+
+        $inventory = '{"candidateManifestSha256":"__CANDIDATE_SHA256__","candidateManifestLength":2,"literal":' + $Token + '}'
+        $failureToken = Invoke-StrictJsonInventoryZipVerifier -InventoryTemplate $inventory -ZipName ('invalid-literal-' + $Name + '.zip') -WorkingDirectory $TestDrive
+
+        $failureToken | Should Be 'bundle_candidate_inventory_mismatch'
+    }
+
+    It 'accepts nested objects arrays strings escapes and literals' {
+        $inventory = '{"candidateManifestSha256":"__CANDIDATE_SHA256__","candidateManifestLength":2,"nested":{"array":[true,false,null,{"number":-0.5e+2,"text":"\"\\\/\b\f\n\r\t\u0041\uD834\uDD1E"}]}}'
+        $failureToken = Invoke-StrictJsonInventoryZipVerifier -InventoryTemplate $inventory -ZipName 'valid-nested-syntax.zip' -WorkingDirectory $TestDrive
+
+        $failureToken | Should BeNullOrEmpty
+    }
+
+    $malformedSyntaxCases = @(
+        @{ Name = 'missing-object-comma'; Tail = '"first":1 "second":2' },
+        @{ Name = 'missing-array-comma'; Tail = '"nested":[1 2]' },
+        @{ Name = 'invalid-simple-escape'; Tail = '"text":"\x"' },
+        @{ Name = 'short-unicode-escape'; Tail = '"text":"\u12"' },
+        @{ Name = 'lone-high-surrogate'; Tail = '"text":"\uD800"' },
+        @{ Name = 'lone-low-surrogate'; Tail = '"text":"\uDC00"' }
+    )
+
+    It 'rejects malformed JSON syntax <Name>' -TestCases $malformedSyntaxCases {
+        param($Name, $Tail)
+
+        $inventory = '{"candidateManifestSha256":"__CANDIDATE_SHA256__","candidateManifestLength":2,' + $Tail + '}'
+        $failureToken = Invoke-StrictJsonInventoryZipVerifier -InventoryTemplate $inventory -ZipName ('invalid-syntax-' + $Name + '.zip') -WorkingDirectory $TestDrive
+
+        $failureToken | Should Be 'bundle_candidate_inventory_mismatch'
+    }
+
+    It 'rejects extra tokens after the complete top-level value' {
+        $inventory = '{"candidateManifestSha256":"__CANDIDATE_SHA256__","candidateManifestLength":2} true'
+        $failureToken = Invoke-StrictJsonInventoryZipVerifier -InventoryTemplate $inventory -ZipName 'extra-top-level-token.zip' -WorkingDirectory $TestDrive
+
+        $failureToken | Should Be 'bundle_candidate_inventory_mismatch'
+    }
+
+    $nestedDuplicateCases = @(
+        @{
+            Name = 'direct-object-escaped-alias'
+            Tail = '"nested":{"name":1,"na\u006de":2}'
+        },
+        @{
+            Name = 'object-in-array-escaped-alias'
+            Tail = '"nested":[{"key":true,"k\u0065y":false}]'
+        }
+    )
+
+    It 'rejects duplicate decoded nested object key <Name>' -TestCases $nestedDuplicateCases {
+        param($Name, $Tail)
+
+        $inventory = '{"candidateManifestSha256":"__CANDIDATE_SHA256__","candidateManifestLength":2,' + $Tail + '}'
+        $failureToken = Invoke-StrictJsonInventoryZipVerifier -InventoryTemplate $inventory -ZipName ('nested-duplicate-' + $Name + '.zip') -WorkingDirectory $TestDrive
+
+        $failureToken | Should Be 'bundle_candidate_inventory_mismatch'
+    }
+
+    It 'rejects JSON nesting deeper than the 64-level safety cap' {
+        $nestedValue = ('[' * 65) + '0' + (']' * 65)
+        $inventory = '{"candidateManifestSha256":"__CANDIDATE_SHA256__","candidateManifestLength":2,"nested":' + $nestedValue + '}'
+        $failureToken = Invoke-StrictJsonInventoryZipVerifier -InventoryTemplate $inventory -ZipName 'excessive-json-depth.zip' -WorkingDirectory $TestDrive
+
+        $failureToken | Should Be 'bundle_candidate_inventory_mismatch'
+    }
+}
+
 Describe 'completed evidence ZIP candidate inventory cross-binding' {
     It 'rejects independently valid entries whose inventory candidate identity differs from candidate bytes' {
         $tokens = $null

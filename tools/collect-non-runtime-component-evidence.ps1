@@ -759,58 +759,184 @@ function Read-EvidenceJsonString {
     throw 'bundle_candidate_inventory_mismatch'
 }
 
-function Skip-EvidenceJsonValue {
+function Read-EvidenceJsonNumber {
     param([string] $Text, [ref] $Index)
 
+    if ($Text[$Index.Value] -eq '-') {
+        $Index.Value++
+        if ($Index.Value -ge $Text.Length) { throw 'bundle_candidate_inventory_mismatch' }
+    }
+
+    $characterCode = [int][char]$Text[$Index.Value]
+    if ($characterCode -eq 0x30) {
+        $Index.Value++
+        if ($Index.Value -lt $Text.Length) {
+            $nextCode = [int][char]$Text[$Index.Value]
+            if ($nextCode -ge 0x30 -and $nextCode -le 0x39) { throw 'bundle_candidate_inventory_mismatch' }
+        }
+    }
+    elseif ($characterCode -ge 0x31 -and $characterCode -le 0x39) {
+        $Index.Value++
+        while ($Index.Value -lt $Text.Length) {
+            $nextCode = [int][char]$Text[$Index.Value]
+            if ($nextCode -lt 0x30 -or $nextCode -gt 0x39) { break }
+            $Index.Value++
+        }
+    }
+    else {
+        throw 'bundle_candidate_inventory_mismatch'
+    }
+
+    if ($Index.Value -lt $Text.Length -and $Text[$Index.Value] -eq '.') {
+        $Index.Value++
+        if ($Index.Value -ge $Text.Length) { throw 'bundle_candidate_inventory_mismatch' }
+        $digitCount = 0
+        while ($Index.Value -lt $Text.Length) {
+            $nextCode = [int][char]$Text[$Index.Value]
+            if ($nextCode -lt 0x30 -or $nextCode -gt 0x39) { break }
+            $Index.Value++
+            $digitCount++
+        }
+        if ($digitCount -eq 0) { throw 'bundle_candidate_inventory_mismatch' }
+    }
+
+    if ($Index.Value -lt $Text.Length -and ($Text[$Index.Value] -eq 'e' -or $Text[$Index.Value] -eq 'E')) {
+        $Index.Value++
+        if ($Index.Value -lt $Text.Length -and ($Text[$Index.Value] -eq '+' -or $Text[$Index.Value] -eq '-')) {
+            $Index.Value++
+        }
+        if ($Index.Value -ge $Text.Length) { throw 'bundle_candidate_inventory_mismatch' }
+        $digitCount = 0
+        while ($Index.Value -lt $Text.Length) {
+            $nextCode = [int][char]$Text[$Index.Value]
+            if ($nextCode -lt 0x30 -or $nextCode -gt 0x39) { break }
+            $Index.Value++
+            $digitCount++
+        }
+        if ($digitCount -eq 0) { throw 'bundle_candidate_inventory_mismatch' }
+    }
+}
+
+function Read-EvidenceJsonLiteral {
+    param([string] $Text, [ref] $Index, [string] $Literal)
+
+    if ($Index.Value + $Literal.Length -gt $Text.Length -or
+        $Text.Substring($Index.Value, $Literal.Length) -cne $Literal) {
+        throw 'bundle_candidate_inventory_mismatch'
+    }
+    $Index.Value += $Literal.Length
+}
+
+function Read-EvidenceJsonArray {
+    param(
+        [string] $Text,
+        [ref] $Index,
+        [int] $Depth,
+        [ref] $CandidateShaCount,
+        [ref] $CandidateLengthCount
+    )
+
+    $Index.Value++
+    Skip-EvidenceJsonWhitespace -Text $Text -Index $Index
+    if ($Index.Value -lt $Text.Length -and $Text[$Index.Value] -eq ']') {
+        $Index.Value++
+        return
+    }
+    while ($true) {
+        Read-EvidenceJsonValue -Text $Text -Index $Index -Depth ($Depth + 1) -CandidateShaCount $CandidateShaCount -CandidateLengthCount $CandidateLengthCount
+        Skip-EvidenceJsonWhitespace -Text $Text -Index $Index
+        if ($Index.Value -ge $Text.Length) { throw 'bundle_candidate_inventory_mismatch' }
+        if ($Text[$Index.Value] -eq ']') {
+            $Index.Value++
+            return
+        }
+        if ($Text[$Index.Value] -ne ',') { throw 'bundle_candidate_inventory_mismatch' }
+        $Index.Value++
+        Skip-EvidenceJsonWhitespace -Text $Text -Index $Index
+        if ($Index.Value -ge $Text.Length -or $Text[$Index.Value] -eq ']') {
+            throw 'bundle_candidate_inventory_mismatch'
+        }
+    }
+}
+
+function Read-EvidenceJsonObject {
+    param(
+        [string] $Text,
+        [ref] $Index,
+        [int] $Depth,
+        [ref] $CandidateShaCount,
+        [ref] $CandidateLengthCount,
+        [bool] $IsTopLevel
+    )
+
+    $Index.Value++
+    $propertyNames = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+    Skip-EvidenceJsonWhitespace -Text $Text -Index $Index
+    if ($Index.Value -lt $Text.Length -and $Text[$Index.Value] -eq '}') {
+        $Index.Value++
+        return
+    }
+    while ($true) {
+        $propertyName = Read-EvidenceJsonString -Text $Text -Index $Index
+        if (-not $propertyNames.Add($propertyName)) { throw 'bundle_candidate_inventory_mismatch' }
+        if ($IsTopLevel) {
+            if ($propertyName -ceq 'candidateManifestSha256') { $CandidateShaCount.Value++ }
+            if ($propertyName -ceq 'candidateManifestLength') { $CandidateLengthCount.Value++ }
+        }
+        Skip-EvidenceJsonWhitespace -Text $Text -Index $Index
+        if ($Index.Value -ge $Text.Length -or $Text[$Index.Value] -ne ':') { throw 'bundle_candidate_inventory_mismatch' }
+        $Index.Value++
+        Read-EvidenceJsonValue -Text $Text -Index $Index -Depth ($Depth + 1) -CandidateShaCount $CandidateShaCount -CandidateLengthCount $CandidateLengthCount
+        Skip-EvidenceJsonWhitespace -Text $Text -Index $Index
+        if ($Index.Value -ge $Text.Length) { throw 'bundle_candidate_inventory_mismatch' }
+        if ($Text[$Index.Value] -eq '}') {
+            $Index.Value++
+            return
+        }
+        if ($Text[$Index.Value] -ne ',') { throw 'bundle_candidate_inventory_mismatch' }
+        $Index.Value++
+        Skip-EvidenceJsonWhitespace -Text $Text -Index $Index
+        if ($Index.Value -ge $Text.Length -or $Text[$Index.Value] -eq '}') {
+            throw 'bundle_candidate_inventory_mismatch'
+        }
+    }
+}
+
+function Read-EvidenceJsonValue {
+    param(
+        [string] $Text,
+        [ref] $Index,
+        [int] $Depth,
+        [ref] $CandidateShaCount,
+        [ref] $CandidateLengthCount,
+        [bool] $IsTopLevel = $false
+    )
+
+    if ($Depth -gt 64) { throw 'bundle_candidate_inventory_mismatch' }
     Skip-EvidenceJsonWhitespace -Text $Text -Index $Index
     if ($Index.Value -ge $Text.Length) { throw 'bundle_candidate_inventory_mismatch' }
     $first = $Text[$Index.Value]
+    if ($first -eq '{') {
+        Read-EvidenceJsonObject -Text $Text -Index $Index -Depth $Depth -CandidateShaCount $CandidateShaCount -CandidateLengthCount $CandidateLengthCount -IsTopLevel $IsTopLevel
+        return
+    }
+    if ($first -eq '[') {
+        Read-EvidenceJsonArray -Text $Text -Index $Index -Depth $Depth -CandidateShaCount $CandidateShaCount -CandidateLengthCount $CandidateLengthCount
+        return
+    }
     if ($first -eq '"') {
         [void](Read-EvidenceJsonString -Text $Text -Index $Index)
         return
     }
-    if ($first -eq '{' -or $first -eq '[') {
-        $stack = New-Object 'Collections.Generic.Stack[char]'
-        $stack.Push($first)
-        $Index.Value++
-        while ($Index.Value -lt $Text.Length) {
-            $character = $Text[$Index.Value]
-            if ($character -eq '"') {
-                [void](Read-EvidenceJsonString -Text $Text -Index $Index)
-                continue
-            }
-            if ($character -eq '{' -or $character -eq '[') {
-                $stack.Push($character)
-                $Index.Value++
-                continue
-            }
-            if ($character -eq '}' -or $character -eq ']') {
-                if ($stack.Count -eq 0) { throw 'bundle_candidate_inventory_mismatch' }
-                $opening = $stack.Pop()
-                if (($opening -eq '{' -and $character -ne '}') -or
-                    ($opening -eq '[' -and $character -ne ']')) {
-                    throw 'bundle_candidate_inventory_mismatch'
-                }
-                $Index.Value++
-                if ($stack.Count -eq 0) { return }
-                continue
-            }
-            $Index.Value++
-        }
-        throw 'bundle_candidate_inventory_mismatch'
+    if ($first -eq 't') { Read-EvidenceJsonLiteral -Text $Text -Index $Index -Literal 'true'; return }
+    if ($first -eq 'f') { Read-EvidenceJsonLiteral -Text $Text -Index $Index -Literal 'false'; return }
+    if ($first -eq 'n') { Read-EvidenceJsonLiteral -Text $Text -Index $Index -Literal 'null'; return }
+    $characterCode = [int][char]$first
+    if ($first -eq '-' -or ($characterCode -ge 0x30 -and $characterCode -le 0x39)) {
+        Read-EvidenceJsonNumber -Text $Text -Index $Index
+        return
     }
-
-    $start = $Index.Value
-    while ($Index.Value -lt $Text.Length -and $Text[$Index.Value] -ne ',' -and $Text[$Index.Value] -ne '}') {
-        $Index.Value++
-    }
-    $end = $Index.Value
-    while ($end -gt $start) {
-        $character = $Text[$end - 1]
-        if ($character -ne ' ' -and $character -ne "`t" -and $character -ne "`r" -and $character -ne "`n") { break }
-        $end--
-    }
-    if ($end -eq $start) { throw 'bundle_candidate_inventory_mismatch' }
+    throw 'bundle_candidate_inventory_mismatch'
 }
 
 function Assert-UniqueCandidateInventoryIdentityProperties {
@@ -818,41 +944,11 @@ function Assert-UniqueCandidateInventoryIdentityProperties {
 
     try {
         $index = 0
-        Skip-EvidenceJsonWhitespace -Text $JsonText -Index ([ref]$index)
-        if ($index -ge $JsonText.Length -or $JsonText[$index] -ne '{') { throw 'bundle_candidate_inventory_mismatch' }
-        $index++
         $shaCount = 0
         $lengthCount = 0
-        while ($true) {
-            Skip-EvidenceJsonWhitespace -Text $JsonText -Index ([ref]$index)
-            if ($index -ge $JsonText.Length) { throw 'bundle_candidate_inventory_mismatch' }
-            if ($JsonText[$index] -eq '}') {
-                $index++
-                break
-            }
-            $propertyName = Read-EvidenceJsonString -Text $JsonText -Index ([ref]$index)
-            if ($propertyName -ceq 'candidateManifestSha256') { $shaCount++ }
-            if ($propertyName -ceq 'candidateManifestLength') { $lengthCount++ }
-            Skip-EvidenceJsonWhitespace -Text $JsonText -Index ([ref]$index)
-            if ($index -ge $JsonText.Length -or $JsonText[$index] -ne ':') { throw 'bundle_candidate_inventory_mismatch' }
-            $index++
-            Skip-EvidenceJsonValue -Text $JsonText -Index ([ref]$index)
-            Skip-EvidenceJsonWhitespace -Text $JsonText -Index ([ref]$index)
-            if ($index -ge $JsonText.Length) { throw 'bundle_candidate_inventory_mismatch' }
-            if ($JsonText[$index] -eq ',') {
-                $index++
-                Skip-EvidenceJsonWhitespace -Text $JsonText -Index ([ref]$index)
-                if ($index -ge $JsonText.Length -or $JsonText[$index] -eq '}') {
-                    throw 'bundle_candidate_inventory_mismatch'
-                }
-                continue
-            }
-            if ($JsonText[$index] -eq '}') {
-                $index++
-                break
-            }
-            throw 'bundle_candidate_inventory_mismatch'
-        }
+        Skip-EvidenceJsonWhitespace -Text $JsonText -Index ([ref]$index)
+        if ($index -ge $JsonText.Length -or $JsonText[$index] -ne '{') { throw 'bundle_candidate_inventory_mismatch' }
+        Read-EvidenceJsonValue -Text $JsonText -Index ([ref]$index) -Depth 0 -CandidateShaCount ([ref]$shaCount) -CandidateLengthCount ([ref]$lengthCount) -IsTopLevel $true
         Skip-EvidenceJsonWhitespace -Text $JsonText -Index ([ref]$index)
         if ($index -ne $JsonText.Length -or $shaCount -ne 1 -or $lengthCount -ne 1) {
             throw 'bundle_candidate_inventory_mismatch'
