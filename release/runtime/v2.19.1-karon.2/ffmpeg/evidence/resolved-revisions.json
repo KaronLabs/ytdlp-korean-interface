@@ -1,0 +1,34 @@
+[
+  {
+    "Stage": "25-openssl",
+    "Repository": "https://github.com/openssl/openssl.git",
+    "RecipeRevision": "openssl-3.6.3",
+    "ResolvedRevision": "aae016bfd52fcad2bc9657c2c782cfdf73b1ed5f",
+    "Failure": null,
+    "EvidenceSha256": "18649A9E073A30E4D3BDE50A3A0F678A2481E42789CEC9DE33A320582A5A7FAD"
+  },
+  {
+    "Stage": "40-mbedtls",
+    "Repository": "https://github.com/ARMmbed/mbedtls.git",
+    "RecipeRevision": "v4.2.0",
+    "ResolvedRevision": "ece41aa84d7879d7e55c59e955a5884b541f7f3b",
+    "Failure": null,
+    "EvidenceSha256": "79E599E9CA06A961C745E9AFCD8B7E34152C6A6C9A56C9704FAFD6A5EE6117E4"
+  },
+  {
+    "Stage": "40-vulkan-headers",
+    "Repository": "https://github.com/KhronosGroup/Vulkan-Headers.git",
+    "RecipeRevision": "v1.4.359",
+    "ResolvedRevision": "f9973cd97e6f3584707e7ef1c425e336f1b92a5b",
+    "Failure": null,
+    "EvidenceSha256": "0B8DF41335939942D5A6C3A9D42D138395902CCF0B2F2C1CA892DF98736E3B13"
+  },
+  {
+    "Stage": "50-libmp3lame",
+    "Repository": "https://svn.code.sf.net/p/lame/svn/trunk/lame",
+    "RecipeRevision": null,
+    "ResolvedRevision": "svn-r6761",
+    "Failure": null,
+    "EvidenceSha256": null
+  }
+]

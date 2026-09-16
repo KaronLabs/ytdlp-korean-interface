@@ -1,0 +1,77 @@
+[
+  {
+    "path": "artifact-10396032837.metadata.json",
+    "bytes": 682,
+    "sha256": "8261E95A21847F12C049D5CC00A50BCFF281057F667AB05BFBD75DEA1E80ED8E"
+  },
+  {
+    "path": "asset-565742558.metadata.json",
+    "bytes": 1712,
+    "sha256": "DB4EA2CD83C0DAD1576EABF6D3346AED87E56B267C5D1D38B5265BC7A3E3EB6C"
+  },
+  {
+    "path": "evaluated-recipes.txt",
+    "bytes": 6246,
+    "sha256": "1152567B2A9C313F9ABB44F57043DAFC6920857401124D4804EB86CA8E43771B"
+  },
+  {
+    "path": "job-104378764705.log",
+    "bytes": 480289,
+    "sha256": "FFB2BEC78A50C9DD9203F6EBD4C8EF916B9D8D8A9321E935811652C7F96339BC"
+  },
+  {
+    "path": "job-104378764705.log.initial.stderr.txt",
+    "bytes": 100,
+    "sha256": "C2C3214C6E570715F0E21D8E7A8865B2F351C188968B6C0F7B446CEA377DC0F6"
+  },
+  {
+    "path": "job-104378764705.metadata.json",
+    "bytes": 3746,
+    "sha256": "33EE643C78CD36DB8492059DDAEC53681C88D684014F93EFA9D166A6E8A0A50F"
+  },
+  {
+    "path": "job-104384912273.log",
+    "bytes": 11668308,
+    "sha256": "CAA811263C2165348FA337DC6377C4BDFEC61AC7E7D9838EDAF391EB539F5348"
+  },
+  {
+    "path": "job-104384912273.log.initial.stderr.txt",
+    "bytes": 100,
+    "sha256": "C2C3214C6E570715F0E21D8E7A8865B2F351C188968B6C0F7B446CEA377DC0F6"
+  },
+  {
+    "path": "job-104384912273.metadata.json",
+    "bytes": 2463,
+    "sha256": "EC777B9B0F256DC4B5729A581C1582C76B723109EBEF5F724CF7A86BC9CCB043"
+  },
+  {
+    "path": "release-389161663.metadata.json",
+    "bytes": 99092,
+    "sha256": "7A461D440291792C8A422CE1EB69EF097C4E5C09AF4DCF3870EF456D5A9298A3"
+  },
+  {
+    "path": "resolved-revisions.json",
+    "bytes": 1202,
+    "sha256": "0B968379D174D5347FF2DF2C305E0144F9373A07D30CEE25D97F2076C03B9697"
+  },
+  {
+    "path": "root-license-fingerprints.json",
+    "bytes": 88952,
+    "sha256": "0AE5D3BF83CB27C916C0DC1D9612A2106B0DE62AA2E432421D160690FA36BE9D"
+  },
+  {
+    "path": "run-34967781095.metadata.json",
+    "bytes": 15346,
+    "sha256": "E8FA2488E77300864442CD02505C88DF2D5D1559BB3A6EC6F235E3D82AAD23B1"
+  },
+  {
+    "path": "spdx-commit-main.json",
+    "bytes": 492467,
+    "sha256": "257E742CBECD9AEF9DB29526B27C9B914502BE0F8AE723CEACF9C4CAA96FF891"
+  },
+  {
+    "path": "upstream-license-api-inventory.json",
+    "bytes": 27971,
+    "sha256": "9D81BADBDEC928E23DE7A3FDB7042DB8AED812D176DFCAC9D8F1E29736689419"
+  }
+]

@@ -4,6 +4,8 @@ param(
     [string] $BinaryArchivePath = 'E:\03_AllWork\ytdlp-korean-interface\.quality-presets-work\karon2-input\immutable\ffmpeg-n9.0.1-30-g9258bacca5-win64-lgpl-9.0.zip',
     [string] $ScratchRoot = 'E:\03_AllWork\ytdlp-korean-interface\.scratch\task-6-ffmpeg-corresponding-sources',
     [string] $CacheRoot,
+    [string] $BtbNCacheRoot = 'E:\03_AllWork\ytdlp-korean-interface\.scratch\task-6-actions-download-cache\extracted',
+    [string] $Rav1eCrateCacheRoot = 'E:\03_AllWork\ytdlp-korean-interface\.scratch\task-6-rav1e-crates',
     [switch] $NoExecute
 )
 
@@ -39,6 +41,7 @@ function Test-ImmutableSourceUrl {
     if (-not [Uri]::TryCreate($Url, [UriKind]::Absolute, [ref] $uri)) { return $false }
     if ($uri.Scheme -cne 'https' -or -not [string]::IsNullOrEmpty($uri.Query)) { return $false }
     if ($uri.AbsolutePath -match '/actions/artifacts/[0-9]+/zip$') { return $true }
+    if ($uri.Host -ceq 'static.crates.io' -and $uri.AbsolutePath -match '^/crates/[^/]+/[^/]+-[0-9][^/]*\.crate$') { return $true }
     return $uri.AbsolutePath -match '(?i)(^|[/._-])[0-9a-f]{40}([/._-]|$)'
 }
 
@@ -214,7 +217,7 @@ function New-DeterministicZip {
     finally { $stream.Dispose() }
 }
 
-function Invoke-FfmpegSourceCollector {
+function Invoke-FfmpegSourceCollectorV1 {
     param(
         [Parameter(Mandatory)][string] $InputManifestPath,
         [Parameter(Mandatory)][string] $InputBinaryArchivePath,
@@ -285,6 +288,143 @@ function Invoke-FfmpegSourceCollector {
         bundleSha256 = (Get-UpperSha256 -Path $bundlePath)
         inventoryPath = $inventoryPath
     }
+}
+
+function Assert-FfmpegClosureGraph {
+    param(
+        [Parameter(Mandatory)] $Manifest,
+        [Parameter(Mandatory)] $Graph,
+        [Parameter(Mandatory)] $Crates,
+        [Parameter(Mandatory)][string[]] $BuildConfigurationOptions
+    )
+    foreach ($forbidden in @('--enable-gpl', '--enable-nonfree')) {
+        if ($BuildConfigurationOptions -ccontains $forbidden) { throw "ffmpeg_source_forbidden_configuration:$forbidden" }
+    }
+    foreach ($required in @('--pkg-config-flags=--static', '--enable-version3')) {
+        if ($BuildConfigurationOptions -cnotcontains $required) { throw "ffmpeg_source_configuration_mismatch:$required" }
+    }
+    $included = @{}
+    foreach ($path in @($Manifest.includedPaths)) {
+        $key = ([string] $path).ToLowerInvariant()
+        if ($included.ContainsKey($key)) { throw "ffmpeg_source_duplicate_path:$path" }
+        $included[$key] = $true
+    }
+    foreach ($name in @('ffmpeg', 'btbnScripts', 'spdxLicenseList')) {
+        $sourceSet = $Manifest.sourceSets.$name
+        if (-not (Test-ImmutableSourceUrl ([string] $sourceSet.url))) { throw "ffmpeg_source_mutable_url:$name" }
+        if ([string] $sourceSet.sha256 -notmatch '^[0-9A-Fa-f]{64}$') { throw "ffmpeg_source_missing_sha256:$name" }
+        $licensePaths = @($sourceSet.PSObject.Properties | Where-Object Name -in @('licenseArchiveMemberPath', 'licenseTextPath') | ForEach-Object Value | Where-Object { -not [string]::IsNullOrWhiteSpace([string] $_) })
+        if ([string]::IsNullOrWhiteSpace([string] $sourceSet.licenseExpression) -or [string] $sourceSet.licenseExpression -ceq 'NOASSERTION' -or $licensePaths.Count -eq 0) {
+            throw "ffmpeg_source_missing_license:$name"
+        }
+    }
+    $components = @{}
+    foreach ($component in @($Graph.components)) {
+        $id = [string] $component.id
+        $key = $id.ToLowerInvariant()
+        if ($components.ContainsKey($key)) { throw "ffmpeg_source_duplicate_component:$id" }
+        $components[$key] = $true
+        if (-not (Test-ImmutableSourceUrl ([string] $component.source.url))) { throw "ffmpeg_source_mutable_url:$id" }
+        if ([string] $component.source.sha256 -notmatch '^[0-9A-Fa-f]{64}$') { throw "ffmpeg_source_missing_sha256:$id" }
+        if ([string]::IsNullOrWhiteSpace([string] $component.license.expression) -or [string] $component.license.expression -ceq 'NOASSERTION' -or @($component.license.archiveMemberPaths).Count -eq 0) {
+            throw "ffmpeg_source_missing_license:$id"
+        }
+        if (-not [string] $component.recipe.scriptPath -or [string] $component.recipe.scriptSha256 -notmatch '^[0-9A-Fa-f]{64}$') { throw "ffmpeg_source_missing_recipe:$id" }
+        foreach ($patch in @($component.recipe.patches)) {
+            if (-not [string] $patch.path -or [string] $patch.sha256 -notmatch '^[0-9A-Fa-f]{64}$') { throw "ffmpeg_source_missing_patch:$id" }
+        }
+    }
+    $crateKeys = @{}
+    foreach ($crate in @($Crates.components)) {
+        $id = "$($crate.name)@$($crate.version)"
+        $key = $id.ToLowerInvariant()
+        if ($crateKeys.ContainsKey($key)) { throw "ffmpeg_source_duplicate_component:$id" }
+        $crateKeys[$key] = $true
+        if (-not (Test-ImmutableSourceUrl ([string] $crate.sourceUrl))) { throw "ffmpeg_source_mutable_url:$id" }
+        if ([string] $crate.sha256 -notmatch '^[0-9A-Fa-f]{64}$') { throw "ffmpeg_source_missing_sha256:$id" }
+        if ([string]::IsNullOrWhiteSpace([string] $crate.licenseExpression) -or [string] $crate.licenseExpression -ceq 'NOASSERTION' -or [string] $crate.licenseExpression -match '/' -or @($crate.licenseTextPaths).Count -eq 0) {
+            throw "ffmpeg_source_missing_license:$id"
+        }
+    }
+    $mapped = @{}
+    foreach ($mapping in @($Manifest.enabledExternalLibraries)) {
+        $option = [string] $mapping.option
+        if ($mapped.ContainsKey($option)) { throw "ffmpeg_source_duplicate_option:$option" }
+        if (-not $components.ContainsKey(([string] $mapping.componentId).ToLowerInvariant())) { throw "ffmpeg_source_unknown_component:$option" }
+        $mapped[$option] = $true
+    }
+    foreach ($option in $BuildConfigurationOptions) {
+        if ((Test-ExternalBuildOption $option) -and -not $mapped.ContainsKey($option)) { throw "ffmpeg_source_unknown_enabled_library:$option" }
+    }
+}
+
+function Get-VerifiedBtbNCacheSources {
+    param([Parameter(Mandatory)] $Graph, [Parameter(Mandatory)][string] $Root)
+    $files = @(Get-ChildItem -LiteralPath $Root -File -Recurse)
+    foreach ($component in @($Graph.components)) {
+        $matches = @($files | Where-Object Name -ceq ([string] $component.source.archiveName))
+        if ($matches.Count -cne 1) { throw "ffmpeg_source_missing_archive:$($component.id)" }
+        Assert-SourceArchiveHash $matches[0].FullName $component.source.sha256 $component.id
+        [pscustomobject]@{ id = $component.id; sha256 = $component.source.sha256.ToUpperInvariant(); path = $matches[0].FullName; bundlePath = "sources/btbn-cache/$($component.source.archiveName)" }
+    }
+}
+
+function Get-VerifiedRav1eCrateSources {
+    param([Parameter(Mandatory)] $Crates, [Parameter(Mandatory)][string] $Root)
+    foreach ($crate in @($Crates.components)) {
+        $id = "crate:$($crate.name)@$($crate.version)"
+        $path = Join-Path $Root $crate.cachePath
+        Assert-SourceArchiveHash $path $crate.sha256 $id
+        [pscustomobject]@{ id = $id; sha256 = $crate.sha256.ToUpperInvariant(); path = $path; bundlePath = "sources/rav1e-crates/$($crate.name)-$($crate.version)-$($crate.sha256).crate" }
+    }
+}
+
+function Invoke-FfmpegSourceCollector {
+    param(
+        [Parameter(Mandatory)][string] $InputManifestPath,
+        [Parameter(Mandatory)][string] $InputBinaryArchivePath,
+        [Parameter(Mandatory)][string] $OutputRoot,
+        [Parameter(Mandatory)][string] $ContentCacheRoot
+    )
+    $manifest = Get-Content -Raw -LiteralPath $InputManifestPath | ConvertFrom-Json
+    if ([int] $manifest.schemaVersion -cne 2) { throw 'ffmpeg_source_manifest_schema_unsupported' }
+    $manifestRoot = Split-Path -Parent (Resolve-Path -LiteralPath $InputManifestPath)
+    $graph = Get-Content -Raw -LiteralPath (Join-Path $manifestRoot $manifest.sourceSets.btbnActionsCache.componentGraphPath) | ConvertFrom-Json
+    $crates = Get-Content -Raw -LiteralPath (Join-Path $manifestRoot $manifest.sourceSets.rav1eCrates.manifestPath) | ConvertFrom-Json
+    [IO.Directory]::CreateDirectory($OutputRoot) | Out-Null
+    [IO.Directory]::CreateDirectory($ContentCacheRoot) | Out-Null
+    $evidence = Read-FfmpegBinaryEvidence $InputBinaryArchivePath $manifest.binary.archiveSha256 $manifest.binary.ffmpegSha256 $manifest.binary.ffprobeSha256 $manifest.binary.expectedVersion
+    $expected = @(Get-Content -LiteralPath (Join-Path $manifestRoot $manifest.binary.buildConfigurationPath) | ForEach-Object Trim | Where-Object { $_ -match '^--' })
+    if (($expected -join ([char]10)) -cne ($evidence.configurationOptions -join ([char]10))) { throw 'ffmpeg_source_build_configuration_mismatch' }
+    Assert-FfmpegClosureGraph $manifest $graph $crates $evidence.configurationOptions
+    $binaryEvidencePath = Join-Path $OutputRoot binary-evidence.json
+    $evidence | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $binaryEvidencePath -Encoding utf8NoBOM
+    $sources = @()
+    foreach ($name in @('ffmpeg', 'btbnScripts', 'spdxLicenseList')) {
+        $component = [pscustomobject]@{ id = $name; source = $manifest.sourceSets.$name }
+        $verified = Get-VerifiedSourceArchive $component $ContentCacheRoot
+        $verified | Add-Member bundlePath "sources/direct/$name.source"
+        $sources += $verified
+    }
+    $sources += @(Get-VerifiedBtbNCacheSources $graph $BtbNCacheRoot)
+    $sources += @(Get-VerifiedRav1eCrateSources $crates $Rav1eCrateCacheRoot)
+    $inventoryPath = Join-Path $OutputRoot inventory.json
+    @($sources | Sort-Object id | ForEach-Object { [pscustomobject]@{ componentId = $_.id; sha256 = $_.sha256; bundlePath = $_.bundlePath } }) | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $inventoryPath -Encoding utf8NoBOM
+    if ([string] $manifest.closureStatus -cne 'complete') {
+        [pscustomobject]@{ status = 'blocked'; reason = 'ffmpeg_source_closure_incomplete'; sourceCount = $sources.Count; bundlePath = $null; inventoryPath = $inventoryPath; unresolvedItems = $manifest.unresolvedItems } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $OutputRoot collector-result.json) -Encoding utf8NoBOM
+        throw 'ffmpeg_source_closure_incomplete'
+    }
+    $items = @($sources | ForEach-Object { [pscustomobject]@{ SourcePath = $_.path; EntryPath = $_.bundlePath } })
+    $items += [pscustomobject]@{ SourcePath = $InputManifestPath; EntryPath = 'manifest.json' }
+    $items += [pscustomobject]@{ SourcePath = $inventoryPath; EntryPath = 'inventory.json' }
+    foreach ($relative in @($manifest.includedPaths)) {
+        $path = Join-Path $manifestRoot $relative
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "ffmpeg_source_missing_included_path:$relative" }
+        $items += [pscustomobject]@{ SourcePath = $path; EntryPath = $relative }
+    }
+    $bundle = Join-Path $OutputRoot 'ytdlp-korean-interface-v2.19.1-karon.2-ffmpeg-corresponding-sources.zip'
+    New-DeterministicZip $items $bundle
+    [pscustomobject]@{ status = 'complete'; sourceCount = $sources.Count; bundlePath = $bundle; bundleSha256 = Get-UpperSha256 $bundle; inventoryPath = $inventoryPath }
 }
 
 if (-not $NoExecute) {

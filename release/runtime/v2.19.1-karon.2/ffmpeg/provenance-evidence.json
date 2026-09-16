@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "actionsRunId": 34967781095,
+  "builderCommit": "3e6685eda92f9288c15ac320139622dcedca09a4",
+  "jobs": [
+    {
+      "id": 104378764705,
+      "metadataSha256": "33EE643C78CD36DB8492059DDAEC53681C88D684014F93EFA9D166A6E8A0A50F",
+      "logSha256": "FFB2BEC78A50C9DD9203F6EBD4C8EF916B9D8D8A9321E935811652C7F96339BC",
+      "logBytes": 480289
+    },
+    {
+      "id": 104384912273,
+      "metadataSha256": "EC777B9B0F256DC4B5729A581C1582C76B723109EBEF5F724CF7A86BC9CCB043",
+      "logSha256": "CAA811263C2165348FA337DC6377C4BDFEC61AC7E7D9838EDAF391EB539F5348",
+      "logBytes": 11668308
+    }
+  ],
+  "initialLogCliFailure": {
+    "exitCode": 1,
+    "stderr": "the response contains terminal escape sequences; pass --allow-escape-sequences to output it anyway",
+    "stderrSha256": "C2C3214C6E570715F0E21D8E7A8865B2F351C188968B6C0F7B446CEA377DC0F6"
+  },
+  "baseImageDigest": "sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be",
+  "releaseAsset": {
+    "id": 565742558,
+    "sha256": "39697D69681A09BD55A0F0224360A9A4285BC12127DF807D7242592B0E144A7B"
+  },
+  "sourceCacheArtifact": {
+    "id": 10396032837,
+    "digest": "sha256:89219a2bad8686b27a2b10907c290fe1ec87088e86869a0c6433d96c6a5832c8",
+    "canonicalArchiveCount": 122,
+    "referencedArchiveCount": 85
+  }
+}

@@ -138,4 +138,18 @@ Describe 'FFmpeg corresponding-source collector' {
         @($evidence.configurationOptions) -contains '--enable-gpl' | Should Be $false
         @($evidence.configurationOptions) -contains '--enable-nonfree' | Should Be $false
     }
+
+    It 'validates all retained source records while preserving the fail-closed gate' {
+        $root = Join-Path $RepositoryRoot 'release\runtime\v2.19.1-karon.2\ffmpeg'
+        $manifest = Get-Content -Raw (Join-Path $root 'manifest.json') | ConvertFrom-Json
+        $graph = Get-Content -Raw (Join-Path $root 'component-graph.json') | ConvertFrom-Json
+        $crates = Get-Content -Raw (Join-Path $root 'rav1e-crates.json') | ConvertFrom-Json
+        $options = @(Get-Content (Join-Path $root 'buildconf.txt') | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^--' })
+
+        Assert-FfmpegClosureGraph $manifest $graph $crates $options
+        $graph.components.Count | Should Be 85
+        $crates.components.Count | Should Be 270
+        $manifest.verifiedSourceRecordCount | Should Be 358
+        $manifest.closureStatus | Should Be 'incomplete'
+    }
 }

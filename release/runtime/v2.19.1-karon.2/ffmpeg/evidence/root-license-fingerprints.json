@@ -1,0 +1,2291 @@
+[
+  {
+    "stage": "10-glib",
+    "files": []
+  },
+  {
+    "stage": "10-mingw",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "99A69660981156C21336FDB5661F89341B013C94E4BF9E1C7467B4745718397F",
+        "bytes": 2326,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "With exception of certain parts that are prominently marked as being",
+          "in the Public Domain, BSD, or LGPL this Software is provided under the",
+          "Zope Public License (ZPL) Version 2.1.",
+          "Copyright (c) 2009 - 2013 by the mingw-w64 project",
+          "See the AUTHORS file for the list of contributors to the mingw-w64 project.",
+          "This license has been certified as open source. It has also been designated",
+          "as GPL compatible by the Free Software Foundation (FSF).",
+          "Redistribution and use in source and binary forms, with or without"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "10-mingw-std-threads",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "86C148320EB0ACC26607ED347E0FDE9F49A236D0EC5291D36DC6A7E0E1D26B9F",
+        "bytes": 1296,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "Copyright (c) 2016, Mega Limited",
+          "All rights reserved.",
+          "Redistribution and use in source and binary forms, with or without",
+          "modification, are permitted provided that the following conditions are met:",
+          "* Redistributions of source code must retain the above copyright notice, this",
+          "list of conditions and the following disclaimer.",
+          "* Redistributions in binary form must reproduce the above copyright notice,",
+          "this list of conditions and the following disclaimer in the documentation"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "20-cairo",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "67228A9F7C5F9B67C58F556F1BE178F62DA4D9E2E6285318D8C74D567255ABDF",
+        "bytes": 1576,
+        "detected": [],
+        "head": [
+          "Cairo is free software.",
+          "Every source file in the implementation[*] of cairo is available to be",
+          "redistributed and/or modified under the terms of either the GNU Lesser",
+          "General Public License (LGPL) version 2.1 or the Mozilla Public",
+          "License (MPL) version 1.1.  Some files are available under more",
+          "liberal terms, but we believe that in all cases, each file may be used",
+          "under either the LGPL or the MPL.",
+          "See the following files in this directory for the precise terms and"
+        ]
+      },
+      {
+        "path": "./COPYING-LGPL-2.1",
+        "sha256": "9E9E8608C4CDDA51A78CC3A385F4EC9A2E4C96D5ECAD74AC8BCA5FCA3E563B7D",
+        "bytes": 26533,
+        "detected": [
+          "LGPL-2.1"
+        ],
+        "head": [
+          "GNU LESSER GENERAL PUBLIC LICENSE",
+          "Version 2.1, February 1999",
+          "Copyright (C) 1991, 1999 Free Software Foundation, Inc.",
+          "51 Franklin Street, Suite 500, Boston, MA 02110-1335, USA",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "[This is the first released version of the Lesser GPL.  It also counts",
+          "as the successor of the GNU Library Public License, version 2, hence"
+        ]
+      },
+      {
+        "path": "./COPYING-MPL-1.1",
+        "sha256": "53692A2ED6C6A2C6EC9B32DD0B820DFAE91E0A1FCDF625CA9ED0BDF8705FCC4F",
+        "bytes": 25755,
+        "detected": [
+          "MPL-1.1"
+        ],
+        "head": [
+          "MOZILLA PUBLIC LICENSE",
+          "Version 1.1",
+          "---------------",
+          "1. Definitions.",
+          "1.0.1. \"Commercial Use\" means distribution or otherwise making the",
+          "Covered Code available to a third party.",
+          "1.1. \"Contributor\" means each entity that creates or contributes to",
+          "the creation of Modifications."
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "20-libiconv",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "8CEB4B9EE5ADEDDE47B31E975C1D90C73AD27B6B165A1DCD80C7C545EB65B903",
+        "bytes": 35147,
+        "detected": [
+          "GPL-3.0"
+        ],
+        "head": [
+          "GNU GENERAL PUBLIC LICENSE",
+          "Version 3, 29 June 2007",
+          "Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "Preamble",
+          "The GNU General Public License is a free, copyleft license for",
+          "software and other kinds of works."
+        ]
+      },
+      {
+        "path": "./COPYING.LIB",
+        "sha256": "20E50FE7AAE3E56378EBF0417D9DE904F55A0E61E4DF315333E632A4D3555D95",
+        "bytes": 26419,
+        "detected": [
+          "LGPL-2.1"
+        ],
+        "head": [
+          "GNU LESSER GENERAL PUBLIC LICENSE",
+          "Version 2.1, February 1999",
+          "Copyright (C) 1991, 1999 Free Software Foundation, Inc.",
+          "<https://fsf.org/>",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "[This is the first released version of the Lesser GPL.  It also counts",
+          "as the successor of the GNU Library Public License, version 2, hence"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "20-zlib",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "E32FF4E00D9D94930537635291DA39E7E612703334BF6FDE8C7F1686FE8A45A2",
+        "bytes": 1002,
+        "detected": [
+          "Zlib"
+        ],
+        "head": [
+          "Copyright notice:",
+          "(C) 1995-2026 Jean-loup Gailly and Mark Adler",
+          "This software is provided 'as-is', without any express or implied",
+          "warranty.  In no event will the authors be held liable for any damages",
+          "arising from the use of this software.",
+          "Permission is granted to anyone to use this software for any purpose,",
+          "including commercial applications, and to alter it and redistribute it",
+          "freely, subject to the following restrictions:"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "25-fftw3",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "231F7EDCC7352D7734A96EEF0B8030F77982678C516876FCB81E25B32D68564C",
+        "bytes": 18002,
+        "detected": [
+          "GPL-2.0"
+        ],
+        "head": [
+          "GNU GENERAL PUBLIC LICENSE",
+          "Version 2, June 1991",
+          "Copyright (C) 1989, 1991 Free Software Foundation, Inc.",
+          "51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "Preamble",
+          "The licenses for most software are designed to take away your"
+        ]
+      },
+      {
+        "path": "./COPYRIGHT",
+        "sha256": "8A74B35D541D93FDF58A22A3D3BAA48AE3EDBF6D715EDFEB6457C21968AE43AC",
+        "bytes": 844,
+        "detected": [],
+        "head": [
+          "/*",
+          "* Copyright (c) 2003, 2007-14 Matteo Frigo",
+          "* Copyright (c) 2003, 2007-14 Massachusetts Institute of Technology",
+          "*",
+          "* This program is free software; you can redistribute it and/or modify",
+          "* it under the terms of the GNU General Public License as published by",
+          "* the Free Software Foundation; either version 2 of the License, or",
+          "* (at your option) any later version."
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "25-freetype",
+    "files": [
+      {
+        "path": "./LICENSE.TXT",
+        "sha256": "BD36C8B474855FA294C2EC5C184544478EF3720AAD37D65A6296A4F264FD2D3B",
+        "bytes": 2149,
+        "detected": [
+          "GPL-3.0",
+          "GPL-2.0"
+        ],
+        "head": [
+          "FREETYPE LICENSES",
+          "-----------------",
+          "The FreeType  2 font  engine is  copyrighted work  and cannot  be used",
+          "legally without  a software  license.  In order  to make  this project",
+          "usable to  a vast majority of  developers, we distribute it  under two",
+          "mutually exclusive open-source licenses.",
+          "This means that *you* must choose  *one* of the two licenses described",
+          "below, then obey all its terms and conditions when using FreeType 2 in"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "25-fribidi",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "32434AFCC8666BA060E111D715BFDB6C2D5DD8A35FA4D3AB8AD67D8F850D2F2B",
+        "bytes": 26440,
+        "detected": [
+          "LGPL-2.1"
+        ],
+        "head": [
+          "GNU LESSER GENERAL PUBLIC LICENSE",
+          "Version 2.1, February 1999",
+          "Copyright (C) 1991, 1999 Free Software Foundation, Inc.",
+          "51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "[This is the first released version of the Lesser GPL.  It also counts",
+          "as the successor of the GNU Library Public License, version 2, hence"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "25-gmp",
+    "files": [
+      {
+        "path": "./COPYING.LESSERv3",
+        "sha256": "A853C2FFEC17057872340EEE242AE4D96CBF2B520AE27D903E1B2FEF1A5F9D1C",
+        "bytes": 7639,
+        "detected": [
+          "LGPL-3.0"
+        ],
+        "head": [
+          "GNU LESSER GENERAL PUBLIC LICENSE",
+          "Version 3, 29 June 2007",
+          "Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "This version of the GNU Lesser General Public License incorporates",
+          "the terms and conditions of version 3 of the GNU General Public",
+          "License, supplemented by the additional permissions listed below."
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "25-libogg",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "D2AB5758336489DA61C12CC5BB757DA5339C4AE9001F9BB0562B4370249AF814",
+        "bytes": 1466,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "Copyright (c) 2002, Xiph.org Foundation",
+          "Redistribution and use in source and binary forms, with or without",
+          "modification, are permitted provided that the following conditions",
+          "are met:",
+          "- Redistributions of source code must retain the above copyright",
+          "notice, this list of conditions and the following disclaimer.",
+          "- Redistributions in binary form must reproduce the above copyright",
+          "notice, this list of conditions and the following disclaimer in the"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "25-libpng",
+    "files": [
+      {
+        "path": "./LICENSE.md",
+        "sha256": "BDB0A645EA18C60507D0368379B1AC5474B92255FCC2D115E07486A7672BA526",
+        "bytes": 5345,
+        "detected": [
+          "Zlib"
+        ],
+        "head": [
+          "COPYRIGHT NOTICE, DISCLAIMER, and LICENSE",
+          "=========================================",
+          "PNG Reference Library License version 2",
+          "---------------------------------------",
+          "* Copyright (c) 1995-2026 The PNG Reference Library Authors.",
+          "* Copyright (c) 2018-2026 Cosmin Truta.",
+          "* Copyright (c) 2000-2002, 2004, 2006-2018 Glenn Randers-Pehrson.",
+          "* Copyright (c) 1996-1997 Andreas Dilger."
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "25-libxml2",
+    "files": [
+      {
+        "path": "./Copyright",
+        "sha256": "5D4873884A890122A4B9B20AD56AC6F7DA1D796A5BFCF04A427970AC96217626",
+        "bytes": 1314,
+        "detected": [
+          "MIT"
+        ],
+        "head": [
+          "Except where otherwise noted in the source code (e.g. the files dict.c and",
+          "list.c, which are covered by a similar licence but with different Copyright",
+          "notices) all the files are:",
+          "Copyright (C) 1998-2012 Daniel Veillard.  All Rights Reserved.",
+          "Copyright (C) The Libxml2 Contributors.",
+          "Permission is hereby granted, free of charge, to any person obtaining a copy",
+          "of this software and associated documentation files (the \"Software\"), to deal",
+          "in the Software without restriction, including without limitation the rights"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "25-openssl",
+    "files": [
+      {
+        "path": "./LICENSE.txt",
+        "sha256": "7D5450CB2D142651B8AFA315B5F238EFC805DAD827D91BA367D8516BC9D49E7A",
+        "bytes": 10175,
+        "detected": [
+          "Apache-2.0"
+        ],
+        "head": [
+          "Apache License",
+          "Version 2.0, January 2004",
+          "https://www.apache.org/licenses/",
+          "TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION",
+          "1. Definitions.",
+          "\"License\" shall mean the terms and conditions for use, reproduction,",
+          "and distribution as defined by Sections 1 through 9 of this document.",
+          "\"Licensor\" shall mean the copyright owner or entity authorized by"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "25-xz",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "616A3AD264CE29B8F1CB97E53037B139D406899CA8D1F799651E17BFA09830B8",
+        "bytes": 3119,
+        "detected": [
+          "LGPL-2.1",
+          "GPL-3.0",
+          "GPL-2.0"
+        ],
+        "head": [
+          "XZ Utils Licensing",
+          "==================",
+          "Different licenses apply to different files in this package. Here",
+          "is a summary of which licenses apply to which parts of this package:",
+          "- liblzma is under the BSD Zero Clause License (0BSD).",
+          "- The command line tools xz, xzdec, lzmadec, and lzmainfo are",
+          "under 0BSD except that, on systems that don't have a usable",
+          "getopt_long, GNU getopt_long is compiled and linked in from the"
+        ]
+      },
+      {
+        "path": "./COPYING.0BSD",
+        "sha256": "0B01625D853911CD0E2E088DCFB743261034A091BB379246CB25A14CC4C74BF1",
+        "bytes": 607,
+        "detected": [
+          "ISC"
+        ],
+        "head": [
+          "Permission to use, copy, modify, and/or distribute this",
+          "software for any purpose with or without fee is hereby granted.",
+          "THE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL",
+          "WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED",
+          "WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL",
+          "THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR",
+          "CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM",
+          "LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,"
+        ]
+      },
+      {
+        "path": "./COPYING.GPLv2",
+        "sha256": "EDAEF632CBB643E4E7A221717A6C441A4C1A7C918E6E4D56DEBC3D8739B233F6",
+        "bytes": 17984,
+        "detected": [
+          "GPL-2.0"
+        ],
+        "head": [
+          "GNU GENERAL PUBLIC LICENSE",
+          "Version 2, June 1991",
+          "Copyright (C) 1989, 1991 Free Software Foundation, Inc.,",
+          "<https://fsf.org/>",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "Preamble",
+          "The licenses for most software are designed to take away your"
+        ]
+      },
+      {
+        "path": "./COPYING.GPLv3",
+        "sha256": "3972DC9744F6499F0F9B2DBF76696F2AE7AD8AF9B23DDE66D6AF86C9DFB36986",
+        "bytes": 35149,
+        "detected": [
+          "GPL-3.0"
+        ],
+        "head": [
+          "GNU GENERAL PUBLIC LICENSE",
+          "Version 3, 29 June 2007",
+          "Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "Preamble",
+          "The GNU General Public License is a free, copyleft license for",
+          "software and other kinds of works."
+        ]
+      },
+      {
+        "path": "./COPYING.LGPLv2.1",
+        "sha256": "20E50FE7AAE3E56378EBF0417D9DE904F55A0E61E4DF315333E632A4D3555D95",
+        "bytes": 26419,
+        "detected": [
+          "LGPL-2.1"
+        ],
+        "head": [
+          "GNU LESSER GENERAL PUBLIC LICENSE",
+          "Version 2.1, February 1999",
+          "Copyright (C) 1991, 1999 Free Software Foundation, Inc.",
+          "<https://fsf.org/>",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "[This is the first released version of the Lesser GPL.  It also counts",
+          "as the successor of the GNU Library Public License, version 2, hence"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "30-pango",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "D245807F90032872D1438D741ED21E2490E1175DC8AA3AFA5DDB6C8E529B58E5",
+        "bytes": 25292,
+        "detected": [],
+        "head": [
+          "GNU LIBRARY GENERAL PUBLIC LICENSE",
+          "Version 2, June 1991",
+          "Copyright (C) 1991 Free Software Foundation, Inc.",
+          "59 Temple Place, Suite 330, Boston, MA  02111-1307  USA",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "[This is the first released version of the library GPL.  It is",
+          "numbered 2 because it goes with version 2 of the ordinary GPL.]"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "35-fontconfig",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "51A51AA9823704FD90BCCC616CDD17EBABB5B2B3E9CBDE886CA02C7002288067",
+        "bytes": 8616,
+        "detected": [
+          "MIT"
+        ],
+        "head": [
+          "fontconfig/COPYING",
+          "Copyright \u00a9 2000,2001,2002,2003,2004,2006,2007 Keith Packard",
+          "Copyright \u00a9 2005 Patrick Lam",
+          "Copyright \u00a9 2007 Dwayne Bailey and Translate.org.za",
+          "Copyright \u00a9 2009 Roozbeh Pournader",
+          "Copyright \u00a9 2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020 Red Hat, Inc.",
+          "Copyright \u00a9 2008 Danilo \u0160egan",
+          "Copyright \u00a9 2012 Google, Inc."
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "40-mbedtls",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "9B405EF4C89342F5EAE1DD828882F931747F71001CFBA7D114801039B52AD09B",
+        "bytes": 29852,
+        "detected": [
+          "Apache-2.0",
+          "GPL-2.0"
+        ],
+        "head": [
+          "Mbed TLS files are provided under a dual [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html)",
+          "OR [GPL-2.0-or-later](https://spdx.org/licenses/GPL-2.0-or-later.html) license.",
+          "This means that users may choose which of these licenses they take the code",
+          "under.",
+          "The full text of each of these licenses is given below.",
+          "Apache License",
+          "Version 2.0, January 2004",
+          "http://www.apache.org/licenses/"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "40-vulkan-headers",
+    "files": [
+      {
+        "path": "./LICENSE.md",
+        "sha256": "95AD366D23FADF701D355BC45FB8B82AE2D700239471D35D41286AC3B08FF903",
+        "bytes": 495,
+        "detected": [],
+        "head": [
+          "Copyright 2015-2026 The Khronos Group Inc.",
+          "Files in this repository fall under one of these licenses:",
+          "- `Apache-2.0`",
+          "- `MIT`",
+          "Note: With the exception of `parse_dependency.py`, which is based on an",
+          "external file, files using the `MIT` license also fall under `Apache-2.0`.",
+          "Example:",
+          "```"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "45-brotli",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "3D180008E36922A4E8DAEC11C34C7AF264FED5962D07924AEA928C38E8663C94",
+        "bytes": 1084,
+        "detected": [
+          "MIT"
+        ],
+        "head": [
+          "Copyright (c) 2009, 2010, 2013-2016 by the Brotli Authors.",
+          "Permission is hereby granted, free of charge, to any person obtaining a copy",
+          "of this software and associated documentation files (the \"Software\"), to deal",
+          "in the Software without restriction, including without limitation the rights",
+          "to use, copy, modify, merge, publish, distribute, sublicense, and/or sell",
+          "copies of the Software, and to permit persons to whom the Software is",
+          "furnished to do so, subject to the following conditions:",
+          "The above copyright notice and this permission notice shall be included in"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "45-harfbuzz",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "BA8F810F2455C2F08E2D56BB49B72F37FCF68F1F4FADE38977CFD7372050AD64",
+        "bytes": 1971,
+        "detected": [],
+        "head": [
+          "HarfBuzz is licensed under the so-called \"Old MIT\" license.  Details follow.",
+          "For parts of HarfBuzz that are licensed under different licenses see individual",
+          "files names COPYING in subdirectories where applicable.",
+          "Copyright \u00a9 2010-2022  Google, Inc.",
+          "Copyright \u00a9 2015-2020  Ebrahim Byagowi",
+          "Copyright \u00a9 2019,2020  Facebook, Inc.",
+          "Copyright \u00a9 2012,2015  Mozilla Foundation",
+          "Copyright \u00a9 2011  Codethink Limited"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "45-lcms2",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "6DBD60437F8EF91D8DE1F08AD75882547FD4931BFCC3566A0735F28DB1484D31",
+        "bytes": 1080,
+        "detected": [
+          "MIT"
+        ],
+        "head": [
+          "MIT License",
+          "Copyright (c) 2023 Marti Maria Saguer",
+          "Permission is hereby granted, free of charge, to any person obtaining",
+          "a copy of this software and associated documentation files (the",
+          "\"Software\"), to deal in the Software without restriction, including",
+          "without limitation the rights to use, copy, modify, merge, publish,",
+          "distribute, sublicense, and/or sell copies of the Software, and to",
+          "permit persons to whom the Software is furnished to do so, subject"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "45-libffi",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "17B64DC60F3B6897A60F971E288B973F655C2EDCDF08B25F3C3DD5549857881C",
+        "bytes": 1132,
+        "detected": [
+          "MIT"
+        ],
+        "head": [
+          "libffi - Copyright (c) 1996-2026  Anthony Green, Red Hat, Inc and others.",
+          "See source files for details.",
+          "Permission is hereby granted, free of charge, to any person obtaining",
+          "a copy of this software and associated documentation files (the",
+          "``Software''), to deal in the Software without restriction, including",
+          "without limitation the rights to use, copy, modify, merge, publish,",
+          "distribute, sublicense, and/or sell copies of the Software, and to",
+          "permit persons to whom the Software is furnished to do so, subject to"
+        ]
+      },
+      {
+        "path": "./LICENSE-BUILDTOOLS",
+        "sha256": "E67978CD18816C0CB7D29AAAACDE7B7447402C2FB321A051698890A8EAEDDA94",
+        "bytes": 18698,
+        "detected": [
+          "GPL-2.0"
+        ],
+        "head": [
+          "The libffi source distribution contains certain code that is not part",
+          "of libffi, and is only used as tooling to assist with the building and",
+          "testing of libffi.  This includes the msvcc.sh script used to wrap the",
+          "Microsoft compiler with GNU compatible command-line options,",
+          "make_sunver.pl, and the libffi test code distributed in the",
+          "testsuite/libffi.bhaible directory.  This code is distributed with",
+          "libffi for the purpose of convenience only, and libffi is in no way",
+          "derived from this code."
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "45-libsamplerate",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "2C1F76CE2EFFDDDB425018405D5690C0B1AB4E6976E35296B0A6DB65C5E1A55D",
+        "bytes": 1334,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "Copyright (c) 2012-2016, Erik de Castro Lopo <erikd@mega-nerd.com>",
+          "All rights reserved.",
+          "Redistribution and use in source and binary forms, with or without",
+          "modification, are permitted provided that the following conditions are",
+          "met:",
+          "1. Redistributions of source code must retain the above copyright",
+          "notice, this list of conditions and the following disclaimer.",
+          "2. Redistributions in binary form must reproduce the above copyright"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "45-libudfread",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "DC626520DCD53A22F727AF3EE42C770E56C97A64FE3ADB063799D8AB032FE551",
+        "bytes": 26530,
+        "detected": [
+          "LGPL-2.1"
+        ],
+        "head": [
+          "GNU LESSER GENERAL PUBLIC LICENSE",
+          "Version 2.1, February 1999",
+          "Copyright (C) 1991, 1999 Free Software Foundation, Inc.",
+          "51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "[This is the first released version of the Lesser GPL.  It also counts",
+          "as the successor of the GNU Library Public License, version 2, hence"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "45-libunibreak",
+    "files": [
+      {
+        "path": "./LICENCE",
+        "sha256": "0C57E2EC42ECE17791A75D2F9B2F8E0663181BE008667A507F765B3EF22522DB",
+        "bytes": 1045,
+        "detected": [
+          "Zlib"
+        ],
+        "head": [
+          "Copyright (C) Wu Yongwei <wuyongwei at gmail dot com>",
+          "Copyright (C) Tom Hacohen <tom at stosb dot com>",
+          "Copyright (C) Petr Filipsky <philodej at gmail dot com>",
+          "Copyright (C) Andreas R\u00f6ver <roever at users dot sf dot net>",
+          "This software is provided 'as-is', without any express or implied",
+          "warranty.  In no event will the author be held liable for any damages",
+          "arising from the use of this software.",
+          "Permission is granted to anyone to use this software for any purpose,"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "45-libvorbis",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "EC1815DB59FCD302846DF949D7424876CB2E2DC5ED1606C5FB0B36787B1CF43A",
+        "bytes": 1470,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "Copyright (c) 2002-2020 Xiph.org Foundation",
+          "Redistribution and use in source and binary forms, with or without",
+          "modification, are permitted provided that the following conditions",
+          "are met:",
+          "- Redistributions of source code must retain the above copyright",
+          "notice, this list of conditions and the following disclaimer.",
+          "- Redistributions in binary form must reproduce the above copyright",
+          "notice, this list of conditions and the following disclaimer in the"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "45-opencl",
+    "files": []
+  },
+  {
+    "stage": "45-pcre2",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "99272C55F3DCFA07A8A7E15A5C1A33096E4727DE74241D65FA049FCCFDD59507",
+        "bytes": 97,
+        "detected": [],
+        "head": [
+          "PCRE2 LICENCE",
+          "Please see the file LICENCE in the PCRE2 distribution for licensing details.",
+          "End"
+        ]
+      },
+      {
+        "path": "./LICENCE.md",
+        "sha256": "197D8A73FFEE0D6B09ADBA2F9C677B5F5AEDE24EDF89258A68E48248D010D811",
+        "bytes": 4011,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "PCRE2 Licence",
+          "=============",
+          "| SPDX-License-Identifier: | BSD-3-Clause WITH PCRE2-exception |",
+          "|---------|-------|",
+          "PCRE2 is a library of functions to support regular expressions whose syntax",
+          "and semantics are as close as possible to those of the Perl 5 language.",
+          "Releases 10.00 and above of PCRE2 are distributed under the terms of the \"BSD\"",
+          "licence, as specified below, with one exemption for certain binary"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "45-pixman",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "FAC9270F0987B96FF4533FCA3548C633E02083CBBA4A0172A3B149B2E4019793",
+        "bytes": 2087,
+        "detected": [
+          "MIT"
+        ],
+        "head": [
+          "The following is the MIT license, agreed upon by most contributors.",
+          "Copyright holders of new code should use this license statement where",
+          "possible. They may also add themselves to the list below.",
+          "/*",
+          "* Copyright 1987, 1988, 1989, 1998  The Open Group",
+          "* Copyright 1987, 1988, 1989 Digital Equipment Corporation",
+          "* Copyright 1999, 2004, 2008 Keith Packard",
+          "* Copyright 2000 SuSE, Inc."
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "45-vmaf",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "A6FDB51D02B9DFE198E55534BB8047FE6D756EDA117F4FF83DE98F92C1952710",
+        "bytes": 2833,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "LICENSE - BSD+Patent",
+          "SPDX short identifier: BSD-2-Clause-Patent",
+          "Note: This license is designed to provide: a) a simple permissive license; b) that is compatible with the GNU General",
+          "Public License (GPL), version 2; and c) which also has an express patent grant included.",
+          "Copyright (c) 2020 Netflix, Inc.",
+          "Redistribution and use in source and binary forms, with or without modification, are permitted provided that the",
+          "following conditions are met:",
+          "1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "45-vulkan-loader",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "8D4D279343D72E5B9E06BBE38C1AD8660FA8EABC217164A5B482DDF4AB0DBA9D",
+        "bytes": 1074,
+        "detected": [
+          "MIT"
+        ],
+        "head": [
+          "MIT License",
+          "Copyright (c) 2025 Timo Rothenpieler",
+          "Permission is hereby granted, free of charge, to any person obtaining a copy",
+          "of this software and associated documentation files (the \"Software\"), to deal",
+          "in the Software without restriction, including without limitation the rights",
+          "to use, copy, modify, merge, publish, distribute, sublicense, and/or sell",
+          "copies of the Software, and to permit persons to whom the Software is",
+          "furnished to do so, subject to the following conditions:"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-amf",
+    "files": [
+      {
+        "path": "./LICENSE.txt",
+        "sha256": "EB297397AAA455B5668AB67D216B83828466152DAB123FA92384C6EC16B74170",
+        "bytes": 1747,
+        "detected": [
+          "MIT"
+        ],
+        "head": [
+          "Notice Regarding Standards.  AMD does not provide a license or sublicense to",
+          "any Intellectual Property Rights relating to any standards, including but not",
+          "limited to any audio and/or video codec technologies such as MPEG-2, MPEG-4;",
+          "AVC/H.264; HEVC/H.265; AAC decode/FFMPEG; AAC encode/FFMPEG; VC-1; and MP3",
+          "(collectively, the \"Media Technologies\"). For clarity, you will pay any",
+          "royalties due for such third party technologies, which may include the Media",
+          "Technologies that are owed as a result of AMD providing the Software to you.",
+          "This software uses libraries from the FFmpeg project under the LGPLv2.1."
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-aom",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "4764A286D8B2FAEAF42F4418E7D7A28D58FC8FD4D00A3D0A7F44B0A4099DE7F2",
+        "bytes": 1316,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "Copyright (c) 2016, Alliance for Open Media. All rights reserved.",
+          "Redistribution and use in source and binary forms, with or without",
+          "modification, are permitted provided that the following conditions",
+          "are met:",
+          "1. Redistributions of source code must retain the above copyright",
+          "notice, this list of conditions and the following disclaimer.",
+          "2. Redistributions in binary form must reproduce the above copyright",
+          "notice, this list of conditions and the following disclaimer in"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-chromaprint",
+    "files": [
+      {
+        "path": "./LICENSE.md",
+        "sha256": "562CFE59627E0C4E8E3B066F3FF2E9736F83811FFE4C6C2C7796595AA7595EBD",
+        "bytes": 1801,
+        "detected": [
+          "LGPL-2.1",
+          "MIT"
+        ],
+        "head": [
+          "License",
+          "=======",
+          "Chromaprint's own source code is licensed under the MIT license, but we",
+          "include some parts of the FFmpeg library, which is licensed under the",
+          "LGPL 2.1 license.",
+          "As a whole, Chromaprint should be therefore considered to be licensed",
+          "under the LGPL 2.1 license. We are hoping to remove the included",
+          "FFmpeg code and make MIT the only license used in the project."
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-dav1d",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "DD92C3C2247C5651606FC23A5E2D6A1EBC5ACE9A3E49CBDE0E12F05AD1CB1EE5",
+        "bytes": 1317,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "Copyright \u00a9 2018-2025, VideoLAN and dav1d authors",
+          "All rights reserved.",
+          "Redistribution and use in source and binary forms, with or without",
+          "modification, are permitted provided that the following conditions are met:",
+          "1. Redistributions of source code must retain the above copyright notice, this",
+          "list of conditions and the following disclaimer.",
+          "2. Redistributions in binary form must reproduce the above copyright notice,",
+          "this list of conditions and the following disclaimer in the documentation"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-ffnvcodec",
+    "files": []
+  },
+  {
+    "stage": "50-freetype",
+    "files": [
+      {
+        "path": "./LICENSE.TXT",
+        "sha256": "BD36C8B474855FA294C2EC5C184544478EF3720AAD37D65A6296A4F264FD2D3B",
+        "bytes": 2149,
+        "detected": [
+          "GPL-3.0",
+          "GPL-2.0"
+        ],
+        "head": [
+          "FREETYPE LICENSES",
+          "-----------------",
+          "The FreeType  2 font  engine is  copyrighted work  and cannot  be used",
+          "legally without  a software  license.  In order  to make  this project",
+          "usable to  a vast majority of  developers, we distribute it  under two",
+          "mutually exclusive open-source licenses.",
+          "This means that *you* must choose  *one* of the two licenses described",
+          "below, then obey all its terms and conditions when using FreeType 2 in"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-gme",
+    "files": [
+      {
+        "path": "./license.gpl2.txt",
+        "sha256": "8177F97513213526DF2CF6184D8FF986C675AFB514D4E68A404010521B880643",
+        "bytes": 18092,
+        "detected": [
+          "GPL-2.0"
+        ],
+        "head": [
+          "GNU GENERAL PUBLIC LICENSE",
+          "Version 2, June 1991",
+          "Copyright (C) 1989, 1991 Free Software Foundation, Inc.,",
+          "51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "Preamble",
+          "The licenses for most software are designed to take away your"
+        ]
+      },
+      {
+        "path": "./license.txt",
+        "sha256": "D2EFC89FBB7533572A472D34E07964951810A3A4F8D3159ECC2DCAA1452C5C26",
+        "bytes": 26938,
+        "detected": [
+          "LGPL-2.1"
+        ],
+        "head": [
+          "GNU LESSER GENERAL PUBLIC LICENSE",
+          "Version 2.1, February 1999",
+          "Copyright (C) 1991, 1999 Free Software Foundation, Inc.",
+          "51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "[This is the first released version of the Lesser GPL.  It also counts",
+          "as the successor of the GNU Library Public License, version 2, hence"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-kvazaar",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "3C1DC3D7F8A3D08C14F4FBE9942F45764D8A21A3296E8D83446F33FD65F21C38",
+        "bytes": 1549,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "Copyright (c) 2021, Tampere University, ITU/ISO/IEC, project contributors",
+          "All rights reserved.",
+          "Redistribution and use in source and binary forms, with or without modification,",
+          "are permitted provided that the following conditions are met:",
+          "* Redistributions of source code must retain the above copyright notice, this",
+          "list of conditions and the following disclaimer.",
+          "* Redistributions in binary form must reproduce the above copyright notice, this",
+          "list of conditions and the following disclaimer in the documentation and/or"
+        ]
+      },
+      {
+        "path": "./LICENSE.EXT.greatest",
+        "sha256": "16F569C87D5EC20B7474B55EE0A8877B8F8B4DC13F9567EBE0B8FE8AFDEB34D2",
+        "bytes": 218,
+        "detected": [],
+        "head": [
+          "Kvazaar uses \"Greatest\" C unit testing library, licensed under ISC license.",
+          "A fork of the library is included in the git project as a submodule. The",
+          "original can be found at https://github.com/silentbicycle/greatest ."
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-lcevcdec",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "3AFA5369B4FB44E18280B6E0E275971F78BC6EAF5F53553F41F2483FD8B1267E",
+        "bytes": 817,
+        "detected": [],
+        "head": [
+          "Copyright (c) V-Nova International Limited 2014-2026. All rights reserved.",
+          "This software is licensed under the BSD-3-Clause-Clear License by V-Nova Limited.",
+          "No patent licenses are granted under this license. For enquiries about patent licenses,",
+          "please contact legal@v-nova.com.",
+          "The LCEVCdec software is a stand-alone project and is NOT A CONTRIBUTION to any other project.",
+          "If the software is incorporated into another project, THE TERMS OF THE BSD-3-CLAUSE-CLEAR LICENSE",
+          "AND THE ADDITIONAL LICENSING INFORMATION CONTAINED IN THIS FILE MUST BE MAINTAINED, AND THE",
+          "SOFTWARE DOES NOT AND MUST NOT ADOPT THE LICENSE OF THE INCORPORATING PROJECT. ANY ONWARD"
+        ]
+      },
+      {
+        "path": "./LICENSE.md",
+        "sha256": "14358B0ECF6E7036C211C10F0F25563C94483DEE7B8C7C954E09E10F3771D0AF",
+        "bytes": 1659,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "The Clear BSD License",
+          "Copyright (c) V-Nova International Limited 2014 - 2026. All rights reserved.",
+          "Redistribution and use in source and binary forms, with or without modification, are permitted",
+          "(subject to the limitations in the disclaimer and the additional terms below) provided that the",
+          "following conditions are met:",
+          "* Redistributions of source code must retain the above copyright notice, this list of conditions",
+          "and the following disclaimer.",
+          "* Redistributions in binary form must reproduce the above copyright notice, this list of conditions"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-libaribb24",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "DA7EABB7BAFDF7D3AE5E9F223AA5BDC1EECE45AC569DC21B3B037520B4464768",
+        "bytes": 7651,
+        "detected": [
+          "LGPL-3.0"
+        ],
+        "head": [
+          "GNU LESSER GENERAL PUBLIC LICENSE",
+          "Version 3, 29 June 2007",
+          "Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "This version of the GNU Lesser General Public License incorporates",
+          "the terms and conditions of version 3 of the GNU General Public",
+          "License, supplemented by the additional permissions listed below."
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-libaribcaption",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "5149F1CE4FE89190D86BFB440456701A3A7406FC2B19EF0D8B57661F62B32C04",
+        "bytes": 1065,
+        "detected": [
+          "MIT"
+        ],
+        "head": [
+          "MIT License",
+          "Copyright (c) 2022 magicxqq",
+          "Permission is hereby granted, free of charge, to any person obtaining a copy",
+          "of this software and associated documentation files (the \"Software\"), to deal",
+          "in the Software without restriction, including without limitation the rights",
+          "to use, copy, modify, merge, publish, distribute, sublicense, and/or sell",
+          "copies of the Software, and to permit persons to whom the Software is",
+          "furnished to do so, subject to the following conditions:"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-libass",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "F7E30699D02798351E7F839E3D3BFEB29CE65E44EFA7735C225464C4FD7DFE9C",
+        "bytes": 755,
+        "detected": [
+          "ISC"
+        ],
+        "head": [
+          "ISC License",
+          "Copyright (C) 2006-2016 libass contributors",
+          "Permission to use, copy, modify, and/or distribute this software for any",
+          "purpose with or without fee is hereby granted, provided that the above",
+          "copyright notice and this permission notice appear in all copies.",
+          "THE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES",
+          "WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF",
+          "MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-libbluray",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "B3AA400ACA6D2BA1F0BD03BD98D03D1FE7489A3BBB26969D72016360AF8A5C9D",
+        "bytes": 24478,
+        "detected": [
+          "LGPL-2.1"
+        ],
+        "head": [
+          "GNU LESSER GENERAL PUBLIC LICENSE",
+          "Version 2.1, February 1999",
+          "Copyright (C) 1991, 1999 Free Software Foundation, Inc.",
+          "51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "[This is the first released version of the Lesser GPL.  It also counts",
+          "as the successor of the GNU Library Public License, version 2, hence"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-libcurl",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "82F2F4427D6545EE5AAAC4F0B80428DA6CC8BA41C2CF5DA3A03680EC327B9681",
+        "bytes": 1088,
+        "detected": [],
+        "head": [
+          "COPYRIGHT AND PERMISSION NOTICE",
+          "Copyright (c) 1996 - 2026, Daniel Stenberg, <daniel@haxx.se>, and many",
+          "contributors, see the THANKS file.",
+          "All rights reserved.",
+          "Permission to use, copy, modify, and distribute this software for any purpose",
+          "with or without fee is hereby granted, provided that the above copyright",
+          "notice and this permission notice appear in all copies.",
+          "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-libjxl",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "8405932022A556380C2D8C272EFF154A923FEB197233F348CE5F7334FB0A5EDE",
+        "bytes": 1508,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "Copyright (c) the JPEG XL Project Authors.",
+          "All rights reserved.",
+          "Redistribution and use in source and binary forms, with or without",
+          "modification, are permitted provided that the following conditions are met:",
+          "1. Redistributions of source code must retain the above copyright notice, this",
+          "list of conditions and the following disclaimer.",
+          "2. Redistributions in binary form must reproduce the above copyright notice,",
+          "this list of conditions and the following disclaimer in the documentation"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-libmp3lame",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "E64F9C5A18F56828C10A575DF13ADE641AA3AF4512A7AFE6C411256943B57AAF",
+        "bytes": 25281,
+        "detected": [],
+        "head": [
+          "GNU LIBRARY GENERAL PUBLIC LICENSE",
+          "Version 2, June 1991",
+          "Copyright (C) 1991 Free Software Foundation, Inc.",
+          "51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "[This is the first released version of the library GPL.  It is",
+          "numbered 2 because it goes with version 2 of the ordinary GPL.]"
+        ]
+      },
+      {
+        "path": "./LICENSE",
+        "sha256": "5C1F8D44F1EACBEA3E1C31FF6EE11A4E1690CCBED4EE4AF16DE3B6EB61DC69A8",
+        "bytes": 503,
+        "detected": [],
+        "head": [
+          "Can I use LAME in my commercial program?",
+          "Yes, you can, under the restrictions of the LGPL (see COPYING",
+          "in this folder). The easiest way to do this is to:",
+          "1. Link to LAME as separate library (libmp3lame.a on unix or",
+          "lame_enc.dll or libmp3lame.dll on windows)",
+          "2. Fully acknowledge that you are using LAME, and give a link",
+          "to our web site, https://lame.sourceforge.io/:w",
+          "3. If you make modifications to LAME, you *must* release these"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-libopus",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "01E1167D54A096D123CF6DFBBEB19587278845C6481D2D66D545669846079551",
+        "bytes": 1945,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "Copyright 2001-2023 Xiph.Org, Skype Limited, Octasic,",
+          "Jean-Marc Valin, Timothy B. Terriberry,",
+          "CSIRO, Gregory Maxwell, Mark Borgerding,",
+          "Erik de Castro Lopo, Mozilla, Amazon",
+          "Redistribution and use in source and binary forms, with or without",
+          "modification, are permitted provided that the following conditions",
+          "are met:",
+          "- Redistributions of source code must retain the above copyright"
+        ]
+      },
+      {
+        "path": "./LICENSE_PLEASE_READ.txt",
+        "sha256": "7EFB4989E0CD1B256229BDF2F09300C5D14E35DB0E7476BFB87FAC243498273D",
+        "bytes": 703,
+        "detected": [],
+        "head": [
+          "Contributions to the collaboration shall not be considered confidential.",
+          "Each contributor represents and warrants that it has the right and",
+          "authority to license copyright in its contributions to the collaboration.",
+          "Each contributor agrees to license the copyright in the contributions",
+          "under the Modified (2-clause or 3-clause) BSD License or the Clear BSD License.",
+          "Please see the IPR statements submitted to the IETF for the complete",
+          "patent licensing details:",
+          "Xiph.Org Foundation:"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-libplacebo",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "B3AA400ACA6D2BA1F0BD03BD98D03D1FE7489A3BBB26969D72016360AF8A5C9D",
+        "bytes": 24478,
+        "detected": [
+          "LGPL-2.1"
+        ],
+        "head": [
+          "GNU LESSER GENERAL PUBLIC LICENSE",
+          "Version 2.1, February 1999",
+          "Copyright (C) 1991, 1999 Free Software Foundation, Inc.",
+          "51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "[This is the first released version of the Lesser GPL.  It also counts",
+          "as the successor of the GNU Library Public License, version 2, hence"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-librist",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "B9841591A3452EE30033D8E3586C7B1244A0B2FC1DC6CB04576957C313CB2792",
+        "bytes": 1319,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "Copyright \u00a9 2019-2020, VideoLAN and librist authors",
+          "All rights reserved.",
+          "Redistribution and use in source and binary forms, with or without",
+          "modification, are permitted provided that the following conditions are met:",
+          "1. Redistributions of source code must retain the above copyright notice, this",
+          "list of conditions and the following disclaimer.",
+          "2. Redistributions in binary form must reproduce the above copyright notice,",
+          "this list of conditions and the following disclaimer in the documentation"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-libssh",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "1656186E951DB1C010A8485481FA94587F7E53A26D24976BEF97945AD0C4DF5A",
+        "bytes": 25008,
+        "detected": [
+          "LGPL-2.1"
+        ],
+        "head": [
+          "GNU LESSER GENERAL PUBLIC LICENSE",
+          "Version 2.1, February 1999",
+          "Copyright (C) 1991, 1999 Free Software Foundation, Inc.",
+          "59 Temple Place, Suite 330, Boston, MA  02111-1307  USA",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "[This is the first released version of the Lesser GPL.  It also counts",
+          "as the successor of the GNU Library Public License, version 2, hence"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-libtheora",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "8417FAD7DA775735564E209484A2E011E0FA201E94F01FDBEE6E4977E478E6FC",
+        "bytes": 1470,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "Copyright (C) 2002-2009 Xiph.org Foundation",
+          "Redistribution and use in source and binary forms, with or without",
+          "modification, are permitted provided that the following conditions",
+          "are met:",
+          "- Redistributions of source code must retain the above copyright",
+          "notice, this list of conditions and the following disclaimer.",
+          "- Redistributions in binary form must reproduce the above copyright",
+          "notice, this list of conditions and the following disclaimer in the"
+        ]
+      },
+      {
+        "path": "./LICENSE",
+        "sha256": "2C902950C73A63CD285DC0C36573DE9C5FEFE66D49312949C51D941F33E92932",
+        "bytes": 960,
+        "detected": [],
+        "head": [
+          "Please see the file COPYING for the copyright license for this software.",
+          "In addition to and irrespective of the copyright license associated",
+          "with this software, On2 Technologies, Inc. makes the following statement",
+          "regarding technology used in this software:",
+          "On2 represents and warrants that it shall not assert any rights",
+          "relating to infringement of On2's registered patents, nor initiate",
+          "any litigation asserting such rights, against any person who, or",
+          "entity which utilizes the On2 VP3 Codec Software, including any"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-libva",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "C86A782EE845B52472DAE9B9D79FB915D333628AC0EFE49CDCE63644814931DE",
+        "bytes": 1130,
+        "detected": [
+          "MIT"
+        ],
+        "head": [
+          "Permission is hereby granted, free of charge, to any person obtaining a",
+          "copy of this software and associated documentation files (the",
+          "\"Software\"), to deal in the Software without restriction, including",
+          "without limitation the rights to use, copy, modify, merge, publish,",
+          "distribute, sub license, and/or sell copies of the Software, and to",
+          "permit persons to whom the Software is furnished to do so, subject to",
+          "the following conditions:",
+          "The above copyright notice and this permission notice (including the"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-libvpx",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "8267348D5AF1262C11D1A08DE2F5AFC77457755F1AC658627DD9ACF71011D615",
+        "bytes": 1537,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "Copyright (c) 2010, The WebM Project authors. All rights reserved.",
+          "Redistribution and use in source and binary forms, with or without",
+          "modification, are permitted provided that the following conditions are",
+          "met:",
+          "* Redistributions of source code must retain the above copyright",
+          "notice, this list of conditions and the following disclaimer.",
+          "* Redistributions in binary form must reproduce the above copyright",
+          "notice, this list of conditions and the following disclaimer in"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-libwebp",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "5AEC868F669E384A22372A4E8A1A6CD7D44C64CD451F960CA69CC170D1E13ACF",
+        "bytes": 1496,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "Copyright (c) 2010, Google Inc. All rights reserved.",
+          "Redistribution and use in source and binary forms, with or without",
+          "modification, are permitted provided that the following conditions are",
+          "met:",
+          "* Redistributions of source code must retain the above copyright",
+          "notice, this list of conditions and the following disclaimer.",
+          "* Redistributions in binary form must reproduce the above copyright",
+          "notice, this list of conditions and the following disclaimer in"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-libzmq",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "1F256ECAD192880510E84AD60474EAB7589218784B9A50BC7CEEE34C2B91F1D5",
+        "bytes": 16725,
+        "detected": [
+          "MPL-2.0"
+        ],
+        "head": [
+          "Mozilla Public License Version 2.0",
+          "==================================",
+          "1. Definitions",
+          "--------------",
+          "1.1. \"Contributor\"",
+          "means each individual or legal entity that creates, contributes to",
+          "the creation of, or owns Covered Software.",
+          "1.2. \"Contributor Version\""
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-onevpl",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "BF1CFAC2E2792B6E1E995CE103D70796AECAF2EC7E4C5FE5474F7ACEC7B4A677",
+        "bytes": 1074,
+        "detected": [
+          "MIT"
+        ],
+        "head": [
+          "MIT License",
+          "Copyright (c) 2020 Intel Corporation",
+          "Permission is hereby granted, free of charge, to any person obtaining a copy",
+          "of this software and associated documentation files (the \"Software\"), to deal",
+          "in the Software without restriction, including without limitation the rights",
+          "to use, copy, modify, merge, publish, distribute, sublicense, and/or sell",
+          "copies of the Software, and to permit persons to whom the Software is",
+          "furnished to do so, subject to the following conditions:"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-openal",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "D808CE217E5B611854DA622B57EC29FE545584C48BC5352FAE72A4B6E5074A15",
+        "bytes": 23330,
+        "detected": [],
+        "head": [
+          "GNU LIBRARY GENERAL PUBLIC LICENSE",
+          "Version 2, June 1991",
+          "Copyright (C) 1991 Free Software Foundation, Inc.",
+          "51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "[This is the first released version of the library GPL.  It is",
+          "numbered 2 because it goes with version 2 of the ordinary GPL.]"
+        ]
+      },
+      {
+        "path": "./LICENSE-pffft",
+        "sha256": "64056328B3E7BC104E24EF96ACCC1A7ABEAD156F0C02D1B87C97E3F3A28030DE",
+        "bytes": 1669,
+        "detected": [],
+        "head": [
+          "A modified PFFFT is included, with the following license.",
+          "Copyright (c) 2023  Christopher Robinson",
+          "Copyright (c) 2013  Julien Pommier ( pommier@modartt.com )",
+          "Copyright (c) 2004 the University Corporation for Atmospheric",
+          "Research (\"UCAR\"). All rights reserved. Developed by NCAR's",
+          "Computational and Information Systems Laboratory, UCAR,",
+          "www.cisl.ucar.edu.",
+          "Redistribution and use of the Software in source and binary forms,"
+        ]
+      },
+      {
+        "path": "./LICENSE.Apache-2.0.txt",
+        "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+        "bytes": 11358,
+        "detected": [
+          "Apache-2.0"
+        ],
+        "head": [
+          "Apache License",
+          "Version 2.0, January 2004",
+          "http://www.apache.org/licenses/",
+          "TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION",
+          "1. Definitions.",
+          "\"License\" shall mean the terms and conditions for use, reproduction,",
+          "and distribution as defined by Sections 1 through 9 of this document.",
+          "\"Licensor\" shall mean the copyright owner or entity authorized by"
+        ]
+      },
+      {
+        "path": "./LICENSE.BSD-3-Clause.txt",
+        "sha256": "B5A08CF98996DD83AA906A72C163600F6CB17A65CE546A553815A1267ABD43FF",
+        "bytes": 1652,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "Portions of this software are licensed under the BSD 3-Clause license.",
+          "Copyright (c) 2015, Archontis Politis",
+          "Copyright (c) 2019, Anis A. Hireche",
+          "Copyright (c) 2019, Christopher Robinson",
+          "All rights reserved.",
+          "Redistribution and use in source and binary forms, with or without",
+          "modification, are permitted provided that the following conditions are met:",
+          "* Redistributions of source code must retain the above copyright notice, this"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-openapv",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "7AD8E53C0C3E24E7BA64DBCAD5E7706108F3DC67CF6515EF761ADAC0A39DAB25",
+        "bytes": 1503,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "Copyright (c) 2022 Samsung Electronics Co., Ltd.",
+          "All Rights Reserved.",
+          "Redistribution and use in source and binary forms, with or without",
+          "modification, are permitted provided that the following conditions are met:",
+          "- Redistributions of source code must retain the above copyright notice,",
+          "this list of conditions and the following disclaimer.",
+          "- Redistributions in binary form must reproduce the above copyright notice,",
+          "this list of conditions and the following disclaimer in the documentation"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-opencore-amr",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "8B3F1762349248D444AB9ACBAFE73941254E36E1064954DA56BB9DDBD5873DDB",
+        "bytes": 10271,
+        "detected": [
+          "Apache-2.0"
+        ],
+        "head": [
+          "Apache License",
+          "Version 2.0, January 2004",
+          "http://www.apache.org/licenses/",
+          "TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION",
+          "1. Definitions.",
+          "\"License\" shall mean the terms and conditions for use, reproduction, and",
+          "distribution as defined by Sections 1 through 9 of this document.",
+          "\"Licensor\" shall mean the copyright owner or entity authorized by the"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-openh264",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "DD5C1C9668512530FA5A96E4C29AC4033D70A7EEB0EED7A42FDDB6DD794EBDBB",
+        "bytes": 1295,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "Copyright (c) 2013, Cisco Systems",
+          "All rights reserved.",
+          "Redistribution and use in source and binary forms, with or without modification,",
+          "are permitted provided that the following conditions are met:",
+          "* Redistributions of source code must retain the above copyright notice, this",
+          "list of conditions and the following disclaimer.",
+          "* Redistributions in binary form must reproduce the above copyright notice, this",
+          "list of conditions and the following disclaimer in the documentation and/or"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-openjpeg",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "A6AF136F3E15038A666B61F376612A07D9A4E48CB7C01ADBF3E33B3F14AB49B6",
+        "bytes": 2112,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "/*",
+          "* The copyright in this software is being made available under the 2-clauses",
+          "* BSD License, included below. This software may be subject to other third",
+          "* party and contributor rights, including patent rights, and no such rights",
+          "* are granted under this license.",
+          "*",
+          "* Copyright (c) 2002-2014, Universite catholique de Louvain (UCL), Belgium",
+          "* Copyright (c) 2002-2014, Professor Benoit Macq"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-openmpt",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "2C999E99533C10A347916A72E075BACF10FCEDEFF793BD90D41D812B46161DA2",
+        "bytes": 1621,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "Copyright (c) 2004-2026, OpenMPT Project Developers and Contributors",
+          "Copyright (c) 1997-2003, Olivier Lapicque",
+          "All rights reserved.",
+          "Redistribution and use in source and binary forms, with or without",
+          "modification, are permitted provided that the following conditions are met:",
+          "* Redistributions of source code must retain the above copyright",
+          "notice, this list of conditions and the following disclaimer.",
+          "* Redistributions in binary form must reproduce the above copyright"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-rav1e",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "2DD0A109751E939DEC3F80DDCFBC1BA91553F18C574399E85C159632182A2C0A",
+        "bytes": 1332,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "BSD 2-Clause License",
+          "Copyright (c) 2017-2023, the rav1e contributors",
+          "All rights reserved.",
+          "Redistribution and use in source and binary forms, with or without",
+          "modification, are permitted provided that the following conditions are met:",
+          "* Redistributions of source code must retain the above copyright notice, this",
+          "list of conditions and the following disclaimer.",
+          "* Redistributions in binary form must reproduce the above copyright notice,"
+        ]
+      },
+      {
+        "path": "./license_template.txt",
+        "sha256": "5097DF781D1759AABEA7EEAA308A591E9B6E0E4389EFF515FDAB458C4B4389AC",
+        "bytes": 526,
+        "detected": [],
+        "head": [
+          "// Copyright (c) 2017-2019, The rav1e contributors. All rights reserved",
+          "//",
+          "// This source code is subject to the terms of the BSD 2 Clause License and",
+          "// the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License",
+          "// was not distributed with this source code in the LICENSE file, you can",
+          "// obtain it at www.aomedia.org/license/software. If the Alliance for Open",
+          "// Media Patent License 1.0 was not distributed with this source code in the",
+          "// PATENTS file, you can obtain it at www.aomedia.org/license/patent."
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-sdl",
+    "files": [
+      {
+        "path": "./LICENSE.txt",
+        "sha256": "1C040B8271B37E5076359F8FD54240E371114112924D2DF81EF87C7D6A1DFDFD",
+        "bytes": 884,
+        "detected": [
+          "Zlib"
+        ],
+        "head": [
+          "Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>",
+          "This software is provided 'as-is', without any express or implied",
+          "warranty.  In no event will the authors be held liable for any damages",
+          "arising from the use of this software.",
+          "Permission is granted to anyone to use this software for any purpose,",
+          "including commercial applications, and to alter it and redistribute it",
+          "freely, subject to the following restrictions:",
+          "1. The origin of this software must not be misrepresented; you must not"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-shaderc",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "C71D239DF91726FC519C6EB72D318EC65820627232B2F796219E87DCF35D0AB4",
+        "bytes": 11357,
+        "detected": [
+          "Apache-2.0"
+        ],
+        "head": [
+          "Apache License",
+          "Version 2.0, January 2004",
+          "http://www.apache.org/licenses/",
+          "TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION",
+          "1. Definitions.",
+          "\"License\" shall mean the terms and conditions for use, reproduction,",
+          "and distribution as defined by Sections 1 through 9 of this document.",
+          "\"Licensor\" shall mean the copyright owner or entity authorized by"
+        ]
+      },
+      {
+        "path": "./license-checker.cfg",
+        "sha256": "FF39F110E4B17C6A2E24EACC14A32674C2C1F2385828BDC23A0399D3475FFFC8",
+        "bytes": 872,
+        "detected": [],
+        "head": [
+          "[",
+          "{",
+          "\"licenses\": [ \"Apache-2.0\" ],",
+          "\"paths\": [",
+          "{",
+          "\"exclude\": [",
+          "\"**.md\",",
+          "\"**.png\","
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-snappy",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "55172044F7E241207117448A4D9D6BA1D0925C8AD66B5D4C08C70ADFA9CC3DE6",
+        "bytes": 2645,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "Copyright 2011, Google Inc.",
+          "All rights reserved.",
+          "Redistribution and use in source and binary forms, with or without",
+          "modification, are permitted provided that the following conditions are",
+          "met:",
+          "* Redistributions of source code must retain the above copyright",
+          "notice, this list of conditions and the following disclaimer.",
+          "* Redistributions in binary form must reproduce the above"
+        ]
+      },
+      {
+        "path": "./COPYING.notestdata",
+        "sha256": "5221A36A801B981FBDFDA7B87DB64CFF231A3B88223A066C325411B539DF796F",
+        "bytes": 1475,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "Copyright 2011, Google Inc.",
+          "All rights reserved.",
+          "Redistribution and use in source and binary forms, with or without",
+          "modification, are permitted provided that the following conditions are",
+          "met:",
+          "* Redistributions of source code must retain the above copyright",
+          "notice, this list of conditions and the following disclaimer.",
+          "* Redistributions in binary form must reproduce the above"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-soxr",
+    "files": [
+      {
+        "path": "./COPYING.LGPL",
+        "sha256": "F2F118B9029EC1871B953639ECC46651B2FC7B62E295E6CF3EF2AC4C9A058B33",
+        "bytes": 26432,
+        "detected": [
+          "LGPL-2.1"
+        ],
+        "head": [
+          "GNU LESSER GENERAL PUBLIC LICENSE",
+          "Version 2.1, February 1999",
+          "Copyright (C) 1991, 1999 Free Software Foundation, Inc.",
+          "51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "[This is the first released version of the Lesser GPL.  It also counts",
+          "as the successor of the GNU Library Public License, version 2, hence"
+        ]
+      },
+      {
+        "path": "./LICENCE",
+        "sha256": "DC98676341FDCD29D9F279C9679D6A75288785B174DED8D1B2E316C366166135",
+        "bytes": 1024,
+        "detected": [],
+        "head": [
+          "SoX Resampler Library       Copyright (c) 2007-18 robs@users.sourceforge.net",
+          "This library is free software; you can redistribute it and/or modify it",
+          "under the terms of the GNU Lesser General Public License as published by",
+          "the Free Software Foundation; either version 2.1 of the License, or (at",
+          "your option) any later version.",
+          "This library is distributed in the hope that it will be useful, but",
+          "WITHOUT ANY WARRANTY; without even the implied warranty of",
+          "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-srt",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "FAB3DD6BDAB226F1C08630B1DD917E11FCB4EC5E1E020E2C16F83A0A13863E85",
+        "bytes": 16726,
+        "detected": [
+          "MPL-2.0"
+        ],
+        "head": [
+          "Mozilla Public License Version 2.0",
+          "==================================",
+          "1. Definitions",
+          "--------------",
+          "1.1. \"Contributor\"",
+          "means each individual or legal entity that creates, contributes to",
+          "the creation of, or owns Covered Software.",
+          "1.2. \"Contributor Version\""
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-svtav1",
+    "files": [
+      {
+        "path": "./LICENSE-BSD2.md",
+        "sha256": "C582FCBEB9CF972A60D298BFAF41DC5ADFF2DD14208946EDCB9BB56A281E8438",
+        "bytes": 1316,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "Copyright (c) 2019, Alliance for Open Media. All rights reserved.",
+          "Redistribution and use in source and binary forms, with or without",
+          "modification, are permitted provided that the following conditions",
+          "are met:",
+          "1. Redistributions of source code must retain the above copyright",
+          "notice, this list of conditions and the following disclaimer.",
+          "2. Redistributions in binary form must reproduce the above copyright",
+          "notice, this list of conditions and the following disclaimer in"
+        ]
+      },
+      {
+        "path": "./LICENSE.md",
+        "sha256": "0ACC2FCB27472BDC9AAF8B71F37055BBDAC4F54671B7D922F241BD7FCD0DD3E6",
+        "bytes": 1709,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "BSD 3-Clause Clear License",
+          "The Clear BSD License",
+          "Copyright (c) 2021, Alliance for Open Media",
+          "All rights reserved.",
+          "Redistribution and use in source and binary forms, with or without",
+          "modification, are permitted (subject to the limitations in the disclaimer below)",
+          "provided that the following conditions are met:",
+          "1. Redistributions of source code must retain the above copyright"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-twolame",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "257A842724705950B07DA76CE0E22FFA80EC77B3E9DFC6702522AC342409DA0F",
+        "bytes": 26428,
+        "detected": [
+          "LGPL-2.1"
+        ],
+        "head": [
+          "GNU LESSER GENERAL PUBLIC LICENSE",
+          "Version 2.1, February 1999",
+          "Copyright (C) 1991, 1999 Free Software Foundation, Inc.",
+          "59 Temple Place, Suite 330, Boston, MA  02111-1307  USA",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "[This is the first released version of the Lesser GPL.  It also counts",
+          "as the successor of the GNU Library Public License, version 2, hence"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-uavs3d",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "5A8DCB7DA222DF8A81B6E334000F859248196335E2D28E1DB9F3C552827D7CDF",
+        "bytes": 1690,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "Copyright (c) 2018-2022 [\"Peking University Shenzhen Graduate School\", \"Peng Cheng Laboratory\", and \"Guangdong Bohua UHD Innovation Corporation\"]",
+          "All rights reserved.",
+          "Redistribution and use in source and binary forms, with or without",
+          "modification, are permitted provided that the following conditions are met:",
+          "1. Redistributions of source code must retain the above copyright",
+          "notice, this list of conditions and the following disclaimer.",
+          "2. Redistributions in binary form must reproduce the above copyright",
+          "notice, this list of conditions and the following disclaimer in the"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-vvenc",
+    "files": [
+      {
+        "path": "./LICENSE.txt",
+        "sha256": "88330A2CC59B9DD90674F8759900BC9C06E9EFC8799DADDA067609ADDEFB49D1",
+        "bytes": 1768,
+        "detected": [
+          "BSD"
+        ],
+        "head": [
+          "The Clear BSD License",
+          "Copyright (c) 2019-2026, Fraunhofer-Gesellschaft zur F\u00f6rderung der angewandten Forschung e.V. & The VVenC Authors.",
+          "All rights reserved.",
+          "Redistribution and use in source and binary forms, with or without modification,",
+          "are permitted (subject to the limitations in the disclaimer below) provided that",
+          "the following conditions are met:",
+          "* Redistributions of source code must retain the above copyright notice,",
+          "this list of conditions and the following disclaimer."
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-zimg",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "7637386B5F81E8A719CA336233149005E5FA28B5E6054EA7B67DE49355B0AD40",
+        "bytes": 484,
+        "detected": [],
+        "head": [
+          "DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE",
+          "Version 2, December 2004",
+          "Copyright (C) 2004 Sam Hocevar <sam@hocevar.net>",
+          "Everyone is permitted to copy and distribute verbatim or modified",
+          "copies of this license document, and changing it is allowed as long",
+          "as the name is changed.",
+          "DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE",
+          "TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "50-zvbi",
+    "files": [
+      {
+        "path": "./COPYING.md",
+        "sha256": "6D679539253897582D38FCD1EABFA670C01C0ECE73D8CD3DC97869FCF723F106",
+        "bytes": 78695,
+        "detected": [
+          "MIT",
+          "BSD"
+        ],
+        "head": [
+          "**zvbi/libzvbi, https://github.com/zapping-vbi/zvbi**",
+          "=======================================================================",
+          "**Unless otherwise specified below, zvbi files have the following copyright and license:**",
+          "Copyright (c) 1995-1997 Martin Buck \\<martin-2.buck@student.uni-ulm.de>",
+          "Copyright (c) 1998-1999 Edgar Toernig \\<froese@gmx.de>",
+          "Copyright (c) 1999      Paul Ortyl \\<ortylp@from.pl>",
+          "Copyright (c) 2000-2013 Michael H. Schimek <mschimek@gmx.at, mschimek@users.sf.net>",
+          "Copyright (c) 2002      Dave Chapman"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "55-spirv-cross",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+        "bytes": 11358,
+        "detected": [
+          "Apache-2.0"
+        ],
+        "head": [
+          "Apache License",
+          "Version 2.0, January 2004",
+          "http://www.apache.org/licenses/",
+          "TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION",
+          "1. Definitions.",
+          "\"License\" shall mean the terms and conditions for use, reproduction,",
+          "and distribution as defined by Sections 1 through 9 of this document.",
+          "\"Licensor\" shall mean the copyright owner or entity authorized by"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "60-spirv-headers",
+    "files": [
+      {
+        "path": "./LICENSE",
+        "sha256": "EA43B1DE38A6F90C488800D66DEC1ED671E68CDA530266BC96951FB5B6307613",
+        "bytes": 23503,
+        "detected": [
+          "MIT"
+        ],
+        "head": [
+          "Files: All files except for those called out below.",
+          "Copyright (c) 2015-2024 The Khronos Group Inc.",
+          "Permission is hereby granted, free of charge, to any person obtaining a",
+          "copy of this software and/or associated documentation files (the",
+          "\"Materials\"), to deal in the Materials without restriction, including",
+          "without limitation the rights to use, copy, modify, merge, publish,",
+          "distribute, sublicense, and/or sell copies of the Materials, and to",
+          "permit persons to whom the Materials are furnished to do so, subject to"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "96-lv2",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "1E6BB175E193608B767FF25A4ED68B82C4DB599491CF0D2694435CF60E9A4841",
+        "bytes": 827,
+        "detected": [
+          "ISC"
+        ],
+        "head": [
+          "Copyright 2006-2012 Steve Harris, David Robillard.",
+          "Copyright 2000-2002 Richard W.E. Furse, Paul Barton-Davis, Stefan Westerfeld.",
+          "Permission to use, copy, modify, and/or distribute this software for any",
+          "purpose with or without fee is hereby granted, provided that the above",
+          "copyright notice and this permission notice appear in all copies.",
+          "THE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH",
+          "REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND",
+          "FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "96-serd",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "AE223ADEBE7CC1EE0716E0F926D1ECC8E42C6E4DA7E1D7418C9C07FAE244BBDE",
+        "bytes": 751,
+        "detected": [
+          "ISC"
+        ],
+        "head": [
+          "Copyright 2011-2026 David Robillard <d@drobilla.net>",
+          "Permission to use, copy, modify, and/or distribute this software for any",
+          "purpose with or without fee is hereby granted, provided that the above",
+          "copyright notice and this permission notice appear in all copies.",
+          "THE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH",
+          "REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND",
+          "FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,",
+          "INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "96-zix",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "1314CC14FB947491491C517C533AC7DE4F6798585F922A472358082C25AC1881",
+        "bytes": 752,
+        "detected": [
+          "ISC"
+        ],
+        "head": [
+          "Copyright 2011-2022 David Robillard <d@drobilla.net>",
+          "Permission to use, copy, modify, and/or distribute this software for any",
+          "purpose with or without fee is hereby granted, provided that the above",
+          "copyright notice and this permission notice appear in all copies.",
+          "THE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH",
+          "REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND",
+          "FITNESS.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,",
+          "INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "97-sord",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "AE223ADEBE7CC1EE0716E0F926D1ECC8E42C6E4DA7E1D7418C9C07FAE244BBDE",
+        "bytes": 751,
+        "detected": [
+          "ISC"
+        ],
+        "head": [
+          "Copyright 2011-2026 David Robillard <d@drobilla.net>",
+          "Permission to use, copy, modify, and/or distribute this software for any",
+          "purpose with or without fee is hereby granted, provided that the above",
+          "copyright notice and this permission notice appear in all copies.",
+          "THE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH",
+          "REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND",
+          "FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,",
+          "INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "98-sratom",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "1D968C655ECAD113E128DBF4D4DEABD9E30B931B42943B6A681C9CF11D7DA5D4",
+        "bytes": 751,
+        "detected": [
+          "ISC"
+        ],
+        "head": [
+          "Copyright 2012-2026 David Robillard <d@drobilla.net>",
+          "Permission to use, copy, modify, and/or distribute this software for any",
+          "purpose with or without fee is hereby granted, provided that the above",
+          "copyright notice and this permission notice appear in all copies.",
+          "THE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH",
+          "REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND",
+          "FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,",
+          "INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "99-librsvg",
+    "files": [
+      {
+        "path": "./COPYING.LIB",
+        "sha256": "DC626520DCD53A22F727AF3EE42C770E56C97A64FE3ADB063799D8AB032FE551",
+        "bytes": 26530,
+        "detected": [
+          "LGPL-2.1"
+        ],
+        "head": [
+          "GNU LESSER GENERAL PUBLIC LICENSE",
+          "Version 2.1, February 1999",
+          "Copyright (C) 1991, 1999 Free Software Foundation, Inc.",
+          "51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA",
+          "Everyone is permitted to copy and distribute verbatim copies",
+          "of this license document, but changing it is not allowed.",
+          "[This is the first released version of the Lesser GPL.  It also counts",
+          "as the successor of the GNU Library Public License, version 2, hence"
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "99-lilv",
+    "files": [
+      {
+        "path": "./COPYING",
+        "sha256": "AE223ADEBE7CC1EE0716E0F926D1ECC8E42C6E4DA7E1D7418C9C07FAE244BBDE",
+        "bytes": 751,
+        "detected": [
+          "ISC"
+        ],
+        "head": [
+          "Copyright 2011-2026 David Robillard <d@drobilla.net>",
+          "Permission to use, copy, modify, and/or distribute this software for any",
+          "purpose with or without fee is hereby granted, provided that the above",
+          "copyright notice and this permission notice appear in all copies.",
+          "THE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH",
+          "REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND",
+          "FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,",
+          "INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM"
+        ]
+      }
+    ]
+  }
+]
