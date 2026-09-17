@@ -3,17 +3,17 @@
 meta:
   created_at: 2026-09-17 (Asia/Seoul)
   review_mode: high_risk
-  review_target: d4c55f907011d4e9db3fea4380cc886830845af8
+  review_target: 32f03f99d1339aa5f8fd37a1f6a1904b6dad5a28
   comparison_base: baf39d25370e05a69814357cd2d0a5cb10696910
   alternative_comparison_evidence:
     status: available
     items:
-      - `git merge-base baf39d25370e05a69814357cd2d0a5cb10696910 d4c55f907011d4e9db3fea4380cc886830845af8` returned the comparison base.
-      - `git rev-list --count baf39d25370e05a69814357cd2d0a5cb10696910..d4c55f907011d4e9db3fea4380cc886830845af8` returned 65.
-      - `git diff --stat` reported 822 files changed, 287363 insertions, and 248 deletions.
-      - `git diff --name-status` reported 799 added files, 23 modified files, and no deleted files.
-      - The authenticated SSH push reported `baf39d2..d4c55f9  HEAD -> main`.
-      - The post-push `git ls-remote origin refs/heads/main` result was exactly `d4c55f907011d4e9db3fea4380cc886830845af8`.
+      - `git merge-base baf39d25370e05a69814357cd2d0a5cb10696910 32f03f99d1339aa5f8fd37a1f6a1904b6dad5a28` returned the comparison base.
+      - `git rev-list --count baf39d25370e05a69814357cd2d0a5cb10696910..32f03f99d1339aa5f8fd37a1f6a1904b6dad5a28` returned 69.
+      - `git diff --shortstat` reported 823 files changed, 287821 insertions, and 250 deletions.
+      - `git diff --name-status` reported 800 added files, 23 modified files, and no deleted files.
+      - The corrective authenticated SSH push reported `766a89f..32f03f9  HEAD -> main`.
+      - The post-push `git ls-remote origin refs/heads/main` result was exactly `32f03f99d1339aa5f8fd37a1f6a1904b6dad5a28`.
   feedback_source:
     - User report that the interface appeared to download only low-quality video despite higher-quality streams being available.
     - User-approved quality preset, GUI, dependency-license, and `v2.19.1-karon.2` release plan.
@@ -29,8 +29,8 @@ meta:
     - Publish the exact source target to public `origin/main` by a normal fast-forward SSH push.
     - Exclude independent GUI adjudication, final ZIP adjudication, tag creation, and GitHub Release publication from this implementation session.
   changed_files:
-    total: 822
-    added: 799
+    total: 823
+    added: 800
     modified: 23
     deleted: 0
     top_level_counts:
@@ -39,17 +39,17 @@ meta:
       tools: 18
       ytdlp-interface: 17
       docs: 3
-      review: 3
+      review: 4
       locales: 1
       README.md: 1
       THIRD-PARTY-NOTICES.txt: 1
       ytdlp-interface dependencies.7z: 1
-    full_inventory: https://github.com/KaronLabs/ytdlp-korean-interface/compare/baf39d25370e05a69814357cd2d0a5cb10696910...d4c55f907011d4e9db3fea4380cc886830845af8
+    full_inventory: https://github.com/KaronLabs/ytdlp-korean-interface/compare/baf39d25370e05a69814357cd2d0a5cb10696910...32f03f99d1339aa5f8fd37a1f6a1904b6dad5a28
   reviewer_access_assumption:
     - The reviewer can access only the public GitHub repository, commit, compare view, and GitHub Actions visible there.
     - The reviewer cannot rely on local `E:` drive artifacts, implementation-agent consoles, private temporary fixtures, or this session's in-memory state.
-    - Exact target: https://github.com/KaronLabs/ytdlp-korean-interface/commit/d4c55f907011d4e9db3fea4380cc886830845af8
-    - Exact comparison: https://github.com/KaronLabs/ytdlp-korean-interface/compare/baf39d25370e05a69814357cd2d0a5cb10696910...d4c55f907011d4e9db3fea4380cc886830845af8
+    - Exact target: https://github.com/KaronLabs/ytdlp-korean-interface/commit/32f03f99d1339aa5f8fd37a1f6a1904b6dad5a28
+    - Exact comparison: https://github.com/KaronLabs/ytdlp-korean-interface/compare/baf39d25370e05a69814357cd2d0a5cb10696910...32f03f99d1339aa5f8fd37a1f6a1904b6dad5a28
     - This spec is an administrative follow-up file outside the functional review target. Its publication must not change `review_target`.
   constitution_documents:
     status: present
@@ -72,8 +72,11 @@ summary:
   - The target also adds the build, dependency, license, source-closure, GUI-evidence, packaging, and publication contracts intended for `v2.19.1-karon.2`.
   - Candidate provenance was hardened to capture exact Git source identity, decode NUL-delimited Git tree paths as strict UTF-8, and resist source replacement between inspection and materialization.
   - The release-license lock was hardened to bind the actual source wrapper and raw archive, retain file handles or immutable snapshots through inspection, and reject ordinal or case-insensitive duplicate archive paths.
-  - All 65 commits in the target range are now publicly accessible on GitHub `main` at exact SHA `d4c55f9...`.
+  - All 69 commits in the target range are now publicly accessible on GitHub `main` at exact SHA `32f03f9...`.
+  - Exact-target candidate construction succeeded after two focused TDD corrections: accepting the official BtbN date suffix and validating the numeric PE product-version parts rather than the human display string.
+  - The sealed candidate executable SHA-256 is `BEBADE61F980CADA9D338A4C32DF77E0122C18BBF07E4E95E4F056C93008F6CA` and its source manifest is bound to commit `32f03f9...` and tree `14995ebe0132bfc3b78e7b774f924c16c29a1e0f`.
   - No tag, public executable ZIP, corresponding-source ZIP, SPDX asset, or GitHub Release was created by this session.
+  - Native-app Computer Use was attempted, but the active backend exposed browser APIs only; GUI cases remain `NOT_RUN` due to automation infrastructure rather than application failure.
   - Exact-target independent GUI, final-package license, and CI validation remain incomplete, so this submission is `partial_success` rather than a completion claim.
 
 rationale:
@@ -106,7 +109,7 @@ changes:
     reason: Keep the new primary workflow understandable in the Korean interface.
   - path: tools/build-candidate.ps1
     status: modified
-    change: Captures source commit/tree identity, materializes the captured tree, normalizes native Git failures, supports Windows PowerShell, and decodes NUL-delimited Git tree inventory as strict UTF-8 without globally changing console encoding.
+    change: Captures source commit/tree identity, materializes the captured tree, normalizes native Git failures, supports Windows PowerShell, decodes NUL-delimited Git tree inventory as strict UTF-8, accepts the pinned BtbN date-suffixed identity, and validates the PE numeric product version independently from the human Karon display version.
     reason: Ensure a candidate is built from the source identity that was inspected and preserve non-ASCII path identity across Windows shells.
   - path: tools/build-release-license-lock.ps1
     status: added
@@ -208,7 +211,7 @@ impact:
   API: No public application API change. GitHub release automation code is added but was not executed for a release.
   DB: none
   configuration: Adds versioned download policy persistence; legacy settings conservatively remain advanced rather than being overwritten.
-  deployment: Source `main` now contains the implementation at `d4c55f9...`; no release tag or binary assets exist from this session.
+  deployment: Source `main` now contains the corrected implementation at `32f03f9...`; no release tag or binary assets exist from this session.
   security: Reduces command selector ambiguity, external-config override, archive substitution, path-collision, candidate source TOCTOU, publication identity, and credential-output risks. Independent security adjudication is still pending.
   performance: Adds metadata simulation before queue/download, start-time reinspection, and ffprobe after download. These are bounded external-process costs per basic-mode item; no benchmark was run.
   dependencies: Moves archive integration toward bit7z 4.1 and a no-RAR 7-Zip runtime; adds pinned FFmpeg, Deno, source-closure, and notice contracts for the intended package.
@@ -263,9 +266,9 @@ threat_model:
 
 deployment_or_rollback:
   deployment_plan:
-    - Completed scope: normal fast-forward SSH push of source target `d4c55f9...` to public `origin/main`.
-    - Deferred scope: independent target validation, final candidate build, final portable ZIP inspection, annotated `v2.19.1-karon.2` tag, and four GitHub Release assets.
-    - This spec may be published in a later administrative commit while retaining `d4c55f9...` as the functional review target.
+    - Completed scope: normal fast-forward SSH push of source target `32f03f9...` to public `origin/main` and construction of a source-bound sealed candidate.
+    - Deferred scope: independent GUI validation, final portable ZIP/license inspection, annotated `v2.19.1-karon.2` tag, and four GitHub Release assets.
+    - This spec may be published in a later administrative commit while retaining `32f03f9...` as the functional review target.
   rollback_procedure:
     - Do not force-push or rewrite public `main`.
     - If independent review rejects the source target, create explicit revert commit(s) for the rejected target range or apply narrowly scoped corrective commits.
@@ -278,12 +281,12 @@ acceptance_criteria:
     required: true
     source: User instruction and prior court target-availability finding.
     result: PASS
-    verification: Authenticated push output was `baf39d2..d4c55f9  HEAD -> main`; post-push `ls-remote` returned the exact target for `refs/heads/main`.
+    verification: Corrective authenticated push output was `766a89f..32f03f9  HEAD -> main`; post-push `ls-remote` returned the exact target for `refs/heads/main`.
   - criterion: The submitted comparison range and changed-file count are derived from Git rather than a stale summary.
     required: true
     source: Review protocol provenance rule.
     result: PASS
-    verification: Git reported 65 commits and 822 files: 799 added, 23 modified, 0 deleted.
+    verification: Git reported 69 commits and 823 files: 800 added, 23 modified, 0 deleted.
   - criterion: Basic video and audio policies, 1080p/720p/best presets, legacy advanced fallback, and per-item queue persistence are implemented in the target.
     required: true
     source: User-approved quality-preset implementation plan.
@@ -313,13 +316,13 @@ acceptance_criteria:
     required: true
     source: User-approved GUI six-case matrix.
     result: NOT_VERIFIED
-    verification: Not executed in this TDD implementation session.
+    verification: Native-app automation was attempted against the sealed candidate, but the active Computer Use backend exposed only browser surfaces and lacked its documented `listApps` and `getApp` functions. The cases remain NOT_RUN; no application failure is inferred.
   - criterion: A final `v2.19.1-karon.2` portable ZIP has zero unclassified files, zero unverified components, no prohibited FFmpeg configuration, and complete source/license bindings.
     required: true
     source: User-approved public binary license gate.
     result: NOT_VERIFIED
     verification: Tooling and repository material were implemented, but no final ZIP was built and independently adjudicated in this session.
-  - criterion: Required CI jobs are successful for exact target `d4c55f9...`.
+  - criterion: Required CI jobs are successful for exact target `32f03f9...`.
     required: true
     source: Code Supreme Court exact-target validation requirement.
     result: NOT_VERIFIED
@@ -339,28 +342,32 @@ validation:
   automated:
     - command: `git -c core.autocrlf=false -C <repo> rev-parse HEAD; git status --porcelain=v1 -uall; git remote get-url origin; git ls-remote origin refs/heads/main`
       result: PASS
-      summary: Before publication, local HEAD was `d4c55f9...`, the worktree was clean, origin was the requested SSH repository, and remote main was `baf39d2...`.
+      summary: Before corrective publication, local HEAD was `32f03f9...`, the worktree was clean, origin was the requested SSH repository, and remote main was `766a89f...`.
       reason: Establish the exact source and remote preconditions for the requested public handoff.
-    - command: `git -c core.autocrlf=false -C <repo> fetch --no-tags origin refs/heads/main:refs/remotes/origin/main; git merge-base --is-ancestor baf39d2... d4c55f9...`
+    - command: `git -c core.autocrlf=false -C <repo> fetch --no-tags origin refs/heads/main:refs/remotes/origin/main; git merge-base --is-ancestor 766a89f... 32f03f9...`
       result: PASS
       summary: The fetched remote SHA matched the preflight SHA and the target was a descendant suitable for normal fast-forward publication.
       reason: Prevent a force push, divergent update, or stale remote assumption.
     - command: `git -c core.autocrlf=false -C <repo> push origin HEAD:refs/heads/main`
       result: PASS
-      summary: Git reported `baf39d2..d4c55f9  HEAD -> main`.
+      summary: Git reported `766a89f..32f03f9  HEAD -> main`.
       reason: Make the exact implementation target accessible to the GitHub-only reviewer.
     - command: `git -c core.autocrlf=false -C <repo> ls-remote origin refs/heads/main`
       result: PASS
-      summary: Post-push remote main equaled `d4c55f907011d4e9db3fea4380cc886830845af8`; the local worktree remained clean.
+      summary: Post-push remote main equaled `32f03f99d1339aa5f8fd37a1f6a1904b6dad5a28`; the local worktree remained clean.
       reason: Detect a failed or competing remote update after publication.
-    - command: `git diff --name-status/--stat and git rev-list for baf39d2...d4c55f9`
+    - command: `git diff --name-status/--shortstat and git rev-list for baf39d2...32f03f9`
       result: PASS
-      summary: Git reported 65 commits, 822 changed files, 799 additions, 23 modifications, no deletions, 287363 inserted lines, and 248 deleted lines.
+      summary: Git reported 69 commits, 823 changed files, 800 additions, 23 modifications, no deletions, 287821 inserted lines, and 250 deleted lines.
       reason: Bind the court summary to the authoritative Git range.
     - command: `implementation-agent focused Pester/native invocations for candidate provenance and release-license lock (exact shell transcript unavailable to the GitHub-only reviewer)`
       result: PASS
       summary: Reported GREEN results were candidate provenance 12/12 on both Windows PowerShell 5.1 and pwsh, release factory 9/9, candidate-related publication 99/99, release lock 15/15, source wrapper 5/5, and lock-related publication 98/98.
       reason: Disclose the TDD implementation evidence while explicitly withholding exact-target CI or independent-verification status.
+    - command: `powershell.exe and pwsh release-branding-about-contract.Tests.ps1; Product Gate Runner build-candidate.ps1 for exact target 32f03f9...`
+      result: PASS
+      summary: The focused branding/version contract passed under both PowerShell engines. Product Gate Runner captured child exit 0 in 140790 ms. The candidate manifest binds commit `32f03f9...`, tree `14995ebe...`, product version `2.19.1.0`, and executable SHA-256 `BEBADE61...F6CA` with actual length 4064256 bytes.
+      reason: Regress the two observed candidate-construction failures and bind the resulting candidate to the corrected exact source.
   manual:
     - procedure: Operate the exact target through basic video 1080p, 720p, best, MP3, advanced mode, queue persistence, changed-selection blocking, completion, and preserved-error paths.
       result: NOT_RUN
@@ -370,7 +377,7 @@ validation:
     - procedure: Inspect Korean and English layouts at 100%, 150%, and 200% DPI using one exact executable SHA.
       result: NOT_RUN
       observed_result: none
-      reason: The user assigned the six-case GUI matrix to another session.
+      reason: Computer Use runtime/documentation mismatch: the runtime object exposed browser APIs only and lacked native `listApps`/`getApp`; the candidate application was never launched by the automation tool.
       artifact: none
     - procedure: Independently classify every file in the final portable ZIP and verify licenses, notices, exact source, and build closure.
       result: NOT_RUN
@@ -379,7 +386,7 @@ validation:
       artifact: none
   ci:
     result: NOT_RUN
-    target_sha: d4c55f907011d4e9db3fea4380cc886830845af8
+    target_sha: 32f03f99d1339aa5f8fd37a1f6a1904b6dad5a28
     run: unavailable
     covered_checks: none established by this filing
     uncovered_checks: exact-target build, native policy, PowerShell contracts, GUI lifecycle, language/DPI matrix, final package/license gate, and publication contract
@@ -397,8 +404,8 @@ risks:
   - description: Exact-target public CI evidence is not established in this filing.
     severity: medium
     handling: follow_up
-    reason: Implementation-agent test reports are not a substitute for a GitHub-visible run bound to `d4c55f9...`.
-  - description: The 822-file range includes a large generated/collected FFmpeg license corpus, increasing review cost and the chance of unnoticed inventory mismatch.
+    reason: Implementation-agent test reports are not a substitute for a GitHub-visible run bound to `32f03f9...`.
+  - description: The 823-file range includes a large generated/collected FFmpeg license corpus, increasing review cost and the chance of unnoticed inventory mismatch.
     severity: medium
     handling: safeguard
     reason: The authoritative Git inventory must be compared by exact members, not accepted from counts alone.
@@ -417,12 +424,12 @@ request:
     - GUILTY
     - DEATH
   review_focus:
-    - Independently fetch exact target `d4c55f9...` and compare it with `baf39d2...`; confirm 65 commits and the exact 822-member file inventory.
+    - Independently fetch exact target `32f03f9...` and compare it with `baf39d2...`; confirm 69 commits and the exact 823-member file inventory.
     - Review the effective basic-mode command, literal format pinning, resolution-cap semantics, queue policy persistence, start-time reinspection, and ffprobe completion gate.
     - Re-run the focused candidate provenance and release-license-lock suites on the exact target rather than accepting implementation-agent totals alone.
     - Run the exact-target GUI lifecycle and Korean/English 100/150/200 percent matrix using one recorded executable identity.
     - Build and independently classify the final portable ZIP, corresponding-source ZIP, SPDX JSON, and checksum list before authorizing a tag or GitHub Release.
-    - Check GitHub Actions only where the workflow head SHA equals `d4c55f9...`; do not inherit success from earlier targets.
+    - Check GitHub Actions only where the workflow head SHA equals `32f03f9...`; do not inherit success from earlier targets.
     - Treat the absence of a public `karon.2` binary release as the intended safeguard while blocking gates remain open.
 
 brief:
