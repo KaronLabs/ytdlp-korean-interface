@@ -1033,11 +1033,17 @@ function Get-VerifiedParentRuntime {
     return [pscustomobject]@{ Path = $parent; YtDlpHash = $hash; YtDlpVersion = $version.Trim(); Provenance = $provenance; RuntimeFiles = $runtimeFiles }
 }
 
+function Get-NumericProductVersion {
+    param([Parameter(Mandatory = $true)] [string] $Path)
+    $version = (Get-Item -LiteralPath $Path).VersionInfo
+    return '{0}.{1}.{2}.{3}' -f $version.ProductMajorPart, $version.ProductMinorPart, $version.ProductBuildPart, $version.ProductPrivatePart
+}
+
 function Get-CandidateManifest {
     param([Parameter(Mandatory = $true)] [string] $CandidateRoot, [object] $Attestation)
     $files = Get-ChildItem -LiteralPath $CandidateRoot -File -Recurse | Sort-Object FullName
     $versions = [ordered]@{
-        product = (Get-Item -LiteralPath (Join-Path $CandidateRoot 'ytdlp-interface.exe')).VersionInfo.ProductVersion
+        product = Get-NumericProductVersion -Path (Join-Path $CandidateRoot 'ytdlp-interface.exe')
         ytdlp = Invoke-CheckedExecutable -Path (Join-Path $CandidateRoot 'yt-dlp.exe') -Arguments @('--version') -Name 'yt-dlp'
         ffmpeg = Invoke-CheckedExecutable -Path (Join-Path $CandidateRoot 'ffmpeg.exe') -Arguments @('-version') -Name 'ffmpeg'
         ffprobe = Invoke-CheckedExecutable -Path (Join-Path $CandidateRoot 'ffprobe.exe') -Arguments @('-version') -Name 'ffprobe'
@@ -1063,7 +1069,7 @@ function Test-CandidateAssembly {
     foreach ($relative in $required) {
         if (-not (Test-Path -LiteralPath (Join-Path $CandidateRoot $relative) -PathType Leaf)) { throw "Candidate assembly is missing $relative." }
     }
-    $version = (Get-Item -LiteralPath (Join-Path $CandidateRoot 'ytdlp-interface.exe')).VersionInfo.ProductVersion
+    $version = Get-NumericProductVersion -Path (Join-Path $CandidateRoot 'ytdlp-interface.exe')
     if ($version -ne '2.19.1.0') { throw "Candidate product version must be 2.19.1.0, got $version." }
 }
 

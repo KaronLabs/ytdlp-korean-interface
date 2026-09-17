@@ -6,6 +6,7 @@ $HeaderPath = Join-Path $RepositoryRoot 'ytdlp-interface\gui.hpp'
 $ResourcePath = Join-Path $RepositoryRoot 'ytdlp-interface\ytdlp-interface.rc'
 $AboutPath = Join-Path $RepositoryRoot 'ytdlp-interface\forms\form_settings.cpp'
 $LocalePath = Join-Path $RepositoryRoot 'locales\ko-KR.json'
+$CandidateBuilderPath = Join-Path $RepositoryRoot 'tools\build-candidate.ps1'
 
 function Assert-True {
     param([bool]$Condition, [string]$Message)
@@ -21,6 +22,7 @@ $header = Get-Content -LiteralPath $HeaderPath -Raw
 $resource = Get-Content -LiteralPath $ResourcePath -Raw
 $about = Get-Content -LiteralPath $AboutPath -Raw
 $locale = (Get-Content -LiteralPath $LocalePath -Raw -Encoding UTF8 | ConvertFrom-Json).strings
+$candidateBuilder = Get-Content -LiteralPath $CandidateBuilderPath -Raw
 
 Assert-True ($header -match 'ver_tag\s*\{\s*"v2\.19\.1"\s*\}') 'upstream version must remain exactly v2.19.1'
 Assert-True ($header -match 'display_ver_tag\s*\{\s*"v2\.19\.1-karon\.2"\s*\}') 'display version must be an explicit v2.19.1-karon.2 constant'
@@ -30,6 +32,9 @@ Assert-True ($resource -match 'FILEVERSION\s+2,19,1,0') 'numeric FILEVERSION mus
 Assert-True ($resource -match 'PRODUCTVERSION\s+2,19,1,0') 'numeric PRODUCTVERSION must remain 2.19.1.0'
 Assert-True ($resource -match 'VALUE\s+"FileVersion",\s+"v2\.19\.1-karon\.2"') 'human FileVersion must expose v2.19.1-karon.2'
 Assert-True ($resource -match 'VALUE\s+"ProductVersion",\s+"v2\.19\.1-karon\.2"') 'human ProductVersion must expose v2.19.1-karon.2'
+foreach ($part in @('ProductMajorPart', 'ProductMinorPart', 'ProductBuildPart', 'ProductPrivatePart')) {
+    Assert-True ($candidateBuilder.Contains($part)) "candidate builder must validate numeric $part instead of the human ProductVersion string"
+}
 Assert-True ($about -match 'display_ver_tag') 'About must use the Karon display version'
 
 $localeKeys = @(
