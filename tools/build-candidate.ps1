@@ -616,7 +616,7 @@ function Get-RuntimeOverlayIdentity {
     }
     if (@('ffmpeg', 'ffprobe') -cnotcontains $Identity) { throw 'runtime_overlay_version_mismatch' }
     $firstLine = @($observed -split "`r?`n", 2)[0]
-    $pattern = '^' + [regex]::Escape($Identity + ' version ' + $ExpectedVersion) + '(?: .*)?$'
+    $pattern = '^' + [regex]::Escape($Identity + ' version ' + $ExpectedVersion) + '(?:-[0-9]{8})?(?: .*)?$'
     if ($firstLine -cnotmatch $pattern) { throw 'runtime_overlay_version_mismatch' }
     return $firstLine
 }

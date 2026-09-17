@@ -254,9 +254,17 @@ Describe 'Reviewed runtime overlay contract' {
         $ffprobe = Get-RuntimeOverlayIdentity -Identity 'ffprobe' -Path 'fixture-ffprobe.exe' -ExpectedVersion 'n9.0.1-30-g9258bacca5' -IdentityReader {
             "ffprobe version n9.0.1-30-g9258bacca5 Copyright fixture`nconfiguration: fixture"
         }
+        $datedFfmpeg = Get-RuntimeOverlayIdentity -Identity 'ffmpeg' -Path 'fixture-ffmpeg.exe' -ExpectedVersion 'n9.0.1-30-g9258bacca5' -IdentityReader {
+            "ffmpeg version n9.0.1-30-g9258bacca5-20260915 Copyright fixture`nconfiguration: fixture"
+        }
+        $datedFfprobe = Get-RuntimeOverlayIdentity -Identity 'ffprobe' -Path 'fixture-ffprobe.exe' -ExpectedVersion 'n9.0.1-30-g9258bacca5' -IdentityReader {
+            "ffprobe version n9.0.1-30-g9258bacca5-20260915 Copyright fixture`nconfiguration: fixture"
+        }
         $sevenZip = Get-RuntimeOverlayIdentity -Identity 'sevenZip' -Path 'fixture-7z.dll' -ExpectedVersion '26.01' -IdentityReader { '26.01' }
         $ffmpeg | Should Be 'ffmpeg version n9.0.1-30-g9258bacca5 Copyright fixture'
         $ffprobe | Should Be 'ffprobe version n9.0.1-30-g9258bacca5 Copyright fixture'
+        $datedFfmpeg | Should Be 'ffmpeg version n9.0.1-30-g9258bacca5-20260915 Copyright fixture'
+        $datedFfprobe | Should Be 'ffprobe version n9.0.1-30-g9258bacca5-20260915 Copyright fixture'
         $sevenZip | Should Be '26.01'
     }
 
