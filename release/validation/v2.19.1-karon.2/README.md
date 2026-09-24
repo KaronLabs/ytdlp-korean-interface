@@ -2,6 +2,8 @@
 
 This directory defines the manual evidence contract for the sealed Windows x64 candidate. It does not claim that the GUI matrix has been run or that the release passed.
 
+The [manual GUI evidence guide](MANUAL-GUI-EVIDENCE-GUIDE.md) gives the operator case-by-case steps. Its `C:\Users\ceo` screenshot paths are examples; replace them with the current Windows account's path before running the commands.
+
 ## Fixed matrix
 
 Exactly these six case IDs are accepted:
