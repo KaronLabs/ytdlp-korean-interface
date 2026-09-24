@@ -1,0 +1,64 @@
+name: Karon.2 quality contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/karon2-quality-contract.yml'
+      - 'ytdlp-interface/**'
+      - 'locales/ko-KR.json'
+      - 'tests/native/**'
+      - 'tests/quality/**'
+      - 'tests/powershell/**'
+      - 'tools/test-quality-policy.ps1'
+      - 'tools/quality-fixture.py'
+      - 'tools/build-candidate.ps1'
+      - 'tools/verify-gui-release-evidence.ps1'
+      - 'tools/build-release-license-lock.ps1'
+      - 'tools/package-quality-release.ps1'
+      - 'release/dependencies/v2.19.1-karon.2.lock.json'
+      - 'release/validation/v2.19.1-karon.2/**'
+  pull_request:
+    paths:
+      - '.github/workflows/karon2-quality-contract.yml'
+      - 'ytdlp-interface/**'
+      - 'locales/ko-KR.json'
+      - 'tests/native/**'
+      - 'tests/quality/**'
+      - 'tests/powershell/**'
+      - 'tools/test-quality-policy.ps1'
+      - 'tools/quality-fixture.py'
+      - 'tools/build-candidate.ps1'
+      - 'tools/verify-gui-release-evidence.ps1'
+      - 'tools/build-release-license-lock.ps1'
+      - 'tools/package-quality-release.ps1'
+      - 'release/dependencies/v2.19.1-karon.2.lock.json'
+      - 'release/validation/v2.19.1-karon.2/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality-contract:
+    runs-on: windows-2022
+    steps:
+      - name: Check out exact commit
+        uses: actions/checkout@v4
+      - name: Native quality policy
+        shell: powershell
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/test-quality-policy.ps1
+          exit $LASTEXITCODE
+      - name: Quality fixture contracts
+        shell: powershell
+        run: |
+          python -m unittest discover -s tests/quality -p 'test_*.py'
+          exit $LASTEXITCODE
+      - name: GUI and release PowerShell contracts
+        shell: powershell
+        run: |
+          foreach ($test in @('gui-release-evidence-contract.Tests.ps1', 'release-license-lock.Tests.ps1', 'release-publication-contract.Tests.ps1')) {
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path tests/powershell $test)
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
