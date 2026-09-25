@@ -1,3 +1,5 @@
+#requires -Version 7.4
+
 $script:RepositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $script:PackageTool = Join-Path $script:RepositoryRoot 'tools\package-quality-release.ps1'
 $script:PublishTool = Join-Path $script:RepositoryRoot 'tools\publish-quality-release.ps1'
