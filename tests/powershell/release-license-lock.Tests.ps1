@@ -47,7 +47,7 @@ function Get-TestSha256 {
 function Get-TestRecord {
     param([string] $Path, [string] $Name = '')
     if ([string]::IsNullOrWhiteSpace($Name)) { $Name = Split-Path -Leaf $Path }
-    [ordered]@{ fileName = $Name; length = [long](Get-Item $Path).Length; sha256 = Get-TestSha256 $Path }
+    [ordered]@{ fileName = $Name; length = [long](Get-Item -LiteralPath $Path).Length; sha256 = Get-TestSha256 $Path }
 }
 
 function New-TestZip {
