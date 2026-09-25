@@ -331,9 +331,9 @@ function Invoke-GuiVerifier {
 function Assert-VerifierRejects {
     param([object] $Fixture, [string] $Pattern)
     $result = Invoke-GuiVerifier $Fixture
-    $result.ExitCode | Should Not Be 0
-    $result.Combined | Should Match $Pattern
-    (Test-Path -LiteralPath (Join-Path $Fixture.Output 'gui-validation-v2.19.1-karon.2')) | Should Be $false
+    $result.ExitCode | Should -Not -Be 0
+    $result.Combined | Should -Match $Pattern
+    (Test-Path -LiteralPath (Join-Path $Fixture.Output 'gui-validation-v2.19.1-karon.2')) | Should -Be $false
 }
 
 function Start-TestInputMutation {
@@ -531,27 +531,27 @@ Describe 'v2.19.1-karon.2 GUI release evidence contract' {
     It 'accepts six complete cases, probes real media, and emits deterministic schema-v2 bytes' {
         $fixture = New-ValidGuiFixture
         $first = Invoke-GuiVerifier $fixture
-        $first.ExitCode | Should Be 0
+        $first.ExitCode | Should -Be 0
         $final = Join-Path $fixture.Output 'gui-validation-v2.19.1-karon.2'
         $summary = Join-Path $final 'gui-validation-summary.json'
         $manifest = Join-Path $final 'gui-validation-evidence-manifest.json'
-        (Test-Path -LiteralPath $summary -PathType Leaf) | Should Be $true
-        (Test-Path -LiteralPath $manifest -PathType Leaf) | Should Be $true
+        (Test-Path -LiteralPath $summary -PathType Leaf) | Should -Be $true
+        (Test-Path -LiteralPath $manifest -PathType Leaf) | Should -Be $true
         $value = Get-Content -LiteralPath $summary -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 64 -DateKind String
-        $value.schemaVersion | Should Be 2
-        $value.status | Should Be 'PASS'
-        $value.candidate.executable.sha256 | Should Be $fixture.ExeSha
-        $value.candidate.ffprobe.sha256 | Should Be (Get-TestSha256 $fixture.Candidate.Ffprobe)
-        $value.candidate.manifest.sha256 | Should Be (Get-TestSha256 $fixture.Candidate.Manifest)
-        @($value.cases).Count | Should Be 6
-        @($value.generatedProbes).Count | Should Be 3
+        $value.schemaVersion | Should -Be 2
+        $value.status | Should -Be 'PASS'
+        $value.candidate.executable.sha256 | Should -Be $fixture.ExeSha
+        $value.candidate.ffprobe.sha256 | Should -Be (Get-TestSha256 $fixture.Candidate.Ffprobe)
+        $value.candidate.manifest.sha256 | Should -Be (Get-TestSha256 $fixture.Candidate.Manifest)
+        @($value.cases).Count | Should -Be 6
+        @($value.generatedProbes).Count | Should -Be 3
 
         $secondOutput = Join-Path $fixture.Root 'second-output'
         New-Item -ItemType Directory -Path $secondOutput | Out-Null
-        (Invoke-GuiVerifier $fixture $secondOutput).ExitCode | Should Be 0
+        (Invoke-GuiVerifier $fixture $secondOutput).ExitCode | Should -Be 0
         $secondFinal = Join-Path $secondOutput 'gui-validation-v2.19.1-karon.2'
-        (Get-TestSha256 $summary) | Should Be (Get-TestSha256 (Join-Path $secondFinal 'gui-validation-summary.json'))
-        (Get-TestSha256 $manifest) | Should Be (Get-TestSha256 (Join-Path $secondFinal 'gui-validation-evidence-manifest.json'))
+        (Get-TestSha256 $summary) | Should -Be (Get-TestSha256 (Join-Path $secondFinal 'gui-validation-summary.json'))
+        (Get-TestSha256 $manifest) | Should -Be (Get-TestSha256 (Join-Path $secondFinal 'gui-validation-evidence-manifest.json'))
     }
 
     It 'rejects a missing required case' {
@@ -827,7 +827,7 @@ Describe 'v2.19.1-karon.2 GUI release evidence contract' {
         $fixture = New-ValidGuiFixture
         $seedOutput = Join-Path $fixture.Root 'seed-output'
         New-Item -ItemType Directory -Path $seedOutput | Out-Null
-        (Invoke-GuiVerifier $fixture $seedOutput).ExitCode | Should Be 0
+        (Invoke-GuiVerifier $fixture $seedOutput).ExitCode | Should -Be 0
         $seedFinal = Join-Path $seedOutput 'gui-validation-v2.19.1-karon.2'
         $raceOutput = Join-Path $fixture.Root 'race-output'
         New-Item -ItemType Directory -Path $raceOutput | Out-Null
@@ -849,12 +849,12 @@ exit 2
         $watcher = Start-Process -FilePath $script:Pwsh -ArgumentList @('-NoProfile', '-File', $watcherPath, $raceOutput, $seedFinal, $raceFinal) -PassThru -WindowStyle Hidden
         $raceResult = Invoke-GuiVerifier $fixture $raceOutput
         $watcher.WaitForExit()
-        $watcher.ExitCode | Should Be 0
-        $raceResult.ExitCode | Should Not Be 0
-        $raceResult.Combined | Should Match 'gui_validation_output_race'
-        (Get-TestSha256 (Join-Path $raceFinal 'gui-validation-summary.json')) | Should Be (Get-TestSha256 (Join-Path $seedFinal 'gui-validation-summary.json'))
-        (Get-TestSha256 (Join-Path $raceFinal 'gui-validation-evidence-manifest.json')) | Should Be (Get-TestSha256 (Join-Path $seedFinal 'gui-validation-evidence-manifest.json'))
-        @(Get-ChildItem -LiteralPath $raceOutput -Directory -Filter '.gui-validation-v2.19.1-karon.2.partial.*').Count | Should Be 0
+        $watcher.ExitCode | Should -Be 0
+        $raceResult.ExitCode | Should -Not -Be 0
+        $raceResult.Combined | Should -Match 'gui_validation_output_race'
+        (Get-TestSha256 (Join-Path $raceFinal 'gui-validation-summary.json')) | Should -Be (Get-TestSha256 (Join-Path $seedFinal 'gui-validation-summary.json'))
+        (Get-TestSha256 (Join-Path $raceFinal 'gui-validation-evidence-manifest.json')) | Should -Be (Get-TestSha256 (Join-Path $seedFinal 'gui-validation-evidence-manifest.json'))
+        @(Get-ChildItem -LiteralPath $raceOutput -Directory -Filter '.gui-validation-v2.19.1-karon.2.partial.*').Count | Should -Be 0
     }
 
     It 'rejects a candidate executable changed after its initial hash' {
@@ -862,9 +862,9 @@ exit 2
         $watcher = Start-TestInputMutation $fixture.Output $fixture.Exe 'AppendText'
         $result = Invoke-GuiVerifier $fixture
         $watcher.WaitForExit()
-        $watcher.ExitCode | Should Be 0
-        $result.ExitCode | Should Not Be 0
-        $result.Combined | Should Match 'gui_input_changed'
+        $watcher.ExitCode | Should -Be 0
+        $result.ExitCode | Should -Not -Be 0
+        $result.Combined | Should -Match 'gui_input_changed'
     }
 
     It 'rejects a candidate manifest changed after its initial hash' {
@@ -872,9 +872,9 @@ exit 2
         $watcher = Start-TestInputMutation $fixture.Output $fixture.Candidate.Manifest 'AppendText'
         $result = Invoke-GuiVerifier $fixture
         $watcher.WaitForExit()
-        $watcher.ExitCode | Should Be 0
-        $result.ExitCode | Should Not Be 0
-        $result.Combined | Should Match 'gui_input_changed'
+        $watcher.ExitCode | Should -Be 0
+        $result.ExitCode | Should -Not -Be 0
+        $result.Combined | Should -Match 'gui_input_changed'
     }
 
     It 'rejects an evidence file added after the allowlist scan' {
@@ -883,9 +883,9 @@ exit 2
         $watcher = Start-TestInputMutation $fixture.Output $secret 'CreateBinary'
         $result = Invoke-GuiVerifier $fixture
         $watcher.WaitForExit()
-        $watcher.ExitCode | Should Be 0
-        $result.ExitCode | Should Not Be 0
-        $result.Combined | Should Match 'gui_input_changed'
+        $watcher.ExitCode | Should -Be 0
+        $result.ExitCode | Should -Not -Be 0
+        $result.Combined | Should -Match 'gui_input_changed'
     }
 
     It 'rejects PNG bytes appended after the terminal IEND chunk' {
@@ -1024,7 +1024,7 @@ exit 2
         Insert-TestBytes $path (Get-TestPngChunkOffset $path 'IDAT') (New-ValidTestPngChunk 'tRNS' ([byte[]](0, 0, 0, 0, 0, 0)))
         Update-DescriptorForFile $case.Value.screenshots[0] $path
         Save-TestCase $case
-        (Invoke-GuiVerifier $fixture).ExitCode | Should Be 0
+        (Invoke-GuiVerifier $fixture).ExitCode | Should -Be 0
     }
 
     It 'rejects duplicate type-2 tRNS chunks before the first IDAT' {
@@ -1050,10 +1050,10 @@ exit 2
         Save-TestCase $case
         Assert-VerifierRejects $fixture 'gui_screenshot_resource_limit'
         $parserSource = Get-TestFunctionSource $script:Verifier 'Assert-PngByteStructure'
-        $parserSource | Should Not Match '\[IO\.File\]::ReadAllBytes'
+        $parserSource | Should -Not -Match '\[IO\.File\]::ReadAllBytes'
         $lengthIndex = $parserSource.IndexOf('$stream.Length', [StringComparison]::Ordinal)
         $allocationIndex = $parserSource.IndexOf('[byte[]]::new', [StringComparison]::Ordinal)
-        ($lengthIndex -ge 0 -and $allocationIndex -gt $lengthIndex) | Should Be $true
+        ($lengthIndex -ge 0 -and $allocationIndex -gt $lengthIndex) | Should -Be $true
     }
 
     It 'rejects a screenshot dimension beyond the configured maximum before decode' {
@@ -1105,7 +1105,7 @@ exit 2
         $case.Value.screenshots[0].path = $newRelative
         Update-DescriptorForFile $case.Value.screenshots[0] $newPath
         Save-TestCase $case
-        (Invoke-GuiVerifier $fixture).ExitCode | Should Be 0
+        (Invoke-GuiVerifier $fixture).ExitCode | Should -Be 0
     }
 
     It 'rejects recorder case identifiers outside the exact fixed matrix' {
@@ -1117,8 +1117,8 @@ exit 2
             $case.caseId = $invalidId
             Write-TestJson $casePath $case
             $result = Invoke-TestScript $script:Recorder @('-Action', 'Finalize', '-CasePath', $casePath)
-            $result.ExitCode | Should Not Be 0
-            $result.Combined | Should Match 'operator_case_id_invalid'
+            $result.ExitCode | Should -Not -Be 0
+            $result.Combined | Should -Match 'operator_case_id_invalid'
         }
     }
 
@@ -1128,8 +1128,8 @@ exit 2
         $case.Value.caseId = 'en-US-100'
         Save-TestCase $case
         $result = Invoke-TestScript $script:Recorder @('-Action', 'Finalize', '-CasePath', $case.Path)
-        $result.ExitCode | Should Not Be 0
-        $result.Combined | Should Match 'operator_case_path_invalid'
+        $result.ExitCode | Should -Not -Be 0
+        $result.Combined | Should -Match 'operator_case_path_invalid'
     }
 
     It 'rejects recorder evidence reached through a parent junction' {
@@ -1138,8 +1138,8 @@ exit 2
         New-Item -ItemType Junction -Path $junction -Target $fixture.Evidence | Out-Null
         $casePath = Join-Path $junction 'cases\ko-KR-100.json'
         $result = Invoke-TestScript $script:Recorder @('-Action', 'Finalize', '-CasePath', $casePath)
-        $result.ExitCode | Should Not Be 0
-        $result.Combined | Should Match 'operator_path_reparse_point'
+        $result.ExitCode | Should -Not -Be 0
+        $result.Combined | Should -Match 'operator_path_reparse_point'
     }
 
     It 'rejects device and UNC style input paths for local immutable evidence' {
@@ -1151,51 +1151,51 @@ exit 2
             '-OutputDirectory', $fixture.Output,
             '-MaximumEvidenceAgeHours', '24'
         )
-        $result.ExitCode | Should Not Be 0
-        $result.Combined | Should Match 'gui_remote_path_not_allowed'
+        $result.ExitCode | Should -Not -Be 0
+        $result.Combined | Should -Match 'gui_remote_path_not_allowed'
     }
 
     It 'emits the exact packaging consumer summary schema documented by the producer' {
         $fixture = New-ValidGuiFixture
         $result = Invoke-GuiVerifier $fixture
-        $result.ExitCode | Should Be 0
+        $result.ExitCode | Should -Be 0
         $final = Join-Path $fixture.Output 'gui-validation-v2.19.1-karon.2'
         $summaryPath = Join-Path $final 'gui-validation-summary.json'
         $manifestPath = Join-Path $final 'gui-validation-evidence-manifest.json'
         $summaryText = Get-Content -LiteralPath $summaryPath -Raw -Encoding UTF8
         $manifestText = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8
         $summary = $summaryText | ConvertFrom-Json -Depth 64 -DateKind String
-        ($summary.PSObject.Properties.Name -join ',') | Should Be 'schemaVersion,releaseVersion,status,candidate,cases,fullVideoLifecycleCases,representativeChecks,generatedProbes,evidenceFileCount,evidenceManifestFile'
-        ($summary.representativeChecks.PSObject.Properties.Name -join ',') | Should Be 'mp3Conversion,settingsSaveRestartRestore,legacySettingsTransition'
-        ($summary.cases[0].PSObject.Properties.Name -join ',') | Should Be 'caseId,language,dpi,evidenceFile,evidenceSha256'
-        ($summary.generatedProbes[0].PSObject.Properties.Name -join ',') | Should Be 'caseId,kind,sourceEvidencePath,path,sha256,length'
+        ($summary.PSObject.Properties.Name -join ',') | Should -Be 'schemaVersion,releaseVersion,status,candidate,cases,fullVideoLifecycleCases,representativeChecks,generatedProbes,evidenceFileCount,evidenceManifestFile'
+        ($summary.representativeChecks.PSObject.Properties.Name -join ',') | Should -Be 'mp3Conversion,settingsSaveRestartRestore,legacySettingsTransition'
+        ($summary.cases[0].PSObject.Properties.Name -join ',') | Should -Be 'caseId,language,dpi,evidenceFile,evidenceSha256'
+        ($summary.generatedProbes[0].PSObject.Properties.Name -join ',') | Should -Be 'caseId,kind,sourceEvidencePath,path,sha256,length'
         $repoRoot = Split-Path -Parent (Split-Path -Parent $script:Verifier)
         $schemaPath = Join-Path $repoRoot 'release\validation\v2.19.1-karon.2\gui-validation-output.schema.json'
-        (Test-Path -LiteralPath $schemaPath -PathType Leaf) | Should Be $true
-        ($summaryText | Test-Json -SchemaFile $schemaPath -ErrorAction SilentlyContinue) | Should Be $true
-        ($manifestText | Test-Json -SchemaFile $schemaPath -ErrorAction SilentlyContinue) | Should Be $true
+        (Test-Path -LiteralPath $schemaPath -PathType Leaf) | Should -Be $true
+        ($summaryText | Test-Json -SchemaFile $schemaPath -ErrorAction SilentlyContinue) | Should -Be $true
+        ($manifestText | Test-Json -SchemaFile $schemaPath -ErrorAction SilentlyContinue) | Should -Be $true
         $invalidSummary = $summaryText | ConvertFrom-Json -Depth 64 -DateKind String
         $invalidSummary | Add-Member -NotePropertyName ignoredExecutablePath -NotePropertyValue 'other.exe'
-        (($invalidSummary | ConvertTo-Json -Depth 64) | Test-Json -SchemaFile $schemaPath -ErrorAction SilentlyContinue) | Should Be $false
+        (($invalidSummary | ConvertTo-Json -Depth 64) | Test-Json -SchemaFile $schemaPath -ErrorAction SilentlyContinue) | Should -Be $false
         $wrongVersion = $summaryText | ConvertFrom-Json -Depth 64 -DateKind String
         $wrongVersion.schemaVersion = '2'
-        (($wrongVersion | ConvertTo-Json -Depth 64) | Test-Json -SchemaFile $schemaPath -ErrorAction SilentlyContinue) | Should Be $false
+        (($wrongVersion | ConvertTo-Json -Depth 64) | Test-Json -SchemaFile $schemaPath -ErrorAction SilentlyContinue) | Should -Be $false
         $readme = Get-Content -LiteralPath (Join-Path $repoRoot 'release\validation\v2.19.1-karon.2\README.md') -Raw -Encoding UTF8
-        $readme | Should Match ([regex]::Escape('gui-validation-output.schema.json'))
-        $readme | Should Match 'canonical machine-readable contract'
+        $readme | Should -Match ([regex]::Escape('gui-validation-output.schema.json'))
+        $readme | Should -Match 'canonical machine-readable contract'
     }
 
     It 'pins the canonical producer schema path identity and root definitions' {
         $relativePath = 'release/validation/v2.19.1-karon.2/gui-validation-output.schema.json'
         $schemaPath = Join-Path $script:RepositoryRoot ($relativePath.Replace('/', '\'))
-        (Test-Path -LiteralPath $schemaPath -PathType Leaf) | Should Be $true
-        ([IO.Path]::GetRelativePath($script:RepositoryRoot, (Resolve-Path $schemaPath).Path).Replace('\', '/')) | Should Be $relativePath
-        (Get-TestSha256 $schemaPath) | Should Be 'e49cc70253bd5dd4b4abd8ee00406f5dd8ed39434e309e3e3c74694b85c1b80e'
+        (Test-Path -LiteralPath $schemaPath -PathType Leaf) | Should -Be $true
+        ([IO.Path]::GetRelativePath($script:RepositoryRoot, (Resolve-Path $schemaPath).Path).Replace('\', '/')) | Should -Be $relativePath
+        (Get-TestSha256 $schemaPath) | Should -Be 'e49cc70253bd5dd4b4abd8ee00406f5dd8ed39434e309e3e3c74694b85c1b80e'
         $schema = Get-Content -LiteralPath $schemaPath -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 100 -DateKind String
-        $schema.'$id' | Should Be 'https://github.com/KaronLabs/ytdlp-korean-interface/blob/v2.19.1-karon.2/release/validation/v2.19.1-karon.2/gui-validation-output.schema.json'
-        (@($schema.oneOf | ForEach-Object { $_.'$ref' }) -join ',') | Should Be '#/$defs/summary,#/$defs/evidenceManifest'
-        ($schema.'$defs'.PSObject.Properties.Name -contains 'summary') | Should Be $true
-        ($schema.'$defs'.PSObject.Properties.Name -contains 'evidenceManifest') | Should Be $true
+        $schema.'$id' | Should -Be 'https://github.com/KaronLabs/ytdlp-korean-interface/blob/v2.19.1-karon.2/release/validation/v2.19.1-karon.2/gui-validation-output.schema.json'
+        (@($schema.oneOf | ForEach-Object { $_.'$ref' }) -join ',') | Should -Be '#/$defs/summary,#/$defs/evidenceManifest'
+        ($schema.'$defs'.PSObject.Properties.Name -contains 'summary') | Should -Be $true
+        ($schema.'$defs'.PSObject.Properties.Name -contains 'evidenceManifest') | Should -Be $true
     }
 
     It 'initializes operator case with no preset observations or environment PASS values' {
@@ -1207,15 +1207,15 @@ exit 2
             '-Action', 'Initialize', '-EvidenceRoot', $evidence, '-CandidateExePath', $exe,
             '-Language', 'ko-KR', '-DpiPercent', '100'
         )
-        $result.ExitCode | Should Be 0
+        $result.ExitCode | Should -Be 0
         $case = Get-Content -LiteralPath (Join-Path $evidence 'cases\ko-KR-100.json') -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 64 -DateKind String
-        $case.schemaVersion | Should Be 2
-        $case.completedAtUtc | Should Be $null
-        $case.environment.observedLanguage | Should Be $null
-        $case.environment.observedDpiPercent | Should Be $null
-        foreach ($name in $script:ObservationNames) { $case.observations.$name | Should Be $null }
-        $case.representativeChecks.mp3Conversion | Should Be $null
-        $case.representativeChecks.settingsSaveRestartRestore | Should Be $null
-        $case.representativeChecks.legacySettingsTransition | Should Be $null
+        $case.schemaVersion | Should -Be 2
+        $case.completedAtUtc | Should -Be $null
+        $case.environment.observedLanguage | Should -Be $null
+        $case.environment.observedDpiPercent | Should -Be $null
+        foreach ($name in $script:ObservationNames) { $case.observations.$name | Should -Be $null }
+        $case.representativeChecks.mp3Conversion | Should -Be $null
+        $case.representativeChecks.settingsSaveRestartRestore | Should -Be $null
+        $case.representativeChecks.legacySettingsTransition | Should -Be $null
     }
 }
