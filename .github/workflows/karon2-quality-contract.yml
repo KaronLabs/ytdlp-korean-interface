@@ -60,6 +60,6 @@ jobs:
         shell: powershell
         run: |
           foreach ($test in @('gui-release-evidence-contract.Tests.ps1', 'release-license-lock.Tests.ps1', 'release-publication-contract.Tests.ps1')) {
-            powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path tests/powershell $test)
+            pwsh -NoProfile -File (Join-Path tests/powershell $test)
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
