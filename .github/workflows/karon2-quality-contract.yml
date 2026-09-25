@@ -48,7 +48,8 @@ jobs:
       - name: Native quality policy
         shell: powershell
         run: |
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/test-quality-policy.ps1
+          $EvidenceRoot = Join-Path $env:RUNNER_TEMP ("quality-helper-" + $env:GITHUB_RUN_ID + "-" + $env:GITHUB_RUN_ATTEMPT)
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/test-quality-policy.ps1 -EvidenceRoot $EvidenceRoot -ImplementationReady
           exit $LASTEXITCODE
       - name: Quality fixture contracts
         shell: powershell
