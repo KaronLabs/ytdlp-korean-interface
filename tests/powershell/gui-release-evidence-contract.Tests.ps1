@@ -507,6 +507,16 @@ function Get-TestFunctionSource {
 
 Describe 'v2.19.1-karon.2 GUI release evidence contract' {
     BeforeAll {
+        $script:RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+        $script:Verifier = Join-Path $script:RepositoryRoot 'tools\verify-gui-release-evidence.ps1'
+        $script:Recorder = Join-Path $script:RepositoryRoot 'tools\record-gui-release-evidence.ps1'
+        $script:Pwsh = (Get-Command pwsh.exe -ErrorAction Stop).Source
+        $script:ReleaseVersion = 'v2.19.1-karon.2'
+        $script:ExpectedCases = @('ko-KR-100', 'ko-KR-150', 'ko-KR-200', 'en-US-100', 'en-US-150', 'en-US-200')
+        $script:ObservationNames = @(
+            'launch', 'downloadType', 'quality1080p', 'quality720p', 'qualityBest', 'expectedResolution',
+            'queueRegistration', 'progress', 'completion', 'advancedNavigation', 'noClipping'
+        )
         $script:FixtureRoots = [Collections.Generic.List[string]]::new()
         $script:Media = $null
         Initialize-TestMedia
