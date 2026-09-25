@@ -11,6 +11,17 @@ $script:Utf8 = New-Object Text.UTF8Encoding($false)
 $script:Tag = 'v2.19.1-karon.2'
 $script:ApprovedDenoCollectorCommit = '09ced74a90248fbeb54969ea03d5aacb98dfc38b'
 
+BeforeAll {
+    $script:RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+    $script:Builder = Join-Path $script:RepositoryRoot 'tools\build-release-license-lock.ps1'
+    $script:SourcesConsumer = Join-Path $script:RepositoryRoot 'tools\build-corresponding-sources.ps1'
+    $script:SpdxConsumer = Join-Path $script:RepositoryRoot 'tools\generate-release-spdx.ps1'
+    $script:PackageConsumer = Join-Path $script:RepositoryRoot 'tools\package-quality-release.ps1'
+    $script:Utf8 = New-Object Text.UTF8Encoding($false)
+    $script:Tag = 'v2.19.1-karon.2'
+    $script:ApprovedDenoCollectorCommit = '09ced74a90248fbeb54969ea03d5aacb98dfc38b'
+}
+
 function Write-TestText {
     param([string] $Path, [string] $Text)
     $parent = Split-Path -Parent $Path
