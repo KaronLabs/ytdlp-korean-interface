@@ -210,6 +210,7 @@ function New-ReleaseContractCase {
     foreach ($directory in @($repository, $candidate, $generated, $gui, $output)) { [void](New-Item -ItemType Directory -Path $directory) }
 
     [void](Invoke-TestGit $repository @('init', '-q'))
+    [void](Invoke-TestGit $repository @('config', 'core.autocrlf', 'false'))
     [void](Invoke-TestGit $repository @('config', 'user.email', 'release-contract@example.invalid'))
     [void](Invoke-TestGit $repository @('config', 'user.name', 'Release Contract Test'))
     $applicationSourcePath = Join-Path $repository 'src\application-source.txt'
