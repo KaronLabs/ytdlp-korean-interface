@@ -462,10 +462,10 @@ function Assert-TestRejected {
     $caught = $null
     try { Invoke-TestBuilder $Fixture | Out-Null }
     catch { $caught = $_ }
-    $caught | Should Not BeNullOrEmpty
-    $caught.Exception.Message | Should Match $Pattern
-    (Test-Path -LiteralPath $Fixture.Output) | Should Be $false
-    @(Get-ChildItem -LiteralPath (Split-Path -Parent $Fixture.Output) -Filter '.generated-license-lock.json.partial.*' -ErrorAction SilentlyContinue).Count | Should Be 0
+    $caught | Should -Not -BeNullOrEmpty
+    $caught.Exception.Message | Should -Match $Pattern
+    (Test-Path -LiteralPath $Fixture.Output) | Should -Be $false
+    @(Get-ChildItem -LiteralPath (Split-Path -Parent $Fixture.Output) -Filter '.generated-license-lock.json.partial.*' -ErrorAction SilentlyContinue).Count | Should -Be 0
 }
 
 function Set-PackageGuiFixture {
@@ -676,7 +676,7 @@ Describe 'final verified release license lock integrator' {
         $boundWrapper = [string]$wrapperProperty.Value
         $alternateWrapper = Join-Path $root 'alternate-sevenzip\7z2601-x64-no-rar-source.zip'
         New-TestSevenZipWrapper -RawPath $raw -OutputPath $alternateWrapper
-        (Get-TestSha256 $alternateWrapper) | Should Not Be (Get-TestSha256 $boundWrapper)
+        (Get-TestSha256 $alternateWrapper) | Should -Not -Be (Get-TestSha256 $boundWrapper)
         $wrapperProperty.Value = $alternateWrapper
 
         Assert-TestRejected $fixture 'release_license_lock_sevenzip_wrapper_binding_mismatch'
@@ -695,7 +695,7 @@ Describe 'final verified release license lock integrator' {
         Set-Variable -Scope Script -Name $race.BuilderVariableName -Value $race.InstrumentedBuilderPath
         try {
             Assert-TestRejected $fixture 'release_license_lock_input_swap_blocked'
-            (Test-Path -LiteralPath $race.BackupPath) | Should Be $false
+            (Test-Path -LiteralPath $race.BackupPath) | Should -Be $false
         }
         finally {
             Set-Variable -Scope Script -Name $race.BuilderVariableName -Value $race.OriginalBuilderPath
@@ -709,13 +709,13 @@ Describe 'final verified release license lock integrator' {
         $wrapper = [string](Get-FixtureProperty $fixture @('SevenZipWrapper', 'SevenZipSourceWrapper')).Value
         $replacement = Join-Path $root 'wrapper-swap\7z2601-x64-no-rar-source.zip'
         New-TestSevenZipWrapper -RawPath $raw -OutputPath $replacement
-        (Get-TestSha256 $replacement) | Should Not Be (Get-TestSha256 $wrapper)
+        (Get-TestSha256 $replacement) | Should -Not -Be (Get-TestSha256 $wrapper)
         $race = New-SwapInstrumentedBuilder -Kind wrapper -TargetPath $wrapper -ReplacementPath $replacement -OutputDirectory $root
 
         Set-Variable -Scope Script -Name $race.BuilderVariableName -Value $race.InstrumentedBuilderPath
         try {
             Assert-TestRejected $fixture 'release_license_lock_input_swap_blocked'
-            (Test-Path -LiteralPath $race.BackupPath) | Should Be $false
+            (Test-Path -LiteralPath $race.BackupPath) | Should -Be $false
         }
         finally {
             Set-Variable -Scope Script -Name $race.BuilderVariableName -Value $race.OriginalBuilderPath
@@ -731,27 +731,27 @@ Describe 'final verified release license lock integrator' {
         $second = Join-Path $fixture.Root 'generated-license-lock-second.json'
         Invoke-TestBuilder $fixture | Out-Null
         Invoke-TestBuilder $fixture $second | Out-Null
-        (Get-TestSha256 $fixture.Output) | Should Be (Get-TestSha256 $second)
+        (Get-TestSha256 $fixture.Output) | Should -Be (Get-TestSha256 $second)
         $bytes = [IO.File]::ReadAllBytes($fixture.Output)
-        ($bytes.Length -gt 3) | Should Be $true
-        (($bytes[0] -eq 0xEF) -and ($bytes[1] -eq 0xBB) -and ($bytes[2] -eq 0xBF)) | Should Be $false
-        $bytes[$bytes.Length - 1] | Should Be 10
-        ([Text.Encoding]::UTF8.GetString($bytes).Contains("`r")) | Should Be $false
+        ($bytes.Length -gt 3) | Should -Be $true
+        (($bytes[0] -eq 0xEF) -and ($bytes[1] -eq 0xBB) -and ($bytes[2] -eq 0xBF)) | Should -Be $false
+        $bytes[$bytes.Length - 1] | Should -Be 10
+        ([Text.Encoding]::UTF8.GetString($bytes).Contains("`r")) | Should -Be $false
         $lock = Read-TestJson $fixture.Output
-        $lock.release.verificationStatus | Should Be 'verified'
-        @($lock.release.blockers).Count | Should Be 0
-        @($lock.components | Where-Object verificationStatus -ne 'verified').Count | Should Be 0
-        @($lock.components.sourceArchives | Where-Object verificationStatus -ne 'verified').Count | Should Be 0
-        $lock.release.integrationEvidence.denoComponent.scope | Should Be 'deno-third-party-notice-source-closure'
-        $lock.release.integrationEvidence.denoComponent.predicateVersion | Should Be 'deno-component-pass/v1'
-        $lock.release.integrationEvidence.denoComponent.componentPass | Should Be $true
-        $lock.release.integrationEvidence.denoComponent.overallReleasePassObserved | Should Be $false
-        $lock.release.integrationEvidence.denoComponent.collectorSourceCommit | Should Be $script:ApprovedDenoCollectorCommit
-        $lock.release.integrationEvidence.denoComponent.evidence.inventory.schemaVersion | Should Be 'deno-source-inventory/v2'
-        $lock.release.integrationEvidence.denoComponent.evidence.inventory.canonicalTreeDigest | Should Be (Read-TestJson $fixture.DenoInventory).canonicalTreeDigest.sha256
-        $lock.release.integrationEvidence.sevenZip.sourceWrapper.innerSha256 | Should Be (Get-TestSha256 $fixture.SevenZipSource)
-        $lock.release.integrationEvidence.sevenZip.sourceWrapper.outerSha256 | Should Be (Get-TestSha256 $fixture.SevenZipWrapper)
-        (Get-Command $script:Builder).Parameters.ContainsKey('verificationStatus') | Should Be $false
+        $lock.release.verificationStatus | Should -Be 'verified'
+        @($lock.release.blockers).Count | Should -Be 0
+        @($lock.components | Where-Object verificationStatus -ne 'verified').Count | Should -Be 0
+        @($lock.components.sourceArchives | Where-Object verificationStatus -ne 'verified').Count | Should -Be 0
+        $lock.release.integrationEvidence.denoComponent.scope | Should -Be 'deno-third-party-notice-source-closure'
+        $lock.release.integrationEvidence.denoComponent.predicateVersion | Should -Be 'deno-component-pass/v1'
+        $lock.release.integrationEvidence.denoComponent.componentPass | Should -Be $true
+        $lock.release.integrationEvidence.denoComponent.overallReleasePassObserved | Should -Be $false
+        $lock.release.integrationEvidence.denoComponent.collectorSourceCommit | Should -Be $script:ApprovedDenoCollectorCommit
+        $lock.release.integrationEvidence.denoComponent.evidence.inventory.schemaVersion | Should -Be 'deno-source-inventory/v2'
+        $lock.release.integrationEvidence.denoComponent.evidence.inventory.canonicalTreeDigest | Should -Be (Read-TestJson $fixture.DenoInventory).canonicalTreeDigest.sha256
+        $lock.release.integrationEvidence.sevenZip.sourceWrapper.innerSha256 | Should -Be (Get-TestSha256 $fixture.SevenZipSource)
+        $lock.release.integrationEvidence.sevenZip.sourceWrapper.outerSha256 | Should -Be (Get-TestSha256 $fixture.SevenZipWrapper)
+        (Get-Command $script:Builder).Parameters.ContainsKey('verificationStatus') | Should -Be $false
     }
 
     It 'rejects stale Git source identity and candidate executable bytes' {
@@ -987,8 +987,8 @@ Describe 'final verified release license lock integrator' {
         [IO.Directory]::CreateDirectory($spdxOutput) | Out-Null
         & $script:SourcesConsumer -LockPath $fixture.Output -SourceRoot $fixture.SourceRoot -CandidateRoot $fixture.Candidate -CacheDirectory $fixture.Cache -OutputDirectory $sourcesOutput | Out-Null
         & $script:SpdxConsumer -LockPath $fixture.Output -SourceRoot $fixture.SourceRoot -CandidateRoot $fixture.Candidate -OutputDirectory $spdxOutput | Out-Null
-        @(Get-ChildItem -LiteralPath $sourcesOutput -File).Count | Should BeGreaterThan 0
-        @(Get-ChildItem -LiteralPath $spdxOutput -File).Count | Should BeGreaterThan 0
+        @(Get-ChildItem -LiteralPath $sourcesOutput -File).Count | Should -BeGreaterThan 0
+        @(Get-ChildItem -LiteralPath $spdxOutput -File).Count | Should -BeGreaterThan 0
     }
 
     It 'produces a tracked canonical lock accepted by package PlanOnly' {
@@ -1014,6 +1014,6 @@ Describe 'final verified release license lock integrator' {
         $packageOutput = Join-Path $fixture.Root 'package-output'
         $receipt = Join-Path $fixture.Root 'release-receipt.json'
         $plan = & $script:PackageConsumer -RepositoryRoot $fixture.Repository -CandidateDirectory $fixture.Candidate -LockPath $canonicalLock -CorrespondingSourcesPath $fixture.CorrespondingSources -SpdxPath $fixture.Spdx -GuiValidationSummaryPath $fixture.GuiSummary -GuiValidationEvidenceManifestPath $fixture.GuiEvidence -OutputDirectory $packageOutput -ReceiptPath $receipt -PlanOnly
-        $plan | Should Not BeNullOrEmpty
+        $plan | Should -Not -BeNullOrEmpty
     }
 }
