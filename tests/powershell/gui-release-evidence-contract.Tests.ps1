@@ -506,7 +506,11 @@ function Get-TestFunctionSource {
 }
 
 Describe 'v2.19.1-karon.2 GUI release evidence contract' {
-    BeforeAll { Initialize-TestMedia }
+    BeforeAll {
+        $script:FixtureRoots = [Collections.Generic.List[string]]::new()
+        $script:Media = $null
+        Initialize-TestMedia
+    }
 
     AfterAll {
         foreach ($root in $script:FixtureRoots) {
