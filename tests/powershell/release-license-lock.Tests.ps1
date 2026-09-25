@@ -47,7 +47,7 @@ function Get-TestSha256 {
 function Get-TestRecord {
     param([string] $Path, [string] $Name = '')
     if ([string]::IsNullOrWhiteSpace($Name)) { $Name = Split-Path -Leaf $Path }
-    [ordered]@{ fileName = $Name; length = [long](Get-Item -LiteralPath $Path).Length; sha256 = Get-TestSha256 $Path }
+    [ordered]@{ fileName = $Name; length = [long](Get-Item $Path).Length; sha256 = Get-TestSha256 $Path }
 }
 
 function New-TestZip {
@@ -628,7 +628,8 @@ function New-SwapInstrumentedBuilder {
         throw 'release_lock_builder_variable_missing'
     }
     $builderVariable = $builderVariables[0]
-    $text = [IO.File]::ReadAllText([string]$builderVariable.Value)
+    # Normalize only the instrumented copy; keep the production file untouched.
+    $text = [IO.File]::ReadAllText([string]$builderVariable.Value).Replace("`r`n", "`n")
     $newLine = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }
 
     if ($Kind -ceq 'raw') {
