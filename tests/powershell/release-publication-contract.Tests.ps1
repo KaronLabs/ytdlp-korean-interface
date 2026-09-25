@@ -305,7 +305,7 @@ function New-ReleaseContractCase {
         }
         components = @($component)
     }
-    $innerLock = $baseLock | ConvertTo-Json -Depth 64 | ConvertFrom-Json -Depth 64
+    $innerLock = $baseLock | ConvertTo-Json -Depth 64 | ConvertFrom-Json
     $innerLockPath = Join-Path $root 'inner.lock.json'
     Write-TestJson $innerLockPath $innerLock
     $sourcesPath = Join-Path $generated $script:SourcesName
@@ -441,9 +441,9 @@ function New-ReleaseContractCase {
     $guiSchemaPath = Join-Path $repository ($script:GuiSchemaRepositoryPath.Replace('/', '\'))
     [void](New-Item -ItemType Directory -Path (Split-Path -Parent $guiSchemaPath))
     [IO.File]::Copy($script:ProducerGuiSchemaFixture, $guiSchemaPath, $false)
-    $guiSchema = Get-Content -Raw $guiSchemaPath | ConvertFrom-Json -Depth 64
+    $guiSchema = Get-Content -Raw $guiSchemaPath | ConvertFrom-Json
 
-    $outerLock = $baseLock | ConvertTo-Json -Depth 64 | ConvertFrom-Json -Depth 64
+    $outerLock = $baseLock | ConvertTo-Json -Depth 64 | ConvertFrom-Json
     $receiptInputs = [ordered]@{
         candidateManifest = New-TestHashRecord $manifestPath 'candidate-manifest.json'
         correspondingSources = New-TestHashRecord $sourcesPath $script:SourcesName
@@ -588,7 +588,7 @@ function New-PackagedPublicationCase {
 
 function New-FakePublicationRunner {
     param([object] $Case, [hashtable] $Options = @{})
-    $receipt = Get-Content -Raw -LiteralPath $Case.ReceiptPath | ConvertFrom-Json -Depth 32
+    $receipt = Get-Content -Raw -LiteralPath $Case.ReceiptPath | ConvertFrom-Json
     $state = @{
         Origin = 'git@github.com:KaronLabs/ytdlp-korean-interface.git'
         PushOrigin = 'git@github.com:KaronLabs/ytdlp-korean-interface.git'
@@ -887,7 +887,7 @@ Describe 'Single production publication entry point' {
 Describe 'Independent immutable provenance anchors' {
     It 'writes application and packaging anchors without an overloaded sourceCommit' {
         $case = New-PackagedPublicationCase 'provenance-receipt-shape'
-        $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json -Depth 32
+        $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json
         (@($receipt.PSObject.Properties.Name) -contains 'applicationSourceCommit') | Should -Be $true
         (@($receipt.PSObject.Properties.Name) -contains 'applicationSourceTree') | Should -Be $true
         (@($receipt.PSObject.Properties.Name) -contains 'packagingCommit') | Should -Be $true
@@ -930,7 +930,7 @@ Describe 'Independent immutable provenance anchors' {
 
     It 'rejects equality confusion in a private receipt' {
         $case = New-PackagedPublicationCase 'provenance-equality-confusion'
-        $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json -Depth 32
+        $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json
         $packagingCommit = [string]$receipt.packagingCommit
         $packagingTree = [string](Invoke-TestGit $case.Repository @('rev-parse', 'HEAD^{tree}'))
         $receipt.applicationSourceCommit = $packagingCommit
@@ -1232,7 +1232,7 @@ Describe 'Exact package, GUI evidence, and receipt contract' {
 
     It 'rejects an SPDX package license contradicting the verified lock' {
         $case = New-ReleaseContractCase 'package-spdx-license-mismatch'
-        $spdx = Get-Content -Raw $case.SpdxPath | ConvertFrom-Json -Depth 64
+        $spdx = Get-Content -Raw $case.SpdxPath | ConvertFrom-Json
         $spdx.packages[0].licenseDeclared = 'GPL-3.0-only'
         Write-TestJson $case.SpdxPath $spdx
         Refresh-TestInputRecord $case 'spdx' $case.SpdxPath $script:SpdxName
@@ -1330,7 +1330,7 @@ Describe 'Fail-closed publication preflight and receipt checks' {
 
     It 'rejects receipt tampering before external commands' {
         $case = New-PackagedPublicationCase 'publish-receipt-tamper'
-        $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json -Depth 32
+        $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json
         $receipt.packagingCommit = 'f' * 40
         Write-TestJson $case.ReceiptPath $receipt
         $fake = New-FakePublicationRunner $case
