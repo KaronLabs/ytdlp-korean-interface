@@ -720,7 +720,8 @@ Describe 'v2.19.1-karon.2 GUI release evidence contract' {
     }
 
     foreach ($checkName in @('mp3Conversion', 'settingsSaveRestartRestore', 'legacySettingsTransition')) {
-        It "rejects missing representative coverage for $checkName" {
+        It "rejects missing representative coverage for $checkName" -TestCases @{ checkName = $checkName } {
+            param($checkName)
             $fixture = New-ValidGuiFixture
             $caseId = if ($checkName -ceq 'legacySettingsTransition') { 'en-US-200' } else { 'ko-KR-100' }
             $case = Read-TestCase $fixture $caseId
