@@ -24,6 +24,36 @@ $script:GuiCases = @(
     [pscustomobject]@{ id = 'en-US-200'; language = 'en-US'; dpi = 200 }
 )
 
+BeforeAll {
+    $script:RepositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+    $script:PackageTool = Join-Path $script:RepositoryRoot 'tools\package-quality-release.ps1'
+    $script:PublishTool = Join-Path $script:RepositoryRoot 'tools\publish-quality-release.ps1'
+    $script:Tag = 'v2.19.1-karon.2'
+    $script:HeadSha = '0123456789abcdef0123456789abcdef01234567'
+    $script:TagObjectSha = '89abcdef0123456789abcdef0123456789abcdef'
+    $script:BinaryName = 'ytdlp-korean-interface-v2.19.1-karon.2-win-x64.zip'
+    $script:SourcesName = 'ytdlp-korean-interface-v2.19.1-karon.2-corresponding-sources.zip'
+    $script:SpdxName = 'ytdlp-korean-interface-v2.19.1-karon.2.spdx.json'
+    $script:SumsName = 'SHA256SUMS.txt'
+    $script:AssetNames = @($script:BinaryName, $script:SourcesName, $script:SpdxName, $script:SumsName)
+    $script:GuiSchemaRepositoryPath = 'release/validation/v2.19.1-karon.2/gui-validation-output.schema.json'
+    $script:ProducerGuiSchemaFixture = Join-Path $PSScriptRoot 'fixtures\gui-validation-output.schema-e49cc702.json'
+    $script:ProducerGuiSchemaSha256 = 'e49cc70253bd5dd4b4abd8ee00406f5dd8ed39434e309e3e3c74694b85c1b80e'
+    $script:SpdxSchemaFixture = Join-Path $PSScriptRoot 'fixtures\spdx-2.3-schema-aadf3b0b.json'
+    $script:SpdxSchemaLength = 45312L
+    $script:SpdxSchemaSha256 = '239208b7ac287b3cf5d9a9af23f9d69863971102a5e1587a27a398b43490b89b'
+    $script:GuiCases = @(
+        [pscustomobject]@{ id = 'ko-KR-100'; language = 'ko-KR'; dpi = 100 },
+        [pscustomobject]@{ id = 'ko-KR-150'; language = 'ko-KR'; dpi = 150 },
+        [pscustomobject]@{ id = 'ko-KR-200'; language = 'ko-KR'; dpi = 200 },
+        [pscustomobject]@{ id = 'en-US-100'; language = 'en-US'; dpi = 100 },
+        [pscustomobject]@{ id = 'en-US-150'; language = 'en-US'; dpi = 150 },
+        [pscustomobject]@{ id = 'en-US-200'; language = 'en-US'; dpi = 200 }
+    )
+    . $script:PackageTool
+    . $script:PublishTool
+}
+
 if (-not (Test-Path -LiteralPath $script:PackageTool -PathType Leaf) -or
     -not (Test-Path -LiteralPath $script:PublishTool -PathType Leaf)) {
     Describe 'Release packaging and publication production scripts' {
