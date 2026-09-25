@@ -28,8 +28,8 @@ if (-not (Test-Path -LiteralPath $script:PackageTool -PathType Leaf) -or
     -not (Test-Path -LiteralPath $script:PublishTool -PathType Leaf)) {
     Describe 'Release packaging and publication production scripts' {
         It 'requires both production scripts before the contract can pass' {
-            (Test-Path -LiteralPath $script:PackageTool -PathType Leaf) | Should Be $true
-            (Test-Path -LiteralPath $script:PublishTool -PathType Leaf) | Should Be $true
+            (Test-Path -LiteralPath $script:PackageTool -PathType Leaf) | Should -Be $true
+            (Test-Path -LiteralPath $script:PublishTool -PathType Leaf) | Should -Be $true
         }
     }
     return
@@ -817,39 +817,39 @@ function Assert-TestSecretAbsent {
         [Parameter(Mandatory)] [string] $Sentinel,
         [Parameter(Mandatory)] [string] $ErrorId
     )
-    $Caught | Should Not BeNullOrEmpty
-    $Caught.Exception.Message | Should Be $ErrorId
-    ($Caught | Out-String) | Should Not Match $Sentinel
-    (($Fake.Calls | ConvertTo-Json -Depth 8) -join '') | Should Not Match $Sentinel
-    (($Fake.Operations | ConvertTo-Json -Depth 8) -join '') | Should Not Match $Sentinel
+    $Caught | Should -Not -BeNullOrEmpty
+    $Caught.Exception.Message | Should -Be $ErrorId
+    ($Caught | Out-String) | Should -Not -Match $Sentinel
+    (($Fake.Calls | ConvertTo-Json -Depth 8) -join '') | Should -Not -Match $Sentinel
+    (($Fake.Operations | ConvertTo-Json -Depth 8) -join '') | Should -Not -Match $Sentinel
     $planFake = New-FakePublicationRunner $Case
     $plan = Invoke-TestPublication $Case $planFake -PlanOnly
-    (($plan.Commands | ConvertTo-Json -Depth 8) -join '') | Should Not Match $Sentinel
+    (($plan.Commands | ConvertTo-Json -Depth 8) -join '') | Should -Not -Match $Sentinel
     $treeContainsSentinel = $false
     foreach ($file in @(Get-ChildItem -LiteralPath $Case.Root -File -Recurse -Force)) {
         $text = [Text.UTF8Encoding]::new($false, $false).GetString([IO.File]::ReadAllBytes($file.FullName))
         if ($text.Contains($Sentinel, [StringComparison]::Ordinal)) { $treeContainsSentinel = $true; break }
     }
-    $treeContainsSentinel | Should Be $false
+    $treeContainsSentinel | Should -Be $false
 }
 
 Describe 'Single production publication entry point' {
     It 'does not expose the legacy publication function or direct stable command builder' {
-        ($null -eq (Get-Command Invoke-QualityReleasePublicationLegacy -ErrorAction SilentlyContinue)) | Should Be $true
-        ($null -eq (Get-Command Get-KaronPublishCommandPlan -ErrorAction SilentlyContinue)) | Should Be $true
+        ($null -eq (Get-Command Invoke-QualityReleasePublicationLegacy -ErrorAction SilentlyContinue)) | Should -Be $true
+        ($null -eq (Get-Command Get-KaronPublishCommandPlan -ErrorAction SilentlyContinue)) | Should -Be $true
     }
 
     It 'contains no latest flag and creates only a draft through the REST endpoint' {
         $text = [IO.File]::ReadAllText($script:PublishTool)
-        $text | Should Not Match '(?i)--latest'
-        $text | Should Not Match "(?i)'release'\s*,\s*'edit'"
-        $text | Should Not Match "(?i)'release'\s*,\s*'create'"
-        $text | Should Match 'https://api\.github\.com/repos/KaronLabs/ytdlp-korean-interface/releases'
-        $text | Should Match 'draft\s*=\s*\$true'
+        $text | Should -Not -Match '(?i)--latest'
+        $text | Should -Not -Match "(?i)'release'\s*,\s*'edit'"
+        $text | Should -Not -Match "(?i)'release'\s*,\s*'create'"
+        $text | Should -Match 'https://api\.github\.com/repos/KaronLabs/ytdlp-korean-interface/releases'
+        $text | Should -Match 'draft\s*=\s*\$true'
         $tokens = $null
         $errors = $null
         [void][Management.Automation.Language.Parser]::ParseFile($script:PublishTool, [ref]$tokens, [ref]$errors)
-        @($errors).Count | Should Be 0
+        @($errors).Count | Should -Be 0
     }
 }
 
@@ -857,19 +857,19 @@ Describe 'Independent immutable provenance anchors' {
     It 'writes application and packaging anchors without an overloaded sourceCommit' {
         $case = New-PackagedPublicationCase 'provenance-receipt-shape'
         $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json -Depth 32
-        (@($receipt.PSObject.Properties.Name) -contains 'applicationSourceCommit') | Should Be $true
-        (@($receipt.PSObject.Properties.Name) -contains 'applicationSourceTree') | Should Be $true
-        (@($receipt.PSObject.Properties.Name) -contains 'packagingCommit') | Should Be $true
-        (@($receipt.PSObject.Properties.Name) -contains 'sourceCommit') | Should Be $false
-        $receipt.applicationSourceCommit | Should Be $case.ApplicationSourceCommit
-        $receipt.applicationSourceTree | Should Be $case.ApplicationSourceTree
-        $receipt.packagingCommit | Should Not Be $receipt.applicationSourceCommit
+        (@($receipt.PSObject.Properties.Name) -contains 'applicationSourceCommit') | Should -Be $true
+        (@($receipt.PSObject.Properties.Name) -contains 'applicationSourceTree') | Should -Be $true
+        (@($receipt.PSObject.Properties.Name) -contains 'packagingCommit') | Should -Be $true
+        (@($receipt.PSObject.Properties.Name) -contains 'sourceCommit') | Should -Be $false
+        $receipt.applicationSourceCommit | Should -Be $case.ApplicationSourceCommit
+        $receipt.applicationSourceTree | Should -Be $case.ApplicationSourceTree
+        $receipt.packagingCommit | Should -Not -Be $receipt.applicationSourceCommit
     }
 
     It 'rejects application source substitution independently of packaging HEAD' {
         $case = New-ReleaseContractCase 'provenance-application-substitution'
         Set-TestApplicationSourceCommit $case ('b' * 40)
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_application_source_mismatch'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_application_source_mismatch'
     }
 
     It 'rejects application source tree substitution' {
@@ -877,13 +877,13 @@ Describe 'Independent immutable provenance anchors' {
         $case.CandidateManifest.applicationSourceTree = 'f' * 40
         Write-TestJson $case.ManifestPath $case.CandidateManifest
         $manifestRecord = @($case.Lock.release.candidateFiles | Where-Object { [string]$_.path -ceq 'candidate-manifest.json' })
-        $manifestRecord.Count | Should Be 1
+        $manifestRecord.Count | Should -Be 1
         $manifestRecord[0].sha256 = Get-TestSha256 $case.ManifestPath
         $entries = Get-KaronPackageCandidateEntries $case.Lock $case.Candidate
         $packagingCommit = [string](Invoke-TestGit $case.Repository @('rev-parse', 'HEAD^{commit}'))
         (Get-TestFailure {
             Get-KaronPackageApplicationProvenance $case.Lock $entries $case.Repository $packagingCommit
-        }) | Should Match 'package_application_source_tree_mismatch'
+        }) | Should -Match 'package_application_source_tree_mismatch'
     }
 
     It 'rejects an application lock that self-references the packaging commit' {
@@ -894,7 +894,7 @@ Describe 'Independent immutable provenance anchors' {
         $entries = Get-KaronPackageCandidateEntries $case.Lock $case.Candidate
         (Get-TestFailure {
             Get-KaronPackageApplicationProvenance $case.Lock $entries $case.Repository $packagingCommit
-        }) | Should Match 'package_provenance_self_reference'
+        }) | Should -Match 'package_provenance_self_reference'
     }
 
     It 'rejects equality confusion in a private receipt' {
@@ -906,8 +906,8 @@ Describe 'Independent immutable provenance anchors' {
         $receipt.applicationSourceTree = $packagingTree
         Write-TestJson $case.ReceiptPath $receipt
         $fake = New-FakePublicationRunner $case
-        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly }) | Should Match 'package_receipt_provenance_confused'
-        $fake.Calls.Count | Should Be 0
+        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly }) | Should -Match 'package_receipt_provenance_confused'
+        $fake.Calls.Count | Should -Be 0
     }
 
     It 'rejects a stale receipt after packaging HEAD advances' {
@@ -916,8 +916,8 @@ Describe 'Independent immutable provenance anchors' {
         [void](Invoke-TestGit $case.Repository @('add', '--', 'contract-revision.txt'))
         [void](Invoke-TestGit $case.Repository @('commit', '-q', '-m', 'advance packaging contract'))
         $fake = New-FakePublicationRunner $case
-        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly }) | Should Match 'package_receipt_packaging_commit_mismatch'
-        $fake.Calls.Count | Should Be 0
+        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly }) | Should -Match 'package_receipt_packaging_commit_mismatch'
+        $fake.Calls.Count | Should -Be 0
     }
 }
 
@@ -926,31 +926,31 @@ Describe 'Application provenance ancestry and release-only delta' {
         $case = New-TestProvenanceOnlyCase 'unrelated' 'unrelated'
         (Get-TestFailure {
             Get-KaronPackageApplicationProvenance $case.Lock $case.Entries $case.Repository $case.PackagingCommit
-        }) | Should Match 'package_application_source_not_ancestor'
+        }) | Should -Match 'package_application_source_not_ancestor'
     }
 
     It 'rejects a stale application ancestor followed by a source-code change' {
         $case = New-TestProvenanceOnlyCase 'source-change' 'source-change'
         (Get-TestFailure {
             Get-KaronPackageApplicationProvenance $case.Lock $case.Entries $case.Repository $case.PackagingCommit
-        }) | Should Match 'package_application_source_delta_invalid'
+        }) | Should -Match 'package_application_source_delta_invalid'
     }
 
     It 'accepts an application ancestor followed only by release evidence' {
         $case = New-TestProvenanceOnlyCase 'release-only' 'release-only'
         $result = Get-KaronPackageApplicationProvenance $case.Lock $case.Entries $case.Repository $case.PackagingCommit
-        $result.ApplicationSourceCommit | Should Be $case.ApplicationCommit
-        $result.PackagingCommit | Should Be $case.PackagingCommit
+        $result.ApplicationSourceCommit | Should -Be $case.ApplicationCommit
+        $result.PackagingCommit | Should -Be $case.PackagingCommit
     }
 }
 
 Describe 'Exact upstream SPDX schema fixture' {
     It 'pins the exact aadf3b0b upstream bytes without newline normalization' {
-        [long](Get-Item -LiteralPath $script:SpdxSchemaFixture).Length | Should Be $script:SpdxSchemaLength
-        (Get-TestSha256 $script:SpdxSchemaFixture) | Should Be $script:SpdxSchemaSha256
+        [long](Get-Item -LiteralPath $script:SpdxSchemaFixture).Length | Should -Be $script:SpdxSchemaLength
+        (Get-TestSha256 $script:SpdxSchemaFixture) | Should -Be $script:SpdxSchemaSha256
         $toolText = [IO.File]::ReadAllText($script:PackageTool)
-        $toolText | Should Match ([regex]::Escape([string]$script:SpdxSchemaLength + 'L'))
-        $toolText | Should Match $script:SpdxSchemaSha256
+        $toolText | Should -Match ([regex]::Escape([string]$script:SpdxSchemaLength + 'L'))
+        $toolText | Should -Match $script:SpdxSchemaSha256
     }
 }
 
@@ -963,7 +963,7 @@ Describe 'GUI evidence byte allowlist' {
         param($Name, $Mutate)
         $case = New-ReleaseContractCase ('gui-evidence-' + $Name)
         & $Mutate $case
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_gui_evidence_'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_gui_evidence_'
     }
 
     It 'rejects case-fold and NFC-colliding GUI evidence records' -TestCases @(
@@ -989,13 +989,13 @@ Describe 'GUI evidence byte allowlist' {
         $case.Summary.evidenceFileCount = $case.GuiManifest.evidenceFiles.Count
         Save-TestGuiManifest $case
         Save-TestSummary $case
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_gui_(manifest_invalid|evidence_inventory_invalid)'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_gui_(manifest_invalid|evidence_inventory_invalid)'
     }
 }
 
 Describe 'Pinned SPDX and LicenseRef enforcement' {
     It 'pins the exact canonical producer GUI schema fixture' {
-        (Get-TestSha256 $script:ProducerGuiSchemaFixture) | Should Be $script:ProducerGuiSchemaSha256
+        (Get-TestSha256 $script:ProducerGuiSchemaFixture) | Should -Be $script:ProducerGuiSchemaSha256
     }
 
     It 'rejects SPDX documents missing official 2.3 required evidence' -TestCases @(
@@ -1007,7 +1007,7 @@ Describe 'Pinned SPDX and LicenseRef enforcement' {
         $case = New-ReleaseContractCase ('spdx-required-' + $Name)
         & $Mutate $case
         Save-TestSpdx $case
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_spdx_schema_invalid'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_spdx_schema_invalid'
     }
 
     It 'rejects a LicenseRef notice hidden in dot-git and absent from component noticeFiles' {
@@ -1034,7 +1034,7 @@ Describe 'Pinned SPDX and LicenseRef enforcement' {
         })
         Rebuild-TestCorrespondingSources $case
         Save-TestSpdx $case
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_license_ref_notice_invalid'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_license_ref_notice_invalid'
     }
 }
 
@@ -1044,7 +1044,7 @@ Describe 'Canonical producer GUI schema handshake' {
         $case.GuiSchema.'$id' = 'https://github.com/KaronLabs/ytdlp-korean-interface/release/validation/v2.19.1-karon.2/gui-validation-output.schema.json'
         Write-TestJson $case.GuiSchemaPath $case.GuiSchema
         Refresh-TestInputRecord $case 'guiValidationSchema' $case.GuiSchemaPath $script:GuiSchemaRepositoryPath 'path'
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_gui_schema_(lock_mismatch|identity_invalid)'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_gui_schema_(lock_mismatch|identity_invalid)'
     }
 
     It 'accepts producer $defs.evidenceManifest without the stale $defs.manifest alias' {
@@ -1052,7 +1052,7 @@ Describe 'Canonical producer GUI schema handshake' {
         [IO.File]::Copy($script:ProducerGuiSchemaFixture, $case.GuiSchemaPath, $true)
         Refresh-TestInputRecord $case 'guiValidationSchema' $case.GuiSchemaPath $script:GuiSchemaRepositoryPath 'path'
         $result = Invoke-TestPackage $case -PlanOnly
-        $result.Mode | Should Be 'plan'
+        $result.Mode | Should -Be 'plan'
     }
 }
 
@@ -1060,14 +1060,14 @@ Describe 'Exact package, GUI evidence, and receipt contract' {
     It 'packages exact public assets and creates a non-public bound receipt' {
         $case = New-ReleaseContractCase 'package-positive'
         $result = Invoke-TestPackage $case
-        @($result.AssetPaths).Count | Should Be 4
-        (Test-Path -LiteralPath $case.ReceiptPath -PathType Leaf) | Should Be $true
-        @(Get-ChildItem -LiteralPath $case.Output -File).Count | Should Be 4
-        @((Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json).guiCaseIds).Count | Should Be 6
+        @($result.AssetPaths).Count | Should -Be 4
+        (Test-Path -LiteralPath $case.ReceiptPath -PathType Leaf) | Should -Be $true
+        @(Get-ChildItem -LiteralPath $case.Output -File).Count | Should -Be 4
+        @((Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json).guiCaseIds).Count | Should -Be 6
         $zip = [IO.Compression.ZipFile]::OpenRead((Join-Path $case.Output $script:BinaryName))
         try { $names = @($zip.Entries | ForEach-Object FullName) }
         finally { $zip.Dispose() }
-        ($names -join '|') | Should Be 'THIRD-PARTY-NOTICES.txt|candidate-manifest.json|ffprobe.exe|release/licenses/v2.19.1-karon.2/application/LICENSE.txt|ytdlp-interface.exe'
+        ($names -join '|') | Should -Be 'THIRD-PARTY-NOTICES.txt|candidate-manifest.json|ffprobe.exe|release/licenses/v2.19.1-karon.2/application/LICENSE.txt|ytdlp-interface.exe'
     }
 
     It 'rejects an unverified release and nonempty blockers' -TestCases @(
@@ -1078,8 +1078,8 @@ Describe 'Exact package, GUI evidence, and receipt contract' {
         $case = New-ReleaseContractCase ('package-release-' + $Name)
         & $Mutate $case
         Save-TestLock $case
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_'
-        @(Get-ChildItem $case.Output -Force).Count | Should Be 0
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_'
+        @(Get-ChildItem $case.Output -Force).Count | Should -Be 0
     }
 
     It 'rejects array-valued release and source statuses before PowerShell coercion' -TestCases @(
@@ -1090,7 +1090,7 @@ Describe 'Exact package, GUI evidence, and receipt contract' {
         $case = New-ReleaseContractCase ('package-array-' + $Name)
         & $Mutate $case
         Save-TestLock $case
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_lock_type_invalid'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_lock_type_invalid'
     }
 
     It 'rejects zero GUI evidence and incomplete six-case inventory' -TestCases @(
@@ -1100,14 +1100,14 @@ Describe 'Exact package, GUI evidence, and receipt contract' {
         param($Name, $Mutate)
         $case = New-ReleaseContractCase ('package-gui-' + $Name)
         & $Mutate $case
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_gui_'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_gui_'
     }
 
     It 'rejects GUI evidence bound to a different candidate executable' {
         $case = New-ReleaseContractCase 'package-gui-candidate'
         $case.Summary.candidate.executable.sha256 = 'f' * 64
         Save-TestSummary $case
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_gui_candidate_mismatch'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_gui_candidate_mismatch'
     }
 
     It 'rejects the deprecated string-v1 flat GUI evidence contract' {
@@ -1131,7 +1131,7 @@ Describe 'Exact package, GUI evidence, and receipt contract' {
         $case.GuiManifest = [ordered]@{ schemaVersion = 'karon-gui-validation-evidence-manifest/v1'; tag = $script:Tag; status = 'verified'; blockers = @(); candidate = $flat; cases = $oldManifestCases }
         Save-TestSummary $case
         Save-TestGuiManifest $case
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_gui_'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_gui_'
     }
 
     It 'rejects producer schema divergence even when the changed schema is tracked and lock-bound' {
@@ -1139,7 +1139,7 @@ Describe 'Exact package, GUI evidence, and receipt contract' {
         $case.GuiSchema.'$id' = 'https://github.com/KaronLabs/ytdlp-korean-interface/blob/v2.19.1-karon.other/release/validation/v2.19.1-karon.2/gui-validation-output.schema.json'
         Write-TestJson $case.GuiSchemaPath $case.GuiSchema
         Refresh-TestInputRecord $case 'guiValidationSchema' $case.GuiSchemaPath $script:GuiSchemaRepositoryPath 'path'
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_gui_'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_gui_'
     }
 
     It 'rejects undeclared v2 GUI properties and a string schema version' -TestCases @(
@@ -1150,14 +1150,14 @@ Describe 'Exact package, GUI evidence, and receipt contract' {
         $case = New-ReleaseContractCase ('package-gui-closed-' + $Name)
         & $Mutate $case
         Save-TestSummary $case
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_gui_'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_gui_'
     }
 
     It 'rejects a plain-text corresponding-sources impostor after lock rebinding' {
         $case = New-ReleaseContractCase 'package-fake-sources'
         [IO.File]::WriteAllText($case.SourcesPath, 'not a zip', [Text.Encoding]::ASCII)
         Refresh-TestInputRecord $case 'correspondingSources' $case.SourcesPath $script:SourcesName
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_sources_zip_invalid'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_sources_zip_invalid'
     }
 
     It 'rejects a source ZIP without its internal dependency manifest' {
@@ -1167,14 +1167,14 @@ Describe 'Exact package, GUI evidence, and receipt contract' {
             ($case.SourcePrefix + 'THIRD-PARTY-NOTICES.txt') = $case.NoticePath
         }
         Refresh-TestInputRecord $case 'correspondingSources' $case.SourcesPath $script:SourcesName
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_sources_manifest_missing'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_sources_manifest_missing'
     }
 
     It 'rejects any canonical inner and outer lock projection mismatch' {
         $case = New-ReleaseContractCase 'package-inner-outer-mismatch'
         $case.InnerLock.components[0].version = '2.0.0'
         Rebuild-TestCorrespondingSources $case
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_sources_manifest_mismatch'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_sources_manifest_mismatch'
     }
 
     It 'rejects a declared nested source archive that is not a real ZIP' {
@@ -1185,7 +1185,7 @@ Describe 'Exact package, GUI evidence, and receipt contract' {
             $lock.components[0].sourceArchives[0].length = [long](Get-Item $case.SourceArchive).Length
         }
         Rebuild-TestCorrespondingSources $case
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_source_archive_invalid'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_source_archive_invalid'
     }
 
     It 'rejects plain-text and wrong-identity SPDX impostors' -TestCases @(
@@ -1196,7 +1196,7 @@ Describe 'Exact package, GUI evidence, and receipt contract' {
         $case = New-ReleaseContractCase ('package-spdx-' + $Name)
         & $Mutate $case
         Refresh-TestInputRecord $case 'spdx' $case.SpdxPath $script:SpdxName
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_spdx_'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_spdx_'
     }
 
     It 'rejects an SPDX package license contradicting the verified lock' {
@@ -1205,7 +1205,7 @@ Describe 'Exact package, GUI evidence, and receipt contract' {
         $spdx.packages[0].licenseDeclared = 'GPL-3.0-only'
         Write-TestJson $case.SpdxPath $spdx
         Refresh-TestInputRecord $case 'spdx' $case.SpdxPath $script:SpdxName
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_spdx_package_contract_mismatch'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_spdx_package_contract_mismatch'
     }
 
     It 'rejects the lock from an arbitrary external path even when bytes are identical' {
@@ -1218,13 +1218,13 @@ Describe 'Exact package, GUI evidence, and receipt contract' {
                 -GuiValidationSummaryPath $case.SummaryPath -GuiValidationEvidenceManifestPath $case.GuiManifestPath `
                 -OutputDirectory $case.Output -ReceiptPath $case.ReceiptPath
         }
-        $failure | Should Match 'package_lock_path_invalid'
+        $failure | Should -Match 'package_lock_path_invalid'
     }
 
     It 'rejects a semantically unchanged working-tree lock whose tracked blob changed' {
         $case = New-ReleaseContractCase 'package-lock-working-tree-change'
         [IO.File]::AppendAllText($case.LockPath, ' ', [Text.UTF8Encoding]::new($false))
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_tracked_blob_mismatch'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_tracked_blob_mismatch'
     }
 
     It 'rejects a repository reached through an ancestor junction' {
@@ -1238,7 +1238,7 @@ Describe 'Exact package, GUI evidence, and receipt contract' {
                 -GuiValidationSummaryPath $case.SummaryPath -GuiValidationEvidenceManifestPath $case.GuiManifestPath `
                 -OutputDirectory $case.Output -ReceiptPath $case.ReceiptPath
         }
-        $failure | Should Match 'package_path_reparse_point'
+        $failure | Should -Match 'package_path_reparse_point'
     }
 
     It 'rejects a same-length root notice substitution despite outer lock rebinding' {
@@ -1247,7 +1247,7 @@ Describe 'Exact package, GUI evidence, and receipt contract' {
         $bytes[0] = $bytes[0] -bxor 1
         [IO.File]::WriteAllBytes($case.NoticePath, $bytes)
         Refresh-TestInputRecord $case 'rootThirdPartyNotices' $case.NoticePath 'THIRD-PARTY-NOTICES.txt'
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_application_source_delta_invalid'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_application_source_delta_invalid'
     }
 
     It 'rejects unlisted and duplicate-case candidate paths' -TestCases @(
@@ -1257,7 +1257,7 @@ Describe 'Exact package, GUI evidence, and receipt contract' {
         param($Name, $Mutate)
         $case = New-ReleaseContractCase ('package-candidate-' + $Name)
         & $Mutate $case
-        (Get-TestFailure { Invoke-TestPackage $case }) | Should Match 'package_candidate_'
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match 'package_candidate_'
     }
 
     It 'preserves an independent producers final file on an atomic move race' {
@@ -1267,8 +1267,8 @@ Describe 'Exact package, GUI evidence, and receipt contract' {
         Write-TestUtf8 $partial 'owned'
         Write-TestUtf8 $final 'independent'
         $before = Get-TestSha256 $final
-        (Get-TestFailure { Move-KaronPackageOwnedArtifact $partial $final }) | Should Match 'package_output_race'
-        (Get-TestSha256 $final) | Should Be $before
+        (Get-TestFailure { Move-KaronPackageOwnedArtifact $partial $final }) | Should -Match 'package_output_race'
+        (Get-TestSha256 $final) | Should -Be $before
     }
 }
 
@@ -1281,8 +1281,8 @@ Describe 'Fail-closed publication preflight and receipt checks' {
         $case = New-PackagedPublicationCase ('publish-assets-' + $Name)
         & $Mutate $case
         $fake = New-FakePublicationRunner $case
-        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly }) | Should Match 'package_'
-        $fake.Calls.Count | Should Be 0
+        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly }) | Should -Match 'package_'
+        $fake.Calls.Count | Should -Be 0
     }
 
     It 'rejects checksum mismatch and same-length asset swaps through the receipt' -TestCases @(
@@ -1293,8 +1293,8 @@ Describe 'Fail-closed publication preflight and receipt checks' {
         $case = New-PackagedPublicationCase ('publish-tamper-' + $Name)
         & $Mutate $case
         $fake = New-FakePublicationRunner $case
-        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly }) | Should Match 'package_receipt_'
-        $fake.Calls.Count | Should Be 0
+        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly }) | Should -Match 'package_receipt_'
+        $fake.Calls.Count | Should -Be 0
     }
 
     It 'rejects receipt tampering before external commands' {
@@ -1303,8 +1303,8 @@ Describe 'Fail-closed publication preflight and receipt checks' {
         $receipt.packagingCommit = 'f' * 40
         Write-TestJson $case.ReceiptPath $receipt
         $fake = New-FakePublicationRunner $case
-        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly }) | Should Match 'package_receipt_packaging_commit_mismatch'
-        $fake.Calls.Count | Should Be 0
+        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly }) | Should -Match 'package_receipt_packaging_commit_mismatch'
+        $fake.Calls.Count | Should -Be 0
     }
 
     It 'rejects external release notes even when their bytes match' {
@@ -1312,8 +1312,8 @@ Describe 'Fail-closed publication preflight and receipt checks' {
         $outside = Join-Path $case.Root 'outside.md'
         [IO.File]::Copy($case.NotesPath, $outside)
         $fake = New-FakePublicationRunner $case
-        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly -NotesPath $outside }) | Should Match 'publication_notes_invalid'
-        $fake.Calls.Count | Should Be 0
+        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly -NotesPath $outside }) | Should -Match 'publication_notes_invalid'
+        $fake.Calls.Count | Should -Be 0
     }
 
     It 'rejects wrong origin, dirty state, wrong main, and tag mismatch' -TestCases @(
@@ -1325,22 +1325,22 @@ Describe 'Fail-closed publication preflight and receipt checks' {
         param($Name, $Options, $Error)
         $case = New-PackagedPublicationCase ('publish-preflight-' + $Name)
         $fake = New-FakePublicationRunner $case $Options
-        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly }) | Should Match $Error
+        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly }) | Should -Match $Error
     }
 
     It 'rejects an existing release without clobbering karon.1 or its assets' {
         $case = New-PackagedPublicationCase 'publish-existing'
         $fake = New-FakePublicationRunner $case @{ Stage = 'draft-assets' }
-        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly }) | Should Match 'publication_release_exists'
-        (@($fake.Calls | ForEach-Object { $_.Arguments -join ' ' }) -join '|') | Should Not Match 'karon\.1|--clobber|--force'
+        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly }) | Should -Match 'publication_release_exists'
+        (@($fake.Calls | ForEach-Object { $_.Arguments -join ' ' }) -join '|') | Should -Not -Match 'karon\.1|--clobber|--force'
     }
 }
 
 Describe 'Release identity tag-rebinding perimeter' {
     It 'contains no post-create tag-based upload or download command' {
         $text = [IO.File]::ReadAllText($script:PublishTool)
-        $text | Should Not Match "'release'\s*,\s*'upload'"
-        $text | Should Not Match "'release'\s*,\s*'download'"
+        $text | Should -Not -Match "'release'\s*,\s*'upload'"
+        $text | Should -Not -Match "'release'\s*,\s*'download'"
     }
 
     It 'never accesses or mutates a rebound tag target at lookup upload or download boundaries' -TestCases @(
@@ -1352,17 +1352,17 @@ Describe 'Release identity tag-rebinding perimeter' {
         $case = New-PackagedPublicationCase ('publish-tag-rebind-' + $Boundary)
         $fake = New-FakePublicationRunner $case @{ TagRebindBoundary = $Boundary }
         [void](Get-TestFailure { Invoke-TestPublication $case $fake })
-        $fake.State.WrongReleaseAccessed | Should Be $false
-        $fake.State.WrongReleaseMutated | Should Be $false
+        $fake.State.WrongReleaseAccessed | Should -Be $false
+        $fake.State.WrongReleaseMutated | Should -Be $false
     }
 
     It 'rolls back only by the sealed numeric release id after a tag rebind' {
         $case = New-PackagedPublicationCase 'publish-tag-rebind-rollback'
         $fake = New-FakePublicationRunner $case @{ TagRebindBoundary = 'rollback'; MainRaceAt = 7 }
-        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should Match 'publication_'
-        $fake.State.WrongReleaseAccessed | Should Be $false
-        $fake.State.WrongReleaseMutated | Should Be $false
-        $fake.State.Stage | Should Be 'draft-assets'
+        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should -Match 'publication_'
+        $fake.State.WrongReleaseAccessed | Should -Be $false
+        $fake.State.WrongReleaseMutated | Should -Be $false
+        $fake.State.Stage | Should -Be 'draft-assets'
     }
 }
 
@@ -1374,22 +1374,22 @@ Describe 'Credential token non-reflection perimeter' {
         $caught = $null
         try { [void](Invoke-TestPublication $case $fake) }
         catch { $caught = $_ }
-        $caught | Should Not BeNullOrEmpty
-        $caught.Exception.Message | Should Be 'publication_gh_token_failed'
-        ($caught | Out-String) | Should Not Match $sentinel
-        (($fake.Calls | ConvertTo-Json -Depth 8) -join '') | Should Not Match $sentinel
-        (($fake.Operations | ConvertTo-Json -Depth 8) -join '') | Should Not Match $sentinel
+        $caught | Should -Not -BeNullOrEmpty
+        $caught.Exception.Message | Should -Be 'publication_gh_token_failed'
+        ($caught | Out-String) | Should -Not -Match $sentinel
+        (($fake.Calls | ConvertTo-Json -Depth 8) -join '') | Should -Not -Match $sentinel
+        (($fake.Operations | ConvertTo-Json -Depth 8) -join '') | Should -Not -Match $sentinel
         $planFake = New-FakePublicationRunner $case
         $plan = Invoke-TestPublication $case $planFake -PlanOnly
-        (($plan.Commands | ConvertTo-Json -Depth 8) -join '') | Should Not Match $sentinel
+        (($plan.Commands | ConvertTo-Json -Depth 8) -join '') | Should -Not -Match $sentinel
         $treeContainsSentinel = $false
         foreach ($file in @(Get-ChildItem -LiteralPath $case.Root -File -Recurse -Force)) {
             $text = [Text.UTF8Encoding]::new($false, $false).GetString([IO.File]::ReadAllBytes($file.FullName))
             if ($text.Contains($sentinel, [StringComparison]::Ordinal)) { $treeContainsSentinel = $true; break }
         }
-        $treeContainsSentinel | Should Be $false
-        $fake.HttpCalls.Count | Should Be 0
-        $fake.State.Stage | Should Be 'absent'
+        $treeContainsSentinel | Should -Be $false
+        $fake.HttpCalls.Count | Should -Be 0
+        $fake.State.Stage | Should -Be 'absent'
     }
 
     It 'fails closed without reflection for an empty or whitespace success token' -TestCases @(
@@ -1401,9 +1401,9 @@ Describe 'Credential token non-reflection perimeter' {
         $case = New-PackagedPublicationCase ('publish-token-invalid-' + $Name)
         $fake = New-FakePublicationRunner $case @{ TokenExitCode = 0; TokenOutput = $TokenOutput }
         $failure = Get-TestFailure { Invoke-TestPublication $case $fake }
-        $failure | Should Be 'publication_gh_token_failed'
-        $fake.HttpCalls.Count | Should Be 0
-        $fake.State.Stage | Should Be 'absent'
+        $failure | Should -Be 'publication_gh_token_failed'
+        $fake.HttpCalls.Count | Should -Be 0
+        $fake.State.Stage | Should -Be 'absent'
     }
 }
 
@@ -1443,9 +1443,9 @@ Describe 'HTTP transport non-reflection perimeter' {
         $caught = $null
         try { [void](Invoke-KaronPublishHttpChecked $runner $request $ErrorId) }
         catch { $caught = $_ }
-        $caught | Should Not BeNullOrEmpty
-        $caught.Exception.Message | Should Be $ErrorId
-        ($caught | Out-String) | Should Not Match $sentinel
+        $caught | Should -Not -BeNullOrEmpty
+        $caught.Exception.Message | Should -Be $ErrorId
+        ($caught | Out-String) | Should -Not -Match $sentinel
     }
 
     It 'sanitizes malformed upload JSON containing a credential sentinel' {
@@ -1463,8 +1463,8 @@ Describe 'HTTP transport non-reflection perimeter' {
         $body = '{"id":7000,"state":"uploaded"}'
         $runner = { param($ignored) [pscustomobject]@{ StatusCode = 201; Body = $body } }.GetNewClosure()
         $result = Invoke-KaronPublishHttpChecked $runner ([pscustomobject]@{ ExpectedStatus = @(201) }) 'publication_upload_failed'
-        $result.StatusCode | Should Be 201
-        $result.Body | Should Be $body
+        $result.StatusCode | Should -Be 201
+        $result.Body | Should -Be $body
     }
 }
 
@@ -1473,45 +1473,45 @@ Describe 'Draft-first publication, redownload proof, and race gates' {
         $case = New-PackagedPublicationCase 'publish-plan'
         $fake = New-FakePublicationRunner $case
         $result = Invoke-TestPublication $case $fake -PlanOnly
-        $result.Mode | Should Be 'plan'
-        @($result.Commands).Count | Should Be 10
-        $result.Commands[0].Method | Should Be 'POST'
-        $result.Commands[0].Uri | Should Be 'https://api.github.com/repos/KaronLabs/ytdlp-korean-interface/releases'
+        $result.Mode | Should -Be 'plan'
+        @($result.Commands).Count | Should -Be 10
+        $result.Commands[0].Method | Should -Be 'POST'
+        $result.Commands[0].Uri | Should -Be 'https://api.github.com/repos/KaronLabs/ytdlp-korean-interface/releases'
         $createBody = $result.Commands[0].Body | ConvertFrom-Json
-        $createBody.tag_name | Should Be $script:Tag
-        $createBody.draft | Should Be $true
-        $createBody.prerelease | Should Be $false
+        $createBody.tag_name | Should -Be $script:Tag
+        $createBody.draft | Should -Be $true
+        $createBody.prerelease | Should -Be $false
         for ($index = 0; $index -lt 4; $index++) {
             $upload = $result.Commands[$index + 1]
-            $upload.Method | Should Be 'POST'
-            $upload.AssetName | Should Be $script:AssetNames[$index]
-            $upload.Uri | Should Be ('{sealed-upload-url}?name=' + [Uri]::EscapeDataString($script:AssetNames[$index]))
+            $upload.Method | Should -Be 'POST'
+            $upload.AssetName | Should -Be $script:AssetNames[$index]
+            $upload.Uri | Should -Be ('{sealed-upload-url}?name=' + [Uri]::EscapeDataString($script:AssetNames[$index]))
             $download = $result.Commands[$index + 5]
-            $download.Method | Should Be 'GET'
-            $download.Uri | Should Be 'https://api.github.com/repos/KaronLabs/ytdlp-korean-interface/releases/assets/{sealed-asset-id}'
-            $download.Accept | Should Be 'application/octet-stream'
+            $download.Method | Should -Be 'GET'
+            $download.Uri | Should -Be 'https://api.github.com/repos/KaronLabs/ytdlp-korean-interface/releases/assets/{sealed-asset-id}'
+            $download.Accept | Should -Be 'application/octet-stream'
         }
-        @($result.Commands[5..8] | ForEach-Object { $_.Directory } | Select-Object -Unique).Count | Should Be 1
-        ($result.Commands[9].Arguments -join '|') | Should Be 'api|--method|PATCH|repos/KaronLabs/ytdlp-korean-interface/releases/{sealed-release-id}|--field|draft=false'
-        (@($fake.Calls | Where-Object { $_.Executable -ceq 'gh' -and $_.Arguments[0] -ceq 'release' })).Count | Should Be 0
+        @($result.Commands[5..8] | ForEach-Object { $_.Directory } | Select-Object -Unique).Count | Should -Be 1
+        ($result.Commands[9].Arguments -join '|') | Should -Be 'api|--method|PATCH|repos/KaronLabs/ytdlp-korean-interface/releases/{sealed-release-id}|--field|draft=false'
+        (@($fake.Calls | Where-Object { $_.Executable -ceq 'gh' -and $_.Arguments[0] -ceq 'release' })).Count | Should -Be 0
     }
 
     It 'publishes only after four exact draft redownload hashes succeed with null API digests' {
         $case = New-PackagedPublicationCase 'publish-positive'
         $fake = New-FakePublicationRunner $case @{ DigestMode = 'null' }
         $result = Invoke-TestPublication $case $fake
-        $result.Mode | Should Be 'published'
-        $result.RedownloadsVerified | Should Be 4
-        $fake.State.Stage | Should Be 'stable'
+        $result.Mode | Should -Be 'published'
+        $result.RedownloadsVerified | Should -Be 4
+        $fake.State.Stage | Should -Be 'stable'
         $downloads = @($fake.HttpCalls | Where-Object { $_.Method -ceq 'GET' -and $_.Accept -ceq 'application/octet-stream' })
-        $downloads.Count | Should Be 4
-        foreach ($download in $downloads) { $download.Uri | Should Match '^https://api\.github\.com/repos/KaronLabs/ytdlp-korean-interface/releases/assets/[0-9]+$' }
-        (($fake.Operations | ConvertTo-Json -Depth 8) -join '') | Should Not Match 'test-token-not-a-secret'
+        $downloads.Count | Should -Be 4
+        foreach ($download in $downloads) { $download.Uri | Should -Match '^https://api\.github\.com/repos/KaronLabs/ytdlp-korean-interface/releases/assets/[0-9]+$' }
+        (($fake.Operations | ConvertTo-Json -Depth 8) -join '') | Should -Not -Match 'test-token-not-a-secret'
         $allCalls = [object[]]@($fake.Operations)
         $publishIndex = [Array]::FindIndex($allCalls, [Predicate[object]]{ param($call) $call.Kind -ceq 'command' -and $call.Executable -ceq 'gh' -and $call.Arguments -contains 'draft=false' })
         $lastDownloadIndex = [Array]::FindLastIndex($allCalls, [Predicate[object]]{ param($call) $call.Kind -ceq 'http' -and $call.Method -ceq 'GET' -and $call.Accept -ceq 'application/octet-stream' })
-        ($publishIndex -gt $lastDownloadIndex) | Should Be $true
-        $fake.State.ReleaseQueries | Should BeGreaterThan 8
+        ($publishIndex -gt $lastDownloadIndex) | Should -Be $true
+        $fake.State.ReleaseQueries | Should -BeGreaterThan 8
     }
 
     It 'rejects a missing or recreated GitHub release identity' -TestCases @(
@@ -1521,15 +1521,15 @@ Describe 'Draft-first publication, redownload proof, and race gates' {
         param($Name, $Options)
         $case = New-PackagedPublicationCase ('publish-release-id-' + $Name)
         $fake = New-FakePublicationRunner $case $Options
-        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should Match 'publication_release_'
-        $fake.State.Stage | Should Match '^draft-'
+        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should -Match 'publication_release_'
+        $fake.State.Stage | Should -Match '^draft-'
     }
 
     It 'rejects array-valued tag_name before PowerShell coercion' {
         $case = New-PackagedPublicationCase 'publish-array-tag-name'
         $fake = New-FakePublicationRunner $case @{ TagNameAsArray = $true }
-        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should Match 'publication_release_json_invalid'
-        $fake.State.Stage | Should Match '^draft-'
+        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should -Match 'publication_release_json_invalid'
+        $fake.State.Stage | Should -Match '^draft-'
     }
 
     It 'rejects release title or body drift while preserving draft state' -TestCases @(
@@ -1539,22 +1539,22 @@ Describe 'Draft-first publication, redownload proof, and race gates' {
         param($Name, $Options)
         $case = New-PackagedPublicationCase ('publish-release-metadata-' + $Name)
         $fake = New-FakePublicationRunner $case $Options
-        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should Match 'publication_release_'
-        $fake.State.Stage | Should Match '^draft-'
+        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should -Match 'publication_release_'
+        $fake.State.Stage | Should -Match '^draft-'
     }
 
     It 'leaves the release draft when a redownload hash differs' {
         $case = New-PackagedPublicationCase 'publish-redownload-mismatch'
         $fake = New-FakePublicationRunner $case @{ DownloadMismatch = $true }
-        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should Match 'publication_redownload_mismatch'
-        $fake.State.Stage | Should Be 'draft-assets'
+        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should -Match 'publication_redownload_mismatch'
+        $fake.State.Stage | Should -Be 'draft-assets'
     }
 
     It 'leaves the release draft when GitHub exposes a mismatching digest' {
         $case = New-PackagedPublicationCase 'publish-digest-mismatch'
         $fake = New-FakePublicationRunner $case @{ DigestMode = 'mismatch' }
-        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should Match 'publication_remote_digest_mismatch'
-        $fake.State.Stage | Should Be 'draft-partial'
+        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should -Match 'publication_remote_digest_mismatch'
+        $fake.State.Stage | Should -Be 'draft-partial'
     }
 
     It 'fails before create on a remote main or tag race' -TestCases @(
@@ -1564,8 +1564,8 @@ Describe 'Draft-first publication, redownload proof, and race gates' {
         param($Name, $Options)
         $case = New-PackagedPublicationCase ('publish-precreate-race-' + $Name)
         $fake = New-FakePublicationRunner $case $Options
-        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should Match 'publication_'
-        $fake.State.Stage | Should Be 'absent'
+        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should -Match 'publication_'
+        $fake.State.Stage | Should -Be 'absent'
     }
 
     It 'keeps draft on a main or tag race after upload' -TestCases @(
@@ -1575,19 +1575,19 @@ Describe 'Draft-first publication, redownload proof, and race gates' {
         param($Name, $Options)
         $case = New-PackagedPublicationCase ('publish-postupload-race-' + $Name)
         $fake = New-FakePublicationRunner $case $Options
-        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should Match 'publication_'
-        $fake.State.Stage | Should Be 'draft-assets'
+        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should -Match 'publication_'
+        $fake.State.Stage | Should -Be 'draft-assets'
     }
 
     It 'rolls a stable transition back to draft if the final ref recheck races' {
         $case = New-PackagedPublicationCase 'publish-poststable-race'
         $fake = New-FakePublicationRunner $case @{ MainRaceAt = 7 }
-        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should Match 'publication_'
-        $fake.State.Stage | Should Be 'draft-assets'
+        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should -Match 'publication_'
+        $fake.State.Stage | Should -Be 'draft-assets'
         (@($fake.Calls | Where-Object {
             $_.Executable -ceq 'gh' -and $_.Arguments[0] -ceq 'api' -and
             $_.Arguments[2] -ceq 'PATCH' -and $_.Arguments -contains 'draft=true'
-        })).Count | Should Be 1
+        })).Count | Should -Be 1
     }
 
     It 'seals every numeric remote asset id after upload' -TestCases @(
@@ -1598,8 +1598,8 @@ Describe 'Draft-first publication, redownload proof, and race gates' {
         param($Name, $Query)
         $case = New-PackagedPublicationCase ('publish-asset-id-race-' + $Name)
         $fake = New-FakePublicationRunner $case @{ AssetIdRaceAt = $Query }
-        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should Match 'publication_remote_asset_identity_mismatch'
-        $fake.State.Stage | Should Be 'draft-assets'
+        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should -Match 'publication_remote_asset_identity_mismatch'
+        $fake.State.Stage | Should -Be 'draft-assets'
     }
 
     It 'uses one fresh verification directory for all four pre-stable downloads' {
@@ -1607,8 +1607,8 @@ Describe 'Draft-first publication, redownload proof, and race gates' {
         $fake = New-FakePublicationRunner $case
         $plan = Invoke-TestPublication $case $fake -PlanOnly
         $directories = @($plan.Commands | Where-Object Name -like 'download-*' | ForEach-Object { [string]$_.Directory } | Select-Object -Unique)
-        $directories.Count | Should Be 1
-        [IO.Path]::GetFileName($directories[0]) | Should Match '^karon-release-verify-[a-f0-9]{32}$'
+        $directories.Count | Should -Be 1
+        [IO.Path]::GetFileName($directories[0]) | Should -Match '^karon-release-verify-[a-f0-9]{32}$'
     }
 
     It 'targets stable mutation by sealed numeric release id and never by tag' {
@@ -1618,10 +1618,10 @@ Describe 'Draft-first publication, redownload proof, and race gates' {
         $patches = @($fake.Calls | Where-Object {
             $_.Executable -ceq 'gh' -and $_.Arguments[0] -ceq 'api' -and $_.Arguments[2] -ceq 'PATCH'
         })
-        $patches.Count | Should Be 1
-        ($patches[0].Arguments -join '|') | Should Be 'api|--method|PATCH|repos/KaronLabs/ytdlp-korean-interface/releases/424242|--field|draft=false'
+        $patches.Count | Should -Be 1
+        ($patches[0].Arguments -join '|') | Should -Be 'api|--method|PATCH|repos/KaronLabs/ytdlp-korean-interface/releases/424242|--field|draft=false'
         (@($fake.Calls | Where-Object {
             $_.Executable -ceq 'gh' -and $_.Arguments[0] -ceq 'release' -and $_.Arguments[1] -ceq 'edit'
-        })).Count | Should Be 0
+        })).Count | Should -Be 0
     }
 }
