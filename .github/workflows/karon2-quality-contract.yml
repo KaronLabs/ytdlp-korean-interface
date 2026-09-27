@@ -17,7 +17,12 @@ on:
       - 'tools/build-release-license-lock.ps1'
       - 'tools/package-quality-release.ps1'
       - 'release/dependencies/v2.19.1-karon.2.lock.json'
+      - 'release/evidence/v2.19.1-karon.2/**'
+      - 'release/licenses/v2.19.1-karon.2/**'
+      - 'release/requests/v2.19.1-karon.2.json'
+      - 'release/runtime/v2.19.1-karon.2/**'
       - 'release/validation/v2.19.1-karon.2/**'
+      - 'THIRD-PARTY-NOTICES.txt'
   pull_request:
     paths:
       - '.github/workflows/karon2-quality-contract.yml'
@@ -33,7 +38,12 @@ on:
       - 'tools/build-release-license-lock.ps1'
       - 'tools/package-quality-release.ps1'
       - 'release/dependencies/v2.19.1-karon.2.lock.json'
+      - 'release/evidence/v2.19.1-karon.2/**'
+      - 'release/licenses/v2.19.1-karon.2/**'
+      - 'release/requests/v2.19.1-karon.2.json'
+      - 'release/runtime/v2.19.1-karon.2/**'
       - 'release/validation/v2.19.1-karon.2/**'
+      - 'THIRD-PARTY-NOTICES.txt'
   workflow_dispatch:
 
 permissions:
