@@ -1,55 +1,55 @@
 #requires -Version 7.4
 
-BeforeAll {
-    Import-Module (Join-Path $PSScriptRoot '..\..\tools\gui-release-waiver.psm1') -Force
+. (Join-Path $PSScriptRoot 'fixtures\should-throw-like.ps1')
 
-    function New-WaiverFixture {
-        param([string] $Name)
-        $root = Join-Path $TestDrive $Name
-        $candidate = Join-Path $root 'candidate'
-        [void][IO.Directory]::CreateDirectory($candidate)
-        $exe = Join-Path $candidate 'ytdlp-interface.exe'
-        [IO.File]::WriteAllText($exe, 'sealed executable', [Text.UTF8Encoding]::new($false))
-        $commit = 'c' * 40
-        $tree = 'd' * 40
-        $exeRecord = [ordered]@{ fileName = 'ytdlp-interface.exe'; length = [long](Get-Item $exe).Length; sha256 = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant() }
-        $manifest = Join-Path $candidate 'candidate-manifest.json'
-        $manifestValue = [ordered]@{ schemaVersion = 1; applicationSourceCommit = $commit; applicationSourceTree = $tree; files = @([ordered]@{ path = 'ytdlp-interface.exe'; length = $exeRecord.length; sha256 = $exeRecord.sha256 }) }
-        [IO.File]::WriteAllText($manifest, ($manifestValue | ConvertTo-Json -Depth 16), [Text.UTF8Encoding]::new($false))
-        $value = [ordered]@{
-            schemaVersion = 'karon-gui-validation-waiver/v1'; releaseVersion = 'v2.19.1-karon.2'; status = 'WAIVED_BY_OWNER'
-            ownerInstruction = '남은 gui 확인 거ㅗㄴ너뛰고 릴리즈 까지 달려'
-            limitedObservation = [ordered]@{ text = '잘되네'; classification = 'LIMITED_UNSTRUCTURED_USER_OBSERVATION' }
-            scope = [ordered]@{
-                caseIds = @('ko-KR-100', 'ko-KR-150', 'ko-KR-200', 'en-US-100', 'en-US-150', 'en-US-200')
-                manualChecks = @('fullVideoLifecycle', 'mp3Conversion', 'settingsSaveRestartRestore', 'legacySettingsTransition')
-                automaticTestsWaived = $false; licenseChecksWaived = $false
-            }
-            candidate = [ordered]@{
-                manifest = [ordered]@{ fileName = 'candidate-manifest.json'; length = [long](Get-Item $manifest).Length; sha256 = (Get-FileHash $manifest -Algorithm SHA256).Hash.ToLowerInvariant() }
-                executable = $exeRecord
-            }
-            applicationSource = [ordered]@{ commit = $commit; tree = $tree }
+Import-Module (Join-Path $PSScriptRoot '..\..\tools\gui-release-waiver.psm1') -Force
+
+function New-WaiverFixture {
+    param([string] $Name)
+    $root = Join-Path $TestDrive $Name
+    $candidate = Join-Path $root 'candidate'
+    [void][IO.Directory]::CreateDirectory($candidate)
+    $exe = Join-Path $candidate 'ytdlp-interface.exe'
+    [IO.File]::WriteAllText($exe, 'sealed executable', [Text.UTF8Encoding]::new($false))
+    $commit = 'c' * 40
+    $tree = 'd' * 40
+    $exeRecord = [ordered]@{ fileName = 'ytdlp-interface.exe'; length = [long](Get-Item $exe).Length; sha256 = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant() }
+    $manifest = Join-Path $candidate 'candidate-manifest.json'
+    $manifestValue = [ordered]@{ schemaVersion = 1; applicationSourceCommit = $commit; applicationSourceTree = $tree; files = @([ordered]@{ path = 'ytdlp-interface.exe'; length = $exeRecord.length; sha256 = $exeRecord.sha256 }) }
+    [IO.File]::WriteAllText($manifest, ($manifestValue | ConvertTo-Json -Depth 16), [Text.UTF8Encoding]::new($false))
+    $value = [ordered]@{
+        schemaVersion = 'karon-gui-validation-waiver/v1'; releaseVersion = 'v2.19.1-karon.2'; status = 'WAIVED_BY_OWNER'
+        ownerInstruction = '남은 gui 확인 거ㅗㄴ너뛰고 릴리즈 까지 달려'
+        limitedObservation = [ordered]@{ text = '잘되네'; classification = 'LIMITED_UNSTRUCTURED_USER_OBSERVATION' }
+        scope = [ordered]@{
+            caseIds = @('ko-KR-100', 'ko-KR-150', 'ko-KR-200', 'en-US-100', 'en-US-150', 'en-US-200')
+            manualChecks = @('fullVideoLifecycle', 'mp3Conversion', 'settingsSaveRestartRestore', 'legacySettingsTransition')
+            automaticTestsWaived = $false; licenseChecksWaived = $false
         }
-        [pscustomobject]@{ Path = (Join-Path $root 'gui-validation-waiver.json'); Candidate = $candidate; Value = $value; Commit = $commit; Tree = $tree; Exe = $exe }
+        candidate = [ordered]@{
+            manifest = [ordered]@{ fileName = 'candidate-manifest.json'; length = [long](Get-Item $manifest).Length; sha256 = (Get-FileHash $manifest -Algorithm SHA256).Hash.ToLowerInvariant() }
+            executable = $exeRecord
+        }
+        applicationSource = [ordered]@{ commit = $commit; tree = $tree }
     }
+    [pscustomobject]@{ Path = (Join-Path $root 'gui-validation-waiver.json'); Candidate = $candidate; Value = $value; Commit = $commit; Tree = $tree; Exe = $exe }
+}
 
-    function Save-WaiverFixture {
-        param([object] $Fixture)
-        [IO.File]::WriteAllText($Fixture.Path, ($Fixture.Value | ConvertTo-Json -Depth 32), [Text.UTF8Encoding]::new($false))
-    }
+function Save-WaiverFixture {
+    param([object] $Fixture)
+    [IO.File]::WriteAllText($Fixture.Path, ($Fixture.Value | ConvertTo-Json -Depth 32), [Text.UTF8Encoding]::new($false))
+}
 
-    function Read-WaiverFixture {
-        param([object] $Fixture)
-        Read-KaronGuiValidationWaiver -Path $Fixture.Path -CandidateDirectory $Fixture.Candidate -ApplicationSourceCommit $Fixture.Commit -ApplicationSourceTree $Fixture.Tree
-    }
+function Read-WaiverFixture {
+    param([object] $Fixture)
+    Read-KaronGuiValidationWaiver -Path $Fixture.Path -CandidateDirectory $Fixture.Candidate -ApplicationSourceCommit $Fixture.Commit -ApplicationSourceTree $Fixture.Tree
 }
 
 Describe 'Explicit GUI validation input selection' {
     It 'rejects neither route and incomplete normal evidence' {
-        { Assert-KaronGuiValidationInputs } | Should -Throw '*gui_validation_input_missing*'
-        { Assert-KaronGuiValidationInputs -GuiValidationSummaryPath 'summary.json' } | Should -Throw '*gui_validation_input_missing*'
-        { Assert-KaronGuiValidationInputs -GuiValidationSummaryPath 'summary.json' -GuiValidationEvidenceManifestPath 'evidence.json' -RequireSchema } | Should -Throw '*gui_validation_input_missing*'
+        { Assert-KaronGuiValidationInputs } | Assert-TestThrowsLike -ExpectedPattern '*gui_validation_input_missing*'
+        { Assert-KaronGuiValidationInputs -GuiValidationSummaryPath 'summary.json' } | Assert-TestThrowsLike -ExpectedPattern '*gui_validation_input_missing*'
+        { Assert-KaronGuiValidationInputs -GuiValidationSummaryPath 'summary.json' -GuiValidationEvidenceManifestPath 'evidence.json' -RequireSchema } | Assert-TestThrowsLike -ExpectedPattern '*gui_validation_input_missing*'
     }
 
     It 'rejects each explicitly supplied normal input alongside a waiver even if empty' -TestCases @(
@@ -58,13 +58,13 @@ Describe 'Explicit GUI validation input selection' {
         param($Name)
         $bound = @{ GuiValidationWaiverPath = 'waiver.json' }
         $bound[$Name] = ''
-        { Assert-KaronGuiValidationInputs -GuiValidationWaiverPath 'waiver.json' -BoundParameters $bound } | Should -Throw '*gui_validation_input_conflict*'
+        { Assert-KaronGuiValidationInputs -GuiValidationWaiverPath 'waiver.json' -BoundParameters $bound } | Assert-TestThrowsLike -ExpectedPattern '*gui_validation_input_conflict*'
     }
 
     It 'selects only complete normal evidence or the explicit waiver' {
         (Assert-KaronGuiValidationInputs -GuiValidationSummaryPath 'summary.json' -GuiValidationEvidenceManifestPath 'evidence.json' -GuiValidationSchemaPath 'schema.json' -RequireSchema) | Should -Be 'normal'
         (Assert-KaronGuiValidationInputs -GuiValidationWaiverPath 'waiver.json') | Should -Be 'waiver'
-        { Assert-KaronGuiValidationInputs -BoundParameters @{ GuiValidationWaiverPath = '' } } | Should -Throw '*gui_validation_input_missing*'
+        { Assert-KaronGuiValidationInputs -BoundParameters @{ GuiValidationWaiverPath = '' } } | Assert-TestThrowsLike -ExpectedPattern '*gui_validation_input_missing*'
     }
 }
 
@@ -104,7 +104,7 @@ Describe 'Owner waiver closed schema and candidate binding' {
         $fixture = New-WaiverFixture $Name
         & $Mutate $fixture.Value
         Save-WaiverFixture $fixture
-        { Read-WaiverFixture $fixture } | Should -Throw '*gui_validation_waiver_*'
+        { Read-WaiverFixture $fixture } | Assert-TestThrowsLike -ExpectedPattern '*gui_validation_waiver_*'
     }
 
     It 'rejects substituted manifest, executable and application source identities' -TestCases @(
@@ -119,7 +119,7 @@ Describe 'Owner waiver closed schema and candidate binding' {
         $fixture = New-WaiverFixture $Name
         & $Mutate $fixture
         Save-WaiverFixture $fixture
-        { Read-WaiverFixture $fixture } | Should -Throw '*gui_validation_waiver_*mismatch*'
+        { Read-WaiverFixture $fixture } | Assert-TestThrowsLike -ExpectedPattern '*gui_validation_waiver_*mismatch*'
     }
 
     It 'rejects duplicate and case-folded JSON keys' -TestCases @(@{ Name = 'status' }, @{ Name = 'Status' }) {
@@ -127,6 +127,6 @@ Describe 'Owner waiver closed schema and candidate binding' {
         $fixture = New-WaiverFixture ('duplicate-' + $Name)
         $text = $fixture.Value | ConvertTo-Json -Depth 32 -Compress
         [IO.File]::WriteAllText($fixture.Path, ('{"' + $Name + '":"WAIVED_BY_OWNER",' + $text.Substring(1)), [Text.UTF8Encoding]::new($false))
-        { Read-WaiverFixture $fixture } | Should -Throw '*gui_validation_waiver_json_invalid*'
+        { Read-WaiverFixture $fixture } | Assert-TestThrowsLike -ExpectedPattern '*gui_validation_waiver_json_invalid*'
     }
 }

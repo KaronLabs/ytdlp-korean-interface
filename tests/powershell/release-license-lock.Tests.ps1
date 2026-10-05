@@ -1,3 +1,5 @@
+. (Join-Path $PSScriptRoot 'fixtures\should-throw-like.ps1')
+
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -11,16 +13,14 @@ $script:Utf8 = New-Object Text.UTF8Encoding($false)
 $script:Tag = 'v2.19.1-karon.2'
 $script:ApprovedDenoCollectorCommit = '09ced74a90248fbeb54969ea03d5aacb98dfc38b'
 
-BeforeAll {
-    $script:RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-    $script:Builder = Join-Path $script:RepositoryRoot 'tools\build-release-license-lock.ps1'
-    $script:SourcesConsumer = Join-Path $script:RepositoryRoot 'tools\build-corresponding-sources.ps1'
-    $script:SpdxConsumer = Join-Path $script:RepositoryRoot 'tools\generate-release-spdx.ps1'
-    $script:PackageConsumer = Join-Path $script:RepositoryRoot 'tools\package-quality-release.ps1'
-    $script:Utf8 = New-Object Text.UTF8Encoding($false)
-    $script:Tag = 'v2.19.1-karon.2'
-    $script:ApprovedDenoCollectorCommit = '09ced74a90248fbeb54969ea03d5aacb98dfc38b'
-}
+$script:RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$script:Builder = Join-Path $script:RepositoryRoot 'tools\build-release-license-lock.ps1'
+$script:SourcesConsumer = Join-Path $script:RepositoryRoot 'tools\build-corresponding-sources.ps1'
+$script:SpdxConsumer = Join-Path $script:RepositoryRoot 'tools\generate-release-spdx.ps1'
+$script:PackageConsumer = Join-Path $script:RepositoryRoot 'tools\package-quality-release.ps1'
+$script:Utf8 = New-Object Text.UTF8Encoding($false)
+$script:Tag = 'v2.19.1-karon.2'
+$script:ApprovedDenoCollectorCommit = '09ced74a90248fbeb54969ea03d5aacb98dfc38b'
 
 function Write-TestText {
     param([string] $Path, [string] $Text)
@@ -754,14 +754,14 @@ Describe 'final verified release license lock integrator' {
         $arguments = Get-WaiverBuilderArguments $fixture $waiver
         [void]$arguments.Remove('CorrespondingSourcesPath')
         [void]$arguments.Remove('SpdxPath')
-        { & $script:Builder @arguments } | Should -Throw '*release_license_lock_artifact_input_missing*'
+        { & $script:Builder @arguments } | Assert-TestThrowsLike -ExpectedPattern '*release_license_lock_artifact_input_missing*'
         (Test-Path -LiteralPath $fixture.Output) | Should -Be $false
         $arguments.AssemblyOnly = $true
         $arguments.OutputPath = Join-Path $fixture.Repository 'release\dependencies\v2.19.1-karon.2.lock.json'
         & $script:Builder @arguments | Out-Null
         & git -c core.autocrlf=false -C $fixture.Repository add -- release
         & git -c core.autocrlf=false -c user.name='Karon Test' -c user.email='karon-test@example.invalid' -C $fixture.Repository commit -q -m assembly
-        { & $script:PackageConsumer -RepositoryRoot $fixture.Repository -CandidateDirectory $fixture.Candidate -LockPath $arguments.OutputPath -CorrespondingSourcesPath $fixture.CorrespondingSources -SpdxPath $fixture.Spdx -GuiValidationWaiverPath $waiver -OutputDirectory (Join-Path $fixture.Root 'output') -ReceiptPath (Join-Path $fixture.Root 'release-receipt.json') -PlanOnly } | Should -Throw '*package_lock_type_invalid*'
+        { & $script:PackageConsumer -RepositoryRoot $fixture.Repository -CandidateDirectory $fixture.Candidate -LockPath $arguments.OutputPath -CorrespondingSourcesPath $fixture.CorrespondingSources -SpdxPath $fixture.Spdx -GuiValidationWaiverPath $waiver -OutputDirectory (Join-Path $fixture.Root 'output') -ReceiptPath (Join-Path $fixture.Root 'release-receipt.json') -PlanOnly } | Assert-TestThrowsLike -ExpectedPattern '*package_lock_type_invalid*'
     }
 
     It 'runs the real license checks before assembly can become verified' {
@@ -771,7 +771,7 @@ Describe 'final verified release license lock integrator' {
         [void]$arguments.Remove('SpdxPath')
         $arguments.AssemblyOnly = $true
         Write-TestText (Join-Path $fixture.SourceRoot 'release/licenses/v2.19.1-karon.2/application/LICENSE.txt') 'tampered license'
-        { & $script:Builder @arguments } | Should -Throw '*release_license_lock_notice_mismatch*'
+        { & $script:Builder @arguments } | Assert-TestThrowsLike -ExpectedPattern '*release_license_lock_notice_mismatch*'
         (Test-Path -LiteralPath $fixture.Output) | Should -Be $false
     }
 
@@ -798,7 +798,7 @@ Describe 'final verified release license lock integrator' {
         $fixture = New-TestFixture ('waiver-input-' + $Name)
         $arguments = Get-WaiverBuilderArguments $fixture (New-LicenseLockWaiver $fixture)
         if ($Name -ceq 'neither') { [void]$arguments.Remove('GuiValidationWaiverPath') } else { $arguments[$Name] = '' }
-        { & $script:Builder @arguments } | Should -Throw '*gui_validation_input_*'
+        { & $script:Builder @arguments } | Assert-TestThrowsLike -ExpectedPattern '*gui_validation_input_*'
         (Test-Path -LiteralPath $fixture.Output) | Should -Be $false
     }
 
