@@ -116,7 +116,7 @@ def prepare(args):
              'v2160': (3840, 2160), 'portrait': (1080, 1920),
              'vp9': (1920, 1080), 'av1': (1920, 1080)}
     for name, (width, height) in sizes.items():
-        codec = ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '20']
+        codec = ['-c:v', 'libopenh264', '-b:v', '4M']
         ext = 'mp4'
         if name == 'vp9':
             codec = ['-c:v', 'libvpx-vp9', '-deadline', 'realtime', '-cpu-used', '8', '-crf', '24', '-b:v', '0']

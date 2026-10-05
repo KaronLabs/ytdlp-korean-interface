@@ -1,10 +1,13 @@
 """Tests for fixture integrity, not an imitation of production policy."""
 import importlib.util
+import contextlib
 import io
 import json
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest import mock
 import urllib.error
 import urllib.request
 import zipfile
@@ -16,6 +19,34 @@ spec.loader.exec_module(fixture)
 
 
 class FixtureTests(unittest.TestCase):
+    def test_prepare_uses_bundled_lgpl_h264_encoder(self):
+        commands = {}
+
+        def capture_run(args, root, label, env=None, expect=0):
+            commands[label] = [str(arg) for arg in args]
+            if label.startswith('generate-'):
+                Path(args[-1]).write_bytes(b'fixture media')
+            stdout = '{}' if label.startswith('probe-') else 'fixture version\n'
+            return SimpleNamespace(stdout=stdout, returncode=0)
+
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            runtime = base / 'runtime'
+            runtime.mkdir()
+            for name in ('yt-dlp.exe', 'ffmpeg.exe', 'ffprobe.exe'):
+                (runtime / name).write_bytes(b'fixture runtime')
+            args = SimpleNamespace(root=base / 'fixture', runtime=runtime,
+                                   candidate_zip=None)
+            with mock.patch.object(fixture, 'run', side_effect=capture_run):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    fixture.prepare(args)
+
+        for name in ('v360', 'v720', 'v1080', 'v2160', 'portrait'):
+            command = commands['generate-' + name]
+            self.assertEqual('libopenh264', command[command.index('-c:v') + 1])
+            self.assertNotIn('libx264', command)
+            self.assertNotIn('-crf', command)
+
     def test_mixed_contains_real_competing_stream_classes(self):
         formats = fixture.case_info('mixed', 'http://127.0.0.1:1234')['formats']
         self.assertEqual(['muxed360', 'v720', 'v1080', 'audio'], [f['format_id'] for f in formats])
