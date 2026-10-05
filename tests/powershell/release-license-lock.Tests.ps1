@@ -811,7 +811,7 @@ Describe 'final verified release license lock integrator' {
         $fixture = New-TestFixture ('waiver-retained-' + $Name)
         $arguments = Get-WaiverBuilderArguments $fixture (New-LicenseLockWaiver $fixture)
         & $Mutate $fixture
-        { & $script:Builder @arguments } | Should -Throw ('*' + $Error + '*')
+        { & $script:Builder @arguments } | Assert-TestThrowsLike -ExpectedPattern ('*' + $Error + '*')
         (Test-Path -LiteralPath $fixture.Output) | Should -Be $false
     }
 
