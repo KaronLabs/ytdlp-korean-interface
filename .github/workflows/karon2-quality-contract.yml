@@ -14,7 +14,15 @@ on:
       - 'tools/quality-fixture.py'
       - 'tools/build-candidate.ps1'
       - 'tools/verify-gui-release-evidence.ps1'
+      - 'tools/gui-release-waiver.psm1'
+      - 'tools/publish-quality-release.ps1'
       - 'tools/build-release-license-lock.ps1'
+      - 'tools/collect-non-runtime-component-evidence.ps1'
+      - 'tools/build-corresponding-sources.ps1'
+      - 'tools/generate-release-spdx.ps1'
+      - 'tools/generated-source-archive.psm1'
+      - 'tools/run-karon2-powershell-contracts.ps1'
+      - '.gitattributes'
       - 'tools/package-quality-release.ps1'
       - 'release/dependencies/v2.19.1-karon.2.lock.json'
       - 'release/evidence/v2.19.1-karon.2/**'
@@ -35,7 +43,15 @@ on:
       - 'tools/quality-fixture.py'
       - 'tools/build-candidate.ps1'
       - 'tools/verify-gui-release-evidence.ps1'
+      - 'tools/gui-release-waiver.psm1'
+      - 'tools/publish-quality-release.ps1'
       - 'tools/build-release-license-lock.ps1'
+      - 'tools/collect-non-runtime-component-evidence.ps1'
+      - 'tools/build-corresponding-sources.ps1'
+      - 'tools/generate-release-spdx.ps1'
+      - 'tools/generated-source-archive.psm1'
+      - 'tools/run-karon2-powershell-contracts.ps1'
+      - '.gitattributes'
       - 'tools/package-quality-release.ps1'
       - 'release/dependencies/v2.19.1-karon.2.lock.json'
       - 'release/evidence/v2.19.1-karon.2/**'
@@ -89,9 +105,14 @@ jobs:
           }
           "KARON_TEST_FFMPEG_DIR=$bin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: GUI and release PowerShell contracts
-        shell: powershell
+        shell: pwsh
         run: |
-          foreach ($test in @('gui-release-evidence-contract.Tests.ps1', 'release-license-lock.Tests.ps1', 'release-publication-contract.Tests.ps1')) {
-            pwsh -NoProfile -File (Join-Path tests/powershell $test)
+          $ErrorActionPreference = 'Stop'
+          Install-Module Pester -RequiredVersion 4.10.1 -Force -Scope CurrentUser
+          $env:TEMP = 'C:\karon2-contracts'
+          $env:TMP = $env:TEMP
+          New-Item -ItemType Directory -Path $env:TEMP -Force | Out-Null
+          foreach ($test in @('gui-release-evidence-contract.Tests.ps1', 'gui-release-waiver.Tests.ps1', 'release-license-lock.Tests.ps1', 'release-publication-contract.Tests.ps1', 'non-runtime-component-evidence.Tests.ps1', 'generated-source-archive.Tests.ps1')) {
+            pwsh -NoProfile -File tools/run-karon2-powershell-contracts.ps1 -Path (Join-Path tests/powershell $test)
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
