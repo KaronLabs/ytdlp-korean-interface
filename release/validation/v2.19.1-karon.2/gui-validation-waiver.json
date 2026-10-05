@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "karon-gui-validation-waiver/v1",
+  "releaseVersion": "v2.19.1-karon.2",
+  "status": "WAIVED_BY_OWNER",
+  "ownerInstruction": "남은 gui 확인 거ㅗㄴ너뛰고 릴리즈 까지 달려",
+  "limitedObservation": {
+    "text": "잘되네",
+    "classification": "LIMITED_UNSTRUCTURED_USER_OBSERVATION"
+  },
+  "scope": {
+    "caseIds": [
+      "ko-KR-100",
+      "ko-KR-150",
+      "ko-KR-200",
+      "en-US-100",
+      "en-US-150",
+      "en-US-200"
+    ],
+    "manualChecks": [
+      "fullVideoLifecycle",
+      "mp3Conversion",
+      "settingsSaveRestartRestore",
+      "legacySettingsTransition"
+    ],
+    "automaticTestsWaived": false,
+    "licenseChecksWaived": false
+  },
+  "candidate": {
+    "manifest": {
+      "fileName": "candidate-manifest.json",
+      "length": 21628,
+      "sha256": "986754c3b2467c12127b7497434c0b3caad5fa6aef13406e2aaefb6b8040163d"
+    },
+    "executable": {
+      "fileName": "ytdlp-interface.exe",
+      "length": 4064256,
+      "sha256": "1e23c9e0962f0ea8f78dca8f0b832c9706ce4aedc1ff7b8703e6b806e0542fd4"
+    }
+  },
+  "applicationSource": {
+    "commit": "b80f594a2b6673d28e00e705659c39b0c4bed647",
+    "tree": "541a9bef018b4b266ba0ca8469ecb2868ef1e6df"
+  }
+}

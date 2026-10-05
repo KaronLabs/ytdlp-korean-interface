@@ -517,6 +517,32 @@ function Set-PackageGuiFixture {
     })
 }
 
+function New-LicenseLockWaiver {
+    param([object] $Fixture)
+    $path = Join-Path $Fixture.Root 'gui-validation-waiver.json'
+    Write-TestJson $path ([ordered]@{
+        schemaVersion = 'karon-gui-validation-waiver/v1'; releaseVersion = $script:Tag; status = 'WAIVED_BY_OWNER'
+        ownerInstruction = '남은 gui 확인 거ㅗㄴ너뛰고 릴리즈 까지 달려'
+        limitedObservation = [ordered]@{ text = '잘되네'; classification = 'LIMITED_UNSTRUCTURED_USER_OBSERVATION' }
+        scope = [ordered]@{
+            caseIds = @('ko-KR-100', 'ko-KR-150', 'ko-KR-200', 'en-US-100', 'en-US-150', 'en-US-200')
+            manualChecks = @('fullVideoLifecycle', 'mp3Conversion', 'settingsSaveRestartRestore', 'legacySettingsTransition')
+            automaticTestsWaived = $false; licenseChecksWaived = $false
+        }
+        candidate = [ordered]@{ manifest = Get-TestRecord $Fixture.CandidateManifest; executable = Get-TestRecord (Join-Path $Fixture.Candidate 'ytdlp-interface.exe') }
+        applicationSource = [ordered]@{ commit = $Fixture.ApplicationCommit; tree = $Fixture.ApplicationTree }
+    })
+    $path
+}
+
+function Get-WaiverBuilderArguments {
+    param([object] $Fixture, [string] $WaiverPath)
+    $arguments = Get-BuilderArguments $Fixture
+    foreach ($name in @('GuiValidationSummaryPath', 'GuiValidationEvidenceManifestPath', 'GuiValidationSchemaPath')) { [void]$arguments.Remove($name) }
+    $arguments.GuiValidationWaiverPath = $WaiverPath
+    $arguments
+}
+
 function Get-FixtureProperty {
     param(
         [Parameter(Mandatory = $true)]
@@ -670,6 +696,7 @@ function New-SwapInstrumentedBuilder {
         [TimeSpan]::FromSeconds(2)
     )
     [IO.File]::WriteAllText($instrumented, $rewritten, [Text.UTF8Encoding]::new($false))
+    Copy-Item -LiteralPath (Join-Path (Split-Path -Parent ([string]$builderVariable.Value)) 'gui-release-waiver.psm1') -Destination (Join-Path $OutputDirectory 'gui-release-waiver.psm1') -Force
 
     return [pscustomobject]@{
         BuilderVariableName = $builderVariable.Name
@@ -680,6 +707,114 @@ function New-SwapInstrumentedBuilder {
 }
 
 Describe 'final verified release license lock integrator' {
+    It 'assembles real evidence before source and SPDX generation without placeholder artifacts' {
+        $fixture = New-TestFixture 'assembly-artifacts-final-lock'
+        $waiver = New-LicenseLockWaiver $fixture
+        Remove-Item -LiteralPath $fixture.CorrespondingSources, $fixture.Spdx
+        $assemblyPath = Join-Path $fixture.Root 'license-assembly.json'
+        $arguments = Get-WaiverBuilderArguments $fixture $waiver
+        [void]$arguments.Remove('CorrespondingSourcesPath')
+        [void]$arguments.Remove('SpdxPath')
+        $arguments.OutputPath = $assemblyPath
+        $arguments.AssemblyOnly = $true
+        & $script:Builder @arguments | Out-Null
+        $assembly = Read-TestJson $assemblyPath
+        $assembly.release.verificationStatus | Should -Be 'verified'
+        $assembly.release.integrationEvidence.gui.status | Should -Be 'WAIVED_BY_OWNER'
+        @($assembly.release.PSObject.Properties.Name) | Should -Not -Contain 'receiptInputs'
+        @($assembly.components | Where-Object verificationStatus -ne 'verified').Count | Should -Be 0
+
+        $sourcesOutput = Join-Path $fixture.Root 'sources-output'
+        $spdxOutput = Join-Path $fixture.Root 'spdx-output'
+        [void][IO.Directory]::CreateDirectory($sourcesOutput)
+        [void][IO.Directory]::CreateDirectory($spdxOutput)
+        & $script:SourcesConsumer -LockPath $assemblyPath -SourceRoot $fixture.SourceRoot -CandidateRoot $fixture.Candidate -CacheDirectory $fixture.Cache -OutputDirectory $sourcesOutput | Out-Null
+        & $script:SpdxConsumer -LockPath $assemblyPath -SourceRoot $fixture.SourceRoot -CandidateRoot $fixture.Candidate -OutputDirectory $spdxOutput | Out-Null
+        $fixture.CorrespondingSources = Join-Path $sourcesOutput 'ytdlp-korean-interface-v2.19.1-karon.2-corresponding-sources.zip'
+        $fixture.Spdx = Join-Path $spdxOutput 'ytdlp-korean-interface-v2.19.1-karon.2.spdx.json'
+        $canonicalLock = Join-Path $fixture.Repository 'release\dependencies\v2.19.1-karon.2.lock.json'
+        $arguments = Get-WaiverBuilderArguments $fixture $waiver
+        $arguments.OutputPath = $canonicalLock
+        & $script:Builder @arguments | Out-Null
+        $final = Read-TestJson $canonicalLock
+        $final.release.receiptInputs.correspondingSources.sha256 | Should -Be (Get-TestSha256 $fixture.CorrespondingSources)
+        $final.release.receiptInputs.spdx.sha256 | Should -Be (Get-TestSha256 $fixture.Spdx)
+        & git -c core.autocrlf=false -C $fixture.Repository add -- release
+        & git -c core.autocrlf=false -c user.name='Karon Test' -c user.email='karon-test@example.invalid' -C $fixture.Repository commit -q -m packaging
+        $packageOutput = Join-Path $fixture.Root 'package-output'
+        $receipt = Join-Path $fixture.Root 'release-receipt.json'
+        $plan = & $script:PackageConsumer -RepositoryRoot $fixture.Repository -CandidateDirectory $fixture.Candidate -LockPath $canonicalLock -CorrespondingSourcesPath $fixture.CorrespondingSources -SpdxPath $fixture.Spdx -GuiValidationWaiverPath $waiver -OutputDirectory $packageOutput -ReceiptPath $receipt -PlanOnly
+        $plan.Mode | Should -Be 'plan'
+        $plan.Status | Should -Be 'WAIVED_BY_OWNER'
+    }
+
+    It 'rejects assembly locks at packaging and rejects missing final artifacts' {
+        $fixture = New-TestFixture 'assembly-not-final'
+        $waiver = New-LicenseLockWaiver $fixture
+        $arguments = Get-WaiverBuilderArguments $fixture $waiver
+        [void]$arguments.Remove('CorrespondingSourcesPath')
+        [void]$arguments.Remove('SpdxPath')
+        { & $script:Builder @arguments } | Should -Throw '*release_license_lock_artifact_input_missing*'
+        (Test-Path -LiteralPath $fixture.Output) | Should -Be $false
+        $arguments.AssemblyOnly = $true
+        $arguments.OutputPath = Join-Path $fixture.Repository 'release\dependencies\v2.19.1-karon.2.lock.json'
+        & $script:Builder @arguments | Out-Null
+        & git -c core.autocrlf=false -C $fixture.Repository add -- release
+        & git -c core.autocrlf=false -c user.name='Karon Test' -c user.email='karon-test@example.invalid' -C $fixture.Repository commit -q -m assembly
+        { & $script:PackageConsumer -RepositoryRoot $fixture.Repository -CandidateDirectory $fixture.Candidate -LockPath $arguments.OutputPath -CorrespondingSourcesPath $fixture.CorrespondingSources -SpdxPath $fixture.Spdx -GuiValidationWaiverPath $waiver -OutputDirectory (Join-Path $fixture.Root 'output') -ReceiptPath (Join-Path $fixture.Root 'release-receipt.json') -PlanOnly } | Should -Throw '*package_lock_type_invalid*'
+    }
+
+    It 'runs the real license checks before assembly can become verified' {
+        $fixture = New-TestFixture 'assembly-license-failure'
+        $arguments = Get-WaiverBuilderArguments $fixture (New-LicenseLockWaiver $fixture)
+        [void]$arguments.Remove('CorrespondingSourcesPath')
+        [void]$arguments.Remove('SpdxPath')
+        $arguments.AssemblyOnly = $true
+        Write-TestText (Join-Path $fixture.SourceRoot 'release/licenses/v2.19.1-karon.2/application/LICENSE.txt') 'tampered license'
+        { & $script:Builder @arguments } | Should -Throw '*release_license_lock_notice_mismatch*'
+        (Test-Path -LiteralPath $fixture.Output) | Should -Be $false
+    }
+
+    It 'records owner authority without inventing GUI PASS evidence' {
+        $fixture = New-TestFixture 'owner-gui-waiver'
+        $waiver = New-LicenseLockWaiver $fixture
+        $arguments = Get-WaiverBuilderArguments $fixture $waiver
+        & $script:Builder @arguments | Out-Null
+        $lock = Read-TestJson $fixture.Output
+        $lock.release.integrationEvidence.gui.status | Should -Be 'WAIVED_BY_OWNER'
+        $lock.release.integrationEvidence.gui.record.ownerInstruction | Should -Be '남은 gui 확인 거ㅗㄴ너뛰고 릴리즈 까지 달려'
+        $lock.release.integrationEvidence.gui.record.limitedObservation.text | Should -Be '잘되네'
+        $lock.release.receiptInputs.guiValidationWaiver.sha256 | Should -Be (Get-TestSha256 $waiver)
+        foreach ($name in @('guiValidationSummary', 'guiValidationEvidenceManifest', 'guiValidationSchema')) {
+            @($lock.release.receiptInputs.PSObject.Properties.Name) | Should -Not -Contain $name
+        }
+        @($lock.components | Where-Object verificationStatus -ne 'verified').Count | Should -Be 0
+    }
+
+    It 'rejects neither GUI route and each mixed normal input' -TestCases @(
+        @{ Name = 'neither' }, @{ Name = 'GuiValidationSummaryPath' }, @{ Name = 'GuiValidationEvidenceManifestPath' }, @{ Name = 'GuiValidationSchemaPath' }
+    ) {
+        param($Name)
+        $fixture = New-TestFixture ('waiver-input-' + $Name)
+        $arguments = Get-WaiverBuilderArguments $fixture (New-LicenseLockWaiver $fixture)
+        if ($Name -ceq 'neither') { [void]$arguments.Remove('GuiValidationWaiverPath') } else { $arguments[$Name] = '' }
+        { & $script:Builder @arguments } | Should -Throw '*gui_validation_input_*'
+        (Test-Path -LiteralPath $fixture.Output) | Should -Be $false
+    }
+
+    It 'retains candidate, archive and license gates with a GUI waiver' -TestCases @(
+        @{ Name = 'candidate'; Mutate = { param($f) Write-TestText (Join-Path $f.Candidate 'yt-dlp.exe') 'tampered' }; Error = 'release_license_lock_candidate_mismatch' },
+        @{ Name = 'source'; Mutate = { param($f) Remove-Item -LiteralPath $f.SevenZipWrapper }; Error = 'release_license_lock_input_missing' },
+        @{ Name = 'license'; Mutate = { param($f) Write-TestText (Join-Path $f.SourceRoot 'release/licenses/v2.19.1-karon.2/application/LICENSE.txt') 'tampered' }; Error = 'release_license_lock_notice_mismatch' }
+    ) {
+        param($Name, $Mutate, $Error)
+        $fixture = New-TestFixture ('waiver-retained-' + $Name)
+        $arguments = Get-WaiverBuilderArguments $fixture (New-LicenseLockWaiver $fixture)
+        & $Mutate $fixture
+        { & $script:Builder @arguments } | Should -Throw ('*' + $Error + '*')
+        (Test-Path -LiteralPath $fixture.Output) | Should -Be $false
+    }
+
     It 'rejects a supplied 7z wrapper that differs from the component corresponding source archive' {
         $fixture = New-TestFixture 'wrapper-binding-remand'
         $root = (Get-FixtureProperty $fixture @('Root')).Value

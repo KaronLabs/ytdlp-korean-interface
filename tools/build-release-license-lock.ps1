@@ -23,11 +23,13 @@ param(
         [Parameter(Mandatory = $true)]
     [string]$SevenZipSourceWrapperPath,
 [Parameter(Mandatory = $true)] [string] $SevenZipVerificationPath,
-    [Parameter(Mandatory = $true)] [string] $GuiValidationSummaryPath,
-    [Parameter(Mandatory = $true)] [string] $GuiValidationEvidenceManifestPath,
-    [Parameter(Mandatory = $true)] [string] $GuiValidationSchemaPath,
-    [Parameter(Mandatory = $true)] [string] $CorrespondingSourcesPath,
-    [Parameter(Mandatory = $true)] [string] $SpdxPath,
+    [string] $GuiValidationSummaryPath,
+    [string] $GuiValidationEvidenceManifestPath,
+    [string] $GuiValidationSchemaPath,
+    [string] $GuiValidationWaiverPath,
+    [string] $CorrespondingSourcesPath,
+    [string] $SpdxPath,
+    [switch] $AssemblyOnly,
     [Parameter(Mandatory = $true)] [string] $RootThirdPartyNoticesPath,
     [Parameter(Mandatory = $true)] [string] $ReleaseNotesPath,
     [Parameter(Mandatory = $true)] [string] $OutputPath
@@ -36,6 +38,12 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+Import-Module (Join-Path $PSScriptRoot 'gui-release-waiver.psm1') -Force
+$guiRoute = Assert-KaronGuiValidationInputs -GuiValidationWaiverPath $GuiValidationWaiverPath -GuiValidationSummaryPath $GuiValidationSummaryPath -GuiValidationEvidenceManifestPath $GuiValidationEvidenceManifestPath -GuiValidationSchemaPath $GuiValidationSchemaPath -BoundParameters $PSBoundParameters -RequireSchema
+if ($AssemblyOnly) {
+    if ($PSBoundParameters.ContainsKey('CorrespondingSourcesPath') -or $PSBoundParameters.ContainsKey('SpdxPath')) { throw 'release_license_lock_assembly_artifacts_forbidden' }
+}
+elseif ([string]::IsNullOrWhiteSpace($CorrespondingSourcesPath) -or [string]::IsNullOrWhiteSpace($SpdxPath)) { throw 'release_license_lock_artifact_input_missing' }
 
 $script:ReleaseTag = 'v2.19.1-karon.2'
 $script:Utf8Strict = New-Object Text.UTF8Encoding($false, $true)
@@ -1361,9 +1369,12 @@ $allInputs = @(
     $TemplateLockPath, $NonRuntimeManifestPath, $NonRuntimeInventoryPath, $NonRuntimeEvidenceBundlePath,
     $DenoRunEvidencePath, $DenoComponentManifestPath, $DenoSourceInventoryPath, $DenoNoticesPath, $DenoSourcesArchivePath,
     $FfmpegClosureManifestPath, $FfmpegSourcesArchivePath, $SevenZipRuntimeArchivePath, $SevenZipSourceArchivePath,
-    $SevenZipSourceWrapperPath, $SevenZipVerificationPath, $GuiValidationSummaryPath, $GuiValidationEvidenceManifestPath, $GuiValidationSchemaPath,
-    $CorrespondingSourcesPath, $SpdxPath, $RootThirdPartyNoticesPath, $ReleaseNotesPath
+    $SevenZipSourceWrapperPath, $SevenZipVerificationPath,
+    $RootThirdPartyNoticesPath, $ReleaseNotesPath
 )
+if (-not $AssemblyOnly) { $allInputs += @($CorrespondingSourcesPath, $SpdxPath) }
+if ($guiRoute -ceq 'waiver') { $allInputs += $GuiValidationWaiverPath }
+else { $allInputs += @($GuiValidationSummaryPath, $GuiValidationEvidenceManifestPath, $GuiValidationSchemaPath) }
 foreach ($inputPath in $allInputs) { if (-not (Test-Path -LiteralPath $inputPath -PathType Leaf)) { throw 'release_license_lock_input_missing' } }
 if (-not (Test-Path -LiteralPath $RepositoryRoot -PathType Container) -or -not (Test-Path -LiteralPath $CandidateDirectory -PathType Container) -or
     -not (Test-Path -LiteralPath $SourceArchiveDirectory -PathType Container)) { throw 'release_license_lock_input_missing' }
@@ -1373,6 +1384,7 @@ $template = Read-StrictJson $TemplateLockPath
 Assert-TemplateStatusIsUntrusted $template
 if ([string](Get-ExactProperty $template 'schemaVersion') -cne 'karon-license-lock/v2') { throw 'release_license_lock_schema_unsupported' }
 $release = Get-ExactProperty $template 'release'
+if ($AssemblyOnly -and (Test-ExactProperty $release 'receiptInputs')) { throw 'release_license_lock_assembly_template_receipt_inputs_forbidden' }
 if ([string](Get-ExactProperty $release 'tag') -cne $script:ReleaseTag -or [string](Get-ExactProperty $release 'platform') -cne 'win-x64') {
     throw 'release_license_lock_release_invalid'
 }
@@ -1413,21 +1425,33 @@ foreach ($id in $componentIds) {
     if ($id -cne 'deno' -and $id -cne 'ffmpeg' -and $nonRuntimeIds -cnotcontains $id) { throw 'release_license_lock_unclassified' }
 }
 
-$guiSummary = Read-StrictJson $GuiValidationSummaryPath
-$guiEvidenceManifest = Read-StrictJson $GuiValidationEvidenceManifestPath
-$guiEvidence = Assert-GuiContract $guiSummary $guiEvidenceManifest $candidate.Records
-
-$guiSchemaRelative = Get-RepositoryRelativePath $RepositoryRoot $GuiValidationSchemaPath
+if ($guiRoute -ceq 'waiver') {
+    $waiverSnapshot = Open-IntegratorLockedSnapshot -Path $GuiValidationWaiverPath -Context 'release_license_lock_gui_waiver'
+    $waiver = Read-KaronGuiValidationWaiver -Path $GuiValidationWaiverPath -CandidateDirectory $CandidateDirectory -ApplicationSourceCommit $candidate.Commit -ApplicationSourceTree $candidate.Tree
+    if ($waiver.FileRecord.sha256 -cne $waiverSnapshot.sha256 -or $waiver.FileRecord.length -ne $waiverSnapshot.length) { throw 'release_license_lock_gui_waiver_changed' }
+    $guiEvidence = [ordered]@{ status = 'WAIVED_BY_OWNER'; waiver = $waiver.FileRecord; record = $waiver.Record }
+}
+else {
+    $guiSummary = Read-StrictJson $GuiValidationSummaryPath
+    $guiEvidenceManifest = Read-StrictJson $GuiValidationEvidenceManifestPath
+    $guiEvidence = Assert-GuiContract $guiSummary $guiEvidenceManifest $candidate.Records
+    $guiSchemaRelative = Get-RepositoryRelativePath $RepositoryRoot $GuiValidationSchemaPath
+}
+if (-not $AssemblyOnly) {
 $releaseNotesRelative = Get-RepositoryRelativePath $RepositoryRoot $ReleaseNotesPath
 $receiptInputs = [ordered]@{
     candidateManifest = Get-FileRecord $candidate.ManifestPath 'candidate-manifest.json'
     correspondingSources = Get-FileRecord $CorrespondingSourcesPath
     spdx = Get-FileRecord $SpdxPath
     rootThirdPartyNotices = Get-FileRecord $RootThirdPartyNoticesPath
-    guiValidationSummary = Get-FileRecord $GuiValidationSummaryPath 'gui-validation-summary.json'
-    guiValidationEvidenceManifest = Get-FileRecord $GuiValidationEvidenceManifestPath 'gui-validation-evidence-manifest.json'
-    guiValidationSchema = [ordered]@{ path = $guiSchemaRelative; length = [long](Get-Item $GuiValidationSchemaPath).Length; sha256 = (Get-FileHash $GuiValidationSchemaPath -Algorithm SHA256).Hash.ToLowerInvariant() }
     releaseNotes = [ordered]@{ path = $releaseNotesRelative; length = [long](Get-Item $ReleaseNotesPath).Length; sha256 = (Get-FileHash $ReleaseNotesPath -Algorithm SHA256).Hash.ToLowerInvariant() }
+}
+if ($guiRoute -ceq 'waiver') { $receiptInputs.guiValidationWaiver = $waiver.FileRecord }
+else {
+    $receiptInputs.guiValidationSummary = Get-FileRecord $GuiValidationSummaryPath 'gui-validation-summary.json'
+    $receiptInputs.guiValidationEvidenceManifest = Get-FileRecord $GuiValidationEvidenceManifestPath 'gui-validation-evidence-manifest.json'
+    $receiptInputs.guiValidationSchema = [ordered]@{ path = $guiSchemaRelative; length = [long](Get-Item $GuiValidationSchemaPath).Length; sha256 = (Get-FileHash $GuiValidationSchemaPath -Algorithm SHA256).Hash.ToLowerInvariant() }
+}
 }
 
 $integrationEvidence = [ordered]@{
@@ -1446,7 +1470,7 @@ $integrationEvidence = [ordered]@{
     sevenZip = $sevenZipEvidence
     gui = $guiEvidence
 }
-Set-ExactProperty $release 'receiptInputs' $receiptInputs
+if (-not $AssemblyOnly) { Set-ExactProperty $release 'receiptInputs' $receiptInputs }
 Set-ExactProperty $release 'integrationEvidence' $integrationEvidence
 
 foreach ($component in $components) {

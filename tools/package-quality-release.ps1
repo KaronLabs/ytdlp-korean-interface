@@ -7,6 +7,8 @@ param(
     [string] $SpdxPath,
     [string] $GuiValidationSummaryPath,
     [string] $GuiValidationEvidenceManifestPath,
+    [string] $GuiValidationSchemaPath,
+    [string] $GuiValidationWaiverPath,
     [string] $OutputDirectory,
     [string] $ReceiptPath,
     [switch] $PlanOnly
@@ -14,6 +16,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+Import-Module (Join-Path $PSScriptRoot 'gui-release-waiver.psm1') -Force
 
 $script:KaronPackageTag = 'v2.19.1-karon.2'
 $script:KaronPackageBinaryName = 'ytdlp-korean-interface-v2.19.1-karon.2-win-x64.zip'
@@ -24,6 +27,8 @@ $script:KaronPackageLicensePrefix = 'release/licenses/v2.19.1-karon.2/'
 $script:KaronPackageGuiSchemaRepositoryPath = 'release/validation/v2.19.1-karon.2/gui-validation-output.schema.json'
 $script:KaronPackageCliGuiSummaryPath = $GuiValidationSummaryPath
 $script:KaronPackageCliGuiManifestPath = $GuiValidationEvidenceManifestPath
+$script:KaronPackageCliGuiSchemaPath = $GuiValidationSchemaPath
+$script:KaronPackageCliGuiWaiverPath = $GuiValidationWaiverPath
 $script:KaronPackageCliReceiptPath = $ReceiptPath
 $script:KaronPackageGuiCases = @(
     [pscustomobject]@{ Id = 'ko-KR-100'; Language = 'ko-KR'; Dpi = 100 },
@@ -767,33 +772,25 @@ function Assert-KaronPackageLockRawContract {
     }
     if ($RequireReceiptInputs) {
         $inputs = Get-KaronPackageRawProperty $release 'receiptInputs' $ErrorId
-        Assert-KaronPackageRawExactKeys $inputs @(
-            'candidateManifest', 'correspondingSources', 'spdx', 'rootThirdPartyNotices',
-            'guiValidationSummary', 'guiValidationEvidenceManifest', 'guiValidationSchema', 'releaseNotes'
-        ) $ErrorId
-        foreach ($name in @(
-            'candidateManifest', 'correspondingSources', 'spdx', 'rootThirdPartyNotices',
-            'guiValidationSummary', 'guiValidationEvidenceManifest'
-        )) {
+        $waived = Test-KaronPackageRawProperty $inputs 'guiValidationWaiver'
+        $fileInputs = @('candidateManifest', 'correspondingSources', 'spdx', 'rootThirdPartyNotices')
+        $trackedInputs = @('releaseNotes')
+        if ($waived) { $fileInputs += 'guiValidationWaiver' }
+        else { $fileInputs += @('guiValidationSummary', 'guiValidationEvidenceManifest'); $trackedInputs += 'guiValidationSchema' }
+        Assert-KaronPackageRawExactKeys $inputs ($fileInputs + $trackedInputs) $ErrorId
+        foreach ($name in $fileInputs) {
             $record = Get-KaronPackageRawProperty $inputs $name $ErrorId
             Assert-KaronPackageRawExactKeys $record @('fileName', 'length', 'sha256') $ErrorId
             [void](Get-KaronPackageRawString (Get-KaronPackageRawProperty $record 'fileName' $ErrorId) $ErrorId)
             if ((Get-KaronPackageRawInt64 (Get-KaronPackageRawProperty $record 'length' $ErrorId) $ErrorId) -le 0) { throw $ErrorId }
             if ((Get-KaronPackageRawString (Get-KaronPackageRawProperty $record 'sha256' $ErrorId) $ErrorId) -notmatch '^[a-fA-F0-9]{64}$') { throw $ErrorId }
         }
-        $notes = Get-KaronPackageRawProperty $inputs 'releaseNotes' $ErrorId
-        Assert-KaronPackageRawExactKeys $notes @('path', 'length', 'sha256') $ErrorId
-        [void](Get-KaronPackageRawString (Get-KaronPackageRawProperty $notes 'path' $ErrorId) $ErrorId)
-        if ((Get-KaronPackageRawInt64 (Get-KaronPackageRawProperty $notes 'length' $ErrorId) $ErrorId) -le 0 -or
-            (Get-KaronPackageRawString (Get-KaronPackageRawProperty $notes 'sha256' $ErrorId) $ErrorId) -notmatch '^[a-fA-F0-9]{64}$') {
-            throw $ErrorId
-        }
-        $guiSchema = Get-KaronPackageRawProperty $inputs 'guiValidationSchema' $ErrorId
-        Assert-KaronPackageRawExactKeys $guiSchema @('path', 'length', 'sha256') $ErrorId
-        [void](Get-KaronPackageRawString (Get-KaronPackageRawProperty $guiSchema 'path' $ErrorId) $ErrorId)
-        if ((Get-KaronPackageRawInt64 (Get-KaronPackageRawProperty $guiSchema 'length' $ErrorId) $ErrorId) -le 0 -or
-            (Get-KaronPackageRawString (Get-KaronPackageRawProperty $guiSchema 'sha256' $ErrorId) $ErrorId) -notmatch '^[a-fA-F0-9]{64}$') {
-            throw $ErrorId
+        foreach ($name in $trackedInputs) {
+            $record = Get-KaronPackageRawProperty $inputs $name $ErrorId
+            Assert-KaronPackageRawExactKeys $record @('path', 'length', 'sha256') $ErrorId
+            [void](Get-KaronPackageRawString (Get-KaronPackageRawProperty $record 'path' $ErrorId) $ErrorId)
+            if ((Get-KaronPackageRawInt64 (Get-KaronPackageRawProperty $record 'length' $ErrorId) $ErrorId) -le 0 -or
+                (Get-KaronPackageRawString (Get-KaronPackageRawProperty $record 'sha256' $ErrorId) $ErrorId) -notmatch '^[a-fA-F0-9]{64}$') { throw $ErrorId }
         }
     }
 }
@@ -874,7 +871,20 @@ function Get-KaronPackageApplicationProvenance {
     $null = @(& git -C $RepositoryRoot merge-base --is-ancestor $applicationSourceCommit $packaging 2>&1)
     if ($LASTEXITCODE -eq 1) { throw 'package_application_source_not_ancestor' }
     if ($LASTEXITCODE -ne 0) { throw 'package_application_source_object_invalid' }
-    $null = @(& git -C $RepositoryRoot diff --quiet --no-ext-diff --no-textconv $applicationSourceCommit $packaging -- . ':(exclude)release/**' 2>&1)
+    $applicationPaths = @(
+        '.', ':(exclude)release/**', ':(exclude)tools/gui-release-waiver.psm1',
+        ':(exclude)tools/build-release-license-lock.ps1', ':(exclude)tools/package-quality-release.ps1',
+        ':(exclude)tools/publish-quality-release.ps1', ':(exclude)tests/powershell/gui-release-waiver.Tests.ps1',
+        ':(exclude)tests/powershell/release-license-lock.Tests.ps1', ':(exclude)tests/powershell/release-publication-contract.Tests.ps1',
+        ':(exclude).github/workflows/karon2-quality-contract.yml', ':(exclude).gitattributes',
+        ':(exclude)THIRD-PARTY-NOTICES.txt', ':(exclude)tools/collect-non-runtime-component-evidence.ps1',
+        ':(exclude)tests/powershell/non-runtime-component-evidence.Tests.ps1',
+        ':(exclude)tools/build-corresponding-sources.ps1', ':(exclude)tools/generate-release-spdx.ps1',
+        ':(exclude)tools/generated-source-archive.psm1', ':(exclude)tests/powershell/generated-source-archive.Tests.ps1',
+        ':(exclude)tools/quality-fixture.py', ':(exclude)tests/quality/test_quality_fixture.py',
+        ':(exclude)tools/run-karon2-powershell-contracts.ps1'
+    )
+    $null = @(& git -C $RepositoryRoot diff --quiet --no-ext-diff --no-textconv $applicationSourceCommit $packaging -- @applicationPaths 2>&1)
     if ($LASTEXITCODE -eq 1) { throw 'package_application_source_delta_invalid' }
     if ($LASTEXITCODE -ne 0) { throw 'package_application_source_object_invalid' }
     $treeOutput = @(& git -C $RepositoryRoot rev-parse --verify ($applicationSourceCommit + '^{tree}') 2>&1)
@@ -1459,6 +1469,43 @@ function Assert-KaronPackageReceiptTrackedRecord {
     $actual
 }
 
+function Assert-KaronPackageGuiWaiverContract {
+    param([object] $Lock, [string] $WaiverPath, [Collections.Generic.Dictionary[string, object]] $CandidateEntries, [object] $Provenance, [object] $RecordedWaiver)
+    $bound = Get-KaronPackageBoundRecord $Lock 'guiValidationWaiver'
+    Assert-KaronPackageBoundFile $bound $WaiverPath 'gui-validation-waiver.json' 'package_gui_waiver_mismatch'
+    $document = ConvertFrom-KaronPackageJsonStrict ($Lock | ConvertTo-Json -Depth 64 -Compress) 'package_gui_waiver_invalid'
+    $gui = Get-KaronPackageRawProperty (Get-KaronPackageRawProperty (Get-KaronPackageRawProperty $document.Raw 'release' 'package_gui_waiver_invalid') 'integrationEvidence' 'package_gui_waiver_invalid') 'gui' 'package_gui_waiver_invalid'
+    Assert-KaronPackageRawExactKeys $gui @('status', 'waiver', 'record') 'package_gui_waiver_invalid'
+    if ((Get-KaronPackageRawString (Get-KaronPackageRawProperty $gui 'status' 'package_gui_waiver_invalid') 'package_gui_waiver_invalid') -cne 'WAIVED_BY_OWNER') { throw 'package_gui_waiver_invalid' }
+    $file = Get-KaronPackageRawProperty $gui 'waiver' 'package_gui_waiver_invalid'
+    Assert-KaronPackageRawExactKeys $file @('fileName', 'length', 'sha256') 'package_gui_waiver_invalid'
+    if ((Get-KaronPackageRawString (Get-KaronPackageRawProperty $file 'fileName' 'package_gui_waiver_invalid') 'package_gui_waiver_invalid') -cne $bound.Name -or
+        (Get-KaronPackageRawInt64 (Get-KaronPackageRawProperty $file 'length' 'package_gui_waiver_invalid') 'package_gui_waiver_invalid') -ne $bound.Length -or
+        (Get-KaronPackageRawString (Get-KaronPackageRawProperty $file 'sha256' 'package_gui_waiver_invalid') 'package_gui_waiver_invalid') -cne $bound.Sha256) { throw 'package_gui_waiver_mismatch' }
+    $candidateRoot = Split-Path -Parent $CandidateEntries['candidate-manifest.json'].SourcePath
+    $waiver = Read-KaronGuiValidationWaiver -Path $WaiverPath -CandidateDirectory $candidateRoot -ApplicationSourceCommit $Provenance.ApplicationSourceCommit -ApplicationSourceTree $Provenance.ApplicationSourceTree
+    if ($waiver.FileRecord.sha256 -cne $bound.Sha256 -or $waiver.FileRecord.length -ne $bound.Length) { throw 'package_gui_waiver_mismatch' }
+    Assert-KaronGuiValidationWaiverRecord (Get-KaronPackageRawProperty $gui 'record' 'package_gui_waiver_invalid') $waiver.Record.candidate.manifest $waiver.Record.candidate.executable $Provenance.ApplicationSourceCommit $Provenance.ApplicationSourceTree
+    if ($null -ne $RecordedWaiver) {
+        Assert-KaronGuiValidationWaiverRecord $RecordedWaiver $waiver.Record.candidate.manifest $waiver.Record.candidate.executable $Provenance.ApplicationSourceCommit $Provenance.ApplicationSourceTree
+    }
+    $waiver
+}
+
+function Assert-KaronPackageGuiWaiverZip {
+    param([string] $BinaryPath, [object] $FileRecord)
+    try { $zip = [IO.Compression.ZipFile]::OpenRead($BinaryPath) }
+    catch { throw 'package_receipt_gui_waiver_zip_mismatch' }
+    try {
+        $entries = @($zip.Entries | Where-Object { $_.FullName -ceq 'gui-validation-waiver.json' })
+        if ($entries.Count -ne 1 -or $entries[0].Length -ne $FileRecord.length) { throw 'package_receipt_gui_waiver_zip_mismatch' }
+        $stream = $entries[0].Open()
+        try { if ((Get-KaronPackageStreamSha256 $stream) -cne $FileRecord.sha256) { throw 'package_receipt_gui_waiver_zip_mismatch' } }
+        finally { $stream.Dispose() }
+    }
+    finally { $zip.Dispose() }
+}
+
 function Assert-KaronReleaseReceipt {
     param(
         [Parameter(Mandatory)] [string] $RepositoryRoot,
@@ -1473,13 +1520,18 @@ function Assert-KaronReleaseReceipt {
         throw 'package_receipt_location_invalid'
     }
     $json = ConvertFrom-KaronPackageJsonStrict ([IO.File]::ReadAllText($receipt, [Text.UTF8Encoding]::new($false, $true))) 'package_receipt_invalid'
-    Assert-KaronPackageRawExactKeys $json.Raw @(
+    $schemaVersion = Get-KaronPackageRawString (Get-KaronPackageRawProperty $json.Raw 'schemaVersion' 'package_receipt_invalid') 'package_receipt_invalid'
+    if ($schemaVersion -cnotin @('karon-release-receipt/v2', 'karon-release-receipt/v3')) { throw 'package_receipt_invalid' }
+    $waived = $schemaVersion -ceq 'karon-release-receipt/v3'
+    $receiptKeys = @(
         'schemaVersion', 'tag', 'platform', 'applicationSourceCommit', 'applicationSourceTree', 'packagingCommit', 'candidateManifest', 'application', 'ffprobe',
-        'guiValidationSummary', 'guiValidationEvidenceManifest', 'guiValidationSchema', 'licenseLock', 'rootThirdPartyNotices',
-        'licenseCorpus', 'correspondingSources', 'spdx', 'releaseNotes', 'guiCaseIds', 'publicAssets'
-    ) 'package_receipt_invalid'
-    if ((Get-KaronPackageRawString (Get-KaronPackageRawProperty $json.Raw 'schemaVersion' 'package_receipt_invalid') 'package_receipt_invalid') -cne 'karon-release-receipt/v2' -or
-        (Get-KaronPackageRawString (Get-KaronPackageRawProperty $json.Raw 'tag' 'package_receipt_invalid') 'package_receipt_invalid') -cne $script:KaronPackageTag -or
+        'licenseLock', 'rootThirdPartyNotices', 'licenseCorpus', 'correspondingSources', 'spdx', 'releaseNotes', 'publicAssets'
+    )
+    if ($waived) { $receiptKeys += @('status', 'guiValidationWaiver', 'guiValidationWaiverRecord') }
+    else { $receiptKeys += @('guiValidationSummary', 'guiValidationEvidenceManifest', 'guiValidationSchema', 'guiCaseIds') }
+    Assert-KaronPackageRawExactKeys $json.Raw $receiptKeys 'package_receipt_invalid'
+    if ($waived -and (Get-KaronPackageRawString (Get-KaronPackageRawProperty $json.Raw 'status' 'package_receipt_invalid') 'package_receipt_invalid') -cne 'WAIVED_BY_OWNER') { throw 'package_receipt_invalid' }
+    if ((Get-KaronPackageRawString (Get-KaronPackageRawProperty $json.Raw 'tag' 'package_receipt_invalid') 'package_receipt_invalid') -cne $script:KaronPackageTag -or
         (Get-KaronPackageRawString (Get-KaronPackageRawProperty $json.Raw 'platform' 'package_receipt_invalid') 'package_receipt_invalid') -cne 'win-x64') {
         throw 'package_receipt_invalid'
     }
@@ -1491,7 +1543,10 @@ function Assert-KaronReleaseReceipt {
     if ($applicationSourceCommit -ceq $packagingCommit) { throw 'package_receipt_provenance_confused' }
     if ($packagingCommit -cne (Get-KaronPackageRepositoryHead $repo)) { throw 'package_receipt_packaging_commit_mismatch' }
     $value = $json.Value
-    foreach ($name in @('candidateManifest', 'application', 'ffprobe', 'guiValidationSummary', 'guiValidationEvidenceManifest', 'correspondingSources', 'spdx')) {
+    $localRecordNames = @('candidateManifest', 'application', 'ffprobe', 'correspondingSources', 'spdx')
+    if ($waived) { $localRecordNames += 'guiValidationWaiver' }
+    else { $localRecordNames += @('guiValidationSummary', 'guiValidationEvidenceManifest') }
+    foreach ($name in $localRecordNames) {
         $rawRecord = Get-KaronPackageRawProperty $json.Raw $name 'package_receipt_invalid'
         Assert-KaronPackageRawExactKeys $rawRecord @('localPath', 'fileName', 'length', 'sha256') 'package_receipt_invalid'
         foreach ($field in @('localPath', 'fileName', 'sha256')) {
@@ -1507,7 +1562,9 @@ function Assert-KaronReleaseReceipt {
     [void](Assert-KaronPackageReceiptTrackedRecord (Get-KaronPackageRawProperty $json.Raw 'rootThirdPartyNotices' 'package_receipt_invalid') $value.rootThirdPartyNotices $repo 'THIRD-PARTY-NOTICES.txt' 'THIRD-PARTY-NOTICES.txt' 'package_receipt_notice_mismatch')
     $notesPath = [IO.Path]::GetFullPath((Join-Path $repo 'release\notes\v2.19.1-karon.2.md'))
     $notesRecord = Assert-KaronPackageReceiptTrackedRecord (Get-KaronPackageRawProperty $json.Raw 'releaseNotes' 'package_receipt_invalid') $value.releaseNotes $repo 'release/notes/v2.19.1-karon.2.md' 'v2.19.1-karon.2.md' 'package_receipt_notes_mismatch'
-    [void](Assert-KaronPackageReceiptTrackedRecord (Get-KaronPackageRawProperty $json.Raw 'guiValidationSchema' 'package_receipt_invalid') $value.guiValidationSchema $repo $script:KaronPackageGuiSchemaRepositoryPath 'gui-validation-output.schema.json' 'package_receipt_gui_schema_mismatch')
+    if (-not $waived) {
+        [void](Assert-KaronPackageReceiptTrackedRecord (Get-KaronPackageRawProperty $json.Raw 'guiValidationSchema' 'package_receipt_invalid') $value.guiValidationSchema $repo $script:KaronPackageGuiSchemaRepositoryPath 'gui-validation-output.schema.json' 'package_receipt_gui_schema_mismatch')
+    }
 
     $lockPath = [IO.Path]::GetFullPath((Join-Path $repo ($lockRepositoryPath.Replace('/', [IO.Path]::DirectorySeparatorChar))))
     $lockDocument = Read-KaronPackageStrictLockDocument $lockPath
@@ -1529,15 +1586,19 @@ function Assert-KaronReleaseReceipt {
     }
     if ($candidateEntries['ytdlp-interface.exe'].Sha256 -cne ([string]$value.application.sha256).ToLowerInvariant() -or
         $candidateEntries['ffprobe.exe'].Sha256 -cne ([string]$value.ffprobe.sha256).ToLowerInvariant()) { throw 'package_receipt_candidate_mismatch' }
-    [void](Assert-KaronPackageGuiContract $lock $repo ([string]$value.guiValidationSummary.localPath) ([string]$value.guiValidationEvidenceManifest.localPath) $candidateEntries)
+    if ($waived) {
+        $waiver = Assert-KaronPackageGuiWaiverContract $lock ([string]$value.guiValidationWaiver.localPath) $candidateEntries $provenance (Get-KaronPackageRawProperty $json.Raw 'guiValidationWaiverRecord' 'package_receipt_invalid')
+        Assert-KaronPackageGuiWaiverZip (Join-Path $assets $script:KaronPackageBinaryName) $waiver.FileRecord
+    }
+    else { [void](Assert-KaronPackageGuiContract $lock $repo ([string]$value.guiValidationSummary.localPath) ([string]$value.guiValidationEvidenceManifest.localPath) $candidateEntries) }
     Assert-KaronPackageSourcesContract $lock $lockDocument.Raw ([string]$value.correspondingSources.localPath) ([string]$value.rootThirdPartyNotices.localPath)
     Assert-KaronPackageSpdxContract $lock ([string]$value.spdx.localPath) $repo $candidateEntries
 
-    $caseIds = @(Get-KaronPackageRawArray (Get-KaronPackageRawProperty $json.Raw 'guiCaseIds' 'package_receipt_invalid') 'package_receipt_invalid')
-    if ($caseIds.Count -ne 6) { throw 'package_receipt_gui_cases_invalid' }
-    for ($index = 0; $index -lt 6; $index++) {
-        if ((Get-KaronPackageRawString $caseIds[$index] 'package_receipt_invalid') -cne $script:KaronPackageGuiCases[$index].Id) {
-            throw 'package_receipt_gui_cases_invalid'
+    if (-not $waived) {
+        $caseIds = @(Get-KaronPackageRawArray (Get-KaronPackageRawProperty $json.Raw 'guiCaseIds' 'package_receipt_invalid') 'package_receipt_invalid')
+        if ($caseIds.Count -ne 6) { throw 'package_receipt_gui_cases_invalid' }
+        for ($index = 0; $index -lt 6; $index++) {
+            if ((Get-KaronPackageRawString $caseIds[$index] 'package_receipt_invalid') -cne $script:KaronPackageGuiCases[$index].Id) { throw 'package_receipt_gui_cases_invalid' }
         }
     }
     $public = @(Get-KaronPackageRawArray (Get-KaronPackageRawProperty $json.Raw 'publicAssets' 'package_receipt_invalid') 'package_receipt_invalid')
@@ -1573,6 +1634,7 @@ function Invoke-QualityReleasePackageCore {
         [Parameter(Mandatory)] [string] $CorrespondingSourcesPath,
         [Parameter(Mandatory)] [string] $SpdxPath,
         [Parameter(Mandatory)] [string] $OutputDirectory,
+        [object] $GuiValidationWaiver,
         [switch] $PlanOnly
     )
 
@@ -1589,6 +1651,12 @@ function Invoke-QualityReleasePackageCore {
     Assert-KaronPackageStatusContract -Lock $lock
     $entries = Get-KaronPackageCandidateEntries -Lock $lock -CandidateRoot $candidateRoot
     Add-KaronPackageNoticeEntries -Entries $entries -Lock $lock -SourceRoot $sourceRoot
+    if ($null -ne $GuiValidationWaiver) {
+        if (-not $entries.TryAdd('gui-validation-waiver.json', [pscustomobject]@{
+            EntryName = 'gui-validation-waiver.json'; SourcePath = $GuiValidationWaiver.LocalPath
+            Sha256 = $GuiValidationWaiver.FileRecord.sha256; Length = [long]$GuiValidationWaiver.FileRecord.length
+        })) { throw 'package_output_path_collision' }
+    }
     Assert-KaronPackageOutputReady -OutputRoot $outputRoot -SourcesPath $sources.FullPath -SpdxPath $spdx.FullPath
 
     $binaryPath = Join-Path $outputRoot $script:KaronPackageBinaryName
@@ -1649,19 +1717,20 @@ function Invoke-QualityReleasePackage {
         [Parameter(Mandatory)] [string] $SpdxPath,
         [string] $GuiValidationSummaryPath = $script:KaronPackageCliGuiSummaryPath,
         [string] $GuiValidationEvidenceManifestPath = $script:KaronPackageCliGuiManifestPath,
+        [string] $GuiValidationSchemaPath = $script:KaronPackageCliGuiSchemaPath,
+        [string] $GuiValidationWaiverPath = $script:KaronPackageCliGuiWaiverPath,
         [Parameter(Mandatory)] [string] $OutputDirectory,
         [string] $ReceiptPath = $script:KaronPackageCliReceiptPath,
         [switch] $PlanOnly
     )
-    if ([string]::IsNullOrWhiteSpace($GuiValidationSummaryPath) -or
-        [string]::IsNullOrWhiteSpace($GuiValidationEvidenceManifestPath) -or
-        [string]::IsNullOrWhiteSpace($ReceiptPath)) { throw 'package_evidence_input_missing' }
+    $guiRoute = Assert-KaronGuiValidationInputs -GuiValidationWaiverPath $GuiValidationWaiverPath -GuiValidationSummaryPath $GuiValidationSummaryPath -GuiValidationEvidenceManifestPath $GuiValidationEvidenceManifestPath -GuiValidationSchemaPath $GuiValidationSchemaPath -BoundParameters $PSBoundParameters
+    if ([string]::IsNullOrWhiteSpace($ReceiptPath)) { throw 'package_evidence_input_missing' }
     $repo = Assert-KaronPackagePathChain $RepositoryRoot
     $candidateRoot = Assert-KaronPackagePathChain $CandidateDirectory
     $outputRoot = Assert-KaronPackagePathChain $OutputDirectory
     $receipt = Assert-KaronPackagePathChain $ReceiptPath
-    if ([IO.Path]::GetFileName($GuiValidationSummaryPath) -cne 'gui-validation-summary.json' -or
-        [IO.Path]::GetFileName($GuiValidationEvidenceManifestPath) -cne 'gui-validation-evidence-manifest.json' -or
+    if (($guiRoute -ceq 'normal' -and ([IO.Path]::GetFileName($GuiValidationSummaryPath) -cne 'gui-validation-summary.json' -or
+        [IO.Path]::GetFileName($GuiValidationEvidenceManifestPath) -cne 'gui-validation-evidence-manifest.json')) -or
         [IO.Path]::GetFileName($receipt) -cne 'release-receipt.json' -or
         (Split-Path -Parent $receipt) -ieq $outputRoot) { throw 'package_evidence_input_invalid' }
     if (Test-Path -LiteralPath $receipt) { throw 'package_receipt_exists' }
@@ -1678,7 +1747,13 @@ function Invoke-QualityReleasePackage {
     $provenance = Get-KaronPackageApplicationProvenance $lock $candidateEntries $repo $packagingCommit
     $candidateManifestRecord = Get-KaronPackageBoundRecord $lock 'candidateManifest'
     Assert-KaronPackageBoundFile $candidateManifestRecord $candidateEntries['candidate-manifest.json'].SourcePath 'candidate-manifest.json' 'package_candidate_manifest_lock_mismatch'
-    $guiSchemaTracked = Assert-KaronPackageGuiContract $lock $repo $GuiValidationSummaryPath $GuiValidationEvidenceManifestPath $candidateEntries
+    $waiver = $null
+    if ($guiRoute -ceq 'waiver') { $waiver = Assert-KaronPackageGuiWaiverContract $lock $GuiValidationWaiverPath $candidateEntries $provenance }
+    else {
+        $guiSchemaTracked = Assert-KaronPackageGuiContract $lock $repo $GuiValidationSummaryPath $GuiValidationEvidenceManifestPath $candidateEntries
+        if (-not [string]::IsNullOrWhiteSpace($GuiValidationSchemaPath) -and
+            (Assert-KaronPackagePathChain $GuiValidationSchemaPath) -cne $guiSchemaTracked.localPath) { throw 'package_gui_schema_path_invalid' }
+    }
     $rootNoticePath = [IO.Path]::GetFullPath((Join-Path $repo 'THIRD-PARTY-NOTICES.txt'))
     $rootNoticeTracked = Get-KaronPackageTrackedFileRecord $repo 'THIRD-PARTY-NOTICES.txt' 'THIRD-PARTY-NOTICES.txt'
     $rootNoticeRecord = Get-KaronPackageBoundRecord $lock 'rootThirdPartyNotices'
@@ -1694,15 +1769,22 @@ function Invoke-QualityReleasePackage {
     $snapshotPaths = [Collections.Generic.List[string]]::new()
     foreach ($entry in $candidateEntries.Values) { $snapshotPaths.Add([string]$entry.SourcePath) }
     foreach ($record in $licenseCorpus) { $snapshotPaths.Add([string]$record.localPath) }
-    foreach ($path in @($actualLockPath, $rootNoticePath, $CorrespondingSourcesPath, $SpdxPath, $GuiValidationSummaryPath, $GuiValidationEvidenceManifestPath, $guiSchemaTracked.localPath, $notesPath)) {
+    foreach ($path in @($actualLockPath, $rootNoticePath, $CorrespondingSourcesPath, $SpdxPath, $notesPath)) {
         $snapshotPaths.Add([string]$path)
     }
-    $guiRoot = Split-Path -Parent ([IO.Path]::GetFullPath($GuiValidationEvidenceManifestPath))
-    foreach ($entry in (Get-KaronPackageSafeInventory $guiRoot 'package_gui_snapshot').Values) { $snapshotPaths.Add([string]$entry.FullPath) }
+    if ($guiRoute -ceq 'waiver') { $snapshotPaths.Add($waiver.LocalPath) }
+    else {
+        $snapshotPaths.Add([string]$guiSchemaTracked.localPath)
+        $guiRoot = Split-Path -Parent ([IO.Path]::GetFullPath($GuiValidationEvidenceManifestPath))
+        foreach ($entry in (Get-KaronPackageSafeInventory $guiRoot 'package_gui_snapshot').Values) { $snapshotPaths.Add([string]$entry.FullPath) }
+    }
     $inputSnapshots = New-KaronPackageByteSnapshots ([string[]]$snapshotPaths.ToArray())
 
-    $coreResult = Invoke-QualityReleasePackageCore -RepositoryRoot $repo -CandidateDirectory $candidateRoot -LockPath $actualLockPath -CorrespondingSourcesPath $CorrespondingSourcesPath -SpdxPath $SpdxPath -OutputDirectory $outputRoot -PlanOnly:$PlanOnly
+    $coreResult = Invoke-QualityReleasePackageCore -RepositoryRoot $repo -CandidateDirectory $candidateRoot -LockPath $actualLockPath -CorrespondingSourcesPath $CorrespondingSourcesPath -SpdxPath $SpdxPath -OutputDirectory $outputRoot -GuiValidationWaiver $waiver -PlanOnly:$PlanOnly
     if ($PlanOnly) {
+        if ($guiRoute -ceq 'waiver') {
+            return [pscustomobject]@{ Mode = 'plan'; Status = 'WAIVED_BY_OWNER'; AssetPaths = @($coreResult.AssetPaths); ZipEntries = @($coreResult.ZipEntries); ReceiptPath = $receipt; GuiValidationWaiverRecord = $waiver.Record }
+        }
         return [pscustomobject]@{
             Mode = 'plan'
             AssetPaths = @($coreResult.AssetPaths)
@@ -1724,17 +1806,25 @@ function Invoke-QualityReleasePackage {
         candidateManifest = New-KaronPackageLocalRecord $candidateEntries['candidate-manifest.json'].SourcePath 'candidate-manifest.json'
         application = New-KaronPackageLocalRecord $candidateEntries['ytdlp-interface.exe'].SourcePath 'ytdlp-interface.exe'
         ffprobe = New-KaronPackageLocalRecord $candidateEntries['ffprobe.exe'].SourcePath 'ffprobe.exe'
-        guiValidationSummary = New-KaronPackageLocalRecord $GuiValidationSummaryPath 'gui-validation-summary.json'
-        guiValidationEvidenceManifest = New-KaronPackageLocalRecord $GuiValidationEvidenceManifestPath 'gui-validation-evidence-manifest.json'
-        guiValidationSchema = $guiSchemaTracked
         licenseLock = $lockTracked
         rootThirdPartyNotices = $rootNoticeTracked
         licenseCorpus = $licenseCorpus
         correspondingSources = New-KaronPackageLocalRecord $sourcesFinal $script:KaronPackageSourcesName
         spdx = New-KaronPackageLocalRecord $spdxFinal $script:KaronPackageSpdxName
         releaseNotes = $notesTracked
-        guiCaseIds = @($script:KaronPackageGuiCases | ForEach-Object Id)
         publicAssets = @(Get-KaronPackagePublicInventory $outputRoot)
+    }
+    if ($guiRoute -ceq 'waiver') {
+        $receiptValue.schemaVersion = 'karon-release-receipt/v3'
+        $receiptValue.status = 'WAIVED_BY_OWNER'
+        $receiptValue.guiValidationWaiver = New-KaronPackageLocalRecord $GuiValidationWaiverPath 'gui-validation-waiver.json'
+        $receiptValue.guiValidationWaiverRecord = $waiver.Record
+    }
+    else {
+        $receiptValue.guiValidationSummary = New-KaronPackageLocalRecord $GuiValidationSummaryPath 'gui-validation-summary.json'
+        $receiptValue.guiValidationEvidenceManifest = New-KaronPackageLocalRecord $GuiValidationEvidenceManifestPath 'gui-validation-evidence-manifest.json'
+        $receiptValue.guiValidationSchema = $guiSchemaTracked
+        $receiptValue.guiCaseIds = @($script:KaronPackageGuiCases | ForEach-Object Id)
     }
     Write-KaronPackageAtomicJson $receipt $receiptValue
     $validated = Assert-KaronReleaseReceipt $repo $outputRoot $receipt
@@ -1749,12 +1839,17 @@ function Invoke-QualityReleasePackage {
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
+    $guiArguments = @{}
+    foreach ($name in @('GuiValidationSummaryPath', 'GuiValidationEvidenceManifestPath', 'GuiValidationSchemaPath', 'GuiValidationWaiverPath')) {
+        if ($PSBoundParameters.ContainsKey($name)) { $guiArguments[$name] = $PSBoundParameters[$name] }
+    }
     Invoke-QualityReleasePackage `
         -RepositoryRoot $RepositoryRoot `
         -CandidateDirectory $CandidateDirectory `
         -LockPath $LockPath `
         -CorrespondingSourcesPath $CorrespondingSourcesPath `
         -SpdxPath $SpdxPath `
+        @guiArguments `
         -OutputDirectory $OutputDirectory `
         -PlanOnly:$PlanOnly
 }

@@ -556,7 +556,7 @@ function Set-TestApplicationSourceCommit {
 }
 
 function Invoke-TestPackage {
-    param([object] $Case, [switch] $PlanOnly)
+    param([object] $Case, [switch] $PlanOnly, [string] $WaiverPath)
     $arguments = @{
         RepositoryRoot = $Case.Repository
         CandidateDirectory = $Case.Candidate
@@ -569,7 +569,39 @@ function Invoke-TestPackage {
         ReceiptPath = $Case.ReceiptPath
         PlanOnly = $PlanOnly
     }
+    if (-not [string]::IsNullOrWhiteSpace($WaiverPath)) {
+        [void]$arguments.Remove('GuiValidationSummaryPath')
+        [void]$arguments.Remove('GuiValidationEvidenceManifestPath')
+        $arguments.GuiValidationWaiverPath = $WaiverPath
+    }
     Invoke-QualityReleasePackage @arguments
+}
+
+function Set-TestOwnerGuiWaiver {
+    param([object] $Case)
+    $path = Join-Path $Case.Root 'gui-validation-waiver.json'
+    $value = [ordered]@{
+        schemaVersion = 'karon-gui-validation-waiver/v1'; releaseVersion = $script:Tag; status = 'WAIVED_BY_OWNER'
+        ownerInstruction = '남은 gui 확인 거ㅗㄴ너뛰고 릴리즈 까지 달려'
+        limitedObservation = [ordered]@{ text = '잘되네'; classification = 'LIMITED_UNSTRUCTURED_USER_OBSERVATION' }
+        scope = [ordered]@{
+            caseIds = @('ko-KR-100', 'ko-KR-150', 'ko-KR-200', 'en-US-100', 'en-US-150', 'en-US-200')
+            manualChecks = @('fullVideoLifecycle', 'mp3Conversion', 'settingsSaveRestartRestore', 'legacySettingsTransition')
+            automaticTestsWaived = $false; licenseChecksWaived = $false
+        }
+        candidate = [ordered]@{ manifest = New-TestHashRecord $Case.ManifestPath 'candidate-manifest.json'; executable = New-TestHashRecord $Case.AppPath 'ytdlp-interface.exe' }
+        applicationSource = [ordered]@{ commit = $Case.ApplicationSourceCommit; tree = $Case.ApplicationSourceTree }
+    }
+    Write-TestJson $path $value
+    foreach ($name in @('guiValidationSummary', 'guiValidationEvidenceManifest', 'guiValidationSchema')) { [void]$Case.Lock.release.receiptInputs.Remove($name) }
+    $record = New-TestHashRecord $path 'gui-validation-waiver.json'
+    $Case.Lock.release.receiptInputs.guiValidationWaiver = $record
+    $gui = [ordered]@{ status = 'WAIVED_BY_OWNER'; waiver = $record; record = $value }
+    foreach ($lock in @($Case.Lock, $Case.InnerLock)) {
+        $lock.release | Add-Member -NotePropertyName integrationEvidence -NotePropertyValue ([ordered]@{ gui = $gui }) -Force
+    }
+    Rebuild-TestCorrespondingSources $Case
+    $path
 }
 
 function Get-TestFailure {
@@ -955,6 +987,28 @@ Describe 'Independent immutable provenance anchors' {
 }
 
 Describe 'Application provenance ancestry and release-only delta' {
+    It 'accepts the authorized release tooling delta while retaining the frozen application anchor' {
+        $case = New-TestProvenanceOnlyCase 'waiver-tooling' 'release-only'
+        foreach ($path in @('tools/gui-release-waiver.psm1', 'tools/build-release-license-lock.ps1', 'tools/package-quality-release.ps1', 'tools/publish-quality-release.ps1', 'tests/powershell/gui-release-waiver.Tests.ps1', 'tests/powershell/release-license-lock.Tests.ps1', 'tests/powershell/release-publication-contract.Tests.ps1', '.github/workflows/karon2-quality-contract.yml')) {
+            Write-TestUtf8 (Join-Path $case.Repository $path) ('release tooling fixture' + [char]10)
+            [void](Invoke-TestGit $case.Repository @('add', '--', $path))
+        }
+        [void](Invoke-TestGit $case.Repository @('commit', '-q', '-m', 'authorized release tooling'))
+        $case.PackagingCommit = [string](Invoke-TestGit $case.Repository @('rev-parse', 'HEAD^{commit}'))
+        $result = Get-KaronPackageApplicationProvenance $case.Lock $case.Entries $case.Repository $case.PackagingCommit
+        $result.ApplicationSourceCommit | Should -Be $case.ApplicationCommit
+        $result.PackagingCommit | Should -Be $case.PackagingCommit
+    }
+
+    It 'rejects a neighboring unapproved tool after the application source freeze' {
+        $case = New-TestProvenanceOnlyCase 'other-tool' 'release-only'
+        Write-TestUtf8 (Join-Path $case.Repository 'tools/build-candidate.ps1') 'changed build tooling'
+        [void](Invoke-TestGit $case.Repository @('add', '--', 'tools/build-candidate.ps1'))
+        [void](Invoke-TestGit $case.Repository @('commit', '-q', '-m', 'unapproved tooling'))
+        $case.PackagingCommit = [string](Invoke-TestGit $case.Repository @('rev-parse', 'HEAD^{commit}'))
+        (Get-TestFailure { Get-KaronPackageApplicationProvenance $case.Lock $case.Entries $case.Repository $case.PackagingCommit }) | Should -Match 'package_application_source_delta_invalid'
+    }
+
     It 'rejects a coherent but unrelated application source commit' {
         $case = New-TestProvenanceOnlyCase 'unrelated' 'unrelated'
         (Get-TestFailure {
@@ -1090,6 +1144,69 @@ Describe 'Canonical producer GUI schema handshake' {
 }
 
 Describe 'Exact package, GUI evidence, and receipt contract' {
+    It 'keeps normal GUI packaging and publication compatible with v2 receipts' {
+        $case = New-PackagedPublicationCase 'normal-v2-compatibility'
+        $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json
+        $receipt.schemaVersion | Should -Be 'karon-release-receipt/v2'
+        @($receipt.PSObject.Properties.Name) | Should -Not -Contain 'guiValidationWaiver'
+        $fake = New-FakePublicationRunner $case
+        (Invoke-TestPublication $case $fake -PlanOnly).Mode | Should -Be 'plan'
+    }
+
+    It 'packages the exact waiver bytes and emits a v3 owner-waived receipt without GUI evidence' {
+        $case = New-ReleaseContractCase 'owner-waiver-package'
+        $waiver = Set-TestOwnerGuiWaiver $case
+        Remove-Item -LiteralPath $case.Gui -Recurse -Force
+        Remove-Item -LiteralPath $case.GuiSchemaPath
+        $result = Invoke-TestPackage $case -WaiverPath $waiver
+        $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json
+        $receipt.schemaVersion | Should -Be 'karon-release-receipt/v3'
+        $receipt.status | Should -Be 'WAIVED_BY_OWNER'
+        $receipt.guiValidationWaiverRecord.status | Should -Be 'WAIVED_BY_OWNER'
+        $receipt.guiValidationWaiver.sha256 | Should -Be (Get-TestSha256 $waiver)
+        foreach ($name in @('guiValidationSummary', 'guiValidationEvidenceManifest', 'guiValidationSchema', 'guiCaseIds')) {
+            @($receipt.PSObject.Properties.Name) | Should -Not -Contain $name
+        }
+        @($result.AssetPaths).Count | Should -Be 4
+        $zip = [IO.Compression.ZipFile]::OpenRead((Join-Path $case.Output $script:BinaryName))
+        try {
+            $entry = $zip.GetEntry('gui-validation-waiver.json')
+            $entry | Should -Not -BeNullOrEmpty
+            $stream = $entry.Open()
+            try { (Get-KaronPackageStreamSha256 $stream) | Should -Be (Get-TestSha256 $waiver) }
+            finally { $stream.Dispose() }
+        }
+        finally { $zip.Dispose() }
+        $fake = New-FakePublicationRunner $case
+        (Invoke-TestPublication $case $fake -PlanOnly).Mode | Should -Be 'plan'
+    }
+
+    It 'rejects a waiver mixed with summary, evidence or schema before writing assets' -TestCases @(
+        @{ Name = 'GuiValidationSummaryPath' }, @{ Name = 'GuiValidationEvidenceManifestPath' }, @{ Name = 'GuiValidationSchemaPath' }
+    ) {
+        param($Name)
+        $case = New-ReleaseContractCase ('package-mixed-waiver-' + $Name)
+        $waiver = Set-TestOwnerGuiWaiver $case
+        $arguments = @{ RepositoryRoot = $case.Repository; CandidateDirectory = $case.Candidate; LockPath = $case.LockPath; CorrespondingSourcesPath = $case.SourcesPath; SpdxPath = $case.SpdxPath; OutputDirectory = $case.Output; ReceiptPath = $case.ReceiptPath; GuiValidationWaiverPath = $waiver }
+        $arguments[$Name] = ''
+        { Invoke-QualityReleasePackage @arguments } | Should -Throw '*gui_validation_input_conflict*'
+        @(Get-ChildItem -LiteralPath $case.Output -Force).Count | Should -Be 0
+    }
+
+    It 'retains license, SPDX, sources and candidate integrity checks under a waiver' -TestCases @(
+        @{ Name = 'license'; Mutate = { param($c) Write-TestUtf8 $c.LicensePath 'tampered notice' } },
+        @{ Name = 'spdx'; Mutate = { param($c) $c.Spdx.packages[0].licenseConcluded = 'Apache-2.0'; Save-TestSpdx $c } },
+        @{ Name = 'sources'; Mutate = { param($c) Write-TestUtf8 $c.SourcesPath 'not an archive'; Refresh-TestInputRecord $c 'correspondingSources' $c.SourcesPath $script:SourcesName } },
+        @{ Name = 'candidate'; Mutate = { param($c) Write-TestUtf8 $c.AppPath 'substituted executable' } }
+    ) {
+        param($Name, $Mutate)
+        $case = New-ReleaseContractCase ('package-waiver-integrity-' + $Name)
+        $waiver = Set-TestOwnerGuiWaiver $case
+        & $Mutate $case
+        (Get-TestFailure { Invoke-TestPackage $case -WaiverPath $waiver }) | Should -Match 'package_'
+        @(Get-ChildItem -LiteralPath $case.Output -Force).Count | Should -Be 0
+    }
+
     It 'packages exact public assets and creates a non-public bound receipt' {
         $case = New-ReleaseContractCase 'package-positive'
         $result = Invoke-TestPackage $case
@@ -1306,6 +1423,37 @@ Describe 'Exact package, GUI evidence, and receipt contract' {
 }
 
 Describe 'Fail-closed publication preflight and receipt checks' {
+    It 'rejects v3 authority, schema and candidate tampering before external commands' -TestCases @(
+        @{ Name = 'status'; Mutate = { param($r) $r.status = 'PASS' } },
+        @{ Name = 'downgrade'; Mutate = { param($r) $r.schemaVersion = 'karon-release-receipt/v2' } },
+        @{ Name = 'mixed'; Mutate = { param($r) $r | Add-Member -NotePropertyName guiValidationSummary -NotePropertyValue $r.guiValidationWaiver } },
+        @{ Name = 'instruction'; Mutate = { param($r) $r.guiValidationWaiverRecord.ownerInstruction = 'skip automatic tests' } },
+        @{ Name = 'exe'; Mutate = { param($r) $r.guiValidationWaiverRecord.candidate.executable.sha256 = 'f' * 64 } },
+        @{ Name = 'tree'; Mutate = { param($r) $r.guiValidationWaiverRecord.applicationSource.tree = 'f' * 40 } }
+    ) {
+        param($Name, $Mutate)
+        $case = New-ReleaseContractCase ('publish-v3-tamper-' + $Name)
+        $waiver = Set-TestOwnerGuiWaiver $case
+        [void](Invoke-TestPackage $case -WaiverPath $waiver)
+        $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json
+        & $Mutate $receipt
+        Write-TestJson $case.ReceiptPath $receipt
+        $fake = New-FakePublicationRunner $case
+        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly }) | Should -Match '(package_receipt_|gui_validation_waiver_)'
+        $fake.Calls.Count | Should -Be 0
+        $fake.HttpCalls.Count | Should -Be 0
+    }
+
+    It 'rejects authorization file byte drift after packaging before publication commands' {
+        $case = New-ReleaseContractCase 'publish-waiver-byte-drift'
+        $waiver = Set-TestOwnerGuiWaiver $case
+        [void](Invoke-TestPackage $case -WaiverPath $waiver)
+        [IO.File]::AppendAllText($waiver, ' ')
+        $fake = New-FakePublicationRunner $case
+        (Get-TestFailure { Invoke-TestPublication $case $fake -PlanOnly }) | Should -Match 'package_receipt_tampered'
+        $fake.Calls.Count | Should -Be 0
+    }
+
     It 'rejects missing or extra public assets before external commands' -TestCases @(
         @{ Name = 'missing'; Mutate = { param($case) Remove-Item (Join-Path $case.Output $script:SpdxName) } },
         @{ Name = 'extra'; Mutate = { param($case) Write-TestUtf8 (Join-Path $case.Output 'extra.bin') 'extra' } }
