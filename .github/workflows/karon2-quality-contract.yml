@@ -82,17 +82,17 @@ jobs:
         run: |
           python -m unittest discover -s tests/quality -p 'test_*.py'
           exit $LASTEXITCODE
-      - name: Prepare pinned FFmpeg test runtime
+      - name: Prepare pinned test-only FFmpeg fixture tools
         shell: pwsh
         run: |
-          $request = Get-Content -LiteralPath release/requests/v2.19.1-karon.2.json -Raw | ConvertFrom-Json
-          $matches = @($request.runtimeOverlays | Where-Object { $_.id -ceq 'ffmpeg' })
-          if ($matches.Count -ne 1) { throw 'CI FFmpeg overlay definition missing or ambiguous.' }
-          $ffmpeg = $matches[0]
-          $archive = Join-Path $env:RUNNER_TEMP $ffmpeg.archiveName
-          Invoke-WebRequest -Uri $ffmpeg.assetUrl -OutFile $archive
+          # Fixture generation only. Never copied into a candidate or release package.
+          # The sealed LGPL candidate runtime is validated separately, unchanged.
+          $archive = Join-Path $env:RUNNER_TEMP 'ffmpeg-9.0.2-essentials_build.zip'
+          $url = 'https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip'
+          $expectedSha = '60F467265B1E312373DBCD92200C2618A74850F98D3D078E94296BB3FA2047BA'
+          Invoke-WebRequest -Uri $url -OutFile $archive
           $actual = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToUpperInvariant()
-          if ($actual -cne ([string]$ffmpeg.archiveSha256).ToUpperInvariant()) {
+          if ($actual -cne $expectedSha) {
             throw "CI FFmpeg archive SHA-256 mismatch: $actual"
           }
           $root = Join-Path $env:RUNNER_TEMP 'karon2-ffmpeg'
@@ -100,6 +100,8 @@ jobs:
           $ffmpegExe = @(Get-ChildItem -LiteralPath $root -File -Filter ffmpeg.exe -Recurse)
           if ($ffmpegExe.Count -ne 1) { throw 'CI FFmpeg executable missing or ambiguous.' }
           $bin = $ffmpegExe[0].Directory.FullName
+          & $ffmpegExe[0].FullName -version
+          if ($LASTEXITCODE -ne 0) { throw 'CI fixture ffmpeg failed to execute.' }
           if (-not (Test-Path -LiteralPath (Join-Path $bin 'ffprobe.exe') -PathType Leaf)) {
             throw 'CI ffprobe executable missing.'
           }
@@ -108,7 +110,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          Install-Module Pester -RequiredVersion 4.10.1 -Force -Scope CurrentUser
+          Install-Module Pester -RequiredVersion 4.10.1 -Force -SkipPublisherCheck -Scope CurrentUser
           $env:TEMP = 'C:\karon2-contracts'
           $env:TMP = $env:TEMP
           New-Item -ItemType Directory -Path $env:TEMP -Force | Out-Null

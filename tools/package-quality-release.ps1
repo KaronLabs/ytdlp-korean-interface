@@ -876,13 +876,16 @@ function Get-KaronPackageApplicationProvenance {
         ':(exclude)tools/build-release-license-lock.ps1', ':(exclude)tools/package-quality-release.ps1',
         ':(exclude)tools/publish-quality-release.ps1', ':(exclude)tests/powershell/gui-release-waiver.Tests.ps1',
         ':(exclude)tests/powershell/release-license-lock.Tests.ps1', ':(exclude)tests/powershell/release-publication-contract.Tests.ps1',
-        ':(exclude).github/workflows/karon2-quality-contract.yml', ':(exclude).gitattributes',
+        ':(exclude).github/workflows/karon2-quality-contract.yml',
+        ':(exclude).github/workflows/release-factory-contract.yml', ':(exclude).gitattributes',
         ':(exclude)THIRD-PARTY-NOTICES.txt', ':(exclude)tools/collect-non-runtime-component-evidence.ps1',
         ':(exclude)tests/powershell/non-runtime-component-evidence.Tests.ps1',
         ':(exclude)tools/build-corresponding-sources.ps1', ':(exclude)tools/generate-release-spdx.ps1',
         ':(exclude)tools/generated-source-archive.psm1', ':(exclude)tests/powershell/generated-source-archive.Tests.ps1',
         ':(exclude)tools/quality-fixture.py', ':(exclude)tests/quality/test_quality_fixture.py',
-        ':(exclude)tools/run-karon2-powershell-contracts.ps1'
+        ':(exclude)tools/run-karon2-powershell-contracts.ps1',
+        ':(exclude)tests/powershell/gui-release-evidence-contract.Tests.ps1',
+        ':(exclude)tests/powershell/fixtures/should-throw-like.ps1'
     )
     $null = @(& git -C $RepositoryRoot diff --quiet --no-ext-diff --no-textconv $applicationSourceCommit $packaging -- @applicationPaths 2>&1)
     if ($LASTEXITCODE -eq 1) { throw 'package_application_source_delta_invalid' }

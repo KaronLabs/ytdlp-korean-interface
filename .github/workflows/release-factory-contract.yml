@@ -18,6 +18,8 @@ on:
       - 'tests/powershell/release-orchestrator.Tests.ps1'
       - 'tests/powershell/release-upstream-layout.Tests.ps1'
       - 'tests/powershell/release-publication-contract.Tests.ps1'
+      - 'tools/run-karon2-powershell-contracts.ps1'
+      - 'tests/powershell/fixtures/should-throw-like.ps1'
       - '.github/workflows/release-factory-contract.yml'
   pull_request:
     paths:
@@ -35,6 +37,8 @@ on:
       - 'tests/powershell/release-orchestrator.Tests.ps1'
       - 'tests/powershell/release-upstream-layout.Tests.ps1'
       - 'tests/powershell/release-publication-contract.Tests.ps1'
+      - 'tools/run-karon2-powershell-contracts.ps1'
+      - 'tests/powershell/fixtures/should-throw-like.ps1'
       - '.github/workflows/release-factory-contract.yml'
 
 permissions:
@@ -46,6 +50,9 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+      - name: Prepare pinned PowerShell test runner
+        shell: pwsh
+        run: Install-Module Pester -RequiredVersion 4.10.1 -Force -SkipPublisherCheck -Scope CurrentUser
       - name: Run release factory contract tests
         shell: powershell
         run: |
@@ -55,7 +62,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/powershell/release-upstream-layout.Tests.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          pwsh -NoProfile -File tests/powershell/release-publication-contract.Tests.ps1
+          $env:TEMP = 'C:\karon2-contracts'
+          $env:TMP = $env:TEMP
+          New-Item -ItemType Directory -Path $env:TEMP -Force | Out-Null
+          pwsh -NoProfile -File tools/run-karon2-powershell-contracts.ps1 -Path tests/powershell/release-publication-contract.Tests.ps1
           exit $LASTEXITCODE
       - name: Run pre-release repository contracts
         shell: powershell

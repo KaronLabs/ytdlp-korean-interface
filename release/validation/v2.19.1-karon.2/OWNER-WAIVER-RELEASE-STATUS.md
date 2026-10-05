@@ -75,3 +75,36 @@ validation result.
 The stable tag and public binary Release must remain absent until these
 non-waived gates pass. The tracked dependency template remains `NOT_VERIFIED`;
 it is not a verified final release lock.
+
+## CI dependency boundary
+
+The first exact-target quality CI run for
+`56f41ebbb95c15a56bf351ab407f0040acd3e349` failed when the historical BtbN
+runtime asset URL returned HTTP 404. Native policy and Python fixture unit
+steps passed; the PowerShell step was skipped, not passed.
+
+CI fixture-generation tools are therefore separately pinned to Gyan FFmpeg
+`9.0.2`, archive SHA-256
+`60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba`.
+They are test-only inputs and are never copied into the final candidate or
+distributed ZIP. The application still uses its exact sealed LGPL FFmpeg and
+ffprobe hashes. CI synthetic contracts do not replace the independent runtime
+tests of those sealed executables.
+
+The pinned Pester 4.10.1 runner correctly returned exit 1 for 31 failing waiver
+tests: their root-level initialization was incompatible with that invocation.
+Test setup compatibility must be repaired; these failures are not reported as
+an application failure or hidden behind a zero process exit.
+
+The subsequent bounded repair was independently tested with the pinned runner:
+31 waiver tests passed, zero failed, child exit 0. The shared error-pattern
+helper executed once and returned child exit 1 for an intentionally wrong
+message, and exit 0 for the matching message. The separate generated-source
+contract suite also passed all 47 tests with Pester 4.10.1. These results do
+not approve the actual production source assembly.
+
+The previous Release factory CI run passed 116 publication tests and failed
+one error-stage expectation: same-length root-notice substitution was still
+rejected, but by `package_sources_entry_hash_mismatch` after root notices became
+an allowed release-metadata delta. The expectation was aligned to that exact
+observed rejection; accepting substituted notices remains forbidden.
