@@ -882,8 +882,10 @@ function Get-KaronPackageApplicationProvenance {
         ':(exclude)tests/powershell/non-runtime-component-evidence.Tests.ps1',
         ':(exclude)tools/build-corresponding-sources.ps1', ':(exclude)tools/generate-release-spdx.ps1',
         ':(exclude)tools/generated-source-archive.psm1', ':(exclude)tests/powershell/generated-source-archive.Tests.ps1',
+        ':(exclude)tools/release-license-producer-adapter.psm1', ':(exclude)tests/powershell/release-license-lock-production.Tests.ps1',
         ':(exclude)tools/quality-fixture.py', ':(exclude)tests/quality/test_quality_fixture.py',
         ':(exclude)tests/contract/test_recovery_contract.py',
+        ':(exclude)tests/powershell/build-sevenzip-no-rar.Tests.ps1',
         ':(exclude)tools/run-karon2-powershell-contracts.ps1',
         ':(exclude)tests/powershell/gui-release-evidence-contract.Tests.ps1',
         ':(exclude)tests/powershell/fixtures/should-throw-like.ps1'

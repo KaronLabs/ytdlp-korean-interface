@@ -21,6 +21,7 @@ on:
       - 'tools/build-corresponding-sources.ps1'
       - 'tools/generate-release-spdx.ps1'
       - 'tools/generated-source-archive.psm1'
+      - 'tools/release-license-producer-adapter.psm1'
       - 'tools/run-karon2-powershell-contracts.ps1'
       - '.gitattributes'
       - 'tools/package-quality-release.ps1'
@@ -50,6 +51,7 @@ on:
       - 'tools/build-corresponding-sources.ps1'
       - 'tools/generate-release-spdx.ps1'
       - 'tools/generated-source-archive.psm1'
+      - 'tools/release-license-producer-adapter.psm1'
       - 'tools/run-karon2-powershell-contracts.ps1'
       - '.gitattributes'
       - 'tools/package-quality-release.ps1'
@@ -114,7 +116,7 @@ jobs:
           $env:TEMP = 'C:\karon2-contracts'
           $env:TMP = $env:TEMP
           New-Item -ItemType Directory -Path $env:TEMP -Force | Out-Null
-          foreach ($test in @('gui-release-evidence-contract.Tests.ps1', 'gui-release-waiver.Tests.ps1', 'release-license-lock.Tests.ps1', 'release-publication-contract.Tests.ps1', 'non-runtime-component-evidence.Tests.ps1', 'generated-source-archive.Tests.ps1')) {
+          foreach ($test in @('gui-release-evidence-contract.Tests.ps1', 'gui-release-waiver.Tests.ps1', 'release-license-lock.Tests.ps1', 'release-license-lock-production.Tests.ps1', 'release-publication-contract.Tests.ps1', 'non-runtime-component-evidence.Tests.ps1', 'generated-source-archive.Tests.ps1')) {
             pwsh -NoProfile -File tools/run-karon2-powershell-contracts.ps1 -Path (Join-Path tests/powershell $test)
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
