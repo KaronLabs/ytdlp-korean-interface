@@ -1,6 +1,7 @@
 name: Release factory contract
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -11,6 +12,7 @@ on:
       - 'release/notes/v2.19.1-karon.1.md'
       - '.github/workflows/release-v2.19.1-karon.1.yml'
       - 'tests/run_contract_tests.py'
+      - 'tests/contract/**'
       - 'tests/run_powershell_tests.ps1'
       - 'tests/run_ci_powershell_tests.ps1'
       - 'tests/powershell/deploy-ssh-main-security.Tests.ps1'
@@ -30,6 +32,7 @@ on:
       - 'release/notes/v2.19.1-karon.1.md'
       - '.github/workflows/release-v2.19.1-karon.1.yml'
       - 'tests/run_contract_tests.py'
+      - 'tests/contract/**'
       - 'tests/run_powershell_tests.ps1'
       - 'tests/run_ci_powershell_tests.ps1'
       - 'tests/powershell/deploy-ssh-main-security.Tests.ps1'
