@@ -30,6 +30,14 @@ FORBIDDEN_ARTIFACT_COMPONENTS = {
     "dependencies",
 }
 FORBIDDEN_ARTIFACT_EXTENSIONS = {".dll", ".exe", ".exp", ".idb", ".ilk", ".lib", ".obj", ".pdb"}
+# The old format button's catalog entry is retained; its active replacement is explicit.
+RETIRED_CATALOG_KEYS = {"formats.use_default": "quality.automatic"}
+ALLOWED_RELEASE_METADATA = {
+    "release/dependencies/v2.19.1-karon.2.lock.json",
+    "release/licenses/v2.19.1-karon.2/bit7z/LICENSE.txt",
+    "release/licenses/v2.19.1-karon.2/libpng/LICENSE.txt",
+    "release/licenses/v2.19.1-karon.2/nana/LICENSE.txt",
+}
 
 
 def recovered_catalog_path():
@@ -200,30 +208,42 @@ def i18n_tr_calls(text):
         index += 1
 
 
-def direct_i18n_calls():
-    direct_call = re.compile(
+def direct_i18n_arguments(arguments):
+    if arguments is None:
+        return None
+    match = re.fullmatch(
         r"\s*(?P<key>" + STRING_LITERAL + r")\s*,\s*"
-        r"(?P<fallback>" + STRING_LITERAL + r")\s*",
+        r"(?P<fallback>(?:" + STRING_LITERAL + r"\s*)+)",
+        arguments,
         re.DOTALL,
     )
+    if not match:
+        return None
+    return (
+        json.loads(match.group("key")),
+        "".join(json.loads(literal) for literal in re.findall(STRING_LITERAL, match.group("fallback"))),
+    )
+
+
+def direct_i18n_calls(texts=None):
     calls = {}
     failures = []
-    for path, text in source_texts().items():
+    for path, text in (source_texts() if texts is None else texts).items():
         for offset, arguments in i18n_tr_calls(text):
             location = f"{path.relative_to(REPOSITORY_ROOT)}:{text.count(chr(10), 0, offset) + 1}"
             if arguments is None:
                 failures.append(f"{location}: unclosed i18n::tr()")
                 continue
-            match = direct_call.fullmatch(arguments)
-            if not match:
-                failures.append(f"{location}: i18n::tr() must have two direct string literals")
+            parsed = direct_i18n_arguments(arguments)
+            if parsed is None:
+                failures.append(f"{location}: i18n::tr() must have a literal key and literal English fallback")
                 continue
-            key = json.loads(match.group("key"))
-            fallback = json.loads(match.group("fallback"))
-            if not fallback:
+            key, fallback = parsed
+            if not fallback.strip():
                 failures.append(f"{location}: {key}: empty English fallback")
             if key in calls:
-                failures.append(f"{location}: duplicate key {key} (first at {calls[key][1]})")
+                if calls[key][0] != fallback:
+                    failures.append(f"{location}: conflicting English fallback for {key} (first at {calls[key][1]})")
             else:
                 calls[key] = (fallback, location)
 
@@ -260,6 +280,8 @@ def valid_nana_markup(value):
 
 
 def is_tracked_runtime_artifact(path):
+    if path in ALLOWED_RELEASE_METADATA:
+        return False
     parts = PurePosixPath(path).parts
     return (
         bool(parts)
@@ -380,9 +402,9 @@ class RecoveryContractTests(unittest.TestCase):
             with self.subTest(declaration=declaration):
                 self.assertRegex(header, declaration)
 
-    def test_recovered_catalog_has_524_nonempty_string_entries(self):
+    def test_recovered_catalog_has_576_nonempty_string_entries(self):
         strings = recovered_strings()
-        self.assertEqual(524, len(strings))
+        self.assertEqual(576, len(strings))
         self.assertTrue(all(isinstance(value, str) and value for value in strings.values()))
 
     def test_every_catalog_key_has_a_source_reference(self):
@@ -390,7 +412,7 @@ class RecoveryContractTests(unittest.TestCase):
         missing = [
             key
             for key in recovered_strings()
-            if key not in referenced
+            if key not in referenced and key not in RETIRED_CATALOG_KEYS
         ]
         self.assertEqual([], missing, f"catalog keys have no tr() source references: {missing}")
 
@@ -398,10 +420,10 @@ class RecoveryContractTests(unittest.TestCase):
         catalog = recovered_strings()
         calls, failures = direct_i18n_calls()
         self.assertEqual([], failures)
-        self.assertEqual(524, len(catalog))
-        self.assertEqual(524, len(calls))
-        self.assertEqual(set(catalog), set(calls))
-        for key in sorted(catalog):
+        self.assertEqual(576, len(catalog))
+        self.assertEqual(575, len(calls))
+        self.assertEqual(set(catalog) - set(RETIRED_CATALOG_KEYS), set(calls))
+        for key in sorted(calls):
             fallback, location = calls[key]
             with self.subTest(key=key, location=location):
                 self.assertTrue(fallback)
@@ -409,11 +431,6 @@ class RecoveryContractTests(unittest.TestCase):
                 self.assertTrue(valid_nana_markup(catalog[key]))
 
     def test_every_tr_call_has_a_nonempty_english_fallback(self):
-        direct_call = re.compile(
-            r"\s*(?P<key>" + STRING_LITERAL + r")\s*,\s*"
-            r"(?P<fallback>" + STRING_LITERAL + r")\s*",
-            re.DOTALL,
-        )
         sample = (
             '// i18n::tr("comment.key", "Comment")\n'
             '/* i18n::tr("block.key", "Block") */\n'
@@ -431,19 +448,89 @@ class RecoveryContractTests(unittest.TestCase):
             calls[0],
         )
         self.assertEqual(2, len(calls))
-        self.assertIsNotNone(direct_call.fullmatch(calls[1]))
+        self.assertIsNotNone(direct_i18n_arguments(calls[1]))
         for path, text in source_texts().items():
             for offset, arguments in i18n_tr_calls(text):
                 location = f"{path.relative_to(REPOSITORY_ROOT)}:{text.count(chr(10), 0, offset) + 1}"
                 with self.subTest(location=location):
                     self.assertIsNotNone(arguments, "i18n::tr() has no closing parenthesis")
-                    match = direct_call.fullmatch(arguments)
+                    parsed = direct_i18n_arguments(arguments)
                     self.assertIsNotNone(
-                        match,
-                        "i18n::tr() must have exactly two direct string literal arguments",
+                        parsed,
+                        "i18n::tr() must have a literal key and literal English fallback",
                     )
-                    fallback = match.group("fallback")[1:-1]
+                    _, fallback = parsed
                     self.assertTrue(fallback.strip(), "i18n::tr() fallback must not be empty")
+
+    def test_i18n_fallback_accepts_adjacent_literals_without_accepting_expressions(self):
+        self.assertEqual(
+            ("about.source_details_body", "First line\nSecond line"),
+            direct_i18n_arguments('"about.source_details_body", "First line\\n"\n "Second line"'),
+        )
+        for arguments in (
+            None,
+            'key, "English"',
+            '"key", english_fallback',
+            '"key", "English" + dynamic_value',
+            '"key", std::string("English")',
+            '"key", "English", "third argument"',
+        ):
+            with self.subTest(arguments=arguments):
+                self.assertIsNone(direct_i18n_arguments(arguments))
+
+    def test_i18n_reused_keys_require_identical_english_fallbacks(self):
+        fixture_path = SOURCE_ROOT / "scanner-fixture.cpp"
+        calls, failures = direct_i18n_calls({
+            fixture_path: 'i18n::tr("quality.boundary", "Same fallback");\n'
+            'i18n::tr("quality.boundary", "Same " "fallback");\n',
+        })
+        self.assertEqual([], failures)
+        self.assertEqual("Same fallback", calls["quality.boundary"][0])
+
+        calls, failures = direct_i18n_calls({
+            fixture_path: 'i18n::tr("quality.boundary", "First fallback");\n'
+            'i18n::tr("quality.boundary", "Different fallback");\n',
+        })
+        self.assertEqual("First fallback", calls["quality.boundary"][0])
+        self.assertEqual(1, len(failures))
+        self.assertIn("conflicting English fallback for quality.boundary", failures[0])
+
+    def test_i18n_whitespace_only_fallback_is_rejected(self):
+        _, failures = direct_i18n_calls({
+            SOURCE_ROOT / "scanner-fixture.cpp": 'i18n::tr("empty.key", " " "\\t");',
+        })
+        self.assertEqual(1, len(failures))
+        self.assertIn("empty English fallback", failures[0])
+
+    def test_retired_catalog_keys_have_explicit_active_replacements(self):
+        catalog = recovered_strings()
+        calls, failures = direct_i18n_calls()
+        self.assertEqual([], failures)
+        for retired, replacement in RETIRED_CATALOG_KEYS.items():
+            with self.subTest(retired=retired):
+                self.assertIn(retired, catalog)
+                self.assertNotIn(retired, calls)
+                self.assertIn(replacement, calls)
+
+    def test_release_metadata_exceptions_do_not_allow_runtime_artifacts(self):
+        for metadata in (
+            "release/dependencies/v2.19.1-karon.2.lock.json",
+            "release/licenses/v2.19.1-karon.2/bit7z/LICENSE.txt",
+            "release/licenses/v2.19.1-karon.2/libpng/LICENSE.txt",
+            "release/licenses/v2.19.1-karon.2/nana/LICENSE.txt",
+        ):
+            with self.subTest(metadata=metadata):
+                self.assertFalse(is_tracked_runtime_artifact(metadata))
+        for artifact in (
+            "dependencies/unapproved.json",
+            "release/dependencies/v2.19.1-karon.2/ffmpeg.exe",
+            "release/licenses/v2.19.1-karon.2/bit7z/LICENSE.exe",
+            "release/licenses/v2.19.1-karon.2/nana/build/output.lib",
+            "release/licenses/v2.19.1-karon.2/libpng/other.txt",
+            "nested/release/licenses/v2.19.1-karon.2/bit7z/LICENSE.txt",
+        ):
+            with self.subTest(artifact=artifact):
+                self.assertTrue(is_tracked_runtime_artifact(artifact))
 
     def test_i18n_tr_calls_ignores_backslash_newline_line_comments(self):
         sample = (
