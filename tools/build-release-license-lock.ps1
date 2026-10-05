@@ -39,6 +39,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 Import-Module (Join-Path $PSScriptRoot 'gui-release-waiver.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'release-license-producer-adapter.psm1') -Force
 $guiRoute = Assert-KaronGuiValidationInputs -GuiValidationWaiverPath $GuiValidationWaiverPath -GuiValidationSummaryPath $GuiValidationSummaryPath -GuiValidationEvidenceManifestPath $GuiValidationEvidenceManifestPath -GuiValidationSchemaPath $GuiValidationSchemaPath -BoundParameters $PSBoundParameters -RequireSchema
 if ($AssemblyOnly) {
     if ($PSBoundParameters.ContainsKey('CorrespondingSourcesPath') -or $PSBoundParameters.ContainsKey('SpdxPath')) { throw 'release_license_lock_assembly_artifacts_forbidden' }
@@ -194,6 +195,21 @@ function Read-StrictJson {
         if ($_.Exception.Message -match '^release_license_lock_') { throw }
         throw 'release_license_lock_json_invalid'
     }
+}
+
+function Read-StrictZipJson {
+    param([string] $Path, [string] $EntryPath)
+    $archive = [IO.Compression.ZipFile]::OpenRead($Path)
+    try {
+        $entries = @($archive.Entries | Where-Object { $_.FullName -ceq $EntryPath })
+        if ($entries.Count -ne 1 -or $entries[0].Length -le 0 -or $entries[0].Length -gt 16MB) { throw 'release_license_lock_archive_invalid' }
+        $reader = [IO.StreamReader]::new($entries[0].Open(), $script:Utf8Strict, $false)
+        try { $text = $reader.ReadToEnd() } finally { $reader.Dispose() }
+        $document = [Text.Json.JsonDocument]::Parse($text)
+        try { Assert-NoDuplicateJsonProperties $document.RootElement } finally { $document.Dispose() }
+        $text | ConvertFrom-Json -Depth 100
+    }
+    finally { $archive.Dispose() }
 }
 
 function Get-ObjectProperties {
@@ -423,6 +439,7 @@ function Assert-LockCandidateFiles {
 
 function Assert-NoticeAndSourceArchives {
     param([object[]] $Components, [string] $SourceRoot, [string] $ArchiveRoot)
+    $application = Get-UniqueById $Components 'application' 'release_license_lock_nonruntime_binding_mismatch'
     foreach ($component in $Components) {
         $commit = [string](Get-ExactProperty $component 'sourceCommit')
         if ($commit -notmatch $script:CommitPattern) { throw 'release_license_lock_component_invalid' }
@@ -433,10 +450,7 @@ function Assert-NoticeAndSourceArchives {
         foreach ($archive in @(Get-ExactProperty $component 'sourceArchives')) {
             $fileName = Assert-RelativePath ([string](Get-ExactProperty $archive 'fileName'))
             if ($fileName.Contains('/')) { throw 'release_license_lock_path_invalid' }
-            if ([string](Get-ExactProperty $archive 'commit') -cne $commit -or
-                -not ([string](Get-ExactProperty $archive 'url')).EndsWith('/' + $commit + '.zip', [StringComparison]::Ordinal)) {
-                throw 'release_license_lock_source_archive_mismatch'
-            }
+            Assert-KaronSourceArchiveMetadata $archive $component $application $candidate.Commit
             $path = Get-ContainedPath $ArchiveRoot $fileName
             [void](Assert-FileIdentity $path (Get-ExactProperty $archive 'sha256') (Get-ExactProperty $archive 'length') 'release_license_lock_source_archive_mismatch')
         }
@@ -463,6 +477,19 @@ function Assert-NonRuntimeContract {
         [string](Get-ExactProperty $Inventory 'schemaVersion') -cne 'karon-source-cache-inventory/v1') { throw 'release_license_lock_schema_unsupported' }
     Assert-EvidenceClean $Manifest
     Assert-EvidenceClean $Inventory
+    if (Test-KaronNonRuntimeProducer $Manifest) {
+        $cacheRecords = @{}
+        foreach ($artifact in @(Get-ExactProperty $Inventory 'artifacts')) {
+            $leaf = Assert-RelativePath ([string](Get-ExactProperty $artifact 'fileName'))
+            if ($leaf.Contains('/') -or $cacheRecords.ContainsKey($leaf)) { throw 'release_license_lock_nonruntime_binding_mismatch' }
+            $cacheRecords[$leaf] = Get-FileRecord (Get-ContainedPath $SourceArchiveRoot $leaf)
+        }
+        return Assert-KaronNonRuntimeProducer -Manifest $Manifest -Inventory $Inventory -Components $LockComponents `
+            -CandidateManifest $candidate.Manifest -CandidateRecords $CandidateRecords `
+            -ManifestRecord (Get-FileRecord $ManifestPath) -InventoryRecord (Get-FileRecord $InventoryPath) `
+            -CandidateManifestRecord (Get-FileRecord $CandidateManifestPath) -BundleRecord (Get-FileRecord $BundlePath) `
+            -BundleInventory (Get-ZipInventory $BundlePath) -SourceCacheRecords $cacheRecords
+    }
     if ([string](Get-ExactProperty $Manifest 'release') -cne $script:ReleaseTag -or
         [string](Get-ExactProperty $Inventory 'release') -cne $script:ReleaseTag -or
         [string](Get-ExactProperty $Inventory 'scope') -cne 'non-ffmpeg-non-deno' -or
@@ -541,7 +568,8 @@ function Assert-SevenZipBaseContract {
     param([object] $NonRuntimeManifest, [object] $Verification, [Collections.Generic.Dictionary[string, object]] $CandidateRecords)
     Assert-EvidenceClean $Verification
     $task5 = Get-ExactProperty (Get-ExactProperty $NonRuntimeManifest 'sharedInputs') 'sevenZipTask5'
-    foreach ($name in @('excludedObjects', 'sourceExclusions', 'requiredObjects')) {
+    $policyFields = if (Test-KaronNonRuntimeProducer $NonRuntimeManifest) { @('requiredObjects', 'forbiddenSourcePattern') } else { @('excludedObjects', 'sourceExclusions', 'requiredObjects') }
+    foreach ($name in $policyFields) {
         if (@(Get-ExactProperty $task5 $name).Count -eq 0) { throw 'release_license_lock_sevenzip_policy_invalid' }
     }
     if ([string](Get-ExactProperty $task5 'forbiddenPattern') -notmatch '(?i)rar') { throw 'release_license_lock_sevenzip_policy_invalid' }
@@ -550,10 +578,10 @@ function Assert-SevenZipBaseContract {
     $verificationRecord = Assert-FileIdentity $SevenZipVerificationPath (Get-ExactProperty $task5 'verificationSha256') (Get-ExactProperty $task5 'verificationLength') 'release_license_lock_sevenzip_binding_mismatch'
     if (-not $CandidateRecords.ContainsKey('7z.dll')) { throw 'release_license_lock_sevenzip_binding_mismatch' }
     $dll = $CandidateRecords['7z.dll']
-    if ([string](Get-ExactProperty $task5 'dllSha256') -cne $dll.sha256 -or [long](Get-ExactProperty $task5 'dllLength') -ne $dll.length -or
-        [string](Get-ExactProperty $Verification 'runtimeArchiveSha256') -cne $runtime.sha256 -or
-        [string](Get-ExactProperty $Verification 'correspondingSourceArchiveSha256') -cne $source.sha256 -or
-        [string](Get-ExactProperty $Verification 'dllSha256') -cne $dll.sha256) { throw 'release_license_lock_sevenzip_binding_mismatch' }
+    if ([string](Get-ExactProperty $task5 'dllSha256') -ine $dll.sha256 -or [long](Get-ExactProperty $task5 'dllLength') -ne $dll.length -or
+        [string](Get-ExactProperty $Verification 'runtimeArchiveSha256') -ine $runtime.sha256 -or
+        [string](Get-ExactProperty $Verification 'correspondingSourceArchiveSha256') -ine $source.sha256 -or
+        [string](Get-ExactProperty $Verification 'dllSha256') -ine $dll.sha256) { throw 'release_license_lock_sevenzip_binding_mismatch' }
     $exitCodes = New-Object Collections.Generic.List[long]
     function Add-SevenZipExitCodes([object] $Value) {
         if ($null -eq $Value -or $Value -is [string]) { return }
@@ -584,7 +612,10 @@ function Assert-DenoBaseContract {
     if ([string](Get-ExactProperty $identity 'version') -cne [string](Get-ExactProperty $LockComponent 'version') -or
         [string](Get-ExactProperty $identity 'sha256') -cne $CandidateRecords['deno.exe'].sha256) { throw 'release_license_lock_deno_artifact_mismatch' }
     $native = Get-ExactProperty $ComponentManifest 'nativeGitTreeEvidence'
-    if ([string](Get-ExactProperty $native 'commit') -cne [string](Get-ExactProperty $LockComponent 'sourceCommit') -or
+    $denoArchive = Get-UniqueSourceArchive $LockComponent 'release_license_lock_deno_artifact_mismatch'
+    $generatedDeno = (Test-ExactProperty $denoArchive 'artifactType') -and ([string](Get-ExactProperty $denoArchive 'artifactType') -ceq 'generated-source-closure')
+    if ([string](Get-ExactProperty $native 'commit') -notmatch $script:CommitPattern -or
+        (-not $generatedDeno -and [string](Get-ExactProperty $native 'commit') -cne [string](Get-ExactProperty $LockComponent 'sourceCommit')) -or
         [string](Get-ExactProperty $native 'tree') -notmatch $script:CommitPattern) { throw 'release_license_lock_deno_closure_invalid' }
 
     $digest = Get-ExactProperty $Inventory 'canonicalTreeDigest'
@@ -621,6 +652,7 @@ function Assert-DenoBaseContract {
     foreach ($file in $files) {
         [void](Assert-ZipRecord $zip ([string](Get-ExactProperty $file 'path')) (Get-ExactProperty $file 'sha256') (Get-ExactProperty $file 'length') 'release_license_lock_deno_artifact_mismatch')
     }
+    if ($generatedDeno) { [void](Assert-KaronDenoRootSource $LockComponent $zip) }
     $noticesRecord = Get-FileRecord $DenoNoticesPath
     [void](Assert-ZipRecord $zip 'THIRD-PARTY-NOTICES.txt' $noticesRecord.sha256 $noticesRecord.length 'release_license_lock_deno_artifact_mismatch')
     $archive = Get-UniqueSourceArchive $LockComponent 'release_license_lock_deno_artifact_mismatch'
@@ -634,6 +666,7 @@ function Assert-DenoBaseContract {
         sourceInventory = Get-FileRecord $DenoSourceInventoryPath
         notices = $noticesRecord
         sourcesArchive = $sourceRecord
+        nativeGitTreeEvidence = $native
     }
 }
 
@@ -1079,6 +1112,8 @@ function Assert-DenoContract {
         componentPass = $true
         overallReleasePassObserved = $false
         collectorSourceCommit = $DenoCollectorSourceCommit
+        sourcesArchive = $baseEvidence.sourcesArchive
+        nativeGitTreeEvidence = $baseEvidence.nativeGitTreeEvidence
         evidence = [pscustomobject][ordered]@{
             runEvidence = [pscustomobject][ordered]@{
                 fileName = $runRecord.fileName
@@ -1229,7 +1264,7 @@ function Assert-SevenZipContract {
     $innerSha256 = $rawSnapshot.sha256
 
     $result = [ordered]@{}
-    foreach ($property in $baseEvidence.PSObject.Properties) {
+    foreach ($property in Get-ObjectProperties $baseEvidence) {
         $result[$property.Name] = $property.Value
     }
     $result['rawSourceArchive'] = [pscustomobject][ordered]@{
@@ -1270,19 +1305,28 @@ function Assert-FfmpegContract {
     }
     if ([string](Get-ExactProperty $binary 'ffmpegCommit') -cne [string](Get-ExactProperty $LockComponent 'sourceCommit') -or
         -not $CandidateRecords.ContainsKey('ffmpeg.exe') -or -not $CandidateRecords.ContainsKey('ffprobe.exe') -or
-        [string](Get-ExactProperty $binary 'ffmpegSha256') -cne $CandidateRecords['ffmpeg.exe'].sha256 -or
-        [string](Get-ExactProperty $binary 'ffprobeSha256') -cne $CandidateRecords['ffprobe.exe'].sha256) { throw 'release_license_lock_ffmpeg_binary_mismatch' }
+        [string](Get-ExactProperty $binary 'ffmpegSha256') -ine $CandidateRecords['ffmpeg.exe'].sha256 -or
+        [string](Get-ExactProperty $binary 'ffprobeSha256') -ine $CandidateRecords['ffprobe.exe'].sha256) { throw 'release_license_lock_ffmpeg_binary_mismatch' }
     $sourceArchive = Get-UniqueSourceArchive $LockComponent 'release_license_lock_source_archive_mismatch'
     $sourceRecord = Assert-FileIdentity $FfmpegSourcesArchivePath (Get-ExactProperty $sourceArchive 'sha256') (Get-ExactProperty $sourceArchive 'length') 'release_license_lock_source_archive_mismatch'
     $zip = Get-ZipInventory $FfmpegSourcesArchivePath -CaptureBuildConfiguration
     $included = @(Get-ExactProperty $Manifest 'includedPaths')
-    if ($included.Count -ne $zip.Count -or $included -cnotcontains 'buildconf.txt' -or $included -cnotcontains 'NOTICE.md') { throw 'release_license_lock_ffmpeg_closure_invalid' }
-    foreach ($path in $included) { if (-not $zip.ContainsKey((Assert-RelativePath ([string]$path)))) { throw 'release_license_lock_ffmpeg_closure_invalid' } }
+    $generatedFfmpeg = (Test-ExactProperty $sourceArchive 'artifactType') -and ([string](Get-ExactProperty $sourceArchive 'artifactType') -ceq 'generated-source-closure')
+    if ($generatedFfmpeg) {
+        $fullInventory = Read-StrictZipJson $FfmpegSourcesArchivePath 'inventory.json'
+        Assert-EvidenceClean $fullInventory
+        Assert-KaronFfmpegInventory $fullInventory $Manifest $zip
+    }
+    else {
+        if ($included.Count -ne $zip.Count -or $included -cnotcontains 'buildconf.txt' -or $included -cnotcontains 'NOTICE.md') { throw 'release_license_lock_ffmpeg_closure_invalid' }
+        foreach ($path in $included) { if (-not $zip.ContainsKey((Assert-RelativePath ([string]$path)))) { throw 'release_license_lock_ffmpeg_closure_invalid' } }
+    }
     $buildConfiguration = [string]$zip['buildconf.txt'].text
-    if ($buildConfiguration -match '(?im)^\s*--enable-(?:gpl|nonfree)(?:\s|$)') { throw 'release_license_lock_ffmpeg_policy_invalid' }
+    if ($buildConfiguration -match '(?im)(?:^|\s)--enable-(?:gpl|nonfree)(?:\s|$)') { throw 'release_license_lock_ffmpeg_policy_invalid' }
     [ordered]@{
         closureStatus = 'complete'; closurePolicy = 'verified-conservative-superset'; verifiedSourceRecordCount = $verifiedCount
         manifest = Get-FileRecord $FfmpegClosureManifestPath; sourcesArchive = $sourceRecord
+        fullSourceInventory = $(if ($generatedFfmpeg) { $zip['inventory.json'] } else { $null })
         ffmpeg = $CandidateRecords['ffmpeg.exe']; ffprobe = $CandidateRecords['ffprobe.exe']
     }
 }
@@ -1408,7 +1452,17 @@ Assert-NoticeAndSourceArchives $components $sourceRoot $SourceArchiveDirectory
 $nonRuntimeManifest = Read-StrictJson $NonRuntimeManifestPath
 $nonRuntimeInventory = Read-StrictJson $NonRuntimeInventoryPath
 $sevenZipVerification = Read-StrictJson $SevenZipVerificationPath
-Assert-NonRuntimeContract $nonRuntimeManifest $nonRuntimeInventory $components $candidate.Records $candidate.Commit $SourceArchiveDirectory $NonRuntimeEvidenceBundlePath $NonRuntimeManifestPath $NonRuntimeInventoryPath $candidate.ManifestPath $SevenZipRuntimeArchivePath $SevenZipSourceArchivePath $SevenZipVerificationPath
+$nonRuntimeProof = Assert-NonRuntimeContract $nonRuntimeManifest $nonRuntimeInventory $components $candidate.Records $candidate.Commit $SourceArchiveDirectory $NonRuntimeEvidenceBundlePath $NonRuntimeManifestPath $NonRuntimeInventoryPath $candidate.ManifestPath $SevenZipRuntimeArchivePath $SevenZipSourceArchivePath $SevenZipVerificationPath
+if (Test-KaronNonRuntimeProducer $nonRuntimeManifest) {
+    $applicationArchives = @(Get-ExactProperty $applicationComponent 'sourceArchives')
+    $applicationClosures = @($applicationArchives | Where-Object { (Test-ExactProperty $_ 'artifactType') -and ([string](Get-ExactProperty $_ 'artifactType') -ceq 'generated-source-closure') })
+    if ($applicationClosures.Count -ne 1) { throw 'release_license_lock_nonruntime_binding_mismatch' }
+    $applicationClosure = $applicationClosures[0]
+    $proof = $nonRuntimeProof.applicationSourceArchive
+    if ([string](Get-ExactProperty $applicationClosure 'fileName') -cne $proof.fileName) { throw 'release_license_lock_nonruntime_binding_mismatch' }
+    [void](Assert-FileIdentity (Get-ContainedPath $SourceArchiveDirectory $proof.fileName) $proof.sha256 $proof.length 'release_license_lock_nonruntime_binding_mismatch')
+    if ([string](Get-ExactProperty $applicationClosure 'sha256') -ine $proof.sha256 -or [long](Get-ExactProperty $applicationClosure 'length') -ne $proof.length) { throw 'release_license_lock_nonruntime_binding_mismatch' }
+}
 $sevenZipEvidence = Assert-SevenZipContract $nonRuntimeManifest $sevenZipVerification $candidate.Records $components $SourceArchiveDirectory
 
 $denoManifest = Read-StrictJson $DenoComponentManifestPath
@@ -1469,6 +1523,11 @@ $integrationEvidence = [ordered]@{
     ffmpeg = $ffmpegEvidence
     sevenZip = $sevenZipEvidence
     gui = $guiEvidence
+}
+if ($null -ne $nonRuntimeProof) {
+    foreach ($property in Get-ObjectProperties $nonRuntimeProof) {
+        $integrationEvidence.nonRuntime[$property.Name] = $property.Value
+    }
 }
 if (-not $AssemblyOnly) { Set-ExactProperty $release 'receiptInputs' $receiptInputs }
 Set-ExactProperty $release 'integrationEvidence' $integrationEvidence

@@ -1,3 +1,4 @@
+#requires -Version 7.4
 . (Join-Path $PSScriptRoot 'fixtures\should-throw-like.ps1')
 
 $ErrorActionPreference = 'Stop'
@@ -101,7 +102,7 @@ function New-TestComponent {
         sourceArchives = @([ordered]@{
             fileName = $record.fileName
             commit = $Commit
-            url = 'https://example.test/archive/' + $Commit + '.zip'
+            url = 'https://example.test/' + $Id + '/archive/' + $Commit + '.zip'
             length = $record.length
             sha256 = $record.sha256
             verificationStatus = 'NOT_VERIFIED'
@@ -407,7 +408,7 @@ function New-TestFixture {
         schemaVersion = 'karon-license-lock/v2'
         release = [ordered]@{
             tag = $script:Tag; platform = 'win-x64'; verificationStatus = 'NOT_VERIFIED'; blockers = @('stale-lock-is-not-authority')
-            metadataPackage = [ordered]@{ id = 'release-metadata'; name = 'Karon release metadata'; version = '2.19.1-karon.2'; licenseExpression = 'CC0-1.0'; licenseConcluded = 'CC0-1.0'; sourceCommit = $applicationCommit; downloadLocation = ('https://example.test/archive/' + $applicationCommit + '.zip') }
+            metadataPackage = [ordered]@{ id = 'release-metadata'; name = 'Karon release metadata'; version = '2.19.1-karon.2'; licenseExpression = 'CC0-1.0'; licenseConcluded = 'CC0-1.0'; sourceCommit = $applicationCommit; downloadLocation = ('https://example.test/application/archive/' + $applicationCommit + '.zip') }
             candidateFiles = $lockCandidateFiles
         }
         components = $components
@@ -697,6 +698,7 @@ function New-SwapInstrumentedBuilder {
     )
     [IO.File]::WriteAllText($instrumented, $rewritten, [Text.UTF8Encoding]::new($false))
     Copy-Item -LiteralPath (Join-Path (Split-Path -Parent ([string]$builderVariable.Value)) 'gui-release-waiver.psm1') -Destination (Join-Path $OutputDirectory 'gui-release-waiver.psm1') -Force
+    Copy-Item -LiteralPath (Join-Path (Split-Path -Parent ([string]$builderVariable.Value)) 'release-license-producer-adapter.psm1') -Destination (Join-Path $OutputDirectory 'release-license-producer-adapter.psm1') -Force
 
     return [pscustomobject]@{
         BuilderVariableName = $builderVariable.Name
