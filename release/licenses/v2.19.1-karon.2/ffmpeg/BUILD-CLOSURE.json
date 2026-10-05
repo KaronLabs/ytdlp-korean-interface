@@ -1,23 +1,366 @@
 {
-  "verificationStatus": "NOT_VERIFIED",
-  "releaseTag": "autobuild-2026-09-15-13-18",
-  "asset": "ffmpeg-n9.0.1-30-g9258bacca5-win64-lgpl-9.0.zip",
-  "assetSha256": "39697d69681a09bd55a0f0224360a9a4285bc12127df807d7242592b0e144a7b",
-  "ffmpegCommit": "9258bacca50d7ca28bcb6d797e8952123e35105b",
-  "buildScriptsCommit": "3e6685eda92f9288c15ac320139622dcedca09a4",
-  "licenseExpression": "LGPL-3.0-or-later",
-  "enabledIntegrations": [
-    "iconv", "zlib", "libxml2", "libvmaf", "fontconfig", "libharfbuzz",
-    "libfreetype", "libfribidi", "vulkan", "libdav1d", "libvorbis",
-    "librav1e", "librsvg", "gmp", "lzma", "liblcevc-dec", "opencl",
-    "amf", "libaom", "chromaprint", "ffnvcodec", "cuda-llvm", "libgme",
-    "libkvazaar", "libaribb24", "libaribcaption", "libass", "libbluray",
-    "libjxl", "libmp3lame", "libopus", "libplacebo", "librist", "libssh",
-    "libtheora", "libvpx", "libwebp", "libzmq", "lv2", "libvpl", "openal",
-    "liboapv", "libopencore-amrnb", "libopencore-amrwb", "libopenh264",
-    "libopenjpeg", "libopenmpt", "schannel", "sdl2", "libsnappy", "libsoxr",
-    "libsrt", "libsvtav1", "libtwolame", "libuavs3d", "vaapi", "libvvenc",
-    "libzimg", "libzvbi"
+  "schemaVersion": 3,
+  "release": "v2.19.1-karon.2",
+  "closureStatus": "complete",
+  "binary": {
+    "repository": "BtbN/FFmpeg-Builds",
+    "releaseTag": "autobuild-2026-09-15-13-18",
+    "assetId": 565742558,
+    "archiveName": "ffmpeg-n9.0.1-30-g9258bacca5-win64-lgpl-9.0.zip",
+    "archiveSha256": "39697D69681A09BD55A0F0224360A9A4285BC12127DF807D7242592B0E144A7B",
+    "ffmpegSha256": "41482EABC1A33F9D1E4334CA32EC9259AA34A3EC2493FCC9F214BFE54301CE38",
+    "ffprobeSha256": "376F55EB141C3B0D8790B64967B8CBF1737D76BEBE0820189356C71CC884B395",
+    "expectedVersion": "n9.0.1-30-g9258bacca5",
+    "ffmpegCommit": "9258bacca50d7ca28bcb6d797e8952123e35105b",
+    "buildConfigurationPath": "buildconf.txt"
+  },
+  "provenance": {
+    "builderCommit": "3e6685eda92f9288c15ac320139622dcedca09a4",
+    "actionsRunId": 34967781095,
+    "actionsRunNumber": 3118,
+    "targetImageJobId": 104378764705,
+    "binaryBuildJobId": 104384912273,
+    "releaseId": 389161663,
+    "sourceCacheArtifactId": 10396032837,
+    "sourceCacheArtifactDigest": "sha256:89219a2bad8686b27a2b10907c290fe1ec87088e86869a0c6433d96c6a5832c8",
+    "sourceCacheArtifactSize": 2166872038,
+    "sourceCacheExpiresAt": "2026-09-29T12:15:12Z",
+    "sourceCacheInnerName": "cache.tar.gz",
+    "sourceCacheInnerSize": 2166213260,
+    "sourceCacheInnerSha256": "F5859AA90C962360FAA4593BFED1618D94C1190CEF720303D996693EEBA7B189",
+    "sourceCacheCanonicalArchiveCount": 122,
+    "targetBaseImage": "ghcr.io/btbn/ffmpeg-builds/base-win64@sha256:f0d05267fd9d4538c73926ebf50e7edfe962c361f487c6c8302469d6616963be",
+    "authenticatedTargetImageLogSha256": "FFB2BEC78A50C9DD9203F6EBD4C8EF916B9D8D8A9321E935811652C7F96339BC",
+    "authenticatedBinaryBuildLogSha256": "CAA811263C2165348FA337DC6377C4BDFEC61AC7E7D9838EDAF391EB539F5348",
+    "baseImageJobId": 104378132452,
+    "crosstoolCommit": "b1a94f65c5187d99037a4e2f57aefbdf995a9677",
+    "gccVersion": "16.2.0",
+    "libgompSource": "gcc-16.2.0/libgomp"
+  },
+  "sourceSets": {
+    "ffmpeg": {
+      "url": "https://codeload.github.com/FFmpeg/FFmpeg/zip/9258bacca50d7ca28bcb6d797e8952123e35105b",
+      "sha256": "5A486A7A20FDF673D0FE9314B41897725ABE34AA8BB63C5C440F2B017935644C",
+      "commit": "9258bacca50d7ca28bcb6d797e8952123e35105b",
+      "licenseExpression": "LGPL-3.0-or-later",
+      "licenseArchiveMemberPath": "FFmpeg-9258bacca50d7ca28bcb6d797e8952123e35105b/COPYING.LGPLv3"
+    },
+    "btbnScripts": {
+      "url": "https://codeload.github.com/BtbN/FFmpeg-Builds/zip/3e6685eda92f9288c15ac320139622dcedca09a4",
+      "sha256": "21BAACE73D2D9599DEDA5688247CC250DFA7E5D9557A06B12C69C8175618AB92",
+      "commit": "3e6685eda92f9288c15ac320139622dcedca09a4",
+      "licenseExpression": "MIT",
+      "licenseArchiveMemberPath": "FFmpeg-Builds-3e6685eda92f9288c15ac320139622dcedca09a4/LICENSE"
+    },
+    "spdxLicenseList": {
+      "url": "https://codeload.github.com/spdx/license-list-data/zip/16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee",
+      "sha256": "5126769C9539855DA1DC4DBFDF0CD7B8DD0C97421919178FAAEFDB9EDA5D3A42",
+      "commit": "16f3aa6c3bdd62e50f8b1cf618f32d2a510250ee",
+      "licenseExpression": "CC0-1.0",
+      "licenseTextPath": "licenses/spdx/CC0-1.0.txt"
+    },
+    "btbnActionsCache": {
+      "artifactUrl": "https://api.github.com/repos/BtbN/FFmpeg-Builds/actions/artifacts/10396032837/zip",
+      "artifactDigest": "sha256:89219a2bad8686b27a2b10907c290fe1ec87088e86869a0c6433d96c6a5832c8",
+      "innerTarGzSha256": "F5859AA90C962360FAA4593BFED1618D94C1190CEF720303D996693EEBA7B189",
+      "componentGraphPath": "component-graph.json",
+      "componentCount": 122
+    },
+    "rav1eCrates": {
+      "manifestPath": "rav1e-crates.json",
+      "componentCount": 270
+    },
+    "toolchain": {
+      "manifestPath": "toolchain-components.json",
+      "componentCount": 12
+    },
+    "licenseCorpus": {
+      "manifestPath": "license-corpus.json",
+      "textRoot": "licenses/extracted",
+      "textObjectCount": 681,
+      "licenseFileReferenceCount": 1750
+    }
+  },
+  "includedPaths": [
+    "buildconf.txt",
+    "component-graph.json",
+    "evidence/artifact-10396032837.metadata.json",
+    "evidence/asset-565742558.metadata.json",
+    "evidence/crosstool-ng-b1a94f65c5187d99037a4e2f57aefbdf995a9677.commit.json",
+    "evidence/evaluated-recipes.txt",
+    "evidence/evidence-inventory.json",
+    "evidence/ffmpeg-9258bacca50d7ca28bcb6d797e8952123e35105b.commit.json",
+    "evidence/ffmpeg-source-identity.json",
+    "evidence/ghcr-base-win64-manifest-fetch.failure.json",
+    "evidence/job-104378132452.log",
+    "evidence/job-104378132452.metadata.json",
+    "evidence/job-104378764705.log",
+    "evidence/job-104378764705.log.initial.stderr.txt",
+    "evidence/job-104378764705.metadata.json",
+    "evidence/job-104384912273.log",
+    "evidence/job-104384912273.log.initial.stderr.txt",
+    "evidence/job-104384912273.metadata.json",
+    "evidence/release-389161663.metadata.json",
+    "evidence/resolved-revisions.json",
+    "evidence/root-license-fingerprints.json",
+    "evidence/run-34967781095.jobs.json",
+    "evidence/run-34967781095.metadata.json",
+    "evidence/spdx-commit-main.json",
+    "evidence/toolchain-source-checksums.json",
+    "evidence/upstream-license-api-inventory.json",
+    "license-corpus.json",
+    "licenses/spdx/Apache-2.0.txt",
+    "licenses/spdx/CC0-1.0.txt",
+    "licenses/spdx/LGPL-2.1-or-later.txt",
+    "licenses/spdx/LLVM-exception.txt",
+    "licenses/spdx/MIT.txt",
+    "NOTICE.md",
+    "provenance-evidence.json",
+    "rav1e-crates.json",
+    "source-cache-inventory.json",
+    "toolchain-components.json"
   ],
-  "blocker": "The exact BtbN .cache/downloads source archives are unavailable. download.sh keys cache files by the SHA-256 of each download command string, not by the downloaded source bytes. The FFmpeg and BtbN trees alone therefore do not prove corresponding-source closure for the enabled static external libraries."
+  "enabledExternalLibraries": [
+    {
+      "option": "--enable-amf",
+      "componentId": "50-amf"
+    },
+    {
+      "option": "--enable-chromaprint",
+      "componentId": "50-chromaprint"
+    },
+    {
+      "option": "--enable-ffnvcodec",
+      "componentId": "50-ffnvcodec"
+    },
+    {
+      "option": "--enable-fontconfig",
+      "componentId": "35-fontconfig"
+    },
+    {
+      "option": "--enable-gmp",
+      "componentId": "25-gmp"
+    },
+    {
+      "option": "--enable-iconv",
+      "componentId": "20-libiconv"
+    },
+    {
+      "option": "--enable-libaom",
+      "componentId": "50-aom"
+    },
+    {
+      "option": "--enable-libaribb24",
+      "componentId": "50-libaribb24"
+    },
+    {
+      "option": "--enable-libaribcaption",
+      "componentId": "50-libaribcaption"
+    },
+    {
+      "option": "--enable-libass",
+      "componentId": "50-libass"
+    },
+    {
+      "option": "--enable-libbluray",
+      "componentId": "50-libbluray"
+    },
+    {
+      "option": "--enable-libdav1d",
+      "componentId": "50-dav1d"
+    },
+    {
+      "option": "--enable-libfreetype",
+      "componentId": "50-freetype"
+    },
+    {
+      "option": "--enable-libfribidi",
+      "componentId": "25-fribidi"
+    },
+    {
+      "option": "--enable-libgme",
+      "componentId": "50-gme"
+    },
+    {
+      "option": "--enable-libharfbuzz",
+      "componentId": "45-harfbuzz"
+    },
+    {
+      "option": "--enable-libjxl",
+      "componentId": "50-libjxl"
+    },
+    {
+      "option": "--enable-libkvazaar",
+      "componentId": "50-kvazaar"
+    },
+    {
+      "option": "--enable-liblcevc-dec",
+      "componentId": "50-lcevcdec"
+    },
+    {
+      "option": "--enable-libmp3lame",
+      "componentId": "50-libmp3lame"
+    },
+    {
+      "option": "--enable-liboapv",
+      "componentId": "50-openapv"
+    },
+    {
+      "option": "--enable-libopencore-amrnb",
+      "componentId": "50-opencore-amr"
+    },
+    {
+      "option": "--enable-libopencore-amrwb",
+      "componentId": "50-opencore-amr"
+    },
+    {
+      "option": "--enable-libopenh264",
+      "componentId": "50-openh264"
+    },
+    {
+      "option": "--enable-libopenjpeg",
+      "componentId": "50-openjpeg"
+    },
+    {
+      "option": "--enable-libopenmpt",
+      "componentId": "50-openmpt"
+    },
+    {
+      "option": "--enable-libopus",
+      "componentId": "50-libopus"
+    },
+    {
+      "option": "--enable-libplacebo",
+      "componentId": "50-libplacebo"
+    },
+    {
+      "option": "--enable-librav1e",
+      "componentId": "50-rav1e"
+    },
+    {
+      "option": "--enable-librist",
+      "componentId": "50-librist"
+    },
+    {
+      "option": "--enable-librsvg",
+      "componentId": "99-librsvg"
+    },
+    {
+      "option": "--enable-libsnappy",
+      "componentId": "50-snappy"
+    },
+    {
+      "option": "--enable-libsoxr",
+      "componentId": "50-soxr"
+    },
+    {
+      "option": "--enable-libsrt",
+      "componentId": "50-srt"
+    },
+    {
+      "option": "--enable-libssh",
+      "componentId": "50-libssh"
+    },
+    {
+      "option": "--enable-libsvtav1",
+      "componentId": "50-svtav1"
+    },
+    {
+      "option": "--enable-libtheora",
+      "componentId": "50-libtheora"
+    },
+    {
+      "option": "--enable-libtwolame",
+      "componentId": "50-twolame"
+    },
+    {
+      "option": "--enable-libuavs3d",
+      "componentId": "50-uavs3d"
+    },
+    {
+      "option": "--enable-libvmaf",
+      "componentId": "45-vmaf"
+    },
+    {
+      "option": "--enable-libvorbis",
+      "componentId": "45-libvorbis"
+    },
+    {
+      "option": "--enable-libvpl",
+      "componentId": "50-onevpl"
+    },
+    {
+      "option": "--enable-libvpx",
+      "componentId": "50-libvpx"
+    },
+    {
+      "option": "--enable-libvvenc",
+      "componentId": "50-vvenc"
+    },
+    {
+      "option": "--enable-libwebp",
+      "componentId": "50-libwebp"
+    },
+    {
+      "option": "--enable-libxml2",
+      "componentId": "25-libxml2"
+    },
+    {
+      "option": "--enable-libzimg",
+      "componentId": "50-zimg"
+    },
+    {
+      "option": "--enable-libzmq",
+      "componentId": "50-libzmq"
+    },
+    {
+      "option": "--enable-libzvbi",
+      "componentId": "50-zvbi"
+    },
+    {
+      "option": "--enable-lv2",
+      "componentId": "99-lilv"
+    },
+    {
+      "option": "--enable-lzma",
+      "componentId": "25-xz"
+    },
+    {
+      "option": "--enable-openal",
+      "componentId": "50-openal"
+    },
+    {
+      "option": "--enable-opencl",
+      "componentId": "45-opencl"
+    },
+    {
+      "option": "--enable-sdl2",
+      "componentId": "50-sdl"
+    },
+    {
+      "option": "--enable-vaapi",
+      "componentId": "50-libva"
+    },
+    {
+      "option": "--enable-vulkan",
+      "componentId": "45-vulkan-loader"
+    },
+    {
+      "option": "--enable-zlib",
+      "componentId": "20-zlib"
+    }
+  ],
+  "unresolvedItems": [],
+  "verifiedSourceRecordCount": 407,
+  "closurePolicy": "verified-conservative-superset",
+  "counts": {
+    "directSourceArchives": 3,
+    "btbnCacheArchives": 122,
+    "rav1eCrates": 270,
+    "toolchainSourceArchives": 12,
+    "totalSourceArchives": 407,
+    "licenseTextObjects": 681,
+    "licenseFileReferences": 1750,
+    "nestedSubmoduleArchives": 19
+  }
 }

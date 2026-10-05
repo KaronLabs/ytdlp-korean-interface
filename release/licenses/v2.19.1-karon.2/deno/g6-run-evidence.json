@@ -1,0 +1,32 @@
+{
+  "exitCode": 0,
+  "elapsedMilliseconds": 1300291,
+  "elapsed": "00:21:40.2914062",
+  "result": {
+    "status": "complete",
+    "closureClassification": "verified-conservative-superset",
+    "outputRoot": "E:\\03_AllWork\\ytdlp-korean-interface\\.scratch\\task-7-deno-notices\\review-g6-79b211-20260916\\deno-third-party-output",
+    "noticePath": "E:\\03_AllWork\\ytdlp-korean-interface\\.scratch\\task-7-deno-notices\\review-g6-79b211-20260916\\deno-third-party-output\\THIRD-PARTY-NOTICES.txt",
+    "noticeSha256": "4e2be6fb33df1399b5893f423ea01c465dde11d8413cdda6187f167c75dad53e",
+    "zipPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.scratch\\task-7-deno-notices\\review-g6-79b211-20260916\\deno-third-party-output\\deno-2.7.14-verified-conservative-superset-sources.zip",
+    "zipSha256": "004b9cdaf34dd488b7752ee1a563dde6d60ee50e538cac6a8c711adea0b604a4",
+    "canonicalTreeSha256": "8073909756587f55b46a8bb05a11db2dbd881b5dc3b86ac919339a9f617197f9",
+    "counts": {
+      "cargoLockPackages": 1127,
+      "registryPackages": 1051,
+      "resolvedRegistryPackages": 1051,
+      "registryPackageFileResolutions": 941,
+      "registrySpdxResolutions": 104,
+      "registryLicenseRefResolutions": 1,
+      "registryUpstreamResolutions": 5,
+      "workspacePackages": 76,
+      "resolvedWorkspacePackages": 76,
+      "workspaceSpdxResolutions": 74,
+      "workspaceUpstreamResolutions": 2,
+      "nativeComponents": 20,
+      "embeddedComponents": 1
+    },
+    "overallReleasePass": false
+  },
+  "error": null
+}

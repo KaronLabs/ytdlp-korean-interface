@@ -1,11 +1,29 @@
-7-Zip 26.01 source commit:
-https://github.com/ip7z/7zip/commit/8c63d71ff886bda90c86db28466287f977374237
+7-Zip 26.01 exact no-RAR production evidence
 
-Conservative target license expression:
-LGPL-2.1-or-later AND BSD-3-Clause AND BSD-2-Clause.
-The intended target build must omit the unRAR sources and RAR handler, but
-that omission is not asserted until exact link/map evidence proves it.
+Source commit: 8c63d71ff886bda90c86db28466287f977374237.
+Source URL: https://github.com/ip7z/7zip/archive/8c63d71ff886bda90c86db28466287f977374237.zip
+Upstream source SHA-256: 01589aeda50512955e66d360c6534b961ec95c51111a76e2fa2976a8daa55271
+Upstream source length: 2892293 bytes.
+DLL SHA-256: 1a482e7ed19b1c7a547558e6e728cc4e4215aa9a98846702dbd8c1e22419c6e0
+DLL length: 1537536 bytes.
 
-NOT_VERIFIED: no sealed 7z.dll 26.01 binary, SHA-256, build transcript, or
-link/map evidence proving omission of unRAR was supplied to Task 3. The older
-7z.dll found outside this worktree reports version 21.07 and is not accepted.
+Actual producer:
+.scratch/task-5-sevenzip-no-rar/output-final/verification.json
+Runtime archive SHA-256: 30ca5f1e80df040aa7b46a0fb956500c3008796ca6a36980be32bff1f2c3a2ba
+Runtime archive length: 578523 bytes.
+No-RAR corresponding-source archive:
+.scratch/task-5-sevenzip-no-rar/output-final/7z2601-x64-no-rar-source.7z
+SHA-256: 7c02369194417c13270ed2b34513472de8bb6d322ac8721f45d41c19898b7ffd
+Length: 1481890 bytes.
+
+The retained build-provenance.json reports both build commands with exit code
+0 and binds the source, patched Arc.mak, toolchain, and exact DLL. build-map.json
+contains linked ZIP/7z handlers and eleven excluded RAR objects. The producer
+verification record retains no-RAR format output and ZIP/7z extraction results
+with exit codes 0. Applicable full LGPL and BSD notices are preserved.
+
+Initial template verificationStatus: NOT_VERIFIED.
+Retained producer facts: successful exact build/map and runtime records.
+Scope: this exact Task 5 build and corresponding source. The blocked final
+non-runtime collector and final release assembly remain NOT_VERIFIED.
+No tests or runtime checks were executed by this license-data implementation.

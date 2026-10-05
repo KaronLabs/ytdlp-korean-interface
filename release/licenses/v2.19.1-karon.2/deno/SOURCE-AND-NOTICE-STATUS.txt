@@ -1,15 +1,36 @@
-Deno 2.7.14 source commit:
-https://github.com/denoland/deno/commit/2d674b25625bcc367853d00fe86f6e84390f88cb
+Deno 2.7.14 exact source and generated notices
 
-Official Windows x64 release archive:
+Source commit: 2d674b25625bcc367853d00fe86f6e84390f88cb.
+Source URL: https://github.com/denoland/deno/archive/2d674b25625bcc367853d00fe86f6e84390f88cb.zip
+Official Windows archive URL:
 https://github.com/denoland/deno/releases/download/v2.7.14/deno-x86_64-pc-windows-msvc.zip
-SHA-256: 25f9871f5c1d9e999d60071f8069767134495fd601d2e2c7ce1e8c641487bda0
+Archive SHA-256: 25f9871f5c1d9e999d60071f8069767134495fd601d2e2c7ce1e8c641487bda0
+deno.exe SHA-256: b6e83993f1f1ab97075a77043de61118966d719b5450bc631251d47c3a34230b
+deno.exe length: 127973152 bytes.
 
-deno.exe SHA-256:
-b6e83993f1f1ab97075a77043de61118966d719b5450bc631251d47c3a34230b
+Actual G6 producer:
+.scratch/task-7-deno-notices/review-g6-79b211-20260916/g6-run-evidence.json
+Exit code: 0. Result status: complete.
+Closure classification: verified-conservative-superset.
+Resolved Cargo.lock packages: 1127 (1051 registry and 76 workspace).
+Native components: 20. Embedded components: 1 (TypeScript 5.9.2).
+The runtime reports V8 14.7.173.20-rusty and TypeScript 5.9.2.
 
-NOT_VERIFIED: Cargo.lock contains 1,127 packages and pins v8 crate 147.4.0
-(crate checksum 2df8fffd507fb18ed000673a83d937f58e60fb07f3306b2274284125b15137cd),
-but the pinned Deno source archive contains no generated third-party license
-report. The binary reports V8 14.7.173.20-rusty. A complete reproducible Rust,
-rusty_v8/V8, and native dependency notice corpus has not been produced.
+The entire generated notice is preserved byte-for-byte as:
+THIRD-PARTY-NOTICES.txt
+SHA-256: 4e2be6fb33df1399b5893f423ea01c465dde11d8413cdda6187f167c75dad53e
+Length: 10142740 bytes.
+The original component-manifest.json and source-inventory.json are retained.
+
+Complete source ZIP:
+.scratch/task-7-deno-notices/review-g6-79b211-20260916/deno-third-party-output/deno-2.7.14-verified-conservative-superset-sources.zip
+SHA-256: 004b9cdaf34dd488b7752ee1a563dde6d60ee50e538cac6a8c711adea0b604a4
+Length: 523700266 bytes.
+Canonical source tree SHA-256:
+8073909756587f55b46a8bb05a11db2dbd881b5dc3b86ac919339a9f617197f9
+
+Initial template verificationStatus: NOT_VERIFIED.
+Producer result status: complete; classification: verified-conservative-superset.
+Scope: the exact G6 notice/source conservative superset. Its run record sets
+overallReleasePass to false. Final license/source-bundle assembly remains
+NOT_VERIFIED; this implementation did not rerun the producer or perform tests.

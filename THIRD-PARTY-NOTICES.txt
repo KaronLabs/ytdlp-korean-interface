@@ -1,60 +1,130 @@
 KaronLabs ytdlp-korean-interface v2.19.1-karon.2
 THIRD-PARTY NOTICES AND EXACT SOURCE LOCATIONS
 
-This is a technical compliance bundle, not legal advice. The portable package
-is not licensed as a whole under MIT. Each component remains under its own
-license. Available license texts and upstream notices are under
-release/licenses/v2.19.1-karon.2/. This collection is not yet complete: the
-Deno dependency corpus and FFmpeg external-library source/license closure
-remain explicitly unverified below.
+Each component retains its own license. The portable package as a whole is
+not licensed solely under MIT. License texts and producer data are under
+release/licenses/v2.19.1-karon.2/. Overall license/release assembly status:
+NOT_VERIFIED. Available source closures are described below with their actual
+producer records; availability does not establish final release approval.
 
 APPLICATION
 ytdlp-interface application; MIT; modified by KaronLabs.
-Source: https://github.com/KaronLabs/ytdlp-korean-interface/archive/8f776b34cf9e644accb9f5e1230dd7e1b24d3def.zip
-Source SHA-256: bd76aaa80c620aa4c8339bb68011c82e1b7fcc72ee7a7dc9dff1602328335586
+Source commit: b80f594a2b6673d28e00e705659c39b0c4bed647
+Source tree: 541a9bef018b4b266ba0ca8469ecb2868ef1e6df
+Source: https://github.com/KaronLabs/ytdlp-korean-interface/archive/b80f594a2b6673d28e00e705659c39b0c4bed647.zip
+Source SHA-256: ed8b1d348d8317bf0061b501737fd2f5211271357b7ade5ecd57a224438a7c06
+Source length: 16022117 bytes.
+Authority: .validation/karon2-release-20261005/application-source.json.
+Application executable SHA-256:
+1e23c9e0962f0ea8f78dca8f0b832c9706ce4aedc1ff7b8703e6b806e0542fd4
 
-STATIC APPLICATION DEPENDENCIES
+STATIC APPLICATION DEPENDENCIES AND BUILD INPUTS
 bit7z 4.1.0; MPL-2.0; commit c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742.
 Source SHA-256: 6af52b2e1b9895e8f1193728880206326161940e7a961e3162ec39752dbb3379
-Nana 1.8; BSL-1.0; upstream baseline 554c4fe87fc31b8ee104228e9117d545d34855b5; locally modified build files.
+Nana 1.7.4; BSL-1.0; baseline tag v1.7.4, commit
+554c4fe87fc31b8ee104228e9117d545d34855b5; modified vendored build tree.
 Source SHA-256: ef657036a4623bbb5c4e0df4e8aa699dc6ac713ca4a6725b30d3fd8175c4c145
 libpng 1.6.37; libpng-2.0; commit a40189cf881e9f0db80511c382292a5604c3c3d1.
 Source SHA-256: b3af9e92167f9c4233482f49aff02730b7dc3a275871ce637ed668413da6283f
 zlib 1.2.5; Zlib; commit 9712272c78b9d9c93746d9c8e156a3728c65ca72.
 Source SHA-256: 66faa243ea50094c2b399f5644cd4aa6110e739eae26800120124bbd1da00535
-libjpeg-turbo 3.1.2; BSD-3-Clause AND IJG AND Zlib; commit 4e151a4ad91001b3aa8c2ece2205c15f487ce320.
+libjpeg-turbo 3.1.2; BSD-3-Clause AND IJG AND Zlib;
+commit 4e151a4ad91001b3aa8c2ece2205c15f487ce320.
 Source SHA-256: d3c33405b46aa14094ef26cd7b9618162ebcafeed7fb2acf2fda5c7c10b80782
 nlohmann-json 3.12.0; MIT; commit 55f93686c01528224f448c19128836e7df245f72.
 Source SHA-256: 0746352e4e9532e7aeabbcbaa79079b6bc6008e9261e4d459c9486a9b48a172e
-The tracked single header differs byte-for-byte from the upstream amalgamation;
-the lock therefore marks the vendored form as modified.
+The approved non-runtime manifest records deterministic LF-to-CRLF conversion
+of the vendored single header and treats that source form as modified.
+CPM.cmake 0.42.3; MIT; build input; commit
+49acea0d775087ace0522ee4cc5de45e3da094a8.
+Source SHA-256: 97d684cfb9e9f5ec37a2d52c737e24b75f2abfdf2594e109718309cb7c0b8a33
+Bootstrap SHA-256: a609e875fd532b067174250f6abbc3dac22fe2d64869783fb1e80bda1625c844
+CPM is not a shipped runtime or a statically linked application library.
+
+The separate candidate dependency archive remains hash-pinned:
+f2cf2203e0f9da8f4e3bb84977db85f3fca3c4ea14be2e7913feb42cf28ced85;
+6,877,761 bytes. Modified dependency trees and upstream baselines retain
+separate provenance in the lock; the official application ZIP is not a
+substitute for that dependency archive.
 
 SEPARATELY SHIPPED COMPONENTS
-7z.dll 26.01 target; LGPL-2.1-or-later AND BSD-3-Clause AND BSD-2-Clause;
-source commit 8c63d71ff886bda90c86db28466287f977374237. The intended
-no-unRAR/no-RAR-handler configuration has not yet been proven by a link map;
-the conservative expression retains all potentially applicable portions.
+7z.dll 26.01; LGPL-2.1-or-later AND BSD-3-Clause AND BSD-2-Clause.
+Source commit: 8c63d71ff886bda90c86db28466287f977374237.
 Source SHA-256: 01589aeda50512955e66d360c6534b961ec95c51111a76e2fa2976a8daa55271
+7z.dll SHA-256: 1a482e7ed19b1c7a547558e6e728cc4e4215aa9a98846702dbd8c1e22419c6e0
+Task 5 output-final retains successful build commands, exact link-object map,
+eleven excluded RAR objects, and ZIP/7z runtime results with exit code 0.
+No-RAR corresponding source is available:
+.scratch/task-5-sevenzip-no-rar/output-final/7z2601-x64-no-rar-source.7z
+SHA-256: 7c02369194417c13270ed2b34513472de8bb6d322ac8721f45d41c19898b7ffd
+Length: 1,481,890 bytes.
+Producer: .scratch/task-5-sevenzip-no-rar/output-final/verification.json.
+Applicable full LGPL and BSD notices are retained in 7zip/; the omitted RAR
+code and unRAR restriction are not part of this custom binary's license claim.
 
-yt-dlp nightly 2026.08.04.234419; source commit
-5d6b8c8cd19785c3086ae3a9ec618c45e25eb3bc; Unlicense plus the complete
-PyInstaller dependency notices in yt-dlp/THIRD-PARTY-LICENSES.txt.
-Source SHA-256: 38184dfb5d8dd435e3bbea24392e55ff47ae31a3cff93918260c00d123b19593
-yt-dlp.exe SHA-256: e78500d301b5de3a9280a418f6dd45604c4d85b718b0a2447c1b0aa9699e2689
+yt-dlp nightly 2026.08.30.232658; source commit
+bbc809a1161d3bfca51fa36f59dda35556ee85a0.
+License: Unlicense AND LicenseRef-yt-dlp-PyInstaller-Third-Party.
+Source: https://github.com/yt-dlp/yt-dlp/archive/bbc809a1161d3bfca51fa36f59dda35556ee85a0.zip
+Source SHA-256: 62a651de6ffcd3631ca34f0f617932bdedc4a6be652777acae8a11d1cafd172b
+Source length: 3,854,279 bytes.
+yt-dlp.exe SHA-256: a3a504c66e91f6474cef0be83b16aedfb7b42b9400a962242d0d433e98f67a70
+The exact source LICENSE and THIRD_PARTY_LICENSES.txt bytes are preserved as
+yt-dlp/LICENSE.txt and yt-dlp/THIRD-PARTY-LICENSES.txt.
+The latter SHA-256 is 472aefe951c7db35e1657c1d13fd337140511ed6f2b329205105ad441c5a02b7.
 
-Deno 2.7.14; MIT plus dependency licenses; source commit
-2d674b25625bcc367853d00fe86f6e84390f88cb.
+Deno 2.7.14; MIT AND LicenseRef-Deno-Third-Party.
+Source commit: 2d674b25625bcc367853d00fe86f6e84390f88cb.
 Source SHA-256: 0fb1aac72af419d8f7de0d623eee7713571d841736d1c01eac97363afd3996dd
 deno.exe SHA-256: b6e83993f1f1ab97075a77043de61118966d719b5450bc631251d47c3a34230b
-Status: NOT_VERIFIED pending complete Rust, V8, and native notice corpus.
+G6 producer status: complete; classification: verified-conservative-superset.
+The full generated notice is preserved byte-for-byte as
+deno/THIRD-PARTY-NOTICES.txt, 10,142,740 bytes, SHA-256
+4e2be6fb33df1399b5893f423ea01c465dde11d8413cdda6187f167c75dad53e.
+The producer resolves 1,127 Cargo packages, 20 native components, and the
+embedded TypeScript 5.9.2 component. Complete source closure is available at
+.scratch/task-7-deno-notices/review-g6-79b211-20260916/deno-third-party-output/deno-2.7.14-verified-conservative-superset-sources.zip
+SHA-256: 004b9cdaf34dd488b7752ee1a563dde6d60ee50e538cac6a8c711adea0b604a4
+Length: 523,700,266 bytes.
+Producer: .scratch/task-7-deno-notices/review-g6-79b211-20260916/g6-run-evidence.json.
+Its overallReleasePass is false; complete component notices are not final
+release validation.
 
-FFmpeg n9.0.1-30-g9258bacca5; LGPL-3.0-or-later because version3 is enabled;
-FFmpeg commit 9258bacca50d7ca28bcb6d797e8952123e35105b; BtbN build scripts commit
-3e6685eda92f9288c15ac320139622dcedca09a4.
-FFmpeg source SHA-256: 5a486a7a20fdf673d0fe9314b41897725abe34aa8bb63c5c440f2b017935644c
-BtbN scripts SHA-256: 21baace73d2d9599deda5688247cc250dfa7e5d9557a06b12c69c8175618ab92
+FFmpeg n9.0.1-30-g9258bacca5-20260915; LGPL-3.0-or-later
+with version3 enabled. FFmpeg commit:
+9258bacca50d7ca28bcb6d797e8952123e35105b.
+BtbN build scripts commit: 3e6685eda92f9288c15ac320139622dcedca09a4.
 Binary archive SHA-256: 39697d69681a09bd55a0f0224360a9a4285bc12127df807d7242592b0e144a7b
 ffmpeg.exe SHA-256: 41482eabc1a33f9d1e4334ca32ec9259aa34a3ec2493fcc9f214bfe54301ce38
 ffprobe.exe SHA-256: 376f55eb141c3b0d8790b64967b8cbf1737d76bebe0820189356c71cc884b395
-Status: NOT_VERIFIED pending source-byte-verified closure for all enabled static
-external libraries listed in ffmpeg/BUILD-CLOSURE.json.
+Task 6 producer status: complete; verified-conservative-superset source closure.
+The source ZIP is available at
+.scratch/task-6-closure-run-e-4537e5d/ytdlp-korean-interface-v2.19.1-karon.2-ffmpeg-corresponding-sources.zip
+SHA-256: cf040e97af067e7ab01fb891dc0302b0f332b88fc7b9daace456413c7b2be75f
+Length: 2,528,152,976 bytes.
+Producer: .scratch/task-6-closure-run-e-4537e5d/collector-result.json.
+It records 407 source archives, 122 cache components, 270 Rav1e crates,
+12 toolchain sources, and 681 exact license text objects. Their full texts and
+reference index are retained in ffmpeg/THIRD-PARTY-NOTICES.txt and
+ffmpeg/license-corpus.json. The original Dockerfile toolchain reference was
+mutable; reproducibly pinned original toolchain selection is not claimed.
+
+ASSEMBLY AND OWNER ACCEPTANCE
+The current exact-candidate non-runtime producer remains blocked by
+production_manifest_git_blob_mismatch and sevenzip_extractor_identity_mismatch.
+Its generated application ZIP differs in bytes from the authoritative official
+ZIP specified above. Producer facts and remaining binding work are recorded in
+ASSEMBLY-STATUS.json. Overall license/release status remains NOT_VERIFIED.
+
+Manual GUI acceptance: WAIVED_BY_OWNER. This is a separate owner acceptance
+decision and does not verify licenses, source closure, or final bundle assembly.
+Builder and waiver artifacts are maintained by their respective owners.
+
+All initial template component and sourceArchive statuses are NOT_VERIFIED.
+The authentic FFmpeg schema-3 BUILD-CLOSURE.json retains producer data; its
+37 includedPaths need reconciliation with the full producer inventory before
+assembly. Generated full closure archive records cannot use upstream commit
+ZIP URLs. A generated-source-closure type with url=null and an exact local
+producer path/hash/length is proposed in ASSEMBLY-STATUS.json, pending owner
+approval and main consumer support. Original G6 output paths must remain the
+Deno builder inputs. The 7-Zip wrapper filename also needs owner staging.

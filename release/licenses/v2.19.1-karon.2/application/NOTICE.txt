@@ -28,3 +28,11 @@ Code reuse, modification, redistribution, commercial use, and teaching remain
 governed by the MIT License. Provenance documentation exists so lawful reuse
 can remain open without rewriting the recorded history of where the code and
 repository-specific changes came from.
+
+Exact application source for this candidate:
+https://github.com/KaronLabs/ytdlp-korean-interface/archive/b80f594a2b6673d28e00e705659c39b0c4bed647.zip
+Commit: b80f594a2b6673d28e00e705659c39b0c4bed647
+Tree: 541a9bef018b4b266ba0ca8469ecb2868ef1e6df
+Source SHA-256: ed8b1d348d8317bf0061b501737fd2f5211271357b7ade5ecd57a224438a7c06
+Source length: 16022117 bytes.
+This identifies the application source; each dependency retains its own license.

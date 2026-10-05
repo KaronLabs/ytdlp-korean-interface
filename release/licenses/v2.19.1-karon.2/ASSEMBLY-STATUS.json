@@ -1,0 +1,107 @@
+{
+  "schemaVersion": "karon-license-assembly-status/v1",
+  "status": "NOT_VERIFIED",
+  "applicationSource": {
+    "fileName": "karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
+    "commit": "b80f594a2b6673d28e00e705659c39b0c4bed647",
+    "url": "https://github.com/KaronLabs/ytdlp-korean-interface/archive/b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
+    "sha256": "ed8b1d348d8317bf0061b501737fd2f5211271357b7ade5ecd57a224438a7c06",
+    "length": 16022117,
+    "tree": "541a9bef018b4b266ba0ca8469ecb2868ef1e6df",
+    "metadataPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/application-source.json",
+    "localPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/source-archives/karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip"
+  },
+  "candidateManifest": {
+    "path": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/candidates/candidate-0f38bce10a904504916f90964000d44b/candidate-manifest.json",
+    "sha256": "986754c3b2467c12127b7497434c0b3caad5fa6aef13406e2aaefb6b8040163d",
+    "length": 21628
+  },
+  "nonRuntimeProducer": {
+    "status": "closed",
+    "inventoryPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/non-runtime-evidence-07/source-cache-inventory.json",
+    "blockersPath": null,
+    "blockers": [],
+    "applicationArchive": {
+      "fileName": "karon-application-b80f594a2b66.zip",
+      "sha256": "166f13da8a2b4bc857ced3e1674ee54b927f04cf1c8d74b922814a4974f47956",
+      "length": 15883862,
+      "url": "https://github.com/KaronLabs/ytdlp-korean-interface/commit/b80f594a2b6673d28e00e705659c39b0c4bed647"
+    }
+  },
+  "remainingWork": [
+    "Actual non-runtime component collection completed with status closed in non-runtime-evidence-07. Final release assembly has not passed.",
+    "Production source assembly attempt 02 failed closed with release_license_lock_source_archive_mismatch. Existing sourceArchives reject generated closures and secondary pinned application source archives.",
+    "The approved production non-runtime manifest uses APPLICATION_RELEASE_COMMIT placeholder, object buildRecipe and kind candidateBinding; the integrator fixture expects resolved strings and candidateBinding.files. Production inventory uses expected/actual hash-length records instead of fixture sha256/length. These protocol differences require explicit validated adaptation, not forged evidence.",
+    "Generated closure consumer support is in progress. No public URL is fabricated for local generated ZIPs.",
+    "The authentic FFmpeg manifest includes 37 projected paths while complete producer inventory covers 1128 ZIP entries; complete inventory verification is still required.",
+    "Use approved Deno collector identity 09ced74a90248fbeb54969ea03d5aacb98dfc38b and original G6 output paths. The G6 overallReleasePass=false sentinel is not release failure or approval.",
+    "The 7-Zip generated wrapper is staged under its required canonical 7z2601-x64-no-rar-source.zip filename.",
+    "Independent GUI waiver, legacy GUI evidence, AssemblyOnly and publication synthetic contracts passed 244 tests. This is NOT final production license adjudication.",
+    "Actual FFmpeg closure source ZIP is 2528152976 bytes, exceeding GitHub per-asset limit under 2 GiB; owner decision on source-part upload is pending. No source material was deleted to evade this limit.",
+    "Final source ZIP, SPDX, final verified license lock, exact-packaging-target CI and stable release are not complete."
+  ],
+  "manualGuiDecision": "WAIVED_BY_OWNER",
+  "manualGuiDecisionScope": "Owner acceptance policy handled separately; it does not establish license verification.",
+  "implementationVerificationExecuted": false,
+  "pendingSourceArchiveShapeProposal": {
+    "status": "IMPLEMENTATION_IN_PROGRESS",
+    "decision": "Represent generated closures with their own type and local producer artifact identity; keep genuine upstream URL/hash/length tuples as separate origin records.",
+    "typeField": "artifactType",
+    "generatedType": "generated-source-closure",
+    "generatedFields": [
+      "artifactType",
+      "fileName",
+      "commit",
+      "sha256",
+      "length",
+      "verificationStatus",
+      "localPath",
+      "url",
+      "producerEvidence",
+      "upstreamSourceArchives"
+    ],
+    "generatedUrl": null,
+    "urlMeaning": "A generated artifact has no upstream archive URL. url stays null until an actual matching publication URL exists; source origins retain genuine upstream URLs.",
+    "consumerChangesRequired": [
+      "Allow generated-source-closure with null URL and require a bound local producer path/hash/length.",
+      "Use exactly one full Deno/FFmpeg closure sourceArchives record after owner approval; retain raw upstream archives as origin data.",
+      "Classify build inputs and modified application-source records without requiring every URL/commit to equal the owning component baseline.",
+      "Resolve authentic FFmpeg includedPaths completeness, original Deno run paths, 7-Zip wrapper staging, and the final assembly cycle."
+    ],
+    "generatedArtifacts": [
+      {
+        "component": "deno",
+        "artifactType": "generated-source-closure",
+        "fileName": "deno-2.7.14-verified-conservative-superset-sources.zip",
+        "commit": "2d674b25625bcc367853d00fe86f6e84390f88cb",
+        "sha256": "004b9cdaf34dd488b7752ee1a563dde6d60ee50e538cac6a8c711adea0b604a4",
+        "length": 523700266,
+        "localPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-7-deno-notices/review-g6-79b211-20260916/deno-third-party-output/deno-2.7.14-verified-conservative-superset-sources.zip",
+        "url": null,
+        "verificationStatus": "NOT_VERIFIED"
+      },
+      {
+        "component": "ffmpeg",
+        "artifactType": "generated-source-closure",
+        "fileName": "ytdlp-korean-interface-v2.19.1-karon.2-ffmpeg-corresponding-sources.zip",
+        "commit": "9258bacca50d7ca28bcb6d797e8952123e35105b",
+        "sha256": "cf040e97af067e7ab01fb891dc0302b0f332b88fc7b9daace456413c7b2be75f",
+        "length": 2528152976,
+        "localPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-6-closure-run-e-4537e5d/ytdlp-korean-interface-v2.19.1-karon.2-ffmpeg-corresponding-sources.zip",
+        "url": null,
+        "verificationStatus": "NOT_VERIFIED"
+      },
+      {
+        "component": "7zip",
+        "artifactType": "generated-source-wrapper",
+        "fileName": "7zip-no-rar-corresponding-sources.zip",
+        "commit": "8c63d71ff886bda90c86db28466287f977374237",
+        "sha256": "ac25181f5fb404f791376432acd55593721f6568cff72a98b94b408ec1309d07",
+        "length": 1482060,
+        "localPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/source-archives/7zip-no-rar-corresponding-sources.zip",
+        "url": null,
+        "verificationStatus": "NOT_VERIFIED"
+      }
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "status": "complete",
+  "closurePolicy": "verified-conservative-superset",
+  "sourceCount": 407,
+  "componentCount": 122,
+  "rav1eCrateCount": 270,
+  "toolchainSourceCount": 12,
+  "licenseTextObjectCount": 681,
+  "nestedClosureCount": 19,
+  "inventoryEntryCount": 1128,
+  "verifiedGitLicenseBlobCount": 681,
+  "verifiedZipEntryCount": 1128,
+  "bundlePath": "E:\\03_AllWork\\ytdlp-korean-interface\\.scratch\\task-6-closure-run-e-4537e5d\\ytdlp-korean-interface-v2.19.1-karon.2-ffmpeg-corresponding-sources.zip",
+  "bundleBytes": 2528152976,
+  "bundleSha256": "CF040E97AF067E7AB01FB891DC0302B0F332B88FC7B9DAACE456413C7B2BE75F",
+  "inventoryPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.scratch\\task-6-closure-run-e-4537e5d\\inventory.json",
+  "blockers": []
+}

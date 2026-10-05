@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "product": "7-Zip",
+  "version": "26.01",
+  "architecture": "x64",
+  "policy": "no-rar-handlers-or-code",
+  "source": {
+    "repository": "ip7z/7zip",
+    "commit": "8c63d71ff886bda90c86db28466287f977374237",
+    "archiveUrl": "https://github.com/ip7z/7zip/archive/8c63d71ff886bda90c86db28466287f977374237.zip",
+    "archiveSha256": "01589AEDA50512955E66D360C6534B961EC95C51111A76E2FA2976A8DAA55271",
+    "arcMakSha256": "21BDEC7EF04A92DBB7A19E71146929A85A851A6E7A4D992AC9529E963D9BF381",
+    "patchedArcMakSha256": "F8C87876AE5BDD74A338E01BE7A02EDB699E2470468F02DA380D4B061E353FBE"
+  },
+  "buildRecipe": {
+    "path": "tools/build-sevenzip-no-rar.ps1",
+    "sha256": "7E23C010E4068EFE36FF688433755FF368EDE705B305CA93FAC3BC0DAD6E3486",
+    "definitionPath": "release/runtime/v2.19.1-karon.2/sevenzip-no-rar.json",
+    "definitionSha256": "9BAA6F82D55669568AAA083CA90C15234249D53AAAF4E4CB8E5C51CFE3B56201"
+  },
+  "toolchain": {
+    "visualStudioVersion": "17.14.36915.13",
+    "windowsSdkVersion": "10.0.26100.0",
+    "tools": {
+      "cl.exe": {
+        "path": "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\cl.exe",
+        "sha256": "4304307E1F0D0528AC13C513183E5CBFA20A7F8DE6F0C8E5BC4293661E6D23A4",
+        "fileVersion": "19.44.35222.0"
+      },
+      "link.exe": {
+        "path": "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe",
+        "sha256": "BA9BDF6FD3DF9C7C3AE007FA3999302C2AA161FCCB22831DA28CFECB0E0C586B",
+        "fileVersion": "14.44.35222.0"
+      },
+      "nmake.exe": {
+        "path": "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\nmake.exe",
+        "sha256": "EAC50D4660094042B4E3F6536220B07EF103A35EBEEC5EB760016349395881AD",
+        "fileVersion": "14.44.35222.0"
+      },
+      "rc.exe": {
+        "path": "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\\\x64\\rc.exe",
+        "sha256": "650E6EA5BE1447C6E4E68DA6D8CE882FD294D3FDC9F697A62B1752F5A79C0090",
+        "fileVersion": "10.0.26100.7175 (WinBuild.160101.0800)"
+      }
+    },
+    "sdkFiles": [
+      {
+        "path": "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.26100.0\\um\\x64\\kernel32.lib",
+        "sha256": "341C7D56125A03B458E4D5093E4C79B33123CCFDFD610FE236937B8E6F3134BB"
+      },
+      {
+        "path": "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.26100.0\\um\\x64\\user32.lib",
+        "sha256": "6F68850339CF3BA7E50EB91C7C1B32C4E9B966ABDEABCAA880A83346E5648251"
+      },
+      {
+        "path": "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.26100.0\\um\\x64\\advapi32.lib",
+        "sha256": "A0EA53377E6DE11C5FDC07E72AF11D22D8FA613CECC6CCB1B6DE43490392EADC"
+      },
+      {
+        "path": "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.26100.0\\um\\x64\\shell32.lib",
+        "sha256": "C739686F82293FCF778FA34CAA921B765799F553618014810B9975D5AA5D066C"
+      },
+      {
+        "path": "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.26100.0\\um\\x64\\ole32.lib",
+        "sha256": "F7B6D1E4A2F2A16C6A78ED821C8AA7F0B488112BB4DA778285086E4588CA197A"
+      },
+      {
+        "path": "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.26100.0\\um\\x64\\oleaut32.lib",
+        "sha256": "CCB86049288E4816E34B572F0D63A6B2C40D91777B092BB77AE639AA8E887AE5"
+      },
+      {
+        "path": "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.26100.0\\ucrt\\x64\\libucrt.lib",
+        "sha256": "2453AAEE39D7E3FFCDBA2ABDC7E0579C50038F81293DF1C4F449C5CDC5CB7A41"
+      }
+    ],
+    "devCommand": "call \"C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\Common7\\Tools\\VsDevCmd.bat\" -arch=x64 -host_arch=x64"
+  },
+  "commands": [
+    {
+      "command": "\"C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\nmake.exe\" PLATFORM=x64",
+      "workingDirectory": "E:\\03_AllWork\\ytdlp-korean-interface\\.scratch\\task-5-sevenzip-no-rar\\output-final\\build-work-3e751a83ca044735b5c3780e64f91df2\\upstream\\7zip-8c63d71ff886bda90c86db28466287f977374237\\CPP\\7zip\\Bundles\\Format7zF",
+      "exitCode": 0,
+      "log": "E:\\03_AllWork\\ytdlp-korean-interface\\.scratch\\task-5-sevenzip-no-rar\\output-final\\build-work-3e751a83ca044735b5c3780e64f91df2\\build-commands.log"
+    },
+    {
+      "command": "\"C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\nmake.exe\" PLATFORM=x64",
+      "workingDirectory": "E:\\03_AllWork\\ytdlp-korean-interface\\.scratch\\task-5-sevenzip-no-rar\\output-final\\build-work-3e751a83ca044735b5c3780e64f91df2\\upstream\\7zip-8c63d71ff886bda90c86db28466287f977374237\\CPP\\7zip\\UI\\Console",
+      "exitCode": 0,
+      "log": "E:\\03_AllWork\\ytdlp-korean-interface\\.scratch\\task-5-sevenzip-no-rar\\output-final\\build-work-3e751a83ca044735b5c3780e64f91df2\\host-build-commands.log"
+    }
+  ],
+  "buildMap": "provenance/build-map.json",
+  "dll": {
+    "archivePath": "x64/7z.dll",
+    "sha256": "1A482E7ED19B1C7A547558E6E728CC4E4215AA9A98846702DBD8C1E22419C6E0",
+    "fileVersion": "26.01",
+    "size": 1537536
+  },
+  "runtimeVerification": {
+    "infoExitCode": 0,
+    "zipExitCode": 0,
+    "sevenZipExitCode": 0,
+    "zipPayload": "karon-zip-payload",
+    "sevenZipPayload": "karon-7z-payload",
+    "commands": [
+      "7z.exe i",
+      "7z.exe a -t7z -mx=1 fixture.7z payload.txt",
+      "7z.exe x -y fixture.zip",
+      "7z.exe x -y fixture.7z"
+    ]
+  },
+  "licenses": [
+    "COPYING.LGPL-2.1.txt",
+    "BSD-NOTICES.txt"
+  ],
+  "legalAdvice": false
+}
