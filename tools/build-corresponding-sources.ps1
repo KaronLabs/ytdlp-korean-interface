@@ -11,6 +11,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+Import-Module (Join-Path $PSScriptRoot 'generated-source-archive.psm1') -Force
 
 function Get-Sha256 {
     param([Parameter(Mandatory)] [string] $Path)
@@ -238,13 +239,22 @@ foreach ($component in @($lock.components)) {
         Assert-RelativePath ([string]$archive.fileName) 'source_archive_name_invalid'
         if ([string]$archive.fileName -notmatch '^[^/]+\.zip$' -or $archive.sha256 -notmatch '^[a-fA-F0-9]{64}$' -or
             -not (Test-Property $archive 'commit')) { throw 'source_archive_metadata_invalid' }
-        $archiveUrl = Assert-PinnedUrl ([string]$archive.url) ([string]$archive.commit) 'source_url_unpinned'
+        $generated = Test-GeneratedSourceArchive $archive
+        $archiveLength = $null
+        if ($generated) {
+            $generatedArchive = Assert-GeneratedSourceArchive -Archive $archive -Component $component -Release $lock.release -ErrorPrefix 'source'
+            $archiveUrl = $null
+            $archiveLength = $generatedArchive.length
+        }
+        else { $archiveUrl = Assert-PinnedUrl ([string]$archive.url) ([string]$archive.commit) 'source_url_unpinned' }
         if ([string]$archive.commit -ceq [string]$component.sourceCommit) { $hasPrimarySource = $true }
         $archiveRequests.Add([pscustomobject]@{
             component = [string]$component.id
             fileName = [string]$archive.fileName
             url = $archiveUrl
             sha256 = ([string]$archive.sha256).ToLowerInvariant()
+            generated = $generated
+            length = $archiveLength
         })
     }
     if (-not $hasPrimarySource) { throw 'source_primary_archive_missing' }
@@ -342,12 +352,14 @@ $cacheContracts = [Collections.Generic.Dictionary[string, object]]::new([StringC
 foreach ($archive in $archiveRequests) {
     if ($cacheContracts.ContainsKey($archive.fileName)) {
         $existing = $cacheContracts[$archive.fileName]
-        if ($existing.sha256 -cne $archive.sha256 -or $existing.url -cne $archive.url) { throw 'source_archive_cache_conflict' }
+        if ($existing.sha256 -cne $archive.sha256 -or $existing.url -cne $archive.url -or
+            $existing.generated -ne $archive.generated -or $existing.length -ne $archive.length) { throw 'source_archive_cache_conflict' }
     }
     else { $cacheContracts.Add($archive.fileName, $archive) }
 
     $cachePath = Join-Path $cache $archive.fileName
     if (-not (Test-Path -LiteralPath $cachePath -PathType Leaf)) {
+        if ($archive.generated) { throw 'source_generated_archive_cache_missing' }
         $downloadPartial = "$cachePath.$PID.$([Guid]::NewGuid().ToString('N')).partial"
         try {
             Invoke-WebRequest -UseBasicParsing -Uri $archive.url -OutFile $downloadPartial
@@ -357,6 +369,9 @@ foreach ($archive in $archiveRequests) {
         finally {
             if (Test-Path -LiteralPath $downloadPartial) { Remove-Item -LiteralPath $downloadPartial -Force }
         }
+    }
+    if ($archive.generated -and (Get-Item -LiteralPath $cachePath).Length -ne $archive.length) {
+        throw 'source_generated_archive_length_mismatch'
     }
     if ((Get-Sha256 $cachePath) -cne $archive.sha256) { throw 'source_archive_hash_mismatch' }
     Assert-SafeZip $cachePath

@@ -10,6 +10,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+Import-Module (Join-Path $PSScriptRoot 'generated-source-archive.psm1') -Force
 
 function Get-FileDigest {
     param([string] $Path, [ValidateSet('SHA1', 'SHA256')] [string] $Algorithm)
@@ -132,7 +133,15 @@ function Assert-SpdxSemantics {
             throw 'spdx_semantic_duplicate_id'
         }
         $contract = $PackageContracts[[string]$package.SPDXID]
-        [void](Assert-PinnedUrl ([string]$package.downloadLocation) ([string]$contract.commit) 'spdx_semantic_download_invalid')
+        if ((Test-Property $contract 'generated') -and $contract.generated) {
+            if ([string]$package.downloadLocation -cne 'NOASSERTION' -or -not (Test-Property $package 'sourceInfo') -or
+                [string]$package.sourceInfo -cne [string]$contract.sourceInfo) { throw 'spdx_semantic_download_invalid' }
+            if (Test-Property $contract 'archiveSha256') {
+                $checksums = @($package.checksums | Where-Object algorithm -ceq 'SHA256')
+                if ($checksums.Count -ne 1 -or $checksums[0].checksumValue -cne $contract.archiveSha256) { throw 'spdx_semantic_checksum_invalid' }
+            }
+        }
+        else { [void](Assert-PinnedUrl ([string]$package.downloadLocation) ([string]$contract.commit) 'spdx_semantic_download_invalid') }
         Assert-LicenseExpression ([string]$package.licenseDeclared) 'spdx_semantic_license_invalid'
         Assert-LicenseExpression ([string]$package.licenseConcluded) 'spdx_semantic_license_invalid'
     }
@@ -211,6 +220,8 @@ $metadataDownload = Assert-PinnedUrl ([string]$metadataPackage.downloadLocation)
 
 $componentById = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
 $componentDownload = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::OrdinalIgnoreCase)
+$componentSourceInfo = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::OrdinalIgnoreCase)
+$generatedArchives = [Collections.Generic.List[object]]::new()
 $noticePaths = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
 $licenseRefs = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
 $expressions = [Collections.Generic.List[string]]::new()
@@ -244,13 +255,30 @@ foreach ($component in @($lock.components)) {
     }
 
     $primaryDownload = $null
+    $hasPrimarySource = $false
+    $generatedSourceInfos = [Collections.Generic.List[string]]::new()
     foreach ($archive in @($component.sourceArchives)) {
         if ($archive.sha256 -notmatch '^[a-fA-F0-9]{64}$' -or -not (Test-Property $archive 'commit')) { throw 'spdx_source_hash_invalid' }
-        $url = Assert-PinnedUrl ([string]$archive.url) ([string]$archive.commit) 'spdx_source_url_unpinned'
-        if ([string]$archive.commit -ceq [string]$component.sourceCommit) { $primaryDownload = $url }
+        if (Test-GeneratedSourceArchive $archive) {
+            $generatedArchive = Assert-GeneratedSourceArchive -Archive $archive -Component $component -Release $lock.release -ErrorPrefix 'spdx'
+            $generatedArchives.Add([pscustomobject]@{ component = $component; archive = $generatedArchive })
+            $generatedSourceInfos.Add($generatedArchive.sourceInfo)
+            $hasPrimarySource = $true
+        }
+        else {
+            $url = Assert-PinnedUrl ([string]$archive.url) ([string]$archive.commit) 'spdx_source_url_unpinned'
+            if ([string]$archive.commit -ceq [string]$component.sourceCommit) { $primaryDownload = $url; $hasPrimarySource = $true }
+        }
     }
-    if ($null -eq $primaryDownload) { throw 'spdx_notice_or_source_missing' }
+    if (-not $hasPrimarySource) { throw 'spdx_notice_or_source_missing' }
+    if ($null -eq $primaryDownload) {
+        if ((Test-Property $component 'downloadLocation') -and $null -ne $component.downloadLocation) {
+            $primaryDownload = Assert-PinnedUrl ([string]$component.downloadLocation) ([string]$component.sourceCommit) 'spdx_source_url_unpinned'
+        }
+        else { $primaryDownload = 'NOASSERTION' }
+    }
     $componentDownload.Add([string]$component.id, $primaryDownload)
+    if ($generatedSourceInfos.Count -gt 0) { $componentSourceInfo.Add([string]$component.id, ($generatedSourceInfos -join "`n")) }
 
     $componentLicenseRefs = if (Test-Property $component 'licenseRefs') { @($component.licenseRefs) } else { @() }
     foreach ($licenseRef in $componentLicenseRefs) {
@@ -361,9 +389,42 @@ foreach ($component in @($lock.components)) {
     if ($component.filesAnalyzed) {
         $package.packageVerificationCode = [ordered]@{ packageVerificationCodeValue = (Get-PackageVerificationCode $assigned $actualPaths) }
     }
+    if ($componentSourceInfo.ContainsKey([string]$component.id)) { $package.sourceInfo = $componentSourceInfo[[string]$component.id] }
     $packages.Add($package)
     $relationships.Add([ordered]@{ spdxElementId = 'SPDXRef-DOCUMENT'; relationshipType = 'DESCRIBES'; relatedSpdxElement = $packageId })
-    $packageContracts.Add($packageId, [pscustomobject]@{ commit = [string]$component.sourceCommit })
+    $packageContracts.Add($packageId, [pscustomobject]@{
+        commit = [string]$component.sourceCommit
+        generated = ($componentDownload[[string]$component.id] -ceq 'NOASSERTION')
+        sourceInfo = if ($componentSourceInfo.ContainsKey([string]$component.id)) { $componentSourceInfo[[string]$component.id] } else { $null }
+    })
+}
+
+foreach ($generated in $generatedArchives) {
+    $component = $generated.component
+    $archive = $generated.archive
+    $sourcePackageId = 'SPDXRef-Source-' + [string]$component.id + '-' + $archive.sha256
+    $packages.Add([ordered]@{
+        name = [string]$component.name + ' generated corresponding sources'
+        SPDXID = $sourcePackageId
+        versionInfo = $archive.commit
+        packageFileName = $archive.fileName
+        downloadLocation = 'NOASSERTION'
+        filesAnalyzed = $false
+        checksums = @([ordered]@{ algorithm = 'SHA256'; checksumValue = $archive.sha256 })
+        sourceInfo = $archive.sourceInfo
+        licenseConcluded = [string]$component.licenseConcluded
+        licenseDeclared = [string]$component.licenseExpression
+        copyrightText = 'Copyright and attribution are identified in the component notice files recorded by the release lock.'
+    })
+    $packageContracts.Add($sourcePackageId, [pscustomobject]@{
+        commit = $archive.commit; generated = $true; sourceInfo = $archive.sourceInfo; archiveSha256 = $archive.sha256
+    })
+    $relationships.Add([ordered]@{ spdxElementId = 'SPDXRef-DOCUMENT'; relationshipType = 'DESCRIBES'; relatedSpdxElement = $sourcePackageId })
+    $relationships.Add([ordered]@{
+        spdxElementId = 'SPDXRef-Package-' + [string]$component.id
+        relationshipType = 'GENERATED_FROM'
+        relatedSpdxElement = $sourcePackageId
+    })
 }
 
 $metadataPackageId = 'SPDXRef-Package-' + [string]$metadataPackage.id
