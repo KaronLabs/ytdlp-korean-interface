@@ -562,6 +562,37 @@ function Read-TestManifest {
     return Get-Content -LiteralPath $Fixture.Manifest -Raw | ConvertFrom-Json
 }
 
+Describe 'Application source content status' {
+    It 'accepts unchanged LF content and rejects tracked, staged and untracked changes' {
+        $tokens = $null
+        $parseErrors = $null
+        $ast = [Management.Automation.Language.Parser]::ParseFile($collectorPath, [ref]$tokens, [ref]$parseErrors)
+        $function = $ast.Find({ param($node)
+            $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
+            $node.Name -ceq 'Get-ApplicationContentStatus'
+        }, $true)
+        Invoke-Expression $function.Extent.Text
+        $root = Join-Path $TestDrive 'application-content-status'
+        [void][IO.Directory]::CreateDirectory($root)
+        Write-TestText (Join-Path $root '.gitattributes') "*.txt text eol=crlf`n"
+        Write-TestText (Join-Path $root 'source.txt') "original`n"
+        & git -C $root init | Out-Null
+        & git -C $root config user.email 'fixture@example.invalid'
+        & git -C $root config user.name 'Fixture'
+        & git -C $root add -- .gitattributes source.txt
+        & git -C $root commit -m fixture | Out-Null
+        Get-ApplicationContentStatus $root | Should Be ''
+        Write-TestText (Join-Path $root 'source.txt') "changed`n"
+        (Get-ApplicationContentStatus $root).Length | Should BeGreaterThan 0
+        & git -C $root add -- source.txt
+        Write-TestText (Join-Path $root 'source.txt') "original`n"
+        (Get-ApplicationContentStatus $root).Length | Should BeGreaterThan 0
+        & git -C $root add -- source.txt
+        Write-TestText (Join-Path $root 'untracked.txt') "new`n"
+        (Get-ApplicationContentStatus $root).Length | Should BeGreaterThan 0
+    }
+}
+
 function Save-TestManifest {
     param([object] $Fixture, [object] $Manifest)
     Write-TestJson $Fixture.Manifest $Manifest

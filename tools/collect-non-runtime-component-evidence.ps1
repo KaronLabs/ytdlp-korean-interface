@@ -1099,6 +1099,20 @@ function New-DeterministicZip {
     }
 }
 
+function Get-ApplicationContentStatus {
+    param([string] $Repository)
+    # Detect content changes without Git's EOL-only working-copy status flags.
+    # PowerShell 5.1 reports native stderr warnings as errors; exit codes remain authoritative.
+    $ErrorActionPreference = 'Continue'
+    $changed = @(& git -C $Repository diff --name-only -- 2>$null)
+    if ($LASTEXITCODE -ne 0) { throw 'application_diff_failed' }
+    $staged = @(& git -C $Repository diff --cached HEAD --name-only -- 2>$null)
+    if ($LASTEXITCODE -ne 0) { throw 'application_diff_failed' }
+    $untracked = @(& git -C $Repository ls-files --others --exclude-standard 2>$null)
+    if ($LASTEXITCODE -ne 0) { throw 'application_untracked_check_failed' }
+    return (($changed + $staged + $untracked) | Out-String).Trim()
+}
+
 function Get-ComponentById {
     param([object] $Manifest, [string] $Id)
     return @($Manifest.components | Where-Object { [string]$_.id -ceq $Id }) | Select-Object -First 1
@@ -1472,7 +1486,7 @@ if ($null -ne $manifest) {
     else {
         try {
             $head = (& git -C $ApplicationRepository rev-parse HEAD 2>$null | Out-String).Trim()
-            $status = (& git -C $ApplicationRepository status --porcelain=v1 --untracked-files=all 2>$null | Out-String).Trim()
+            $status = Get-ApplicationContentStatus $ApplicationRepository
             if ($LASTEXITCODE -ne 0 -or $head -cne $ApplicationCommit) { Add-EvidenceBlocker 'application_commit_mismatch' }
             elseif (-not [string]::IsNullOrEmpty($status)) { Add-EvidenceBlocker 'application_tree_dirty' }
             else {

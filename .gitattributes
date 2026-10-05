@@ -1,0 +1,6 @@
+release/evidence/v2.19.1-karon.2/non-runtime-components.json text eol=lf
+release/licenses/v2.19.1-karon.2/** -text
+THIRD-PARTY-NOTICES.txt -text
+release/dependencies/v2.19.1-karon.2.lock.json text eol=lf
+release/notes/v2.19.1-karon.2.md text eol=lf
+release/validation/v2.19.1-karon.2/gui-validation-waiver.json text eol=lf
