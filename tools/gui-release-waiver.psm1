@@ -186,7 +186,7 @@ function Read-KaronGuiValidationWaiver {
     $exeLength = Get-WaiverProperty $matches[0] 'length'
     $length = 0L
     if ($exeLength.ValueKind -ne [Text.Json.JsonValueKind]::Number -or -not $exeLength.TryGetInt64([ref]$length) -or
-        $length -ne $executableRecord.length -or (Get-WaiverString $matches[0] 'sha256') -cne $executableRecord.sha256) { throw 'gui_validation_waiver_candidate_mismatch' }
+        $length -ne $executableRecord.length -or (Get-WaiverString $matches[0] 'sha256').ToLowerInvariant() -cne $executableRecord.sha256) { throw 'gui_validation_waiver_candidate_mismatch' }
     Assert-KaronGuiValidationWaiverRecord $json.Raw $manifestRecord $executableRecord $ApplicationSourceCommit $ApplicationSourceTree
     [pscustomobject]@{
         Record = $json.Value

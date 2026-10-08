@@ -81,6 +81,33 @@ Describe 'Owner waiver closed schema and candidate binding' {
         $result.FileRecord.sha256 | Should -Be (Get-FileHash $fixture.Path -Algorithm SHA256).Hash.ToLowerInvariant()
     }
 
+    It 'accepts an uppercase executable digest in the sealed candidate manifest' {
+        $fixture = New-WaiverFixture 'uppercase-candidate-digest'
+        $manifestPath = Join-Path $fixture.Candidate 'candidate-manifest.json'
+        $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+        $manifest.files[0].sha256 = $manifest.files[0].sha256.ToUpperInvariant()
+        [IO.File]::WriteAllText($manifestPath, ($manifest | ConvertTo-Json -Depth 16), [Text.UTF8Encoding]::new($false))
+        $fixture.Value.candidate.manifest.length = [long](Get-Item $manifestPath).Length
+        $fixture.Value.candidate.manifest.sha256 = (Get-FileHash $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        Save-WaiverFixture $fixture
+        $result = Read-WaiverFixture $fixture
+        $result.Record.status | Should -Be 'WAIVED_BY_OWNER'
+        $result.Record.scope.automaticTestsWaived | Should -Be $false
+        $result.Record.scope.licenseChecksWaived | Should -Be $false
+    }
+
+    It 'rejects a different uppercase executable digest in the sealed candidate manifest' {
+        $fixture = New-WaiverFixture 'different-uppercase-candidate-digest'
+        $manifestPath = Join-Path $fixture.Candidate 'candidate-manifest.json'
+        $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+        $manifest.files[0].sha256 = 'A' * 64
+        [IO.File]::WriteAllText($manifestPath, ($manifest | ConvertTo-Json -Depth 16), [Text.UTF8Encoding]::new($false))
+        $fixture.Value.candidate.manifest.length = [long](Get-Item $manifestPath).Length
+        $fixture.Value.candidate.manifest.sha256 = (Get-FileHash $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        Save-WaiverFixture $fixture
+        { Read-WaiverFixture $fixture } | Assert-TestThrowsLike -ExpectedPattern '*gui_validation_waiver_candidate_mismatch*'
+    }
+
     It 'rejects broader authority, fabricated evidence, coercible types and incomplete scope' -TestCases @(
         @{ Name = 'release'; Mutate = { param($v) $v.releaseVersion = 'v2.19.1-karon.3' } },
         @{ Name = 'pass'; Mutate = { param($v) $v.status = 'PASS' } },
