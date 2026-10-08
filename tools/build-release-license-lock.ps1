@@ -480,6 +480,8 @@ function Assert-NonRuntimeContract {
     if (Test-KaronNonRuntimeProducer $Manifest) {
         $cacheRecords = @{}
         foreach ($artifact in @(Get-ExactProperty $Inventory 'artifacts')) {
+            # This archive is produced inside the evidence bundle, not the upstream cache.
+            if ([string](Get-ExactProperty $artifact 'id') -ceq 'application-source') { continue }
             $leaf = Assert-RelativePath ([string](Get-ExactProperty $artifact 'fileName'))
             if ($leaf.Contains('/') -or $cacheRecords.ContainsKey($leaf)) { throw 'release_license_lock_nonruntime_binding_mismatch' }
             $cacheRecords[$leaf] = Get-FileRecord (Get-ContainedPath $SourceArchiveRoot $leaf)
@@ -1315,7 +1317,9 @@ function Assert-FfmpegContract {
     if ($generatedFfmpeg) {
         $fullInventory = Read-StrictZipJson $FfmpegSourcesArchivePath 'inventory.json'
         Assert-EvidenceClean $fullInventory
-        Assert-KaronFfmpegInventory $fullInventory $Manifest $zip
+        $producer = Get-ExactProperty $LockComponent 'producerEvidence'
+        [void](Assert-ZipRecord $zip 'inventory.json' (Get-ExactProperty $producer 'inventorySha256') (Get-ExactProperty $producer 'inventoryLength') 'release_license_lock_ffmpeg_closure_invalid')
+        Assert-KaronFfmpegInventory $fullInventory $Manifest $zip (Get-FileRecord $FfmpegClosureManifestPath)
     }
     else {
         if ($included.Count -ne $zip.Count -or $included -cnotcontains 'buildconf.txt' -or $included -cnotcontains 'NOTICE.md') { throw 'release_license_lock_ffmpeg_closure_invalid' }
@@ -1533,15 +1537,21 @@ if (-not $AssemblyOnly) { Set-ExactProperty $release 'receiptInputs' $receiptInp
 Set-ExactProperty $release 'integrationEvidence' $integrationEvidence
 
 foreach ($component in $components) {
-    Set-ExactProperty $component 'verificationStatus' 'verified'
-    Set-ExactProperty $component 'blockers' @()
+    $outputStatus = if ($AssemblyOnly) { 'NOT_VERIFIED' } else { 'verified' }
+    $outputBlockers = if ($AssemblyOnly) { @('Independent exact-candidate license validation has not run.') } else { @() }
+    Set-ExactProperty $component 'verificationStatus' $outputStatus
+    Set-ExactProperty $component 'blockers' $outputBlockers
     foreach ($archive in @(Get-ExactProperty $component 'sourceArchives')) {
-        Set-ExactProperty $archive 'verificationStatus' 'verified'
-        Set-ExactProperty $archive 'blockers' @()
+        Set-ExactProperty $archive 'verificationStatus' $outputStatus
+        Set-ExactProperty $archive 'blockers' $outputBlockers
     }
 }
-Set-ExactProperty $release 'verificationStatus' 'verified'
-Set-ExactProperty $release 'blockers' @()
+Set-ExactProperty $release 'verificationStatus' $outputStatus
+Set-ExactProperty $release 'blockers' $outputBlockers
+if ($AssemblyOnly) {
+    Set-ExactProperty $release 'productionAssembly' 'ASSEMBLED_PENDING_INDEPENDENT_VALIDATION'
+    Set-ExactProperty $release 'licenseApproval' 'HOLD'
+}
 
 $canonical = ConvertTo-CanonicalNode $template
 $json = $canonical | ConvertTo-Json -Depth 100 -Compress

@@ -145,6 +145,15 @@ Describe 'Raw non-runtime producer protocol' {
         $fixture.SourceCacheRecords.Remove('CPM_0.42.3.cmake')
         { Assert-KaronNonRuntimeProducer @fixture } | Should -Throw
     }
+    It 'uses the embedded Git application archive without requiring a cache copy' {
+        $fixture.SourceCacheRecords.Remove('karon-application-b80f594a2b66.zip')
+        $proof = Assert-KaronNonRuntimeProducer @fixture
+        $proof.gitApplicationSourceArchive.sha256 | Should -Be $fixture.Inventory.artifacts[-1].actualSha256
+    }
+    It 'rejects a changed embedded application source even with an intact cache copy' {
+        $fixture.BundleInventory['application/karon-application-b80f594a2b66.zip'].sha256 = 'f' * 64
+        { Assert-KaronNonRuntimeProducer @fixture } | Should -Throw
+    }
 }
 
 Describe 'Explicit raw and generated source provenance' {
@@ -189,23 +198,24 @@ Describe 'FFmpeg complete inventory versus manifest projection' {
             entries = @(
                 [pscustomobject]@{ path = 'buildconf.txt'; bytes = 10; sha256 = ('a' * 64) }
                 [pscustomobject]@{ path = 'NOTICE.md'; bytes = 10; sha256 = ('b' * 64) }
-                [pscustomobject]@{ path = 'sources/dependency.tar.gz'; bytes = 10; sha256 = ('c' * 64) }
+                [pscustomobject]@{ path = 'sources/direct/dependency.tar.gz'; bytes = 10; sha256 = ('c' * 64) }
+                [pscustomobject]@{ path = 'manifest.json'; bytes = 10; sha256 = ('d' * 64) }
             )
         }
         $manifest = [pscustomobject]@{
             includedPaths = @('buildconf.txt', 'NOTICE.md')
-            counts = [pscustomobject]@{ totalSourceArchives = 1; btbnCacheArchives = 0; rav1eCrates = 0; toolchainSourceArchives = 0; licenseTextObjects = 1 }
+            counts = [pscustomobject]@{ totalSourceArchives = 1; directSourceArchives = 1; btbnCacheArchives = 0; rav1eCrates = 0; toolchainSourceArchives = 0; licenseTextObjects = 1 }
         }
         $zip = @{'inventory.json' = (New-ProducerRecord 'inventory.json')}
         foreach ($entry in $full.entries) { $zip[$entry.path] = New-ProducerRecord $entry.path $entry.sha256 $entry.bytes }
     }
     It 'accepts complete indexed content beyond the projection' { Assert-KaronFfmpegInventory $full $manifest $zip }
     It 'rejects an omitted dependency even when all projected files remain' {
-        $zip.Remove('sources/dependency.tar.gz')
+        $zip.Remove('sources/direct/dependency.tar.gz')
         { Assert-KaronFfmpegInventory $full $manifest $zip } | Should -Throw
     }
     It 'rejects a changed dependency hash' {
-        $zip['sources/dependency.tar.gz'].sha256 = 'f' * 64
+        $zip['sources/direct/dependency.tar.gz'].sha256 = 'f' * 64
         { Assert-KaronFfmpegInventory $full $manifest $zip } | Should -Throw
     }
     It 'rejects undeclared archive content' {
@@ -218,6 +228,16 @@ Describe 'FFmpeg complete inventory versus manifest projection' {
     }
     It 'rejects mismatched source archive counts' {
         $full.sourceArchiveCount = 2
+        { Assert-KaronFfmpegInventory $full $manifest $zip } | Should -Throw
+    }
+    It 'binds the projected manifest to its archived bytes' {
+        Assert-KaronFfmpegInventory $full $manifest $zip (New-ProducerRecord 'BUILD-CLOSURE.json' ('d' * 64))
+    }
+    It 'rejects a projection from a different manifest' {
+        { Assert-KaronFfmpegInventory $full $manifest $zip (New-ProducerRecord 'BUILD-CLOSURE.json' ('e' * 64)) } | Should -Throw
+    }
+    It 'rejects source-category counts that do not match retained paths' {
+        $manifest.counts.directSourceArchives = 2
         { Assert-KaronFfmpegInventory $full $manifest $zip } | Should -Throw
     }
 }

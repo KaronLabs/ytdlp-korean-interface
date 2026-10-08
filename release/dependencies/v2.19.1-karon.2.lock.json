@@ -70,15 +70,8 @@
       }
     ],
     "blockers": [
-      "Exact-candidate non-runtime collection remains blocked by production_manifest_git_blob_mismatch and sevenzip_extractor_identity_mismatch.",
-      "The non-runtime producer application ZIP (166f13da8a2b4bc857ced3e1674ee54b927f04cf1c8d74b922814a4974f47956, 15883862 bytes) differs from the authoritative official ZIP (ed8b1d348d8317bf0061b501737fd2f5211271357b7ade5ecd57a224438a7c06, 16022117 bytes).",
-      "Generated Deno/FFmpeg complete closure ZIPs and the 7-Zip source wrapper are local producer artifacts, not the upstream commit ZIPs. The current pinned-URL consumer only accepts raw commit ZIP URLs; generated-source archive shape and source splitting are pending owner approval.",
-      "The main Deno/FFmpeg contracts require exactly one full closure sourceArchives record. Legacy raw sourceArchives are retained as origin facts pending the approved consumer/schema transition; sourceClosure identifies the real full archives without a fabricated public URL.",
-      "The authentic FFmpeg schema-3 manifest contains 37 includedPaths; the producer inventory records 1128 ZIP entries. A provenance-backed complete-path projection or consumer adjustment is required before assembly.",
-      "The Deno contract binds original G6 outputRoot paths; use original producer paths as builder inputs, not the redistributed notice/manifest copies. Its approved collectorSourceCommit is 09ced74a90248fbeb54969ea03d5aacb98dfc38b.",
-      "The current 7-Zip wrapper filename is 7zip-no-rar-corresponding-sources.zip while the consumer requires 7z2601-x64-no-rar-source.zip; wrapper staging is owned by assembly.",
-      "These working-tree license data changes postdate the sealed b80f594 source. The assembly owner must reconcile metadata/candidate binding and the lock/SPDX/corresponding-source cycle.",
-      "Final assembly and independent exact-candidate license validation have not been run by this implementation task."
+      "Independent exact-candidate license validation has not run.",
+      "Packaging metadata has not been sealed into a separate packaging commit."
     ],
     "metadataPackage": {
       "id": "release-metadata",
@@ -88,25 +81,26 @@
       "licenseConcluded": "CC0-1.0",
       "sourceCommit": "b80f594a2b6673d28e00e705659c39b0c4bed647",
       "downloadLocation": "https://github.com/KaronLabs/ytdlp-korean-interface/archive/b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
-      "bindingNote": "Application source base only; this updated working-tree license metadata has not been sealed or independently verified.",
+      "bindingNote": "Application source base only. Packaging metadata is unsealed and independent validation has not run.",
       "noticeFiles": [
         {
           "path": "THIRD-PARTY-NOTICES.txt",
-          "sha256": "3c7dfda1aa8d92eadaca4c0977d6eabe5d44853bbaa77426ecb875d45573dcee",
-          "length": 8040
+          "sha256": "c65d43d4a6694a06b597e9024875f7d336c545cca53d757a5c25437e62143cac",
+          "length": 8619
         },
         {
           "path": "release/licenses/v2.19.1-karon.2/README.txt",
-          "sha256": "cbeef4e4c660361cf84935ca62afab3f7a67732d58d8d84434fd60a325604d9f",
-          "length": 1791
+          "sha256": "139f7bd7e2eb7afd64635e8fa1a0fba550770f41d4d56924eec0fa4f16815ee3",
+          "length": 2111
         },
         {
           "path": "release/licenses/v2.19.1-karon.2/ASSEMBLY-STATUS.json",
-          "sha256": "e4d705a3b29fb81720b642c09d8331c7bc3459fd7c5cd14467715d57ae6f631b",
-          "length": 7208
+          "sha256": "779b6a16f058615ec5caefac5e054c3c65bdf9f55f9c074cc592c81f1a1091bb",
+          "length": 6442
         }
       ],
-      "verificationStatus": "NOT_VERIFIED"
+      "verificationStatus": "NOT_VERIFIED",
+      "packagingCommit": null
     },
     "applicationSource": {
       "fileName": "karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
@@ -201,7 +195,10 @@
       ],
       "bindingScope": "Separate candidate dependency archive and modified dependency trees; not the application source ZIP."
     },
-    "assemblyStatusPath": "release/licenses/v2.19.1-karon.2/ASSEMBLY-STATUS.json"
+    "assemblyStatusPath": "release/licenses/v2.19.1-karon.2/ASSEMBLY-STATUS.json",
+    "sourceTransportSplitting": "APPROVED_BY_OWNER",
+    "productionAssembly": "NOT_RUN",
+    "licenseApproval": "HOLD"
   },
   "components": [
     {
@@ -236,12 +233,37 @@
           "url": "https://github.com/KaronLabs/ytdlp-korean-interface/archive/b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
           "sha256": "ed8b1d348d8317bf0061b501737fd2f5211271357b7ade5ecd57a224438a7c06",
           "length": 16022117,
-          "localPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/source-archives/karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
-          "verificationStatus": "NOT_VERIFIED"
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
+        },
+        {
+          "artifactType": "generated-source-closure",
+          "fileName": "ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip",
+          "commit": "b80f594a2b6673d28e00e705659c39b0c4bed647",
+          "url": null,
+          "sha256": "3baf0e28fab0e036f898e8f3099a623d67ff79fb73bf400427c3a024243e8a21",
+          "length": 47673568,
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "provenance": {
+            "component": "application",
+            "sourceCommit": "b80f594a2b6673d28e00e705659c39b0c4bed647"
+          },
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
         }
       ],
       "buildRecipe": "Run tools/build-candidate.ps1 from the exact clean final release commit; bind its source attestation, dependency archive, linker inputs, toolchain, commands, and candidate file hashes.",
-      "blockers": "The exact-candidate non-runtime producer is blocked by production_manifest_git_blob_mismatch and sevenzip_extractor_identity_mismatch. Its application ZIP differs from the authoritative official source archive; fresh bound assembly is required.",
+      "blockers": [
+        "Independent exact-candidate license validation has not run.",
+        "Packaging metadata has not been sealed into a separate packaging commit."
+      ],
       "filesAnalyzed": false,
       "licenseConcluded": "MIT AND MPL-2.0 AND BSL-1.0 AND libpng-2.0 AND Zlib AND BSD-3-Clause AND IJG",
       "producerEvidence": {
@@ -277,8 +299,12 @@
           "url": "https://github.com/rikyoz/bit7z/archive/c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742.zip",
           "sha256": "6af52b2e1b9895e8f1193728880206326161940e7a961e3162ec39752dbb3379",
           "length": 494710,
-          "localPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-9-non-runtime-evidence/source-cache/bit7z-c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742.zip",
-          "verificationStatus": "NOT_VERIFIED"
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\bit7z-c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
         },
         {
           "fileName": "karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
@@ -286,12 +312,37 @@
           "url": "https://github.com/KaronLabs/ytdlp-korean-interface/archive/b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
           "sha256": "ed8b1d348d8317bf0061b501737fd2f5211271357b7ade5ecd57a224438a7c06",
           "length": 16022117,
-          "localPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/source-archives/karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
-          "verificationStatus": "NOT_VERIFIED"
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
+        },
+        {
+          "artifactType": "generated-source-closure",
+          "fileName": "ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip",
+          "commit": "b80f594a2b6673d28e00e705659c39b0c4bed647",
+          "url": null,
+          "sha256": "3baf0e28fab0e036f898e8f3099a623d67ff79fb73bf400427c3a024243e8a21",
+          "length": 47673568,
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "provenance": {
+            "component": "application",
+            "sourceCommit": "b80f594a2b6673d28e00e705659c39b0c4bed647"
+          },
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
         }
       ],
       "buildRecipe": "Configure and build Release x64 with CMake, MSVC v143, native strings, path sanitization, regex matching, static runtime, custom no-RAR 7-Zip SDK, and the pinned local CPM bootstrap.",
-      "blockers": "The exact-candidate non-runtime producer is blocked by production_manifest_git_blob_mismatch and sevenzip_extractor_identity_mismatch. Its application ZIP differs from the authoritative official source archive; fresh bound assembly is required.",
+      "blockers": [
+        "Independent exact-candidate license validation has not run.",
+        "Packaging metadata has not been sealed into a separate packaging commit."
+      ],
       "filesAnalyzed": false,
       "staticLinkTarget": "application",
       "licenseConcluded": "MPL-2.0",
@@ -356,12 +407,19 @@
           "url": "https://github.com/cpm-cmake/CPM.cmake/archive/49acea0d775087ace0522ee4cc5de45e3da094a8.zip",
           "sha256": "97d684cfb9e9f5ec37a2d52c737e24b75f2abfdf2594e109718309cb7c0b8a33",
           "length": 168785,
-          "localPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-9-non-runtime-evidence/source-cache/cpm-49acea0d775087ace0522ee4cc5de45e3da094a8.zip",
-          "verificationStatus": "NOT_VERIFIED"
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\cpm-49acea0d775087ace0522ee4cc5de45e3da094a8.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
         }
       ],
       "buildRecipe": "Use the exact v0.42.3 release asset bytes as CPM_DOWNLOAD_LOCATION with no network fallback.",
-      "blockers": "The exact-candidate non-runtime producer is blocked; CPM is an approved build input, not a shipped or statically linked runtime.",
+      "blockers": [
+        "Independent exact-candidate license validation has not run.",
+        "Packaging metadata has not been sealed into a separate packaging commit."
+      ],
       "filesAnalyzed": false,
       "licenseConcluded": "MIT",
       "usage": "build-input",
@@ -414,8 +472,12 @@
           "url": "https://github.com/cnjinhao/nana/archive/554c4fe87fc31b8ee104228e9117d545d34855b5.zip",
           "sha256": "ef657036a4623bbb5c4e0df4e8aa699dc6ac713ca4a6725b30d3fd8175c4c145",
           "length": 745596,
-          "localPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-9-non-runtime-evidence/source-cache/nana-554c4fe87fc31b8ee104228e9117d545d34855b5.zip",
-          "verificationStatus": "NOT_VERIFIED"
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\nana-554c4fe87fc31b8ee104228e9117d545d34855b5.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
         },
         {
           "fileName": "karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
@@ -423,12 +485,37 @@
           "url": "https://github.com/KaronLabs/ytdlp-korean-interface/archive/b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
           "sha256": "ed8b1d348d8317bf0061b501737fd2f5211271357b7ade5ecd57a224438a7c06",
           "length": 16022117,
-          "localPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/source-archives/karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
-          "verificationStatus": "NOT_VERIFIED"
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
+        },
+        {
+          "artifactType": "generated-source-closure",
+          "fileName": "ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip",
+          "commit": "b80f594a2b6673d28e00e705659c39b0c4bed647",
+          "url": null,
+          "sha256": "3baf0e28fab0e036f898e8f3099a623d67ff79fb73bf400427c3a024243e8a21",
+          "length": 47673568,
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "provenance": {
+            "component": "application",
+            "sourceCommit": "b80f594a2b6673d28e00e705659c39b0c4bed647"
+          },
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
         }
       ],
       "buildRecipe": "Build the complete modified vendored Nana source tree with nana/build/vc2022/nana.sln, Release x64, MSVC v143, and hermetic MSBuild properties.",
-      "blockers": "The exact-candidate non-runtime producer is blocked by production_manifest_git_blob_mismatch and sevenzip_extractor_identity_mismatch. Its application ZIP differs from the authoritative official source archive; fresh bound assembly is required.",
+      "blockers": [
+        "Independent exact-candidate license validation has not run.",
+        "Packaging metadata has not been sealed into a separate packaging commit."
+      ],
       "filesAnalyzed": false,
       "staticLinkTarget": "application",
       "licenseConcluded": "BSL-1.0",
@@ -485,8 +572,12 @@
           "url": "https://github.com/pnggroup/libpng/archive/a40189cf881e9f0db80511c382292a5604c3c3d1.zip",
           "sha256": "b3af9e92167f9c4233482f49aff02730b7dc3a275871ce637ed668413da6283f",
           "length": 1803566,
-          "localPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-9-non-runtime-evidence/source-cache/libpng-a40189cf881e9f0db80511c382292a5604c3c3d1.zip",
-          "verificationStatus": "NOT_VERIFIED"
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\libpng-a40189cf881e9f0db80511c382292a5604c3c3d1.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
         },
         {
           "fileName": "karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
@@ -494,12 +585,37 @@
           "url": "https://github.com/KaronLabs/ytdlp-korean-interface/archive/b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
           "sha256": "ed8b1d348d8317bf0061b501737fd2f5211271357b7ade5ecd57a224438a7c06",
           "length": 16022117,
-          "localPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/source-archives/karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
-          "verificationStatus": "NOT_VERIFIED"
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
+        },
+        {
+          "artifactType": "generated-source-closure",
+          "fileName": "ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip",
+          "commit": "b80f594a2b6673d28e00e705659c39b0c4bed647",
+          "url": null,
+          "sha256": "3baf0e28fab0e036f898e8f3099a623d67ff79fb73bf400427c3a024243e8a21",
+          "length": 47673568,
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "provenance": {
+            "component": "application",
+            "sourceCommit": "b80f594a2b6673d28e00e705659c39b0c4bed647"
+          },
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
         }
       ],
       "buildRecipe": "Build the complete modified vendored libpng tree with libpng/libpng.sln, Release x64, MSVC v143, hermetic MSBuild properties, and the exact zlib.static 1.2.5 package.",
-      "blockers": "The exact-candidate non-runtime producer is blocked by production_manifest_git_blob_mismatch and sevenzip_extractor_identity_mismatch. Its application ZIP differs from the authoritative official source archive; fresh bound assembly is required.",
+      "blockers": [
+        "Independent exact-candidate license validation has not run.",
+        "Packaging metadata has not been sealed into a separate packaging commit."
+      ],
       "filesAnalyzed": false,
       "staticLinkTarget": "application",
       "licenseConcluded": "libpng-2.0",
@@ -561,8 +677,12 @@
           "url": "https://github.com/madler/zlib/archive/9712272c78b9d9c93746d9c8e156a3728c65ca72.zip",
           "sha256": "66faa243ea50094c2b399f5644cd4aa6110e739eae26800120124bbd1da00535",
           "length": 703697,
-          "localPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-9-non-runtime-evidence/source-cache/zlib-9712272c78b9d9c93746d9c8e156a3728c65ca72.zip",
-          "verificationStatus": "NOT_VERIFIED"
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\zlib-9712272c78b9d9c93746d9c8e156a3728c65ca72.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
         },
         {
           "fileName": "karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
@@ -570,12 +690,37 @@
           "url": "https://github.com/KaronLabs/ytdlp-korean-interface/archive/b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
           "sha256": "ed8b1d348d8317bf0061b501737fd2f5211271357b7ade5ecd57a224438a7c06",
           "length": 16022117,
-          "localPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/source-archives/karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
-          "verificationStatus": "NOT_VERIFIED"
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
+        },
+        {
+          "artifactType": "generated-source-closure",
+          "fileName": "ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip",
+          "commit": "b80f594a2b6673d28e00e705659c39b0c4bed647",
+          "url": null,
+          "sha256": "3baf0e28fab0e036f898e8f3099a623d67ff79fb73bf400427c3a024243e8a21",
+          "length": 47673568,
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "provenance": {
+            "component": "application",
+            "sourceCommit": "b80f594a2b6673d28e00e705659c39b0c4bed647"
+          },
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
         }
       ],
       "buildRecipe": "Use the exact official zlib.static 1.2.5 NuGet package embedded byte-for-byte in the dependency archive; its complete source directory is retained there and consumed by the libpng project.",
-      "blockers": "The exact-candidate non-runtime producer is blocked by production_manifest_git_blob_mismatch and sevenzip_extractor_identity_mismatch. Its application ZIP differs from the authoritative official source archive; fresh bound assembly is required.",
+      "blockers": [
+        "Independent exact-candidate license validation has not run.",
+        "Packaging metadata has not been sealed into a separate packaging commit."
+      ],
       "filesAnalyzed": false,
       "staticLinkTarget": "application",
       "licenseConcluded": "Zlib",
@@ -628,8 +773,12 @@
           "url": "https://github.com/libjpeg-turbo/libjpeg-turbo/archive/4e151a4ad91001b3aa8c2ece2205c15f487ce320.zip",
           "sha256": "d3c33405b46aa14094ef26cd7b9618162ebcafeed7fb2acf2fda5c7c10b80782",
           "length": 3033904,
-          "localPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-9-non-runtime-evidence/source-cache/libjpeg-turbo-4e151a4ad91001b3aa8c2ece2205c15f487ce320.zip",
-          "verificationStatus": "NOT_VERIFIED"
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\libjpeg-turbo-4e151a4ad91001b3aa8c2ece2205c15f487ce320.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
         },
         {
           "fileName": "karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
@@ -637,12 +786,37 @@
           "url": "https://github.com/KaronLabs/ytdlp-korean-interface/archive/b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
           "sha256": "ed8b1d348d8317bf0061b501737fd2f5211271357b7ade5ecd57a224438a7c06",
           "length": 16022117,
-          "localPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/source-archives/karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
-          "verificationStatus": "NOT_VERIFIED"
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
+        },
+        {
+          "artifactType": "generated-source-closure",
+          "fileName": "ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip",
+          "commit": "b80f594a2b6673d28e00e705659c39b0c4bed647",
+          "url": null,
+          "sha256": "3baf0e28fab0e036f898e8f3099a623d67ff79fb73bf400427c3a024243e8a21",
+          "length": 47673568,
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "provenance": {
+            "component": "application",
+            "sourceCommit": "b80f594a2b6673d28e00e705659c39b0c4bed647"
+          },
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
         }
       ],
       "buildRecipe": "Configure the complete retained source tree for VS 2022 x64 with ENABLE_SHARED=OFF, ENABLE_STATIC=ON, WITH_TURBOJPEG=ON, WITH_CRT_DLL=OFF; build turbojpeg-static.",
-      "blockers": "The exact-candidate non-runtime producer is blocked by production_manifest_git_blob_mismatch and sevenzip_extractor_identity_mismatch. Its application ZIP differs from the authoritative official source archive; fresh bound assembly is required.",
+      "blockers": [
+        "Independent exact-candidate license validation has not run.",
+        "Packaging metadata has not been sealed into a separate packaging commit."
+      ],
       "filesAnalyzed": false,
       "staticLinkTarget": "application",
       "licenseConcluded": "BSD-3-Clause AND IJG AND Zlib",
@@ -687,8 +861,12 @@
           "url": "https://github.com/nlohmann/json/archive/55f93686c01528224f448c19128836e7df245f72.zip",
           "sha256": "0746352e4e9532e7aeabbcbaa79079b6bc6008e9261e4d459c9486a9b48a172e",
           "length": 10243783,
-          "localPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-9-non-runtime-evidence/source-cache/nlohmann-json-55f93686c01528224f448c19128836e7df245f72.zip",
-          "verificationStatus": "NOT_VERIFIED"
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\nlohmann-json-55f93686c01528224f448c19128836e7df245f72.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
         },
         {
           "fileName": "karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
@@ -696,12 +874,37 @@
           "url": "https://github.com/KaronLabs/ytdlp-korean-interface/archive/b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
           "sha256": "ed8b1d348d8317bf0061b501737fd2f5211271357b7ade5ecd57a224438a7c06",
           "length": 16022117,
-          "localPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/source-archives/karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
-          "verificationStatus": "NOT_VERIFIED"
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\karon-b80f594a2b6673d28e00e705659c39b0c4bed647.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
+        },
+        {
+          "artifactType": "generated-source-closure",
+          "fileName": "ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip",
+          "commit": "b80f594a2b6673d28e00e705659c39b0c4bed647",
+          "url": null,
+          "sha256": "3baf0e28fab0e036f898e8f3099a623d67ff79fb73bf400427c3a024243e8a21",
+          "length": 47673568,
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "provenance": {
+            "component": "application",
+            "sourceCommit": "b80f594a2b6673d28e00e705659c39b0c4bed647"
+          },
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
         }
       ],
       "buildRecipe": "Compile ytdlp-interface/json.hpp from the exact final application source. The only upstream-to-vendored byte transform is deterministic LF-to-CRLF conversion.",
-      "blockers": "The exact-candidate non-runtime producer is blocked by production_manifest_git_blob_mismatch and sevenzip_extractor_identity_mismatch. Its application ZIP differs from the authoritative official source archive; fresh bound assembly is required.",
+      "blockers": [
+        "Independent exact-candidate license validation has not run.",
+        "Packaging metadata has not been sealed into a separate packaging commit."
+      ],
       "filesAnalyzed": false,
       "staticLinkTarget": "application",
       "licenseConcluded": "MIT",
@@ -788,17 +991,40 @@
       ],
       "sourceArchives": [
         {
-          "fileName": "7zip-8c63d71ff886bda90c86db28466287f977374237.zip",
+          "artifactType": "generated-source-closure",
+          "fileName": "7z2601-x64-no-rar-source.zip",
           "commit": "8c63d71ff886bda90c86db28466287f977374237",
-          "url": "https://github.com/ip7z/7zip/archive/8c63d71ff886bda90c86db28466287f977374237.zip",
-          "sha256": "01589aeda50512955e66d360c6534b961ec95c51111a76e2fa2976a8daa55271",
-          "length": 2892293,
-          "localPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-9-non-runtime-evidence/source-cache/7zip-8c63d71ff886bda90c86db28466287f977374237.zip",
-          "verificationStatus": "NOT_VERIFIED"
+          "url": null,
+          "sha256": "ac25181f5fb404f791376432acd55593721f6568cff72a98b94b408ec1309d07",
+          "length": 1482060,
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\7z2601-x64-no-rar-source.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "provenance": {
+            "component": "7zip",
+            "sourceCommit": "8c63d71ff886bda90c86db28466287f977374237",
+            "upstreamSourceArchives": [
+              {
+                "fileName": "7zip-8c63d71ff886bda90c86db28466287f977374237.zip",
+                "commit": "8c63d71ff886bda90c86db28466287f977374237",
+                "url": "https://github.com/ip7z/7zip/archive/8c63d71ff886bda90c86db28466287f977374237.zip",
+                "sha256": "01589aeda50512955e66d360c6534b961ec95c51111a76e2fa2976a8daa55271",
+                "length": 2892293,
+                "localPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-9-non-runtime-evidence/source-cache/7zip-8c63d71ff886bda90c86db28466287f977374237.zip",
+                "verificationStatus": "NOT_VERIFIED"
+              }
+            ]
+          },
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
         }
       ],
       "buildRecipe": "Use KaronBuild/build-sevenzip-no-rar.ps1 from the sealed corresponding-source archive; retain commands, link object map, toolchain hashes, runtime ZIP/7z extraction results, and exact DLL SHA.",
-      "blockers": "This is an untrusted initial template. Exact producer facts are retained separately; main assembly consumers and generated-source archive binding remain pending owner approval.",
+      "blockers": [
+        "Independent exact-candidate license validation has not run.",
+        "Packaging metadata has not been sealed into a separate packaging commit."
+      ],
       "filesAnalyzed": false,
       "licenseConcluded": "LGPL-2.1-or-later AND BSD-3-Clause AND BSD-2-Clause",
       "producerEvidence": {
@@ -858,8 +1084,8 @@
         "upstreamSourceUrl": "https://github.com/ip7z/7zip/archive/8c63d71ff886bda90c86db28466287f977374237.zip",
         "verificationStatus": "NOT_VERIFIED",
         "sourceWrapper": {
-          "fileName": "7zip-no-rar-corresponding-sources.zip",
-          "localPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/source-archives/7zip-no-rar-corresponding-sources.zip",
+          "fileName": "7z2601-x64-no-rar-source.zip",
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\7z2601-x64-no-rar-source.zip",
           "sha256": "ac25181f5fb404f791376432acd55593721f6568cff72a98b94b408ec1309d07",
           "length": 1482060,
           "entryPath": "sevenzip/7z2601-x64-no-rar-source.7z",
@@ -877,6 +1103,17 @@
           "length": 2892293,
           "format": "zip",
           "includeInBundle": true
+        }
+      ],
+      "upstreamSourceArchives": [
+        {
+          "fileName": "7zip-8c63d71ff886bda90c86db28466287f977374237.zip",
+          "commit": "8c63d71ff886bda90c86db28466287f977374237",
+          "url": "https://github.com/ip7z/7zip/archive/8c63d71ff886bda90c86db28466287f977374237.zip",
+          "sha256": "01589aeda50512955e66d360c6534b961ec95c51111a76e2fa2976a8daa55271",
+          "length": 2892293,
+          "localPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-9-non-runtime-evidence/source-cache/7zip-8c63d71ff886bda90c86db28466287f977374237.zip",
+          "verificationStatus": "NOT_VERIFIED"
         }
       ]
     },
@@ -908,8 +1145,12 @@
           "url": "https://github.com/yt-dlp/yt-dlp/archive/bbc809a1161d3bfca51fa36f59dda35556ee85a0.zip",
           "sha256": "62a651de6ffcd3631ca34f0f617932bdedc4a6be652777acae8a11d1cafd172b",
           "length": 3854279,
-          "localPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-9-non-runtime-evidence/source-cache/yt-dlp-bbc809a1161d3bfca51fa36f59dda35556ee85a0.zip",
-          "verificationStatus": "NOT_VERIFIED"
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\yt-dlp-bbc809a1161d3bfca51fa36f59dda35556ee85a0.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
         }
       ],
       "binaryProvenance": {
@@ -926,7 +1167,10 @@
         "length": 17842860
       },
       "buildRecipe": "Use the official immutable nightly release asset generated from source commit bbc809a1161d3bfca51fa36f59dda35556ee85a0; verify the official SHA2-256SUMS and preserve the exact source LICENSE and THIRD_PARTY_LICENSES.txt corpus.",
-      "blockers": "The exact-candidate non-runtime producer is blocked by production_manifest_git_blob_mismatch and sevenzip_extractor_identity_mismatch. Its application ZIP differs from the authoritative official source archive; fresh bound assembly is required.",
+      "blockers": [
+        "Independent exact-candidate license validation has not run.",
+        "Packaging metadata has not been sealed into a separate packaging commit."
+      ],
       "filesAnalyzed": false,
       "licenseConcluded": "Unlicense AND LicenseRef-yt-dlp-PyInstaller-Third-Party",
       "licenseRefs": [
@@ -1014,14 +1258,41 @@
       ],
       "sourceArchives": [
         {
-          "fileName": "deno-2d674b25.zip",
+          "artifactType": "generated-source-closure",
+          "fileName": "deno-2.7.14-verified-conservative-superset-sources.zip",
           "commit": "2d674b25625bcc367853d00fe86f6e84390f88cb",
-          "url": "https://github.com/denoland/deno/archive/2d674b25625bcc367853d00fe86f6e84390f88cb.zip",
-          "sha256": "0fb1aac72af419d8f7de0d623eee7713571d841736d1c01eac97363afd3996dd",
-          "length": 33443763,
-          "archiveEntry": "SOURCES/deno-source-2d674b25625bcc367853d00fe86f6e84390f88cb.zip",
-          "containerPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-7-deno-notices/review-g6-79b211-20260916/deno-third-party-output/deno-2.7.14-verified-conservative-superset-sources.zip",
-          "verificationStatus": "NOT_VERIFIED"
+          "url": null,
+          "sha256": "004b9cdaf34dd488b7752ee1a563dde6d60ee50e538cac6a8c711adea0b604a4",
+          "length": 523700266,
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\deno-2.7.14-verified-conservative-superset-sources.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "provenance": {
+            "component": "deno",
+            "sourceCommit": "2d674b25625bcc367853d00fe86f6e84390f88cb",
+            "upstreamSourceArchives": [
+              {
+                "fileName": "deno-2d674b25.zip",
+                "commit": "2d674b25625bcc367853d00fe86f6e84390f88cb",
+                "url": "https://github.com/denoland/deno/archive/2d674b25625bcc367853d00fe86f6e84390f88cb.zip",
+                "sha256": "0fb1aac72af419d8f7de0d623eee7713571d841736d1c01eac97363afd3996dd",
+                "length": 33443763,
+                "archiveEntry": "SOURCES/deno-source-2d674b25625bcc367853d00fe86f6e84390f88cb.zip",
+                "containerPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-7-deno-notices/review-g6-79b211-20260916/deno-third-party-output/deno-2.7.14-verified-conservative-superset-sources.zip",
+                "verificationStatus": "NOT_VERIFIED"
+              }
+            ],
+            "upstreamSource": {
+              "entryPath": "SOURCES/deno-source-2d674b25625bcc367853d00fe86f6e84390f88cb.zip",
+              "commit": "2d674b25625bcc367853d00fe86f6e84390f88cb",
+              "url": "https://github.com/denoland/deno/archive/2d674b25625bcc367853d00fe86f6e84390f88cb.zip",
+              "sha256": "0fb1aac72af419d8f7de0d623eee7713571d841736d1c01eac97363afd3996dd",
+              "length": 33443763
+            }
+          },
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
         }
       ],
       "binaryProvenance": {
@@ -1031,7 +1302,10 @@
         "binaryLength": 127973152
       },
       "buildRecipe": "Build the pinned Deno source and its Cargo.lock dependency graph for x86_64-pc-windows-msvc, including v8 crate 147.4.0 and V8 14.7.173.20-rusty.",
-      "blockers": "This is an untrusted initial template. Exact producer facts are retained separately; main assembly consumers and generated-source archive binding remain pending owner approval.",
+      "blockers": [
+        "Independent exact-candidate license validation has not run.",
+        "Packaging metadata has not been sealed into a separate packaging commit."
+      ],
       "filesAnalyzed": false,
       "licenseConcluded": "MIT AND LicenseRef-Deno-Third-Party",
       "licenseRefs": [
@@ -1073,7 +1347,19 @@
         "originalComponentManifestPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-7-deno-notices/review-g6-79b211-20260916/deno-third-party-output/component-manifest.json",
         "originalInventoryPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-7-deno-notices/review-g6-79b211-20260916/deno-third-party-output/source-inventory.json",
         "originalNoticesPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-7-deno-notices/review-g6-79b211-20260916/deno-third-party-output/THIRD-PARTY-NOTICES.txt"
-      }
+      },
+      "upstreamSourceArchives": [
+        {
+          "fileName": "deno-2d674b25.zip",
+          "commit": "2d674b25625bcc367853d00fe86f6e84390f88cb",
+          "url": "https://github.com/denoland/deno/archive/2d674b25625bcc367853d00fe86f6e84390f88cb.zip",
+          "sha256": "0fb1aac72af419d8f7de0d623eee7713571d841736d1c01eac97363afd3996dd",
+          "length": 33443763,
+          "archiveEntry": "SOURCES/deno-source-2d674b25625bcc367853d00fe86f6e84390f88cb.zip",
+          "containerPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-7-deno-notices/review-g6-79b211-20260916/deno-third-party-output/deno-2.7.14-verified-conservative-superset-sources.zip",
+          "verificationStatus": "NOT_VERIFIED"
+        }
+      ]
     },
     {
       "id": "ffmpeg",
@@ -1140,24 +1426,44 @@
       ],
       "sourceArchives": [
         {
-          "fileName": "ffmpeg-9258bacc.zip",
+          "artifactType": "generated-source-closure",
+          "fileName": "ytdlp-korean-interface-v2.19.1-karon.2-ffmpeg-corresponding-sources.zip",
           "commit": "9258bacca50d7ca28bcb6d797e8952123e35105b",
-          "url": "https://github.com/FFmpeg/FFmpeg/archive/9258bacca50d7ca28bcb6d797e8952123e35105b.zip",
-          "sha256": "5a486a7a20fdf673d0fe9314b41897725abe34aa8bb63c5c440f2b017935644c",
-          "length": 23725274,
-          "archiveEntry": "sources/direct/ffmpeg.source",
-          "containerPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-6-closure-run-e-4537e5d/ytdlp-korean-interface-v2.19.1-karon.2-ffmpeg-corresponding-sources.zip",
-          "verificationStatus": "NOT_VERIFIED"
-        },
-        {
-          "fileName": "btbn-3e6685ed.zip",
-          "commit": "3e6685eda92f9288c15ac320139622dcedca09a4",
-          "url": "https://github.com/BtbN/FFmpeg-Builds/archive/3e6685eda92f9288c15ac320139622dcedca09a4.zip",
-          "sha256": "21baace73d2d9599deda5688247cc250dfa7e5d9557a06b12c69c8175618ab92",
-          "length": 239560,
-          "archiveEntry": "sources/direct/btbnScripts.source",
-          "containerPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-6-closure-run-e-4537e5d/ytdlp-korean-interface-v2.19.1-karon.2-ffmpeg-corresponding-sources.zip",
-          "verificationStatus": "NOT_VERIFIED"
+          "url": null,
+          "sha256": "cf040e97af067e7ab01fb891dc0302b0f332b88fc7b9daace456413c7b2be75f",
+          "length": 2528152976,
+          "localPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\source-assembly-20261008-implementation-01\\source-archives\\ytdlp-korean-interface-v2.19.1-karon.2-ffmpeg-corresponding-sources.zip",
+          "verificationStatus": "NOT_VERIFIED",
+          "provenance": {
+            "component": "ffmpeg",
+            "sourceCommit": "9258bacca50d7ca28bcb6d797e8952123e35105b",
+            "upstreamSourceArchives": [
+              {
+                "fileName": "ffmpeg-9258bacc.zip",
+                "commit": "9258bacca50d7ca28bcb6d797e8952123e35105b",
+                "url": "https://github.com/FFmpeg/FFmpeg/archive/9258bacca50d7ca28bcb6d797e8952123e35105b.zip",
+                "sha256": "5a486a7a20fdf673d0fe9314b41897725abe34aa8bb63c5c440f2b017935644c",
+                "length": 23725274,
+                "archiveEntry": "sources/direct/ffmpeg.source",
+                "containerPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-6-closure-run-e-4537e5d/ytdlp-korean-interface-v2.19.1-karon.2-ffmpeg-corresponding-sources.zip",
+                "verificationStatus": "NOT_VERIFIED"
+              },
+              {
+                "fileName": "btbn-3e6685ed.zip",
+                "commit": "3e6685eda92f9288c15ac320139622dcedca09a4",
+                "url": "https://github.com/BtbN/FFmpeg-Builds/archive/3e6685eda92f9288c15ac320139622dcedca09a4.zip",
+                "sha256": "21baace73d2d9599deda5688247cc250dfa7e5d9557a06b12c69c8175618ab92",
+                "length": 239560,
+                "archiveEntry": "sources/direct/btbnScripts.source",
+                "containerPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-6-closure-run-e-4537e5d/ytdlp-korean-interface-v2.19.1-karon.2-ffmpeg-corresponding-sources.zip",
+                "verificationStatus": "NOT_VERIFIED"
+              }
+            ]
+          },
+          "blockers": [
+            "Independent exact-candidate license validation has not run.",
+            "Packaging metadata has not been sealed into a separate packaging commit."
+          ]
         }
       ],
       "binaryProvenance": {
@@ -1171,7 +1477,10 @@
         "ffprobeLength": 132456960
       },
       "buildRecipe": "Use BtbN commit 3e6685eda92f9288c15ac320139622dcedca09a4, target win64, variant lgpl, addin 9.0, and the exact configuration inventory in release/licenses/v2.19.1-karon.2/ffmpeg/BUILD-CLOSURE.json.",
-      "blockers": "This is an untrusted initial template. Exact producer facts are retained separately; main assembly consumers and generated-source archive binding remain pending owner approval.",
+      "blockers": [
+        "Independent exact-candidate license validation has not run.",
+        "Packaging metadata has not been sealed into a separate packaging commit."
+      ],
       "filesAnalyzed": false,
       "licenseConcluded": "LGPL-3.0-or-later",
       "verificationScope": "Task 6 completed FFmpeg/BtbN source and license conservative superset for the exact LGPL binary pair; not an overall release verdict.",
@@ -1218,7 +1527,29 @@
         "manifestSha256": "8537558fe5e739a3eaec9c2312fb85839db375eeb4595e52ec4ab3b0696b8b43",
         "manifestLength": 11146,
         "manifestSchemaVersion": 3
-      }
+      },
+      "upstreamSourceArchives": [
+        {
+          "fileName": "ffmpeg-9258bacc.zip",
+          "commit": "9258bacca50d7ca28bcb6d797e8952123e35105b",
+          "url": "https://github.com/FFmpeg/FFmpeg/archive/9258bacca50d7ca28bcb6d797e8952123e35105b.zip",
+          "sha256": "5a486a7a20fdf673d0fe9314b41897725abe34aa8bb63c5c440f2b017935644c",
+          "length": 23725274,
+          "archiveEntry": "sources/direct/ffmpeg.source",
+          "containerPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-6-closure-run-e-4537e5d/ytdlp-korean-interface-v2.19.1-karon.2-ffmpeg-corresponding-sources.zip",
+          "verificationStatus": "NOT_VERIFIED"
+        },
+        {
+          "fileName": "btbn-3e6685ed.zip",
+          "commit": "3e6685eda92f9288c15ac320139622dcedca09a4",
+          "url": "https://github.com/BtbN/FFmpeg-Builds/archive/3e6685eda92f9288c15ac320139622dcedca09a4.zip",
+          "sha256": "21baace73d2d9599deda5688247cc250dfa7e5d9557a06b12c69c8175618ab92",
+          "length": 239560,
+          "archiveEntry": "sources/direct/btbnScripts.source",
+          "containerPath": "E:/03_AllWork/ytdlp-korean-interface/.scratch/task-6-closure-run-e-4537e5d/ytdlp-korean-interface-v2.19.1-karon.2-ffmpeg-corresponding-sources.zip",
+          "verificationStatus": "NOT_VERIFIED"
+        }
+      ]
     }
   ]
 }

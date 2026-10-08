@@ -17,8 +17,10 @@ and Task 6 FFmpeg complete source/license closure are available. Deno's full
 FFmpeg's 681 exact license objects are retained in THIRD-PARTY-NOTICES.txt
 with their content-derived reference index in license-corpus.json.
 
-The non-runtime collector remains blocked. Final assembly and independent
-exact-candidate validation have not been performed by this implementation.
+The retained non-runtime-evidence-07 inventory records status closed. Its Git
+application ZIP remains distinct from the official application archive.
+The complete non-runtime bundle retains exact modified dependency sources.
+Final independent exact-candidate validation has not been performed here.
 See ASSEMBLY-STATUS.json and the versioned dependency lock for actual producer
 paths, byte identities, boundaries, and remaining binding work.
 
@@ -27,7 +29,9 @@ That decision does not establish license verification or source closure.
 
 All initial lock component/sourceArchive verificationStatus values are
 NOT_VERIFIED. Actual producer completion facts are retained separately.
-Generated closure ZIPs have no fabricated upstream download URL. Their
-sourceArchive type/URL schema transition awaits owner approval.
+Generated closure ZIPs use url=null and explicit producer-origin bindings.
+Source transport splitting is approved; source obligations remain mandatory.
 FFmpeg BUILD-CLOSURE.json preserves the authentic schema-3 producer manifest;
-its includedPaths/consumer contract difference remains an assembly blocker.
+assembly binds its projection to manifest.json and the full 407-source inventory.
+The original source ZIP is used; the NOT_VERIFIED diet ZIP is not substituted.
+AssemblyOnly outputs remain NOT_VERIFIED with licenseApproval=HOLD.

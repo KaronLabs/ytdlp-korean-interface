@@ -48,7 +48,12 @@ function Assert-GeneratedSourceArchive {
     $metadataError = $ErrorPrefix + '_generated_archive_metadata_invalid'
     if ((Get-GeneratedSourceProperty $Archive 'artifactType' $metadataError) -cne 'generated-source-closure') { throw $metadataError }
     $componentId = Get-GeneratedSourceProperty $Component 'id' $metadataError
-    if ($componentId -isnot [string] -or $componentId -cnotin @('application', 'deno', 'ffmpeg', '7zip')) {
+    $provenanceError = $ErrorPrefix + '_generated_archive_provenance_invalid'
+    $provenance = Get-GeneratedSourceProperty $Archive 'provenance' $provenanceError
+    $staticApplication = $componentId -cin @('bit7z', 'nana', 'libpng', 'zlib', 'libjpeg-turbo', 'nlohmann-json') -and
+        (Get-GeneratedSourceProperty $provenance 'component' $provenanceError) -ceq 'application'
+    $owner = if ($staticApplication) { 'application' } else { $componentId }
+    if ($componentId -isnot [string] -or ($componentId -cnotin @('application', 'deno', 'ffmpeg', '7zip') -and -not $staticApplication)) {
         throw ($ErrorPrefix + '_generated_archive_component_invalid')
     }
     if ($null -ne (Get-GeneratedSourceProperty $Archive 'url' ($ErrorPrefix + '_generated_archive_url_invalid'))) {
@@ -57,6 +62,11 @@ function Assert-GeneratedSourceArchive {
 
     $commit = Get-GeneratedSourceProperty $Archive 'commit' $metadataError
     $sourceCommit = Get-GeneratedSourceProperty $Component 'sourceCommit' $metadataError
+    if ($staticApplication) {
+        $integration = Get-GeneratedSourceProperty $Release 'integrationEvidence' $provenanceError
+        $applicationSource = Get-GeneratedSourceProperty $integration 'applicationSource' $provenanceError
+        $sourceCommit = Get-GeneratedSourceProperty $applicationSource 'commit' $provenanceError
+    }
     if ($commit -isnot [string] -or $commit -notmatch '^[a-fA-F0-9]{40}$' -or $commit -cne $sourceCommit) {
         throw ($ErrorPrefix + '_generated_archive_commit_mismatch')
     }
@@ -69,9 +79,7 @@ function Assert-GeneratedSourceArchive {
         throw $metadataError
     }
 
-    $provenanceError = $ErrorPrefix + '_generated_archive_provenance_invalid'
-    $provenance = Get-GeneratedSourceProperty $Archive 'provenance' $provenanceError
-    if ((Get-GeneratedSourceProperty $provenance 'component' $provenanceError) -cne $componentId -or
+    if ((Get-GeneratedSourceProperty $provenance 'component' $provenanceError) -cne $owner -or
         (Get-GeneratedSourceProperty $provenance 'sourceCommit' $provenanceError) -cne $commit) { throw $provenanceError }
     $origin = Get-GeneratedSourceProperty $Component 'sourceRepository' $metadataError
     if ($origin -isnot [string] -or [string]::IsNullOrWhiteSpace($origin)) { throw $metadataError }
@@ -85,7 +93,7 @@ function Assert-GeneratedSourceArchive {
     $integration = Get-GeneratedSourceProperty $Release 'integrationEvidence' $proofError
     if ((Get-GeneratedSourceProperty $integration 'schemaVersion' $proofError) -cne 'karon-release-license-lock-integration/v1') { throw $proofError }
     # Fixed producer selectors only. Never search unrelated evidence for a matching hash.
-    $selector = switch ($componentId) {
+    $selector = switch ($owner) {
         'application' { @('nonRuntime', 'applicationSourceArchive') }
         'deno' { @('denoComponent', 'sourcesArchive') }
         'ffmpeg' { @('ffmpeg', 'sourcesArchive') }
@@ -117,7 +125,7 @@ function Assert-GeneratedSourceArchive {
         sha256 = $normalizedSha256
         provenance = $provenance
         evidencePath = $evidencePath
-        sourceInfo = "Origin: $origin; source commit: $commit; locally generated source closure: $fileName; length: $length; SHA256: $normalizedSha256; producer evidence: $evidencePath."
+        sourceInfo = "Origin: $origin; baseline commit: $(Get-GeneratedSourceProperty $Component 'sourceCommit' $metadataError); closure owner: $owner; source commit: $commit; locally generated source closure: $fileName; length: $length; SHA256: $normalizedSha256; producer evidence: $evidencePath."
     }
 }
 

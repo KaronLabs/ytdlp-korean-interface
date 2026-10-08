@@ -70,11 +70,24 @@ function Assert-KaronSourceArchiveMetadata {
     else { $type = if ($null -ne $typeProperty) { $typeProperty.Value } else { $null } }
     if ($null -ne $type) {
         $provenance = Get-ProducerProperty $Archive 'provenance'
-        if ($type -cne 'generated-source-closure' -or $id -cnotin @('application', 'deno', 'ffmpeg', '7zip') -or
-            $null -ne $url -or $commit -cne $sourceCommit -or $fileName -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*\.zip$' -or
+        $staticApplication = $id -cin @('bit7z', 'nana', 'libpng', 'zlib', 'libjpeg-turbo', 'nlohmann-json') -and
+            (Get-ProducerProperty $provenance 'component') -ceq 'application'
+        $owner = if ($staticApplication) { 'application' } else { $id }
+        $ownerCommit = if ($staticApplication) { $ApplicationCommit } else { $sourceCommit }
+        if ($type -cne 'generated-source-closure' -or ($id -cnotin @('application', 'deno', 'ffmpeg', '7zip') -and -not $staticApplication) -or
+            $null -ne $url -or $commit -cne $ownerCommit -or $fileName -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*\.zip$' -or
             $fileName -match '^(?i:CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9])(?:\.|$)' -or
-            (Get-ProducerProperty $provenance 'component') -cne $id -or
+            (Get-ProducerProperty $provenance 'component') -cne $owner -or
             (Get-ProducerProperty $provenance 'sourceCommit') -cne $commit) { throw 'release_license_lock_source_archive_mismatch' }
+        if ($staticApplication) {
+            if ((Get-ProducerProperty $ApplicationComponent 'sourceCommit') -cne $commit) { throw 'release_license_lock_source_archive_mismatch' }
+            $matches = @((Get-ProducerProperty $ApplicationComponent 'sourceArchives') | Where-Object {
+                (Get-ProducerProperty $_ 'fileName') -ceq $fileName -and (Get-ProducerProperty $_ 'commit') -ceq $commit -and
+                (Get-ProducerProperty $_ 'url') -eq $null
+            })
+            if ($matches.Count -ne 1 -or (Get-ProducerProperty $matches[0] 'artifactType') -cne $type) { throw 'release_license_lock_source_archive_mismatch' }
+            Assert-ProducerRecord $Archive (Get-ProducerProperty $matches[0] 'sha256') (Get-ProducerProperty $matches[0] 'length')
+        }
         return
     }
     $repository = [string](Get-ProducerProperty $Component 'sourceRepository')
@@ -211,8 +224,16 @@ function Assert-KaronNonRuntimeProducer {
         Assert-ProducerPath $artifact.fileName -Leaf
         Assert-ProducerDigest $artifact.expectedSha256 $artifact.actualSha256
         Assert-ProducerLength $artifact.expectedLength $artifact.actualLength
-        if (-not $SourceCacheRecords.ContainsKey($artifact.fileName)) { throw 'release_license_lock_nonruntime_binding_mismatch' }
-        $record = $SourceCacheRecords[$artifact.fileName]
+        if ($artifact.id -ceq 'application-source') {
+            $entryPath = 'application/' + $appName
+            if (-not $BundleInventory.ContainsKey($entryPath)) { throw 'release_license_lock_nonruntime_binding_mismatch' }
+            $embedded = $BundleInventory[$entryPath]
+            $record = [ordered]@{ fileName = $appName; sha256 = $embedded.sha256; length = $embedded.length }
+        }
+        else {
+            if (-not $SourceCacheRecords.ContainsKey($artifact.fileName)) { throw 'release_license_lock_nonruntime_binding_mismatch' }
+            $record = $SourceCacheRecords[$artifact.fileName]
+        }
         Assert-ProducerRecord $record $artifact.actualSha256 $artifact.actualLength
         $declaration = $declared[$artifact.id]
         if ($artifact.component -cne $declaration.component) { throw 'release_license_lock_nonruntime_binding_mismatch' }
@@ -246,7 +267,7 @@ function Assert-KaronNonRuntimeProducer {
 }
 
 function Assert-KaronFfmpegInventory {
-    param([object] $Inventory, [object] $Manifest, [object] $ArchiveInventory)
+    param([object] $Inventory, [object] $Manifest, [object] $ArchiveInventory, [object] $ManifestRecord)
     if ($Inventory.schemaVersion -ne 1 -or $Inventory.policy -cne 'verified-conservative-superset' -or
         $Inventory.inventorySelfEntry -cne 'inventory.json' -or -not $ArchiveInventory.ContainsKey('inventory.json')) {
         throw 'release_license_lock_ffmpeg_closure_invalid'
@@ -264,6 +285,19 @@ function Assert-KaronFfmpegInventory {
         Assert-ProducerRecord $ArchiveInventory[$entry.path] $entry.sha256 $entry.bytes
     }
     if ($seen.Count -eq 0 -or $ArchiveInventory.Count -ne ($seen.Count + 1)) { throw 'release_license_lock_ffmpeg_closure_invalid' }
+    foreach ($pair in @(
+        @('sources/direct/', 'directSourceArchives'), @('sources/btbn-cache/', 'btbnCacheArchives'),
+        @('sources/rav1e-crates/', 'rav1eCrates'), @('sources/toolchain/', 'toolchainSourceArchives')
+    )) {
+        $count = @($Inventory.entries | Where-Object { $_.path.StartsWith($pair[0], [StringComparison]::Ordinal) }).Count
+        Assert-ProducerLength ([long]$count) (Get-ProducerProperty $Manifest.counts $pair[1])
+    }
+    $sourceCount = @($Inventory.entries | Where-Object { $_.path.StartsWith('sources/', [StringComparison]::Ordinal) }).Count
+    Assert-ProducerLength ([long]$sourceCount) (Get-ProducerProperty $Inventory 'sourceArchiveCount')
+    if ($null -ne $ManifestRecord) {
+        if (-not $ArchiveInventory.ContainsKey('manifest.json')) { throw 'release_license_lock_ffmpeg_closure_invalid' }
+        Assert-ProducerRecord $ArchiveInventory['manifest.json'] $ManifestRecord.sha256 $ManifestRecord.length
+    }
     $projection = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     foreach ($path in $Manifest.includedPaths) {
         Assert-ProducerPath $path

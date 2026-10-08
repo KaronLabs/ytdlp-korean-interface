@@ -110,21 +110,27 @@ ffmpeg/license-corpus.json. The original Dockerfile toolchain reference was
 mutable; reproducibly pinned original toolchain selection is not claimed.
 
 ASSEMBLY AND OWNER ACCEPTANCE
-The current exact-candidate non-runtime producer remains blocked by
-production_manifest_git_blob_mismatch and sevenzip_extractor_identity_mismatch.
-Its generated application ZIP differs in bytes from the authoritative official
-ZIP specified above. Producer facts and remaining binding work are recorded in
-ASSEMBLY-STATUS.json. Overall license/release status remains NOT_VERIFIED.
+The retained non-runtime-evidence-07 inventory records status closed for this
+exact candidate. Earlier collector errors are historical, not an additional
+owner-approval gate. The embedded Git application ZIP is a separate artifact:
+166f13da8a2b4bc857ced3e1674ee54b927f04cf1c8d74b922814a4974f47956,
+15,883,862 bytes. It is not substituted for the official application ZIP.
+The full non-runtime evidence bundle also retains the exact dependency archive,
+modified static source trees, header transform and candidate linker bindings.
+Final independent license/release validation remains NOT_VERIFIED.
 
 Manual GUI acceptance: WAIVED_BY_OWNER. This is a separate owner acceptance
 decision and does not verify licenses, source closure, or final bundle assembly.
 Builder and waiver artifacts are maintained by their respective owners.
 
-All initial template component and sourceArchive statuses are NOT_VERIFIED.
-The authentic FFmpeg schema-3 BUILD-CLOSURE.json retains producer data; its
-37 includedPaths need reconciliation with the full producer inventory before
-assembly. Generated full closure archive records cannot use upstream commit
-ZIP URLs. A generated-source-closure type with url=null and an exact local
-producer path/hash/length is proposed in ASSEMBLY-STATUS.json, pending owner
-approval and main consumer support. Original G6 output paths must remain the
-Deno builder inputs. The 7-Zip wrapper filename also needs owner staging.
+All template component and sourceArchive statuses remain NOT_VERIFIED.
+Generated full source closures use artifactType=generated-source-closure and
+url=null. Genuine upstream archive tuples remain separate origin records.
+Deno and FFmpeg each have one full closure; original G6 output paths are the
+Deno assembly inputs. The canonical wrapper is 7z2601-x64-no-rar-source.zip.
+FFmpeg's 37 projected paths are bound to the archived manifest.json; the full
+inventory separately binds every payload entry and all 407 source inputs.
+The original cf040e97 FFmpeg closure remains the input. The diet ZIP remains
+NOT_VERIFIED and is not substituted. Source transport splitting is approved;
+it does not reduce source obligations or establish independent validation.
+Application source b80f594 remains distinct from unsealed packaging metadata.
