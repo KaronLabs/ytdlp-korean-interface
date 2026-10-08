@@ -19,3 +19,9 @@ candidate-runtime/
 smoke-evidence/
 backups/
 provenance-staging/
+
+# Local scratch, validation work, and generated build output
+/.scratch/
+/.validation/
+/build/
+/out/
