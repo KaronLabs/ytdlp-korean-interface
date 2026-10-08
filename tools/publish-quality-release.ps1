@@ -197,7 +197,7 @@ function ConvertFrom-KaronPublishAssetJson {
 }
 
 function Get-KaronPublishAssetInventory {
-    param([Parameter(Mandatory)] [string] $AssetRoot)
+    param([Parameter(Mandatory)] [string] $AssetRoot, [string[]] $AssetNames = $script:KaronPublishAssetNames)
 
     $root = Assert-KaronPackagePathChain $AssetRoot 'publication_path_reparse_point'
     if (-not (Test-Path -LiteralPath $root -PathType Container)) { throw 'publication_asset_inventory_invalid' }
@@ -207,7 +207,8 @@ function Get-KaronPublishAssetInventory {
     $actual = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($item in @(Get-ChildItem -LiteralPath $root -Force)) {
         [void](Assert-KaronPackagePathChain $item.FullName 'publication_path_reparse_point')
-        if ($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $item.Length -le 0) {
+        if ($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+            $item.Length -le 0 -or $item.Length -ge (Get-KaronSourceTransportLimits).AssetLimit) {
             throw 'publication_asset_inventory_invalid'
         }
         if (-not $actual.TryAdd($item.Name, [pscustomobject]@{
@@ -218,8 +219,8 @@ function Get-KaronPublishAssetInventory {
         })) { throw 'publication_asset_inventory_invalid' }
         if ([string]$actual[$item.Name].Name -cne $item.Name) { throw 'publication_asset_inventory_invalid' }
     }
-    if ($actual.Count -ne $script:KaronPublishAssetNames.Count) { throw 'publication_asset_inventory_invalid' }
-    foreach ($name in $script:KaronPublishAssetNames) {
+    if ($actual.Count -ne $AssetNames.Count -or $AssetNames.Count -gt 1000) { throw 'publication_asset_inventory_invalid' }
+    foreach ($name in $AssetNames) {
         if (-not $actual.ContainsKey($name) -or [string]$actual[$name].Name -cne $name) {
             throw 'publication_asset_inventory_invalid'
         }
@@ -227,13 +228,21 @@ function Get-KaronPublishAssetInventory {
     $actual
 }
 
+function Get-KaronPublishInventoryNames {
+    param([Collections.Generic.Dictionary[string, object]] $Inventory)
+    if ($Inventory.ContainsKey($script:KaronPackageSourcesName)) { return $script:KaronPublishAssetNames }
+    $parts = @($Inventory.Keys | Where-Object { $_.StartsWith($script:KaronPackageSourcesName + '.part', [StringComparison]::Ordinal) })
+    Get-KaronPackageTransportAssetNames $parts.Count
+}
+
 function Assert-KaronPublishInventorySnapshot {
     param(
         [Parameter(Mandatory)] [string] $AssetRoot,
         [Parameter(Mandatory)] [Collections.Generic.Dictionary[string, object]] $Snapshot
     )
-    $current = Get-KaronPublishAssetInventory $AssetRoot
-    foreach ($name in $script:KaronPublishAssetNames) {
+    $names = @(Get-KaronPublishInventoryNames $Snapshot)
+    $current = Get-KaronPublishAssetInventory $AssetRoot $names
+    foreach ($name in $names) {
         if ([long]$current[$name].Length -ne [long]$Snapshot[$name].Length -or
             [string]$current[$name].Sha256 -cne [string]$Snapshot[$name].Sha256) { throw 'publication_asset_changed' }
     }
@@ -250,11 +259,12 @@ function New-KaronPublishUploadSnapshot {
     [void](New-Item -ItemType Directory -Path $root)
     [void](Assert-KaronPackagePathChain $root 'publication_path_reparse_point')
     try {
-        foreach ($name in $script:KaronPublishAssetNames) {
+        $names = @(Get-KaronPublishInventoryNames $Inventory)
+        foreach ($name in $names) {
             [IO.File]::Copy([string]$Inventory[$name].Path, (Join-Path $root $name), $false)
         }
-        $sealed = Get-KaronPublishAssetInventory $root
-        foreach ($name in $script:KaronPublishAssetNames) {
+        $sealed = Get-KaronPublishAssetInventory $root $names
+        foreach ($name in $names) {
             if ([long]$sealed[$name].Length -ne [long]$Inventory[$name].Length -or
                 [string]$sealed[$name].Sha256 -cne [string]$Inventory[$name].Sha256) { throw 'publication_asset_snapshot_failed' }
         }
@@ -290,7 +300,7 @@ function Assert-KaronPublishChecksums {
     catch { throw 'publication_checksum_format_invalid' }
 
     $lines = @($text.Substring(0, $text.Length - 1).Split("`n"))
-    $coveredNames = @($script:KaronPublishAssetNames[0], $script:KaronPublishAssetNames[1], $script:KaronPublishAssetNames[2])
+    $coveredNames = @(Get-KaronPublishInventoryNames $Inventory | Where-Object { $_ -cne 'SHA256SUMS.txt' })
     if ($lines.Count -ne $coveredNames.Count) { throw 'publication_checksum_inventory_invalid' }
     for ($index = 0; $index -lt $coveredNames.Count; $index++) {
         $match = [regex]::Match($lines[$index], '^([0-9a-f]{64})  (.+)$', [Text.RegularExpressions.RegexOptions]::CultureInvariant)
@@ -450,8 +460,14 @@ function Assert-KaronPublishRemoteAssets {
             throw 'publication_remote_asset_inventory_invalid'
         }
     }
-    if ($remote.Count -ne 4) { throw 'publication_remote_asset_inventory_invalid' }
-    foreach ($name in $script:KaronPublishAssetNames) {
+    $names = @(Get-KaronPublishInventoryNames $Inventory)
+    if ($remote.Count -ne $names.Count) { throw 'publication_remote_asset_inventory_invalid' }
+    if (-not $Inventory.ContainsKey($script:KaronPackageSourcesName)) {
+        for ($index = 0; $index -lt $names.Count; $index++) {
+            if ([string]$assets[$index].Name -cne $names[$index]) { throw 'publication_remote_asset_order_invalid' }
+        }
+    }
+    foreach ($name in $names) {
         if (-not $remote.ContainsKey($name) -or [string]$remote[$name].Name -cne $name -or
             [string]$remote[$name].State -cne 'uploaded' -or
             [long]$remote[$name].Size -ne [long]$Inventory[$name].Length) { throw 'publication_remote_asset_inventory_invalid' }
@@ -461,7 +477,7 @@ function Assert-KaronPublishRemoteAssets {
             }
         }
     }
-    $sealedAssets = @($script:KaronPublishAssetNames | ForEach-Object {
+    $sealedAssets = @($names | ForEach-Object {
         $asset = $remote[$_]
         [pscustomobject]@{ Name = [string]$asset.Name; Id = [long]$asset.Id; Size = [long]$asset.Size; Digest = $asset.Digest }
     })
@@ -497,7 +513,8 @@ function New-KaronPublishDraftPlan {
         Body = $createBody
         ExpectedStatus = @(201)
     }
-    $uploads = @($script:KaronPublishAssetNames | ForEach-Object {
+    $names = @(Get-KaronPublishInventoryNames $Inventory)
+    $uploads = @($names | ForEach-Object {
         $name = $_
         [pscustomobject]@{
             Name = 'upload-' + $name
@@ -505,7 +522,7 @@ function New-KaronPublishDraftPlan {
             Method = 'POST'
             Uri = '{sealed-upload-url}?name=' + [Uri]::EscapeDataString($name)
             Accept = 'application/vnd.github+json'
-            ContentType = if ($name.EndsWith('.zip', [StringComparison]::Ordinal)) { 'application/zip' } elseif ($name.EndsWith('.json', [StringComparison]::Ordinal)) { 'application/json' } else { 'text/plain' }
+            ContentType = if ($name -match '\.part[0-9]{4}$') { 'application/octet-stream' } elseif ($name.EndsWith('.zip', [StringComparison]::Ordinal)) { 'application/zip' } elseif ($name.EndsWith('.json', [StringComparison]::Ordinal)) { 'application/json' } else { 'text/plain' }
             UploadPath = [string]$Inventory[$name].Path
             ExpectedLength = [long]$Inventory[$name].Length
             ExpectedSha256 = [string]$Inventory[$name].Sha256
@@ -514,7 +531,7 @@ function New-KaronPublishDraftPlan {
     })
     $downloads = @()
     $directory = Join-Path ([IO.Path]::GetTempPath()) ('karon-release-verify-' + [Guid]::NewGuid().ToString('N'))
-    foreach ($name in $script:KaronPublishAssetNames) {
+    foreach ($name in $names) {
         $downloads += [pscustomobject]@{
             Name = 'download-' + $name
             Directory = $directory
@@ -558,7 +575,8 @@ function Invoke-KaronPublishDownloadVerification {
         [object] $Plan,
         [Collections.Generic.Dictionary[string, object]] $Inventory,
         [object] $ReleaseSeal,
-        [scriptblock] $HttpRunner
+        [scriptblock] $HttpRunner,
+        [object] $SourceTransport
     )
     $directory = [string]$Plan.Downloads[0].Directory
     if (Test-Path -LiteralPath $directory) { throw 'publication_verification_directory_exists' }
@@ -582,8 +600,9 @@ function Invoke-KaronPublishDownloadVerification {
             [void](Assert-KaronPublishRemoteAssets (Get-KaronPublishRemoteRelease $CommandRunner $RepositoryRoot $ReleaseSeal.Id) $Inventory $true $true $ReleaseSeal)
         }
         $items = @(Get-ChildItem -LiteralPath $directory -Force)
-        if ($items.Count -ne 4) { throw 'publication_redownload_inventory_mismatch' }
-        foreach ($name in $script:KaronPublishAssetNames) {
+        $names = @(Get-KaronPublishInventoryNames $Inventory)
+        if ($items.Count -ne $names.Count) { throw 'publication_redownload_inventory_mismatch' }
+        foreach ($name in $names) {
             $matches = @($items | Where-Object { $_.Name -ceq $name })
             if ($matches.Count -ne 1 -or $matches[0].PSIsContainer -or
                 ($matches[0].Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
@@ -591,6 +610,17 @@ function Invoke-KaronPublishDownloadVerification {
                 (Get-KaronPublishSha256 $matches[0].FullName) -cne [string]$Inventory[$name].Sha256) {
                 throw ('publication_redownload_mismatch: ' + $name)
             }
+        }
+        $downloadInventory = Get-KaronPublishAssetInventory $directory $names
+        Assert-KaronPublishChecksums $downloadInventory
+        if ($null -ne $SourceTransport) {
+            $manifestPath = Join-Path $directory ($script:KaronPackageSourcesName + '.transport.json')
+            $contract = Read-KaronSourceTransportManifest $manifestPath
+            $expectedRaw = ConvertFrom-KaronPackageJsonStrict ($SourceTransport | ConvertTo-Json -Depth 64) 'publication_transport_invalid'
+            $actualRaw = ConvertFrom-KaronPackageJsonStrict ([IO.File]::ReadAllText($manifestPath, [Text.UTF8Encoding]::new($false, $true))) 'publication_transport_invalid'
+            if ((Get-KaronPackageLockProjectionSha256 $expectedRaw.Raw) -cne (Get-KaronPackageLockProjectionSha256 $actualRaw.Raw)) { throw 'publication_transport_mismatch' }
+            $lockDocument = Read-KaronPackageStrictLockDocument (Join-Path $RepositoryRoot 'release\dependencies\v2.19.1-karon.2.lock.json')
+            Invoke-KaronPackageTransportGate $directory $contract $lockDocument (Join-Path $RepositoryRoot 'THIRD-PARTY-NOTICES.txt')
         }
     }
     finally { Remove-KaronPublishVerificationDirectory $directory }
@@ -631,7 +661,7 @@ function Invoke-QualityReleasePublication {
     $receiptPathFull = Assert-KaronPackagePathChain $ReceiptPath 'publication_path_reparse_point'
     $receipt = Assert-KaronReleaseReceipt $root $assets $receiptPathFull
     if ($receipt.NotesPath -cne $notes) { throw 'publication_notes_invalid' }
-    $inventory = Get-KaronPublishAssetInventory $assets
+    $inventory = Get-KaronPublishAssetInventory $assets $receipt.AssetNames
     Assert-KaronPublishChecksums $inventory
     if ($null -eq $CommandRunner) {
         $CommandRunner = { param($Executable, $Arguments, $WorkingDirectory) Invoke-KaronPublishExternal $Executable $Arguments $WorkingDirectory }
@@ -721,7 +751,7 @@ function Invoke-QualityReleasePublication {
         Assert-KaronPublishInventorySnapshot $assets $uploadInventory
         [void](Get-KaronPublishRepositorySeal $CommandRunner $root $postUploadReceipt $seal)
         [void](Assert-KaronPublishRemoteAssets (Get-KaronPublishRemoteRelease $CommandRunner $root $releaseSeal.Id) $uploadInventory $true $true $releaseSeal)
-        Invoke-KaronPublishDownloadVerification $CommandRunner $root $plan $uploadInventory $releaseSeal $HttpRunner
+        Invoke-KaronPublishDownloadVerification $CommandRunner $root $plan $uploadInventory $releaseSeal $HttpRunner $receipt.SourceTransport
         $preStableReceipt = Assert-KaronReleaseReceipt $root $assets $receiptPathFull
         if ($preStableReceipt.ReceiptSha256 -cne $receipt.ReceiptSha256) { throw 'publication_receipt_changed' }
         Assert-KaronPublishInventorySnapshot $assets $uploadInventory
@@ -738,8 +768,8 @@ function Invoke-QualityReleasePublication {
             Head = $seal.Head
             Tag = $script:KaronPublishTag
             ReleaseId = [long]$releaseSeal.Id
-            Assets = [string[]]$script:KaronPublishAssetNames
-            RedownloadsVerified = 4
+            Assets = [string[]]$receipt.AssetNames
+            RedownloadsVerified = $receipt.AssetNames.Count
         }
     }
     catch {

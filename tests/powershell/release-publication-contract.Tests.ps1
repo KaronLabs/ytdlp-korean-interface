@@ -666,7 +666,7 @@ function New-FakePublicationRunner {
     $operations = [Collections.Generic.List[object]]::new()
     $assetDirectory = $Case.Output
     $tag = $script:Tag
-    $assetNames = @($script:AssetNames)
+    $assetNames = @($receipt.publicAssets | ForEach-Object fileName)
     $binaryName = $script:BinaryName
     $releaseJson = {
         param([long] $ReleaseId)
@@ -808,7 +808,7 @@ function New-FakePublicationRunner {
             $name = [Uri]::UnescapeDataString($uri.Query.Substring(6))
             if ($state.TagRebindBoundary -ceq 'upload') { $state.TagMappedReleaseId = [long]$state.ReleaseId + 1L }
             if (-not $state.UploadedAssetNames.Contains($name)) { $state.UploadedAssetNames.Add($name) }
-            $state.Stage = if ($state.UploadedAssetNames.Count -eq 4) { 'draft-assets' } else { 'draft-partial' }
+            $state.Stage = if ($state.UploadedAssetNames.Count -eq $assetNames.Count) { 'draft-assets' } else { 'draft-partial' }
             $index = [Array]::IndexOf([string[]]$assetNames, $name)
             $path = Join-Path $assetDirectory $name
             $digest = $null
@@ -896,6 +896,220 @@ function Assert-TestSecretAbsent {
         if ($text.Contains($Sentinel, [StringComparison]::Ordinal)) { $treeContainsSentinel = $true; break }
     }
     $treeContainsSentinel | Should -Be $false
+}
+
+Describe 'Final corresponding-source split transport' {
+    BeforeEach {
+        # Scale only the internal source decision and part writer; public asset limits stay real.
+        Mock Get-KaronSourceTransportLimits {
+            [pscustomobject]@{ SplitThreshold = 1L; PartLength = 512L; AssetLimit = 2147483648L }
+        }
+    }
+
+    It 'keeps the ordinary v2 four-asset receipt and three checksum lines' {
+        Mock Get-KaronSourceTransportLimits {
+            [pscustomobject]@{ SplitThreshold = 2147483648L; PartLength = 1073741824L; AssetLimit = 2147483648L }
+        }
+        $case = New-PackagedPublicationCase 'split-small-v2'
+        $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json
+        $receipt.schemaVersion | Should -Be 'karon-release-receipt/v2'
+        (@($receipt.publicAssets.fileName) -join '|') | Should -Be ($script:AssetNames -join '|')
+        @($receipt.PSObject.Properties.Name) | Should -Not -Contain 'sourceTransport'
+        @(Get-Content (Join-Path $case.Output 'SHA256SUMS.txt')).Count | Should -Be 3
+    }
+
+    It 'keeps the ordinary v3 owner waiver distinct from PASS' {
+        Mock Get-KaronSourceTransportLimits {
+            [pscustomobject]@{ SplitThreshold = 2147483648L; PartLength = 1073741824L; AssetLimit = 2147483648L }
+        }
+        $case = New-ReleaseContractCase 'split-small-v3'
+        $waiver = Set-TestOwnerGuiWaiver $case
+        [void](Invoke-TestPackage $case -WaiverPath $waiver)
+        $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json
+        $receipt.schemaVersion | Should -Be 'karon-release-receipt/v3'
+        $receipt.status | Should -Be 'WAIVED_BY_OWNER'
+        @($receipt.publicAssets).Count | Should -Be 4
+    }
+
+    It 'splits at equality on the final combined ZIP and preserves the whole archive binding' {
+        $case = New-ReleaseContractCase 'split-equality'
+        $threshold = [long](Get-Item $case.SourcesPath).Length
+        $script:SplitTestThreshold = $threshold
+        Mock Get-KaronSourceTransportLimits {
+            [pscustomobject]@{ SplitThreshold = $script:SplitTestThreshold; PartLength = 512L; AssetLimit = 2147483648L }
+        }
+        [void](Invoke-TestPackage $case)
+        $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json
+        $receipt.schemaVersion | Should -Be 'karon-release-receipt/v4'
+        $receipt.correspondingSources.sha256 | Should -Be (Get-TestSha256 $case.SourcesPath)
+        $receipt.correspondingSources.length | Should -Be $threshold
+        (Get-Item $case.SourceArchive).Length | Should -BeLessThan $threshold
+        $receipt.sourceTransport.contract.archive.sha256 | Should -Be $receipt.correspondingSources.sha256
+        $receipt.sourceTransport.contract.candidateManifestSha256 | Should -Be (Get-TestSha256 $case.ManifestPath)
+        (Test-Path (Join-Path $case.Output $script:SourcesName)) | Should -Be $false
+        @($receipt.publicAssets | Where-Object fileName -eq $script:BinaryName).Count | Should -Be 1
+        foreach ($part in $receipt.sourceTransport.contract.parts) { $part.length | Should -BeLessOrEqual 512 }
+    }
+
+    It 'ships an executable restoration script that recreates byte-identical ZIP bytes' {
+        $case = New-PackagedPublicationCase 'split-restore-script'
+        $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json
+        $destination = Join-Path $case.Root 'restored'
+        [void](New-Item -ItemType Directory -Path $destination)
+        & pwsh -NoProfile -File (Join-Path $case.Output $receipt.sourceTransport.contract.restoreScript.fileName) `
+            -TransportManifestPath (Join-Path $case.Output $receipt.sourceTransport.manifest.fileName) -RestoreDirectory $destination
+        $LASTEXITCODE | Should -Be 0
+        $restored = Join-Path $destination $script:SourcesName
+        (Get-TestSha256 $restored) | Should -Be (Get-TestSha256 $case.SourcesPath)
+        $zip = [IO.Compression.ZipFile]::OpenRead($restored)
+        try { @($zip.Entries).Count | Should -Be 4 } finally { $zip.Dispose() }
+    }
+
+    It 'uses v5 only with the genuine candidate-bound owner waiver' {
+        $case = New-ReleaseContractCase 'split-owner-waiver'
+        $waiver = Set-TestOwnerGuiWaiver $case
+        [void](Invoke-TestPackage $case -WaiverPath $waiver)
+        $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json
+        $receipt.schemaVersion | Should -Be 'karon-release-receipt/v5'
+        $receipt.status | Should -Be 'WAIVED_BY_OWNER'
+        $fake = New-FakePublicationRunner $case
+        $result = Invoke-TestPublication $case $fake
+        $result.RedownloadsVerified | Should -Be @($receipt.publicAssets).Count
+        $fake.State.Stage | Should -Be 'stable'
+    }
+
+    It 'rejects <Attack> before any publication request' -TestCases @(
+        @{ Attack = 'missing' }, @{ Attack = 'extra' }, @{ Attack = 'reordered' },
+        @{ Attack = 'truncated' }, @{ Attack = 'mismatched' }, @{ Attack = 'oversized' },
+        @{ Attack = 'wrong-candidate' }, @{ Attack = 'wrong-whole' }, @{ Attack = 'wrong-script' },
+        @{ Attack = 'wrong-instructions' }, @{ Attack = 'wrong-manifest' }, @{ Attack = 'downgrade' },
+        @{ Attack = 'public-order' }
+    ) {
+        param($Attack)
+        $case = New-PackagedPublicationCase ('split-attack-' + $Attack)
+        $fake = New-FakePublicationRunner $case
+        $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json
+        $part = Join-Path $case.Output $receipt.sourceTransport.contract.parts[0].fileName
+        switch ($Attack) {
+            'missing' { Remove-Item -LiteralPath $part }
+            'extra' { Write-TestUtf8 (Join-Path $case.Output 'extra.part') 'extra' }
+            'reordered' {
+                $parts = @($receipt.sourceTransport.contract.parts)
+                $receipt.sourceTransport.contract.parts[0] = $parts[1]
+                $receipt.sourceTransport.contract.parts[1] = $parts[0]
+            }
+            'truncated' { [IO.File]::WriteAllBytes($part, [byte[]]@(1)) }
+            'mismatched' {
+                $bytes = [IO.File]::ReadAllBytes($part); $bytes[0] = $bytes[0] -bxor 1
+                [IO.File]::WriteAllBytes($part, $bytes)
+            }
+            'oversized' { $receipt.sourceTransport.contract.parts[0].length = 1073741825L }
+            'wrong-candidate' { $receipt.sourceTransport.contract.candidateManifestSha256 = 'f' * 64 }
+            'wrong-whole' { $receipt.sourceTransport.contract.archive.sha256 = 'f' * 64 }
+            'wrong-script' { Write-TestUtf8 (Join-Path $case.Output $receipt.sourceTransport.contract.restoreScript.fileName) 'changed' }
+            'wrong-instructions' { Write-TestUtf8 (Join-Path $case.Output $receipt.sourceTransport.contract.instructions.fileName) 'changed' }
+            'wrong-manifest' { Write-TestUtf8 (Join-Path $case.Output $receipt.sourceTransport.manifest.fileName) '{}' }
+            'downgrade' { $receipt.schemaVersion = 'karon-release-receipt/v2' }
+            'public-order' {
+                $assets = @($receipt.publicAssets)
+                $receipt.publicAssets[1] = $assets[2]
+                $receipt.publicAssets[2] = $assets[1]
+            }
+        }
+        Write-TestJson $case.ReceiptPath $receipt
+        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should -Match 'package_|source_transport_'
+        $fake.HttpCalls.Count | Should -Be 0
+        $fake.State.Stage | Should -Be 'absent'
+    }
+
+    It 'rejects a rehashed corrupt part through the independent whole ZIP hash' {
+        $case = New-PackagedPublicationCase 'split-whole-hash'
+        $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json
+        $contract = $receipt.sourceTransport.contract
+        $part = Join-Path $case.Output $contract.parts[0].fileName
+        $bytes = [IO.File]::ReadAllBytes($part); $bytes[0] = $bytes[0] -bxor 1
+        [IO.File]::WriteAllBytes($part, $bytes)
+        $contract.parts[0].sha256 = Get-TestSha256 $part
+        $manifest = Join-Path $case.Output $receipt.sourceTransport.manifest.fileName
+        Write-TestJson $manifest $contract
+        $contract = Read-KaronSourceTransportManifest $manifest
+        (Get-TestFailure {
+            Restore-KaronCorrespondingSources $case.Output $contract (Join-Path $case.Root $script:SourcesName)
+        }) | Should -Match 'source_transport_whole_mismatch'
+        (Test-Path (Join-Path $case.Root $script:SourcesName)) | Should -Be $false
+    }
+
+    It 'redownloads every split asset and completes the source gate before stable' {
+        $case = New-PackagedPublicationCase 'split-publish'
+        $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json
+        $fake = New-FakePublicationRunner $case
+        $result = Invoke-TestPublication $case $fake
+        $result.RedownloadsVerified | Should -Be @($receipt.publicAssets).Count
+        $fake.State.DownloadCount | Should -Be @($receipt.publicAssets).Count
+        $fake.State.Stage | Should -Be 'stable'
+    }
+
+    It 'rejects reordered remote split assets and retains the draft' {
+        $case = New-PackagedPublicationCase 'split-remote-order'
+        $fake = New-FakePublicationRunner $case
+        $inner = $fake.Runner
+        $fake.Runner = {
+            param($Executable, $Arguments, $WorkingDirectory)
+            $result = & $inner $Executable $Arguments $WorkingDirectory
+            if ($Executable -ceq 'gh' -and $Arguments[0] -ceq 'api' -and $Arguments[2] -ceq 'GET' -and $result.ExitCode -eq 0) {
+                $json = $result.Output | ConvertFrom-Json
+                if (@($json.assets).Count -gt 1) {
+                    $assets = @($json.assets)
+                    $json.assets[0] = $assets[1]; $json.assets[1] = $assets[0]
+                    $result.Output = $json | ConvertTo-Json -Depth 16 -Compress
+                }
+            }
+            $result
+        }.GetNewClosure()
+        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should -Match 'publication_remote_asset_order_invalid'
+        $fake.State.Stage | Should -Be 'draft-assets'
+    }
+
+    It 'rejects a single runtime asset at the GitHub limit without allocating a huge file' {
+        $case = New-PackagedPublicationCase 'split-runtime-limit'
+        $assetRoot = $case.Output
+        Mock Get-ChildItem {
+            [pscustomobject]@{
+                Name = 'ytdlp-korean-interface-v2.19.1-karon.2-win-x64.zip'
+                FullName = Join-Path $assetRoot 'ytdlp-korean-interface-v2.19.1-karon.2-win-x64.zip'
+                PSIsContainer = $false; Attributes = [IO.FileAttributes]::Normal; Length = 2147483648L
+            }
+        } -ParameterFilter { $LiteralPath -ceq $assetRoot }
+        (Get-TestFailure { Get-KaronPublishAssetInventory $case.Output }) | Should -Match 'publication_asset_inventory_invalid'
+    }
+
+    It 'keeps a draft when a redownloaded part fails its checksum' {
+        $case = New-PackagedPublicationCase 'split-download-corrupt'
+        $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json
+        $fake = New-FakePublicationRunner $case
+        $inner = $fake.HttpRunner
+        $partName = [string]$receipt.sourceTransport.contract.parts[0].fileName
+        $fake.HttpRunner = {
+            param($Request)
+            $response = & $inner $Request
+            if ($Request.Method -ceq 'GET' -and [IO.Path]::GetFileName($Request.DownloadPath) -ceq $partName) {
+                [IO.File]::WriteAllBytes($Request.DownloadPath, [byte[]]@(1))
+            }
+            $response
+        }.GetNewClosure()
+        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should -Match 'publication_redownload_mismatch'
+        $fake.State.Stage | Should -Be 'draft-assets'
+    }
+
+    It 'keeps a draft when the reconstructed redownload fails the complete license gate' {
+        $case = New-PackagedPublicationCase 'split-download-license-gate'
+        $fake = New-FakePublicationRunner $case
+        Mock Invoke-KaronPackageTransportGate { throw 'package_sources_entry_hash_mismatch' } -ParameterFilter {
+            $AssetDirectory -like '*karon-release-verify-*'
+        }
+        (Get-TestFailure { Invoke-TestPublication $case $fake }) | Should -Match 'package_sources_entry_hash_mismatch'
+        $fake.State.Stage | Should -Be 'draft-assets'
+    }
 }
 
 Describe 'Single production publication entry point' {

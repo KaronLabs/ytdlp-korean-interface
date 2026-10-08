@@ -30,6 +30,7 @@ $script:KaronPackageCliGuiManifestPath = $GuiValidationEvidenceManifestPath
 $script:KaronPackageCliGuiSchemaPath = $GuiValidationSchemaPath
 $script:KaronPackageCliGuiWaiverPath = $GuiValidationWaiverPath
 $script:KaronPackageCliReceiptPath = $ReceiptPath
+. (Join-Path $PSScriptRoot 'source-release-transport.ps1')
 $script:KaronPackageGuiCases = @(
     [pscustomobject]@{ Id = 'ko-KR-100'; Language = 'ko-KR'; Dpi = 100 },
     [pscustomobject]@{ Id = 'ko-KR-150'; Language = 'ko-KR'; Dpi = 150 },
@@ -875,6 +876,7 @@ function Get-KaronPackageApplicationProvenance {
         '.', ':(exclude)release/**', ':(exclude)tools/gui-release-waiver.psm1',
         ':(exclude)tools/build-release-license-lock.ps1', ':(exclude)tools/package-quality-release.ps1',
         ':(exclude)tools/publish-quality-release.ps1', ':(exclude)tests/powershell/gui-release-waiver.Tests.ps1',
+        ':(exclude)tools/source-release-transport.ps1',
         ':(exclude)tests/powershell/release-license-lock.Tests.ps1', ':(exclude)tests/powershell/release-publication-contract.Tests.ps1',
         ':(exclude).github/workflows/karon2-quality-contract.yml',
         ':(exclude).github/workflows/release-factory-contract.yml', ':(exclude).gitattributes',
@@ -1382,11 +1384,15 @@ function New-KaronPackageLocalRecord {
 }
 
 function Get-KaronPackagePublicInventory {
-    param([string] $AssetDirectory)
+    param([string] $AssetDirectory, [string[]] $Names = @($script:KaronPackageBinaryName, $script:KaronPackageSourcesName, $script:KaronPackageSpdxName, $script:KaronPackageSumsName))
     [void](Assert-KaronPackagePathChain $AssetDirectory)
-    $names = @($script:KaronPackageBinaryName, $script:KaronPackageSourcesName, $script:KaronPackageSpdxName, $script:KaronPackageSumsName)
-    $files = @(Get-ChildItem -LiteralPath $AssetDirectory -File -Force)
-    if ($files.Count -ne 4) { throw 'package_final_inventory_invalid' }
+    $files = @(Get-ChildItem -LiteralPath $AssetDirectory -Force)
+    if ($files.Count -ne $Names.Count -or $Names.Count -gt 1000) { throw 'package_final_inventory_invalid' }
+    $limit = (Get-KaronSourceTransportLimits).AssetLimit
+    foreach ($file in $files) {
+        if ($file.PSIsContainer -or ($file.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+            $file.Name -cnotin $Names -or $file.Length -le 0 -or $file.Length -ge $limit) { throw 'package_final_inventory_invalid' }
+    }
     $result = @()
     foreach ($name in $names) {
         $path = Join-Path $AssetDirectory $name
@@ -1396,6 +1402,136 @@ function Get-KaronPackagePublicInventory {
         $result += [ordered]@{ fileName = $name; length = [long]$item.Length; sha256 = Get-KaronPackageSha256 $path }
     }
     $result
+}
+
+function Get-KaronPackageTransportAssetNames {
+    param([int] $PartCount)
+    $names = Get-KaronSourceTransportNames $PartCount
+    @($script:KaronPackageBinaryName) + @($names.Parts) + @($names.Manifest, $names.RestoreScript, $names.Instructions, $script:KaronPackageSpdxName, $script:KaronPackageSumsName)
+}
+
+function New-KaronPackageSourceTransport {
+    param([object] $Sources, [string] $OutputRoot, [object] $Binding)
+    $limits = Get-KaronSourceTransportLimits
+    $count = [int][Math]::Ceiling([double]$Sources.Length / $limits.PartLength)
+    $names = Get-KaronSourceTransportNames $count
+    $parts = @()
+    $input = [IO.File]::Open($Sources.FullPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    try {
+        if ($input.Length -ne [long]$Sources.Length) { throw 'package_input_changed' }
+        $buffer = [byte[]]::new(1048576)
+        foreach ($name in $names.Parts) {
+            $path = Join-Path $OutputRoot $name
+            $partial = $path + '.' + [Guid]::NewGuid().ToString('N') + '.partial'
+            try {
+                $output = [IO.File]::Open($partial, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+                try {
+                    [long]$remaining = [Math]::Min([long]$limits.PartLength, $input.Length - $input.Position)
+                    while ($remaining -gt 0) {
+                        $read = $input.Read($buffer, 0, [int][Math]::Min([long]$buffer.Length, $remaining))
+                        if ($read -le 0) { throw 'package_input_changed' }
+                        $output.Write($buffer, 0, $read)
+                        $remaining -= $read
+                    }
+                }
+                finally { $output.Dispose() }
+                Move-KaronPackageOwnedArtifact $partial $path
+            }
+            finally { if (Test-Path -LiteralPath $partial) { Remove-Item -LiteralPath $partial -Force } }
+            $record = New-KaronPackageLocalRecord $path $name
+            $parts += [ordered]@{ fileName = $name; length = $record.length; sha256 = $record.sha256 }
+        }
+    }
+    finally { $input.Dispose() }
+    $helper = Join-Path $PSScriptRoot 'source-release-transport.ps1'
+    $scriptPath = Join-Path $OutputRoot $names.RestoreScript
+    Copy-KaronPackageArtifactAtomic $helper $scriptPath (Get-KaronPackageSha256 $helper)
+    $instructionsPath = Join-Path $OutputRoot $names.Instructions
+    $instructions = @(
+        'Corresponding source restoration (PowerShell 7.4 or later).'
+        'Download every ordered .partNNNN file, the .transport.json manifest, .restore.ps1 script, and this .restore.txt file into one directory.'
+        'Check their hashes against SHA256SUMS.txt before running the script.'
+        ('pwsh -NoProfile -File "' + $names.RestoreScript + '" -TransportManifestPath "' + $names.Manifest + '" -RestoreDirectory "."')
+        'The script refuses to overwrite an existing ZIP, validates every part, concatenates in manifest order, and checks the complete ZIP length and SHA-256 before committing the output.'
+        ('Expected ZIP: ' + $names.Archive)
+        ('Expected bytes: ' + [string]$Sources.Length)
+        ('Expected whole ZIP SHA-256: ' + $Sources.Sha256)
+        'Use a filesystem with large-file support and free space for the entire ZIP. Parts are raw byte slices, not individually extractable ZIPs.'
+    ) -join "`n"
+    $partial = $instructionsPath + '.' + [Guid]::NewGuid().ToString('N') + '.partial'
+    try {
+        [IO.File]::WriteAllText($partial, ($instructions + "`n"), [Text.UTF8Encoding]::new($false))
+        Move-KaronPackageOwnedArtifact $partial $instructionsPath
+    }
+    finally { if (Test-Path -LiteralPath $partial) { Remove-Item -LiteralPath $partial -Force } }
+    $restore = New-KaronPackageLocalRecord $scriptPath $names.RestoreScript
+    $guide = New-KaronPackageLocalRecord $instructionsPath $names.Instructions
+    $contract = [ordered]@{
+        schemaVersion = 'karon-corresponding-source-transport/v1'
+        contract = 'ordered-byte-concatenation/1GiB-parts'
+        tag = $script:KaronPackageTag; platform = 'win-x64'
+        applicationSourceCommit = $Binding.ApplicationSourceCommit
+        applicationSourceTree = $Binding.ApplicationSourceTree
+        candidateManifestSha256 = $Binding.CandidateManifestSha256
+        archive = [ordered]@{ fileName = $names.Archive; length = [long]$Sources.Length; sha256 = $Sources.Sha256 }
+        partSize = [long]$limits.PartLength
+        parts = $parts
+        restoreScript = [ordered]@{ fileName = $names.RestoreScript; length = $restore.length; sha256 = $restore.sha256 }
+        instructions = [ordered]@{ fileName = $names.Instructions; length = $guide.length; sha256 = $guide.sha256 }
+    }
+    $manifestPath = Join-Path $OutputRoot $names.Manifest
+    Write-KaronPackageAtomicJson $manifestPath $contract
+    $manifest = New-KaronPackageLocalRecord $manifestPath $names.Manifest
+    [ordered]@{
+        manifest = [ordered]@{ fileName = $names.Manifest; length = $manifest.length; sha256 = $manifest.sha256 }
+        contract = $contract
+    }
+}
+
+function Assert-KaronPackageSourceTransportReceipt {
+    param([Text.Json.JsonElement] $Raw, [object] $Receipt, [string] $AssetDirectory)
+    Assert-KaronPackageRawExactKeys $Raw @('manifest', 'contract') 'package_transport_receipt_invalid'
+    $record = Get-KaronPackageRawProperty $Raw 'manifest' 'package_transport_receipt_invalid'
+    Assert-KaronPackageRawExactKeys $record @('fileName', 'length', 'sha256') 'package_transport_receipt_invalid'
+    $name = Get-KaronPackageRawString (Get-KaronPackageRawProperty $record 'fileName' 'package_transport_receipt_invalid') 'package_transport_receipt_invalid'
+    if ($name -cne ($script:KaronPackageSourcesName + '.transport.json')) { throw 'package_transport_receipt_invalid' }
+    $path = Join-Path $AssetDirectory $name
+    $bound = [pscustomobject]@{
+        Name = $name
+        Length = Get-KaronPackageRawInt64 (Get-KaronPackageRawProperty $record 'length' 'package_transport_receipt_invalid') 'package_transport_receipt_invalid'
+        Sha256 = Get-KaronPackageRawString (Get-KaronPackageRawProperty $record 'sha256' 'package_transport_receipt_invalid') 'package_transport_receipt_invalid'
+    }
+    Assert-KaronPackageBoundFile $bound $path $name 'package_transport_manifest_mismatch'
+    $contract = Read-KaronSourceTransportManifest $path
+    $document = ConvertFrom-KaronPackageJsonStrict ([IO.File]::ReadAllText($path, [Text.UTF8Encoding]::new($false, $true))) 'package_transport_manifest_invalid'
+    if ((Get-KaronPackageLockProjectionSha256 $document.Raw) -cne
+        (Get-KaronPackageLockProjectionSha256 (Get-KaronPackageRawProperty $Raw 'contract' 'package_transport_receipt_invalid'))) { throw 'package_transport_contract_mismatch' }
+    $limits = Get-KaronSourceTransportLimits
+    if ($contract.archive.length -lt $limits.SplitThreshold -or $contract.partSize -ne $limits.PartLength -or
+        $contract.archive.fileName -cne $Receipt.correspondingSources.fileName -or
+        $contract.archive.length -ne $Receipt.correspondingSources.length -or
+        $contract.archive.sha256 -cne $Receipt.correspondingSources.sha256 -or
+        $contract.applicationSourceCommit -cne $Receipt.applicationSourceCommit -or
+        $contract.applicationSourceTree -cne $Receipt.applicationSourceTree -or
+        $contract.candidateManifestSha256 -cne $Receipt.candidateManifest.sha256) { throw 'package_transport_binding_mismatch' }
+    $contract
+}
+
+function Invoke-KaronPackageTransportGate {
+    param([string] $AssetDirectory, [object] $Contract, [object] $LockDocument, [string] $RootNoticePath)
+    $temp = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\', '/')
+    [void](Assert-KaronPackagePathChain $temp)
+    $root = Join-Path $temp ('karon-source-restore-' + [Guid]::NewGuid().ToString('N'))
+    [void](New-Item -ItemType Directory -Path $root)
+    try {
+        $path = Restore-KaronCorrespondingSources $AssetDirectory $Contract (Join-Path $root $script:KaronPackageSourcesName)
+        Assert-KaronPackageSourcesContract $LockDocument.Value $LockDocument.Raw $path $RootNoticePath
+    }
+    finally {
+        $full = Assert-KaronPackagePathChain $root
+        if ((Split-Path -Parent $full) -cne $temp -or -not ([IO.Path]::GetFileName($full)).StartsWith('karon-source-restore-', [StringComparison]::Ordinal)) { throw 'package_transport_restore_location_invalid' }
+        Remove-Item -LiteralPath $full -Recurse -Force
+    }
 }
 
 function New-KaronPackageByteSnapshots {
@@ -1527,12 +1663,14 @@ function Assert-KaronReleaseReceipt {
     }
     $json = ConvertFrom-KaronPackageJsonStrict ([IO.File]::ReadAllText($receipt, [Text.UTF8Encoding]::new($false, $true))) 'package_receipt_invalid'
     $schemaVersion = Get-KaronPackageRawString (Get-KaronPackageRawProperty $json.Raw 'schemaVersion' 'package_receipt_invalid') 'package_receipt_invalid'
-    if ($schemaVersion -cnotin @('karon-release-receipt/v2', 'karon-release-receipt/v3')) { throw 'package_receipt_invalid' }
-    $waived = $schemaVersion -ceq 'karon-release-receipt/v3'
+    if ($schemaVersion -cnotin @('karon-release-receipt/v2', 'karon-release-receipt/v3', 'karon-release-receipt/v4', 'karon-release-receipt/v5')) { throw 'package_receipt_invalid' }
+    $split = $schemaVersion -cin @('karon-release-receipt/v4', 'karon-release-receipt/v5')
+    $waived = $schemaVersion -cin @('karon-release-receipt/v3', 'karon-release-receipt/v5')
     $receiptKeys = @(
         'schemaVersion', 'tag', 'platform', 'applicationSourceCommit', 'applicationSourceTree', 'packagingCommit', 'candidateManifest', 'application', 'ffprobe',
         'licenseLock', 'rootThirdPartyNotices', 'licenseCorpus', 'correspondingSources', 'spdx', 'releaseNotes', 'publicAssets'
     )
+    if ($split) { $receiptKeys += 'sourceTransport' }
     if ($waived) { $receiptKeys += @('status', 'guiValidationWaiver', 'guiValidationWaiverRecord') }
     else { $receiptKeys += @('guiValidationSummary', 'guiValidationEvidenceManifest', 'guiValidationSchema', 'guiCaseIds') }
     Assert-KaronPackageRawExactKeys $json.Raw $receiptKeys 'package_receipt_invalid'
@@ -1560,7 +1698,13 @@ function Assert-KaronReleaseReceipt {
         }
         $length = Get-KaronPackageRawInt64 (Get-KaronPackageRawProperty $rawRecord 'length' 'package_receipt_invalid') 'package_receipt_invalid'
         $record = [pscustomobject]@{ Name = [string]$value.$name.fileName; Length = $length; Sha256 = ([string]$value.$name.sha256).ToLowerInvariant() }
-        Assert-KaronPackageBoundFile $record ([string]$value.$name.localPath) $record.Name 'package_receipt_tampered'
+        if (-not ($split -and $name -ceq 'correspondingSources')) {
+            Assert-KaronPackageBoundFile $record ([string]$value.$name.localPath) $record.Name 'package_receipt_tampered'
+        }
+    }
+    $transport = $null
+    if ($split) {
+        $transport = Assert-KaronPackageSourceTransportReceipt (Get-KaronPackageRawProperty $json.Raw 'sourceTransport' 'package_receipt_invalid') $value $assets
     }
 
     $lockRepositoryPath = 'release/dependencies/v2.19.1-karon.2.lock.json'
@@ -1597,7 +1741,8 @@ function Assert-KaronReleaseReceipt {
         Assert-KaronPackageGuiWaiverZip (Join-Path $assets $script:KaronPackageBinaryName) $waiver.FileRecord
     }
     else { [void](Assert-KaronPackageGuiContract $lock $repo ([string]$value.guiValidationSummary.localPath) ([string]$value.guiValidationEvidenceManifest.localPath) $candidateEntries) }
-    Assert-KaronPackageSourcesContract $lock $lockDocument.Raw ([string]$value.correspondingSources.localPath) ([string]$value.rootThirdPartyNotices.localPath)
+    if ($split) { Invoke-KaronPackageTransportGate $assets $transport $lockDocument ([string]$value.rootThirdPartyNotices.localPath) }
+    else { Assert-KaronPackageSourcesContract $lock $lockDocument.Raw ([string]$value.correspondingSources.localPath) ([string]$value.rootThirdPartyNotices.localPath) }
     Assert-KaronPackageSpdxContract $lock ([string]$value.spdx.localPath) $repo $candidateEntries
 
     if (-not $waived) {
@@ -1608,9 +1753,11 @@ function Assert-KaronReleaseReceipt {
         }
     }
     $public = @(Get-KaronPackageRawArray (Get-KaronPackageRawProperty $json.Raw 'publicAssets' 'package_receipt_invalid') 'package_receipt_invalid')
-    $actualPublic = Get-KaronPackagePublicInventory $assets
-    if ($public.Count -ne 4) { throw 'package_receipt_assets_invalid' }
-    for ($index = 0; $index -lt 4; $index++) {
+    $assetNames = @($script:KaronPackageBinaryName, $script:KaronPackageSourcesName, $script:KaronPackageSpdxName, $script:KaronPackageSumsName)
+    if ($split) { $assetNames = @(Get-KaronPackageTransportAssetNames @($transport.parts).Count) }
+    $actualPublic = Get-KaronPackagePublicInventory $assets $assetNames
+    if ($public.Count -ne $assetNames.Count) { throw 'package_receipt_assets_invalid' }
+    for ($index = 0; $index -lt $assetNames.Count; $index++) {
         $record = $public[$index]
         Assert-KaronPackageRawExactKeys $record @('fileName', 'length', 'sha256') 'package_receipt_assets_invalid'
         if ((Get-KaronPackageRawString (Get-KaronPackageRawProperty $record 'fileName' 'package_receipt_assets_invalid') 'package_receipt_assets_invalid') -cne [string]$actualPublic[$index].fileName -or
@@ -1627,6 +1774,8 @@ function Assert-KaronReleaseReceipt {
         NotesBlobSha1 = [string]$notesRecord.gitBlobSha1
         NotesBody = [IO.File]::ReadAllText($notesPath, [Text.UTF8Encoding]::new($false, $true))
         ReceiptSha256 = Get-KaronPackageSha256 $receipt
+        AssetNames = $assetNames
+        SourceTransport = $transport
         AssetPaths = @($actualPublic | ForEach-Object { Join-Path $assets $_.fileName })
     }
 }
@@ -1641,6 +1790,7 @@ function Invoke-QualityReleasePackageCore {
         [Parameter(Mandatory)] [string] $SpdxPath,
         [Parameter(Mandatory)] [string] $OutputDirectory,
         [object] $GuiValidationWaiver,
+        [object] $SourceTransportBinding,
         [switch] $PlanOnly
     )
 
@@ -1652,6 +1802,9 @@ function Invoke-QualityReleasePackageCore {
         -not (Test-Path -LiteralPath $LockPath -PathType Leaf)) { throw 'package_input_missing' }
 
     $sources = Assert-KaronPackageGeneratedAsset -Path $CorrespondingSourcesPath -ExpectedName $script:KaronPackageSourcesName -ErrorId 'package_sources_invalid'
+    $split = $sources.Length -ge (Get-KaronSourceTransportLimits).SplitThreshold
+    if ($split -and ($null -eq $SourceTransportBinding -or
+        (Split-Path -Parent $sources.FullPath) -ieq $outputRoot)) { throw 'package_split_source_must_be_bound_and_outside_assets' }
     $spdx = Assert-KaronPackageGeneratedAsset -Path $SpdxPath -ExpectedName $script:KaronPackageSpdxName -ErrorId 'package_spdx_invalid'
     $lock = Read-KaronPackageJson -Path $LockPath -ErrorId 'package_lock_invalid'
     Assert-KaronPackageStatusContract -Lock $lock
@@ -1670,6 +1823,12 @@ function Invoke-QualityReleasePackageCore {
     $spdxFinal = Join-Path $outputRoot $script:KaronPackageSpdxName
     $sumsPath = Join-Path $outputRoot $script:KaronPackageSumsName
     $assetPaths = @($binaryPath, $sourcesFinal, $spdxFinal, $sumsPath)
+    $assetNames = @($script:KaronPackageBinaryName, $script:KaronPackageSourcesName, $script:KaronPackageSpdxName, $script:KaronPackageSumsName)
+    if ($split) {
+        $partCount = [int][Math]::Ceiling([double]$sources.Length / (Get-KaronSourceTransportLimits).PartLength)
+        $assetNames = @(Get-KaronPackageTransportAssetNames $partCount)
+        $assetPaths = @($assetNames | ForEach-Object { Join-Path $outputRoot $_ })
+    }
     if ($PlanOnly) {
         return [pscustomobject]@{ Mode = 'plan'; AssetPaths = $assetPaths; ZipEntries = @(Get-KaronPackageSortedNames $entries) }
     }
@@ -1683,14 +1842,14 @@ function Invoke-QualityReleasePackageCore {
         if (Test-Path -LiteralPath $binaryPartial) { Remove-Item -LiteralPath $binaryPartial -Force }
     }
 
-    Copy-KaronPackageArtifactAtomic -SourcePath $sources.FullPath -FinalPath $sourcesFinal -ExpectedSha256 $sources.Sha256
+    $transport = $null
+    if ($split) { $transport = New-KaronPackageSourceTransport $sources $outputRoot $SourceTransportBinding }
+    else { Copy-KaronPackageArtifactAtomic -SourcePath $sources.FullPath -FinalPath $sourcesFinal -ExpectedSha256 $sources.Sha256 }
     Copy-KaronPackageArtifactAtomic -SourcePath $spdx.FullPath -FinalPath $spdxFinal -ExpectedSha256 $spdx.Sha256
 
-    $lines = @(
-        ((Get-KaronPackageSha256 $binaryPath) + '  ' + $script:KaronPackageBinaryName)
-        ((Get-KaronPackageSha256 $sourcesFinal) + '  ' + $script:KaronPackageSourcesName)
-        ((Get-KaronPackageSha256 $spdxFinal) + '  ' + $script:KaronPackageSpdxName)
-    )
+    $lines = @($assetNames | Where-Object { $_ -cne $script:KaronPackageSumsName } | ForEach-Object {
+        (Get-KaronPackageSha256 (Join-Path $outputRoot $_)) + '  ' + $_
+    })
     $sumsPartial = "$sumsPath.$PID.$([Guid]::NewGuid().ToString('N')).partial"
     try {
         [IO.File]::WriteAllText($sumsPartial, (($lines -join "`n") + "`n"), [Text.UTF8Encoding]::new($false))
@@ -1700,17 +1859,9 @@ function Invoke-QualityReleasePackageCore {
         if (Test-Path -LiteralPath $sumsPartial) { Remove-Item -LiteralPath $sumsPartial -Force }
     }
 
-    $finalItems = @(Get-ChildItem -LiteralPath $outputRoot -Force)
-    if ($finalItems.Count -ne 4 -or @($finalItems | Where-Object {
-        $_.PSIsContainer -or ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $_.Length -le 0
-    }).Count -ne 0) { throw 'package_final_inventory_invalid' }
-    $finalNames = [string[]]@($finalItems | ForEach-Object Name)
-    $expectedNames = [string[]]@($script:KaronPackageBinaryName, $script:KaronPackageSourcesName, $script:KaronPackageSpdxName, $script:KaronPackageSumsName)
-    [Array]::Sort($finalNames, [StringComparer]::Ordinal)
-    [Array]::Sort($expectedNames, [StringComparer]::Ordinal)
-    if (($finalNames -join "`n") -cne ($expectedNames -join "`n")) { throw 'package_final_inventory_invalid' }
+    [void](Get-KaronPackagePublicInventory $outputRoot $assetNames)
 
-    [pscustomobject]@{ Mode = 'packaged'; AssetPaths = $assetPaths; ZipEntries = @(Get-KaronPackageSortedNames $entries) }
+    [pscustomobject]@{ Mode = 'packaged'; AssetPaths = $assetPaths; AssetNames = $assetNames; SourceTransport = $transport; ZipEntries = @(Get-KaronPackageSortedNames $entries) }
 }
 
 function Invoke-QualityReleasePackage {
@@ -1786,7 +1937,12 @@ function Invoke-QualityReleasePackage {
     }
     $inputSnapshots = New-KaronPackageByteSnapshots ([string[]]$snapshotPaths.ToArray())
 
-    $coreResult = Invoke-QualityReleasePackageCore -RepositoryRoot $repo -CandidateDirectory $candidateRoot -LockPath $actualLockPath -CorrespondingSourcesPath $CorrespondingSourcesPath -SpdxPath $SpdxPath -OutputDirectory $outputRoot -GuiValidationWaiver $waiver -PlanOnly:$PlanOnly
+    $transportBinding = [pscustomobject]@{
+        ApplicationSourceCommit = $provenance.ApplicationSourceCommit
+        ApplicationSourceTree = $provenance.ApplicationSourceTree
+        CandidateManifestSha256 = $candidateEntries['candidate-manifest.json'].Sha256
+    }
+    $coreResult = Invoke-QualityReleasePackageCore -RepositoryRoot $repo -CandidateDirectory $candidateRoot -LockPath $actualLockPath -CorrespondingSourcesPath $CorrespondingSourcesPath -SpdxPath $SpdxPath -OutputDirectory $outputRoot -GuiValidationWaiver $waiver -SourceTransportBinding $transportBinding -PlanOnly:$PlanOnly
     if ($PlanOnly) {
         if ($guiRoute -ceq 'waiver') {
             return [pscustomobject]@{ Mode = 'plan'; Status = 'WAIVED_BY_OWNER'; AssetPaths = @($coreResult.AssetPaths); ZipEntries = @($coreResult.ZipEntries); ReceiptPath = $receipt; GuiValidationWaiverRecord = $waiver.Record }
@@ -1801,6 +1957,7 @@ function Invoke-QualityReleasePackage {
     }
 
     $sourcesFinal = Join-Path $outputRoot $script:KaronPackageSourcesName
+    if ($null -ne $coreResult.SourceTransport) { $sourcesFinal = $CorrespondingSourcesPath }
     $spdxFinal = Join-Path $outputRoot $script:KaronPackageSpdxName
     $receiptValue = [ordered]@{
         schemaVersion = 'karon-release-receipt/v2'
@@ -1818,7 +1975,7 @@ function Invoke-QualityReleasePackage {
         correspondingSources = New-KaronPackageLocalRecord $sourcesFinal $script:KaronPackageSourcesName
         spdx = New-KaronPackageLocalRecord $spdxFinal $script:KaronPackageSpdxName
         releaseNotes = $notesTracked
-        publicAssets = @(Get-KaronPackagePublicInventory $outputRoot)
+        publicAssets = @(Get-KaronPackagePublicInventory $outputRoot $coreResult.AssetNames)
     }
     if ($guiRoute -ceq 'waiver') {
         $receiptValue.schemaVersion = 'karon-release-receipt/v3'
@@ -1831,6 +1988,10 @@ function Invoke-QualityReleasePackage {
         $receiptValue.guiValidationEvidenceManifest = New-KaronPackageLocalRecord $GuiValidationEvidenceManifestPath 'gui-validation-evidence-manifest.json'
         $receiptValue.guiValidationSchema = $guiSchemaTracked
         $receiptValue.guiCaseIds = @($script:KaronPackageGuiCases | ForEach-Object Id)
+    }
+    if ($null -ne $coreResult.SourceTransport) {
+        $receiptValue.schemaVersion = if ($guiRoute -ceq 'waiver') { 'karon-release-receipt/v5' } else { 'karon-release-receipt/v4' }
+        $receiptValue.sourceTransport = $coreResult.SourceTransport
     }
     Write-KaronPackageAtomicJson $receipt $receiptValue
     $validated = Assert-KaronReleaseReceipt $repo $outputRoot $receipt
