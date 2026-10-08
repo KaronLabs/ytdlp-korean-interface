@@ -12,7 +12,7 @@ foreach ($testPath in $ordinaryTests) {
         (Get-Command pwsh.exe -CommandType Application -ErrorAction Stop).Source
     }
     else {
-        Join-Path $PSHOME 'powershell.exe'
+        Join-Path $PSHOME 'pwsh.exe'
     }
     & $hostPath -NoProfile -ExecutionPolicy Bypass -File $testPath.FullName
     if ($LASTEXITCODE -ne 0) { Write-Error ('FAIL ' + $testPath.Name); exit $LASTEXITCODE }
@@ -64,7 +64,7 @@ $runtimeTests = @(
 
 foreach ($testName in $runtimeTests) {
     Write-Host ('START runtime-maintenance::' + $testName)
-    & (Join-Path $PSHOME 'powershell.exe') -NoProfile -ExecutionPolicy Bypass -File $runtimeTest -TestFilter $testName
+    & (Join-Path $PSHOME 'pwsh.exe') -NoProfile -ExecutionPolicy Bypass -File $runtimeTest -TestFilter $testName
     if ($LASTEXITCODE -ne 0) { Write-Error ('FAIL runtime-maintenance::' + $testName); exit $LASTEXITCODE }
     Write-Host ('PASS runtime-maintenance::' + $testName)
 }
