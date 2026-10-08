@@ -73,11 +73,11 @@ jobs:
           pwsh -NoProfile -File tools/run-karon2-powershell-contracts.ps1 -Path tests/powershell/release-publication-contract.Tests.ps1
           exit $LASTEXITCODE
       - name: Run pre-release repository contracts
-        shell: powershell
+        shell: pwsh
         env:
           RECOVERED_CATALOG: locales/ko-KR.json
         run: |
           python tests/run_contract_tests.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/run_ci_powershell_tests.ps1
+          pwsh -NoProfile -ExecutionPolicy Bypass -File tests/run_ci_powershell_tests.ps1
           exit $LASTEXITCODE
