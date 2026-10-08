@@ -7,6 +7,14 @@ Windows GUI의 직접적인 upstream은 [ErrorFlynn/ytdlp-interface]
 (https://github.com/ErrorFlynn/ytdlp-interface)입니다.
 ```
 
+## 먼저 다운로드하세요
+
+일반 사용자께서는 **[기존 `v2.19.1-karon.1` 안정 릴리스](https://github.com/KaronLabs/ytdlp-korean-interface/releases/tag/v2.19.1-karon.1)**의 Assets에서 **`*-win-x64.zip`**을 선택해 주세요. **폴더 전체를 압축 해제**한 뒤 그 안의 **`ytdlp-interface.exe`**를 실행해 주세요.
+
+앱 실행용으로는 `corresponding-sources` 묶음, `SPDX` 파일, GitHub의 **Source code (zip)** 또는 **Code → Download ZIP**을 받지 마세요. **약 2.5GB 소스 묶음은 앱 실행용 ZIP이 아닙니다.** 제3자 소스·라이선스 자료는 개발·재배포용으로 별도 제공되며, 일반 사용자께서 앱 실행을 위해 따로 받으실 필요는 없습니다.
+
+**다음 버전 `v2.19.1-karon.2`: 준비 / HOLD (아직 공개되지 않았습니다).** 면제되지 않은 릴리스 검증·승인 조건을 충족한 뒤 공개할 예정입니다.
+
 [![윈도우 실행판 바로 다운로드](docs/win-downlaod-here.png)](https://github.com/KaronLabs/ytdlp-korean-interface/releases/download/v2.19.1-karon.1/ytdlp-korean-interface-v2.19.1-karon.1-win-x64.zip)
 
 
