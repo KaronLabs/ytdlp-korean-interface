@@ -80,16 +80,29 @@ function New-AssemblyBindingFixture {
     $cpmSource = Join-Path $sourceArchives 'cpm-source.zip'
     $cpmBootstrap = Join-Path $sourceArchives 'CPM.cmake'
     $bundle = Join-Path $nonRuntime 'ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip'
+    $denoClosurePath = Join-Path $root 'deno-2.7.14-verified-conservative-superset-sources.zip'
     [IO.File]::WriteAllBytes($official, [byte[]]@(1, 2, 3))
     [IO.File]::WriteAllBytes($collectedApplication, [byte[]]@(4, 5, 6))
     [IO.File]::WriteAllBytes($cpmSource, [byte[]]@(7, 8, 9))
     [IO.File]::WriteAllBytes($cpmBootstrap, [byte[]]@(10, 11, 12))
     [IO.File]::WriteAllBytes($bundle, [byte[]]@(13, 14, 15))
+    [IO.File]::WriteAllBytes($denoClosurePath, [byte[]]@(16, 17, 18))
     $appArtifact = New-AssemblyBindingArtifact 'application-source' 'application' $collectedApplication
     $cpmArchive = New-AssemblyBindingArtifact 'cpm-source' 'cpm' $cpmSource
     $cpmScript = New-AssemblyBindingArtifact 'cpm-bootstrap' 'cpm' $cpmBootstrap
     $appCommit = 'a' * 40
     $cpmCommit = 'b' * 40
+    $denoCommit = '2d674b25625bcc367853d00fe86f6e84390f88cb'
+    $denoClosureSha = (Get-FileHash -LiteralPath $denoClosurePath -Algorithm SHA256).Hash
+    $denoClosureLength = (Get-Item -LiteralPath $denoClosurePath).Length
+    $denoEntry = 'SOURCES/deno-source-2d674b25625bcc367853d00fe86f6e84390f88cb.zip'
+    $denoOrigin = [ordered]@{
+        fileName = 'deno-2d674b25.zip'; commit = $denoCommit
+        url = "https://github.com/denoland/deno/archive/$denoCommit.zip"
+        sha256 = '0fb1aac72af419d8f7de0d623eee7713571d841736d1c01eac97363afd3996dd'
+        length = 33443763L; archiveEntry = $denoEntry; containerPath = $denoClosurePath
+        verificationStatus = 'NOT_VERIFIED'
+    }
     $manifest = [ordered]@{
         schemaVersion = 'karon-non-runtime-component-evidence/v1'; approvalProfile = 'fixture-profile'
         release = [ordered]@{ tag = 'v2.19.1-karon.2'; expectedComponentCount = 2 }
@@ -136,6 +149,31 @@ function New-AssemblyBindingFixture {
                 id = 'cpm'; sourceCommit = $cpmCommit; sourceArchives = @()
                 verificationStatus = 'NOT_VERIFIED'; blockers = @()
                 producerEvidence = $oldProof
+            },
+            [ordered]@{
+                id = 'deno'; sourceCommit = $denoCommit
+                verificationStatus = 'NOT_VERIFIED'; blockers = @()
+                sourceArchives = @([ordered]@{
+                    artifactType = 'generated-source-closure'
+                    fileName = [IO.Path]::GetFileName($denoClosurePath)
+                    commit = $denoCommit; url = $null; sha256 = $denoClosureSha
+                    length = $denoClosureLength; localPath = $denoClosurePath
+                    verificationStatus = 'NOT_VERIFIED'; blockers = @()
+                    provenance = [ordered]@{
+                        component = 'deno'; sourceCommit = $denoCommit
+                        upstreamSourceArchives = @($denoOrigin)
+                        upstreamSource = [ordered]@{
+                            entryPath = $denoEntry; commit = $denoCommit; url = $denoOrigin.url
+                            sha256 = $denoOrigin.sha256; length = $denoOrigin.length
+                        }
+                    }
+                })
+                upstreamSourceArchives = @($denoOrigin)
+                sourceClosure = [ordered]@{
+                    localPath = $denoClosurePath
+                    fileName = [IO.Path]::GetFileName($denoClosurePath)
+                    sha256 = $denoClosureSha; length = $denoClosureLength
+                }
             }
         )
     }
@@ -162,13 +200,17 @@ Describe 'Closed producer evidence in source assembly' {
     It 'derives exact e07 proof paths and leaves the committed template untouched' {
         & $prepare -RepositoryRoot $fixture.Repository -EvidenceDirectory $fixture.Evidence -OutputDirectory $fixture.Output | Out-Null
         $result = Get-Content -LiteralPath (Join-Path $fixture.Output 'source-closure-template.json') -Raw | ConvertFrom-Json
-        foreach ($component in $result.components) {
+        foreach ($component in @($result.components | Where-Object { $_.PSObject.Properties.Name -contains 'producerEvidence' })) {
             $component.producerEvidence.manifestPath | Should -Be $fixture.ManifestPath
             $component.producerEvidence.collectorInventoryPath | Should -Be $fixture.InventoryPath
             $component.producerEvidence.status | Should -Be 'verified'
             ($component.producerEvidence.PSObject.Properties.Name -contains 'collectorBlockersPath') | Should -BeFalse
         }
         $result.components[0].producerEvidence.authoritativeSourceMetadataPath | Should -Be 'source-authority.json'
+        $deno = @($result.components | Where-Object id -CEQ 'deno')[0]
+        $deno.sourceArchives[0].provenance.upstreamSource.entryPath | Should -Be 'SOURCES/deno-source-2d674b25625bcc367853d00fe86f6e84390f88cb.zip'
+        $deno.sourceArchives[0].provenance.upstreamSourceArchives[0].archiveEntry | Should -Be $deno.upstreamSourceArchives[0].archiveEntry
+        $deno.sourceArchives[0].provenance.upstreamSource.sha256 | Should -Be $deno.upstreamSourceArchives[0].sha256
         $result.release.metadataPackage.packagingCommit | Should -Be $fixture.Head
         $result.release.verificationStatus | Should -Be 'NOT_VERIFIED'
         $result.release.licenseApproval | Should -Be 'HOLD'

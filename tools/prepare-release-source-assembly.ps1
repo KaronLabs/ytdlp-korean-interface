@@ -107,6 +107,9 @@ foreach ($component in $lock.components) {
     }
     if ($component.id -cin @('deno', 'ffmpeg', '7zip')) {
         $origins = @($component.sourceArchives)
+        if ($component.id -ceq 'deno' -and $component.PSObject.Properties.Name -ccontains 'upstreamSourceArchives') {
+            $origins = @($component.upstreamSourceArchives)
+        }
         $component | Add-Member -NotePropertyName upstreamSourceArchives -NotePropertyValue $origins -Force
         $closure = $component.sourceClosure
         if ($component.id -ceq '7zip') {
@@ -123,7 +126,16 @@ foreach ($component in $lock.components) {
         }
         $provenance = [ordered]@{ component = $component.id; sourceCommit = $component.sourceCommit; upstreamSourceArchives = $origins }
         if ($component.id -ceq 'deno') {
-            $origin = @($origins | Where-Object commit -CEQ $component.sourceCommit)[0]
+            $matches = @($origins | Where-Object commit -CEQ $component.sourceCommit)
+            if ($matches.Count -ne 1 -or
+                $matches[0].PSObject.Properties.Name -cnotcontains 'archiveEntry' -or
+                [string]::IsNullOrWhiteSpace([string]$matches[0].archiveEntry) -or
+                $matches[0].PSObject.Properties.Name -cnotcontains 'url' -or
+                $matches[0].PSObject.Properties.Name -cnotcontains 'sha256' -or
+                $matches[0].PSObject.Properties.Name -cnotcontains 'length') {
+                throw 'source_assembly_deno_upstream_origin_invalid'
+            }
+            $origin = $matches[0]
             $provenance.upstreamSource = [pscustomobject]@{
                 entryPath = $origin.archiveEntry; commit = $origin.commit; url = $origin.url; sha256 = $origin.sha256; length = $origin.length
             }
