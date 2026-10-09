@@ -201,7 +201,7 @@ function New-TestHashRecord {
 }
 
 function New-ReleaseContractCase {
-    param([Parameter(Mandatory)] [string] $Name)
+    param([Parameter(Mandatory)] [string] $Name, [string] $NestedLocaleManifestPath = '')
     $root = Join-Path $TestDrive $Name
     $repository = Join-Path $root 'repository'
     $candidate = Join-Path $root 'candidate'
@@ -231,6 +231,8 @@ function New-ReleaseContractCase {
     $ffprobePath = Join-Path $candidate 'ffprobe.exe'
     Write-TestUtf8 $appPath ('sealed application bytes' + [char]10)
     Write-TestUtf8 $ffprobePath ('sealed ffprobe bytes' + [char]10)
+    $localePath = Join-Path $candidate 'locales\ko-KR.json'
+    if ($NestedLocaleManifestPath -ne '') { Write-TestUtf8 $localePath ('{"language":"ko-KR"}' + [char]10) }
     $manifestPath = Join-Path $candidate 'candidate-manifest.json'
     $manifest = [ordered]@{
         schemaVersion = 1
@@ -241,6 +243,9 @@ function New-ReleaseContractCase {
             [ordered]@{ path = 'ffprobe.exe'; sha256 = Get-TestSha256 $ffprobePath; length = [long](Get-Item $ffprobePath).Length },
             [ordered]@{ path = 'ytdlp-interface.exe'; sha256 = Get-TestSha256 $appPath; length = [long](Get-Item $appPath).Length }
         )
+    }
+    if ($NestedLocaleManifestPath -ne '') {
+        $manifest.files += [ordered]@{ path = $NestedLocaleManifestPath; sha256 = Get-TestSha256 $localePath; length = [long](Get-Item $localePath).Length }
     }
     Write-TestJson $manifestPath $manifest
 
@@ -295,6 +300,9 @@ function New-ReleaseContractCase {
         [ordered]@{ path = 'ytdlp-interface.exe'; sha256 = Get-TestSha256 $appPath; package = 'application'; licenseConcluded = 'MIT' },
         [ordered]@{ path = 'candidate-manifest.json'; sha256 = Get-TestSha256 $manifestPath; package = 'release-metadata'; licenseConcluded = 'CC0-1.0' }
     )
+    if ($NestedLocaleManifestPath -ne '') {
+        $candidateFiles += [ordered]@{ path = 'locales/ko-KR.json'; sha256 = Get-TestSha256 $localePath; package = 'application'; licenseConcluded = 'MIT' }
+    }
     $baseLock = [ordered]@{
         schemaVersion = 'karon-license-lock/v2'
         release = [ordered]@{
@@ -1380,6 +1388,24 @@ Describe 'Canonical producer GUI schema handshake' {
 }
 
 Describe 'Exact package, GUI evidence, and receipt contract' {
+    It 'packages a nested Windows-separator manifest entry under its canonical ZIP path' {
+        $case = New-ReleaseContractCase 'package-windows-locale' -NestedLocaleManifestPath 'locales\ko-KR.json'
+        @($case.CandidateManifest.files | Where-Object path -CEQ 'locales\ko-KR.json').Count | Should -Be 1
+        @($case.Lock.release.candidateFiles | Where-Object path -CEQ 'locales/ko-KR.json').Count | Should -Be 1
+        [void](Invoke-TestPackage $case)
+        $zip = [IO.Compression.ZipFile]::OpenRead((Join-Path $case.Output $script:BinaryName))
+        try { $zip.GetEntry('locales/ko-KR.json') | Should -Not -BeNullOrEmpty }
+        finally { $zip.Dispose() }
+    }
+
+    It 'rejects a traversal alias even when its file and canonical lock record exist' {
+        $case = New-ReleaseContractCase 'package-locale-traversal' -NestedLocaleManifestPath 'locales\..\locales\ko-KR.json'
+        @($case.CandidateManifest.files | Where-Object path -CEQ 'locales\..\locales\ko-KR.json').Count | Should -Be 1
+        @($case.Lock.release.candidateFiles | Where-Object path -CEQ 'locales/ko-KR.json').Count | Should -Be 1
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match '^package_'
+        @(Get-ChildItem -LiteralPath $case.Output -Force).Count | Should -Be 0
+    }
+
     It 'accepts a parsed <Kind> relationship in final SPDX package validation' -TestCases @(
         @{ Kind = 'static' }, @{ Kind = 'build-input' }
     ) {

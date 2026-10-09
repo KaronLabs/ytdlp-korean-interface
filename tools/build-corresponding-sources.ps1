@@ -321,7 +321,7 @@ $manifest = Read-JsonFile $manifestPath 'source_candidate_manifest_invalid'
 if ($manifest.schemaVersion -ne 1 -or -not (Test-Property $manifest 'files')) { throw 'source_candidate_manifest_invalid' }
 $manifestFiles = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
 foreach ($entry in @($manifest.files)) {
-    $relative = [string]$entry.path
+    $relative = ([string]$entry.path).Replace('\', '/')
     Assert-RelativePath $relative 'source_candidate_manifest_inventory_mismatch'
     if ($relative -ieq 'candidate-manifest.json' -or $entry.sha256 -notmatch '^[a-fA-F0-9]{64}$' -or
         ([string]$entry.length) -notmatch '^(0|[1-9][0-9]*)$') { throw 'source_candidate_manifest_inventory_mismatch' }

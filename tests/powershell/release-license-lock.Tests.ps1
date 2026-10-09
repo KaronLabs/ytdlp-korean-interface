@@ -114,7 +114,8 @@ function New-TestComponent {
 function New-TestFixture {
     param(
         [string] $Name,
-        [switch] $DenoCaseCollision
+        [switch] $DenoCaseCollision,
+        [switch] $WindowsNestedLocale
     )
     $root = Join-Path $TestDrive $Name
     [IO.Directory]::CreateDirectory($root) | Out-Null
@@ -142,10 +143,15 @@ function New-TestFixture {
         'ytdlp-interface.exe' = 'karon application executable'
     }
     foreach ($name in $candidatePayloads.Keys) { Write-TestText (Join-Path $candidate $name) ([string]$candidatePayloads[$name]) }
+    $localePath = Join-Path $candidate 'locales\ko-KR.json'
+    if ($WindowsNestedLocale) { Write-TestText $localePath '{"language":"ko-KR"}' }
     $candidateFiles = @()
     foreach ($name in @($candidatePayloads.Keys | Sort-Object)) {
         $path = Join-Path $candidate $name
         $candidateFiles += [ordered]@{ path = $name; length = [long](Get-Item $path).Length; sha256 = Get-TestSha256 $path }
+    }
+    if ($WindowsNestedLocale) {
+        $candidateFiles += [ordered]@{ path = 'locales\ko-KR.json'; length = [long](Get-Item $localePath).Length; sha256 = Get-TestSha256 $localePath }
     }
     $candidateManifestPath = Join-Path $candidate 'candidate-manifest.json'
     $candidateManifest = [ordered]@{
@@ -399,8 +405,9 @@ function New-TestFixture {
     )
     $lockCandidateFiles = @()
     foreach ($entry in $candidateFiles) {
-        $package = switch ($entry.path) { '7z.dll' { '7zip' }; 'deno.exe' { 'deno' }; 'ffmpeg.exe' { 'ffmpeg' }; 'ffprobe.exe' { 'ffmpeg' }; 'yt-dlp.exe' { 'yt-dlp' }; default { 'application' } }
-        $lockCandidateFiles += [ordered]@{ path = $entry.path; length = $entry.length; sha256 = $entry.sha256; package = $package; licenseConcluded = (@($components | Where-Object id -eq $package)[0].licenseConcluded) }
+        $canonicalPath = $entry.path.Replace('\', '/')
+        $package = switch ($canonicalPath) { '7z.dll' { '7zip' }; 'deno.exe' { 'deno' }; 'ffmpeg.exe' { 'ffmpeg' }; 'ffprobe.exe' { 'ffmpeg' }; 'yt-dlp.exe' { 'yt-dlp' }; default { 'application' } }
+        $lockCandidateFiles += [ordered]@{ path = $canonicalPath; length = $entry.length; sha256 = $entry.sha256; package = $package; licenseConcluded = (@($components | Where-Object id -eq $package)[0].licenseConcluded) }
     }
     $lockCandidateFiles += [ordered]@{ path = 'candidate-manifest.json'; length = [long](Get-Item $candidateManifestPath).Length; sha256 = Get-TestSha256 $candidateManifestPath; package = 'release-metadata'; licenseConcluded = 'CC0-1.0' }
     $template = Join-Path $root 'license-template.json'
@@ -709,6 +716,34 @@ function New-SwapInstrumentedBuilder {
 }
 
 Describe 'source and SPDX assembly recovery checkpoint' {
+    It 'accepts a nested Windows manifest path with canonical lock ownership for <Kind>' -TestCases @(
+        @{ Kind = 'source' }, @{ Kind = 'spdx' }
+    ) {
+        param($Kind)
+        $fixture = New-TestFixture ('windows-locale-' + $Kind) -WindowsNestedLocale
+        $manifest = Read-TestJson $fixture.CandidateManifest
+        @($manifest.files | Where-Object path -CEQ 'locales\ko-KR.json').Count | Should -Be 1
+        $template = Read-TestJson $fixture.Template
+        @($template.release.candidateFiles | Where-Object path -CEQ 'locales/ko-KR.json').Count | Should -Be 1
+        $arguments = Get-WaiverBuilderArguments $fixture (New-LicenseLockWaiver $fixture)
+        [void]$arguments.Remove('CorrespondingSourcesPath')
+        [void]$arguments.Remove('SpdxPath')
+        $arguments.AssemblyOnly = $true
+        $arguments.OutputPath = Join-Path $fixture.Root 'assembly.json'
+        & $script:Builder @arguments | Out-Null
+        $output = Join-Path $fixture.Root 'generated'
+        [void][IO.Directory]::CreateDirectory($output)
+        if ($Kind -eq 'source') {
+            & $script:SourcesConsumer -LockPath $arguments.OutputPath -SourceRoot $fixture.SourceRoot -CandidateRoot $fixture.Candidate -CacheDirectory $fixture.Cache -OutputDirectory $output | Out-Null
+            (Test-Path -LiteralPath (Join-Path $output 'ytdlp-korean-interface-v2.19.1-karon.2-corresponding-sources.zip')) | Should -Be $true
+        }
+        else {
+            & $script:SpdxConsumer -LockPath $arguments.OutputPath -SourceRoot $fixture.SourceRoot -CandidateRoot $fixture.Candidate -OutputDirectory $output | Out-Null
+            $spdx = Read-TestJson (Join-Path $output 'ytdlp-korean-interface-v2.19.1-karon.2.spdx.json')
+            @($spdx.files | Where-Object fileName -CEQ './locales/ko-KR.json').Count | Should -Be 1
+        }
+    }
+
     It 'constructs <Kind> from checked assembly without approving the lock' -TestCases @(
         @{ Kind = 'source' }, @{ Kind = 'spdx' }
     ) {

@@ -292,7 +292,7 @@ function Get-KaronPackageCandidateEntries {
     if ($applicationSourceCommit -notmatch '^[a-fA-F0-9]{40}$' -or $applicationSourceTree -notmatch '^[a-fA-F0-9]{40}$') { throw 'package_candidate_manifest_invalid' }
     $manifestFiles = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($entry in @($manifest.files)) {
-        $relative = [string]$entry.path
+        $relative = ([string]$entry.path).Replace('\', '/')
         Assert-KaronPackageRelativePath -Path $relative -ErrorId 'package_candidate_manifest_inventory_mismatch'
         $length = 0L
         if ($relative -ieq 'candidate-manifest.json' -or [string]$entry.sha256 -notmatch '^[a-fA-F0-9]{64}$' -or
@@ -300,12 +300,12 @@ function Get-KaronPackageCandidateEntries {
             throw 'package_candidate_manifest_inventory_mismatch'
         }
         if (-not $manifestFiles.TryAdd($relative, $entry)) { throw 'package_candidate_manifest_path_collision' }
-        if ([string]$manifestFiles[$relative].path -cne $relative) { throw 'package_candidate_manifest_path_collision' }
+        if (([string]$manifestFiles[$relative].path).Replace('\', '/') -cne $relative) { throw 'package_candidate_manifest_path_collision' }
     }
     if ($manifestFiles.Count -ne ($locked.Count - 1)) { throw 'package_candidate_manifest_inventory_mismatch' }
     foreach ($relative in $locked.Keys) {
         if ($relative -ieq 'candidate-manifest.json') { continue }
-        if (-not $manifestFiles.ContainsKey($relative) -or [string]$manifestFiles[$relative].path -cne [string]$locked[$relative].path) {
+        if (-not $manifestFiles.ContainsKey($relative) -or ([string]$manifestFiles[$relative].path).Replace('\', '/') -cne [string]$locked[$relative].path) {
             throw 'package_candidate_manifest_inventory_mismatch'
         }
         if ([string]$manifestFiles[$relative].sha256 -cne ([string]$locked[$relative].sha256).ToLowerInvariant()) {
