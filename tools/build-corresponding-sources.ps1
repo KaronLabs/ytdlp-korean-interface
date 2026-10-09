@@ -304,7 +304,12 @@ foreach ($component in $componentById.Values) {
         if ($count -eq 0) { throw 'source_candidate_package_empty' }
     }
     else {
-        if ($count -ne 0 -or -not (Test-Property $component 'staticLinkTarget') -or
+        if ($count -ne 0) { throw 'source_static_link_invalid' }
+        if ((Test-Property $component 'usage') -and $component.usage -ceq 'build-input') {
+            if ((Test-Property $component 'staticLinkTarget') -or -not $componentById.ContainsKey('application') -or
+                -not $componentById['application'].filesAnalyzed) { throw 'source_static_link_invalid' }
+        }
+        elseif (-not (Test-Property $component 'staticLinkTarget') -or
             -not $componentById.ContainsKey([string]$component.staticLinkTarget) -or
             -not $componentById[[string]$component.staticLinkTarget].filesAnalyzed) { throw 'source_static_link_invalid' }
     }

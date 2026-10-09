@@ -1326,7 +1326,12 @@ function Assert-KaronPackageSpdxContract {
         [void]$expectedRelationships.Add($expectedFiles[$relative].Package + '|CONTAINS|' + $expectedFiles[$relative].SpdxId)
     }
     foreach ($component in @($Lock.components | Where-Object { -not [bool]$_.filesAnalyzed })) {
-        [void]$expectedRelationships.Add(('SPDXRef-Package-' + [string]$component.staticLinkTarget + '|STATIC_LINK|SPDXRef-Package-' + [string]$component.id))
+        if (($component.PSObject.Properties.Name -ccontains 'usage') -and [string]$component.usage -ceq 'build-input') {
+            [void]$expectedRelationships.Add(('SPDXRef-Package-' + [string]$component.id + '|BUILD_TOOL_OF|SPDXRef-Package-application'))
+        }
+        else {
+            [void]$expectedRelationships.Add(('SPDXRef-Package-' + [string]$component.staticLinkTarget + '|STATIC_LINK|SPDXRef-Package-' + [string]$component.id))
+        }
     }
     $actualRelationships = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     foreach ($relationship in Get-KaronPackageRawArray (Get-KaronPackageRawProperty $json.Raw 'relationships' 'package_spdx_invalid') 'package_spdx_invalid') {

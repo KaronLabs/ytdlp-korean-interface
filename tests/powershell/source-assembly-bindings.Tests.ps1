@@ -132,7 +132,12 @@ function New-AssemblyBindingFixture {
         schemaVersion = 'karon-license-lock/v2'
         release = [ordered]@{
             applicationSource = [ordered]@{ fileName = 'official.zip'; localPath = $official; commit = $appCommit }
-            metadataPackage = [ordered]@{ noticeFiles = @(); bindingNote = 'unsealed'; packagingCommit = $null }
+            metadataPackage = [ordered]@{ id = 'release-metadata'; noticeFiles = @(); bindingNote = 'unsealed'; packagingCommit = $null }
+            candidateFiles = @(
+                [ordered]@{ path = 'ytdlp-interface.exe'; package = 'application'; sha256 = (Get-FileHash -LiteralPath $official -Algorithm SHA256).Hash; length = (Get-Item -LiteralPath $official).Length; licenseConcluded = 'MIT' },
+                [ordered]@{ path = 'deno.exe'; package = 'deno'; sha256 = $denoClosureSha; length = $denoClosureLength; licenseConcluded = 'MIT' },
+                [ordered]@{ path = 'candidate-manifest.json'; package = 'release-metadata'; sha256 = ('c' * 64); length = 1L; licenseConcluded = 'MIT' }
+            )
             verificationStatus = 'NOT_VERIFIED'; blockers = @()
         }
         components = @(
@@ -146,7 +151,7 @@ function New-AssemblyBindingFixture {
                 }
             },
             [ordered]@{
-                id = 'cpm'; sourceCommit = $cpmCommit; sourceArchives = @()
+                id = 'cpm'; sourceCommit = $cpmCommit; sourceArchives = @(); usage = 'build-input'
                 verificationStatus = 'NOT_VERIFIED'; blockers = @()
                 producerEvidence = $oldProof
             },
@@ -211,6 +216,9 @@ Describe 'Closed producer evidence in source assembly' {
         $deno.sourceArchives[0].provenance.upstreamSource.entryPath | Should -Be 'SOURCES/deno-source-2d674b25625bcc367853d00fe86f6e84390f88cb.zip'
         $deno.sourceArchives[0].provenance.upstreamSourceArchives[0].archiveEntry | Should -Be $deno.upstreamSourceArchives[0].archiveEntry
         $deno.sourceArchives[0].provenance.upstreamSource.sha256 | Should -Be $deno.upstreamSourceArchives[0].sha256
+        $result.components[0].filesAnalyzed | Should -BeTrue
+        $deno.filesAnalyzed | Should -BeTrue
+        (@($result.components | Where-Object id -CEQ 'cpm')[0]).filesAnalyzed | Should -BeFalse
         $result.release.metadataPackage.packagingCommit | Should -Be $fixture.Head
         $result.release.verificationStatus | Should -Be 'NOT_VERIFIED'
         $result.release.licenseApproval | Should -Be 'HOLD'
@@ -298,5 +306,70 @@ Describe 'Idempotent non-runtime source closure binding' {
             $thrown = $_.Exception.Message
         }
         $thrown | Should -Match '^source_assembly_application_closure_conflict:application:'
+    }
+}
+
+Describe 'Candidate-file analysis in source assembly' {
+    BeforeAll {
+        $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+        $preparePath = Join-Path $repositoryRoot 'tools\prepare-release-source-assembly.ps1'
+        $tokens = $null
+        $parseErrors = $null
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($preparePath, [ref]$tokens, [ref]$parseErrors)
+        $analysisFunction = $ast.Find({
+            param($node)
+            $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+            $node.Name -eq 'Set-AssemblyFilesAnalyzedFromCandidateFiles'
+        }, $true)
+        if ($null -eq $analysisFunction) { throw 'source_assembly_candidate_analysis_function_missing' }
+        . ([scriptblock]::Create($analysisFunction.Extent.Text))
+    }
+
+    BeforeEach {
+        $templatePath = Join-Path $repositoryRoot 'release\dependencies\v2.19.1-karon.2.lock.json'
+        $template = Get-Content -LiteralPath $templatePath -Raw | ConvertFrom-Json
+    }
+
+    It 'marks only packages represented by the nine candidate files as analyzed' {
+        @($template.release.candidateFiles).Count | Should -Be 9
+        Set-AssemblyFilesAnalyzedFromCandidateFiles -Lock $template
+        foreach ($id in @('application', 'ffmpeg', 'yt-dlp', '7zip', 'deno')) {
+            (@($template.components | Where-Object id -CEQ $id)[0]).filesAnalyzed | Should -BeTrue
+        }
+        foreach ($id in @('bit7z', 'nana', 'libpng', 'zlib', 'libjpeg-turbo', 'nlohmann-json', 'cpm')) {
+            (@($template.components | Where-Object id -CEQ $id)[0]).filesAnalyzed | Should -BeFalse
+        }
+    }
+
+    It 'rejects a candidate file assigned to a static-linked library' {
+        $template.release.candidateFiles[0].package = 'bit7z'
+        $failure = $null
+        try { Set-AssemblyFilesAnalyzedFromCandidateFiles -Lock $template }
+        catch { $failure = $_.Exception.Message }
+        $failure | Should -Be 'source_assembly_candidate_files_invalid'
+    }
+
+    It 'rejects a candidate file assigned to the build-input CPM package' {
+        $template.release.candidateFiles[0].package = 'cpm'
+        $failure = $null
+        try { Set-AssemblyFilesAnalyzedFromCandidateFiles -Lock $template }
+        catch { $failure = $_.Exception.Message }
+        $failure | Should -Be 'source_assembly_candidate_files_invalid'
+    }
+
+    It 'rejects a candidate record without a valid digest' {
+        $template.release.candidateFiles[0].sha256 = 'invalid'
+        $failure = $null
+        try { Set-AssemblyFilesAnalyzedFromCandidateFiles -Lock $template }
+        catch { $failure = $_.Exception.Message }
+        $failure | Should -Be 'source_assembly_candidate_files_invalid'
+    }
+
+    It 'rejects a direct runtime component missing from candidate files' {
+        $template.release.candidateFiles = @($template.release.candidateFiles | Where-Object package -CNE 'ffmpeg')
+        $failure = $null
+        try { Set-AssemblyFilesAnalyzedFromCandidateFiles -Lock $template }
+        catch { $failure = $_.Exception.Message }
+        $failure | Should -Be 'source_assembly_candidate_files_invalid'
     }
 }

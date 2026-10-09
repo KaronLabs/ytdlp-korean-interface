@@ -64,6 +64,65 @@ foreach ($definition in $manifest.components) {
     $component.producerEvidence.PSObject.Properties.Remove('collectorBlockersPath')
     $component.producerEvidence.status = 'verified'
 }
+function Set-AssemblyFilesAnalyzedFromCandidateFiles {
+    param([object]$Lock)
+
+    $invalid = 'source_assembly_candidate_files_invalid'
+    if ($Lock.release.PSObject.Properties.Name -cnotcontains 'candidateFiles' -or
+        $Lock.release.metadataPackage.PSObject.Properties.Name -cnotcontains 'id') { throw $invalid }
+
+    $components = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
+    $counts = [Collections.Generic.Dictionary[string, int]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($component in @($Lock.components)) {
+        $id = [string]$component.id
+        if ([string]::IsNullOrWhiteSpace($id) -or -not $components.TryAdd($id, $component)) { throw $invalid }
+        $counts.Add($id, 0)
+    }
+    $metadataId = [string]$Lock.release.metadataPackage.id
+    if ([string]::IsNullOrWhiteSpace($metadataId) -or $components.ContainsKey($metadataId)) { throw $invalid }
+    $counts.Add($metadataId, 0)
+
+    $paths = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $files = @($Lock.release.candidateFiles)
+    if ($files.Count -eq 0) { throw $invalid }
+    foreach ($file in $files) {
+        if ($null -eq $file) { throw $invalid }
+        foreach ($name in @('path', 'sha256', 'length', 'package', 'licenseConcluded')) {
+            if ($file.PSObject.Properties.Name -cnotcontains $name) { throw $invalid }
+        }
+        $path = [string]$file.path
+        $length = 0L
+        if ([string]::IsNullOrWhiteSpace($path) -or $path.Contains('\') -or $path.Contains(':') -or
+            @($path.Split('/') | Where-Object { $_ -in @('', '.', '..') }).Count -ne 0 -or
+            -not $paths.Add($path) -or [string]$file.sha256 -notmatch '^[a-fA-F0-9]{64}$' -or
+            -not [long]::TryParse([string]$file.length, [ref]$length) -or $length -le 0 -or
+            [string]::IsNullOrWhiteSpace([string]$file.licenseConcluded)) { throw $invalid }
+        $package = [string]$file.package
+        if (-not $counts.ContainsKey($package)) { throw $invalid }
+        if ($package -ieq $metadataId) {
+            if ($package -cne $metadataId -or $path -cne 'candidate-manifest.json') { throw $invalid }
+        }
+        elseif ($package -cne [string]$components[$package].id) { throw $invalid }
+        $counts[$package]++
+    }
+    if ($counts[$metadataId] -ne 1) { throw $invalid }
+
+    $decisions = [System.Collections.Generic.List[object]]::new()
+    foreach ($component in @($Lock.components)) {
+        $id = [string]$component.id
+        $buildInput = $component.PSObject.Properties.Name -ccontains 'usage' -and [string]$component.usage -ceq 'build-input'
+        $static = $component.PSObject.Properties.Name -ccontains 'staticLinkTarget' -and
+            -not [string]::IsNullOrWhiteSpace([string]$component.staticLinkTarget)
+        $analyzed = $counts[$id] -gt 0
+        if (($buildInput -or $static) -eq $analyzed) { throw $invalid }
+        $decisions.Add([pscustomobject]@{ component = $component; analyzed = $analyzed })
+    }
+    foreach ($decision in $decisions) {
+        $decision.component | Add-Member -NotePropertyName filesAnalyzed -NotePropertyValue $decision.analyzed -Force
+    }
+}
+Set-AssemblyFilesAnalyzedFromCandidateFiles -Lock $lock
+
 $repositoryPath = [IO.Path]::GetFullPath($RepositoryRoot).TrimEnd('\', '/')
 $gitRoot = @(& git -C $RepositoryRoot rev-parse --show-toplevel 2>$null)
 if ($LASTEXITCODE -ne 0 -or $gitRoot.Count -ne 1 -or

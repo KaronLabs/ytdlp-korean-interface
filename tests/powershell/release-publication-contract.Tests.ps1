@@ -1380,6 +1380,56 @@ Describe 'Canonical producer GUI schema handshake' {
 }
 
 Describe 'Exact package, GUI evidence, and receipt contract' {
+    It 'accepts a parsed <Kind> relationship in final SPDX package validation' -TestCases @(
+        @{ Kind = 'static' }, @{ Kind = 'build-input' }
+    ) {
+        param($Kind)
+        $case = New-ReleaseContractCase ('package-related-' + $Kind)
+        $id = if ($Kind -eq 'static') { 'fixture-static' } else { 'cpm' }
+        $component = ($case.Lock.components[0] | ConvertTo-Json -Depth 64 | ConvertFrom-Json)
+        $component.id = $id
+        $component.name = 'Fixture ' + $id
+        $component.filesAnalyzed = $false
+        if ($Kind -eq 'static') { $component | Add-Member -NotePropertyName staticLinkTarget -NotePropertyValue 'application' }
+        else { $component | Add-Member -NotePropertyName usage -NotePropertyValue 'build-input' }
+        $noticeRelative = 'release/licenses/v2.19.1-karon.2/' + $id + '/LICENSE.txt'
+        $noticePath = Join-Path $case.Repository ($noticeRelative.Replace('/', '\'))
+        Write-TestUtf8 $noticePath ('Fixture ' + $id + ' license.' + [char]10)
+        $component.noticeFiles[0].path = $noticeRelative
+        $component.noticeFiles[0].sha256 = Get-TestSha256 $noticePath
+        $case.Lock.components = @($case.Lock.components) + @($component)
+        $case.InnerLock.components = @($case.InnerLock.components) + @(($component | ConvertTo-Json -Depth 64 | ConvertFrom-Json))
+        Write-TestJson $case.InnerLockPath $case.InnerLock
+        if (Test-Path -LiteralPath $case.SourcesPath) { Remove-Item -LiteralPath $case.SourcesPath -Force }
+        New-TestZip $case.SourcesPath @{
+            ($case.SourcePrefix + 'release/dependencies/v2.19.1-karon.2.lock.json') = $case.InnerLockPath
+            ($case.SourcePrefix + 'THIRD-PARTY-NOTICES.txt') = $case.NoticePath
+            ($case.SourcePrefix + 'release/licenses/v2.19.1-karon.2/application/LICENSE.txt') = $case.LicensePath
+            ($case.SourcePrefix + $noticeRelative) = $noticePath
+            ($case.SourcePrefix + 'sources/application/application-source.zip') = $case.SourceArchive
+            ($case.SourcePrefix + 'sources/' + $id + '/application-source.zip') = $case.SourceArchive
+        }
+        Refresh-TestInputRecord $case 'correspondingSources' $case.SourcesPath $script:SourcesName
+
+        $spdxPackage = ($case.Spdx.packages[0] | ConvertTo-Json -Depth 64 | ConvertFrom-Json)
+        $spdxPackage.SPDXID = 'SPDXRef-Package-' + $id
+        $spdxPackage.name = $component.name
+        $spdxPackage.filesAnalyzed = $false
+        $case.Spdx.packages = @($case.Spdx.packages) + @($spdxPackage)
+        $case.Spdx.documentDescribes = @($case.Spdx.documentDescribes) + @($spdxPackage.SPDXID)
+        $case.Spdx.relationships = @($case.Spdx.relationships) + @(
+            [ordered]@{ spdxElementId = 'SPDXRef-DOCUMENT'; relationshipType = 'DESCRIBES'; relatedSpdxElement = $spdxPackage.SPDXID },
+            $(if ($Kind -eq 'static') {
+                [ordered]@{ spdxElementId = 'SPDXRef-Package-application'; relationshipType = 'STATIC_LINK'; relatedSpdxElement = $spdxPackage.SPDXID }
+            }
+            else {
+                [ordered]@{ spdxElementId = $spdxPackage.SPDXID; relationshipType = 'BUILD_TOOL_OF'; relatedSpdxElement = 'SPDXRef-Package-application' }
+            })
+        )
+        Save-TestSpdx $case
+        (Invoke-TestPackage $case -PlanOnly).Mode | Should -Be 'plan'
+    }
+
     It 'keeps normal GUI packaging and publication compatible with v2 receipts' {
         $case = New-PackagedPublicationCase 'normal-v2-compatibility'
         $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json

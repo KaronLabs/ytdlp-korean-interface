@@ -830,6 +830,61 @@ Describe 'source and SPDX assembly recovery checkpoint' {
     }
 }
 
+Describe 'build-only source component contracts' {
+    It 'accepts a source-only build tool and rejects <Fault> for <Kind>' -TestCases @(
+        @{ Kind = 'source'; Fault = 'none' }, @{ Kind = 'spdx'; Fault = 'none' },
+        @{ Kind = 'source'; Fault = 'usage' }, @{ Kind = 'spdx'; Fault = 'usage' },
+        @{ Kind = 'source'; Fault = 'static-target' }, @{ Kind = 'spdx'; Fault = 'static-target' }
+    ) {
+        param($Kind, $Fault)
+        $fixture = New-TestFixture ('build-tool-' + $Kind + '-' + $Fault)
+        $arguments = Get-WaiverBuilderArguments $fixture (New-LicenseLockWaiver $fixture)
+        [void]$arguments.Remove('CorrespondingSourcesPath')
+        [void]$arguments.Remove('SpdxPath')
+        $arguments.AssemblyOnly = $true
+        & $script:Builder @arguments | Out-Null
+
+        $lock = Read-TestJson $fixture.Output
+        $application = @($lock.components | Where-Object id -ceq 'application')[0]
+        $buildTool = ($application | ConvertTo-Json -Depth 100 | ConvertFrom-Json)
+        $buildTool.id = 'cpm'
+        $buildTool.name = 'CPM.cmake fixture'
+        $buildTool.sourceRepository = 'https://example.test/cpm'
+        $buildTool.filesAnalyzed = $false
+        $buildTool | Add-Member -NotePropertyName usage -NotePropertyValue $(if ($Fault -eq 'usage') { 'runtime' } else { 'build-input' })
+        if ($Fault -eq 'static-target') { $buildTool | Add-Member -NotePropertyName staticLinkTarget -NotePropertyValue 'application' }
+        $buildTool.sourceArchives[0].fileName = 'cpm-source.zip'
+        $buildTool.sourceArchives[0].url = 'https://example.test/cpm/archive/' + $buildTool.sourceCommit + '.zip'
+        [IO.File]::Copy((Join-Path $fixture.Cache $application.sourceArchives[0].fileName), (Join-Path $fixture.Cache 'cpm-source.zip'))
+        $lock.components = @($lock.components) + @($buildTool)
+        Write-TestJson $fixture.Output $lock
+
+        $output = Join-Path $fixture.Root 'generated'
+        [void][IO.Directory]::CreateDirectory($output)
+        $generate = {
+            if ($Kind -eq 'source') {
+                & $script:SourcesConsumer -LockPath $fixture.Output -SourceRoot $fixture.SourceRoot -CandidateRoot $fixture.Candidate -CacheDirectory $fixture.Cache -OutputDirectory $output | Out-Null
+            }
+            else {
+                & $script:SpdxConsumer -LockPath $fixture.Output -SourceRoot $fixture.SourceRoot -CandidateRoot $fixture.Candidate -OutputDirectory $output | Out-Null
+            }
+        }
+        if ($Fault -ne 'none') {
+            $generate | Should -Throw
+        }
+        else {
+            & $generate
+            if ($Kind -eq 'source') {
+                Test-Path -LiteralPath (Join-Path $output 'ytdlp-korean-interface-v2.19.1-karon.2-corresponding-sources.zip') | Should -Be $true
+            }
+            else {
+                $spdx = Read-TestJson (Join-Path $output 'ytdlp-korean-interface-v2.19.1-karon.2.spdx.json')
+                @($spdx.relationships | Where-Object { $_.spdxElementId -ceq 'SPDXRef-Package-cpm' -and $_.relationshipType -ceq 'BUILD_TOOL_OF' -and $_.relatedSpdxElement -ceq 'SPDXRef-Package-application' }).Count | Should -Be 1
+            }
+        }
+    }
+}
+
 Describe 'final verified release license lock integrator' {
     It 'assembles real evidence before source and SPDX generation without placeholder artifacts' {
         $fixture = New-TestFixture 'assembly-artifacts-final-lock'

@@ -325,7 +325,12 @@ foreach ($component in $componentById.Values) {
         if ($count -eq 0) { throw 'spdx_candidate_package_empty' }
     }
     else {
-        if ($count -ne 0 -or -not (Test-Property $component 'staticLinkTarget') -or
+        if ($count -ne 0) { throw 'spdx_static_link_invalid' }
+        if ((Test-Property $component 'usage') -and $component.usage -ceq 'build-input') {
+            if ((Test-Property $component 'staticLinkTarget') -or -not $componentById.ContainsKey('application') -or
+                -not $componentById['application'].filesAnalyzed) { throw 'spdx_static_link_invalid' }
+        }
+        elseif (-not (Test-Property $component 'staticLinkTarget') -or
             -not $componentById.ContainsKey([string]$component.staticLinkTarget) -or
             -not $componentById[[string]$component.staticLinkTarget].filesAnalyzed) { throw 'spdx_static_link_invalid' }
     }
@@ -460,11 +465,20 @@ foreach ($relative in @($inventory.Keys | Sort-Object)) {
 }
 
 foreach ($component in @($lock.components | Where-Object { -not $_.filesAnalyzed })) {
-    $relationships.Add([ordered]@{
-        spdxElementId = 'SPDXRef-Package-' + [string]$component.staticLinkTarget
-        relationshipType = 'STATIC_LINK'
-        relatedSpdxElement = 'SPDXRef-Package-' + [string]$component.id
-    })
+    if ((Test-Property $component 'usage') -and $component.usage -ceq 'build-input') {
+        $relationships.Add([ordered]@{
+            spdxElementId = 'SPDXRef-Package-' + [string]$component.id
+            relationshipType = 'BUILD_TOOL_OF'
+            relatedSpdxElement = 'SPDXRef-Package-application'
+        })
+    }
+    else {
+        $relationships.Add([ordered]@{
+            spdxElementId = 'SPDXRef-Package-' + [string]$component.staticLinkTarget
+            relationshipType = 'STATIC_LINK'
+            relatedSpdxElement = 'SPDXRef-Package-' + [string]$component.id
+        })
+    }
 }
 
 $extracted = [Collections.Generic.List[object]]::new()
