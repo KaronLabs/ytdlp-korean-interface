@@ -240,3 +240,63 @@ Describe 'Closed producer evidence in source assembly' {
         $failure | Should -Be 'source_assembly_repository_dirty'
     }
 }
+
+
+Describe 'Idempotent non-runtime source closure binding' {
+    BeforeAll {
+        $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+        $preparePath = Join-Path $repositoryRoot 'tools\prepare-release-source-assembly.ps1'
+        $tokens = $null
+        $parseErrors = $null
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($preparePath, [ref]$tokens, [ref]$parseErrors)
+        $closureFunction = $ast.Find({
+            param($node)
+            $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+            $node.Name -eq 'Set-UniqueApplicationClosure'
+        }, $true)
+        if ($null -eq $closureFunction) { throw 'source_assembly_closure_function_missing' }
+        . ([scriptblock]::Create($closureFunction.Extent.Text))
+    }
+
+    BeforeEach {
+        # The tracked production template already contains one generated closure
+        # alongside the official application archive and each static upstream archive.
+        $templatePath = Join-Path $repositoryRoot 'release\dependencies\v2.19.1-karon.2.lock.json'
+        $template = Get-Content -LiteralPath $templatePath -Raw | ConvertFrom-Json
+        $application = @($template.components | Where-Object { $_.id -ceq 'application' })[0]
+        $closure = @($application.sourceArchives | Where-Object {
+            $_.artifactType -ceq 'generated-source-closure'
+        })[0]
+    }
+
+    It 'retains exactly one matching closure for application and all six static components' {
+        foreach ($id in @('application', 'bit7z', 'nana', 'libpng', 'zlib', 'libjpeg-turbo', 'nlohmann-json')) {
+            $component = @($template.components | Where-Object { $_.id -ceq $id })[0]
+            $originalCount = @($component.sourceArchives).Count
+            Set-UniqueApplicationClosure -Component $component -Closure $closure
+            @($component.sourceArchives | Where-Object { $_.fileName -ceq $closure.fileName }).Count | Should -Be 1
+            @($component.sourceArchives).Count | Should -Be $originalCount
+        }
+    }
+
+    It 'collapses pre-existing identical duplicates to one' {
+        $application.sourceArchives = @($application.sourceArchives) + @($closure)
+        Set-UniqueApplicationClosure -Component $application -Closure $closure
+        @($application.sourceArchives | Where-Object { $_.fileName -ceq $closure.fileName }).Count | Should -Be 1
+    }
+
+    It 'rejects the same filename with a conflicting digest' {
+        $conflict = ConvertFrom-Json (ConvertTo-Json -InputObject $closure -Depth 12)
+        $conflict.sha256 = 'f' * 64
+        $application.sourceArchives = @($application.sourceArchives | Where-Object {
+            $_.fileName -ine $closure.fileName
+        }) + @($conflict)
+        $thrown = $null
+        try {
+            Set-UniqueApplicationClosure -Component $application -Closure $closure
+        } catch {
+            $thrown = $_.Exception.Message
+        }
+        $thrown | Should -Match '^source_assembly_application_closure_conflict:application:'
+    }
+}

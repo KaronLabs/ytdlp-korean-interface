@@ -95,7 +95,45 @@ $appClosure = [pscustomobject][ordered]@{
     provenance = [pscustomobject]@{ component = 'application'; sourceCommit = $app.sourceCommit }
 }
 Copy-Item -LiteralPath $bundlePath -Destination $appClosure.localPath
-$app.sourceArchives = @($app.sourceArchives) + @($appClosure)
+function Set-UniqueApplicationClosure {
+    param([object]$Component, [object]$Closure)
+
+    $preserved = [System.Collections.Generic.List[object]]::new()
+    $existing = [System.Collections.Generic.List[object]]::new()
+    foreach ($archive in @($Component.sourceArchives)) {
+        if ([string]$archive.fileName -ieq [string]$Closure.fileName) {
+            $existing.Add($archive)
+        } else {
+            $preserved.Add($archive)
+        }
+    }
+
+    foreach ($archive in $existing) {
+        $provenance = if ($archive.PSObject.Properties.Name -ccontains 'provenance') { $archive.provenance } else { $null }
+        if ([string]$archive.fileName -cne [string]$Closure.fileName -or
+            $archive.PSObject.Properties.Name -cnotcontains 'artifactType' -or
+            [string]$archive.artifactType -cne [string]$Closure.artifactType -or
+            [string]$archive.commit -ine [string]$Closure.commit -or
+            [string]$archive.sha256 -ine [string]$Closure.sha256 -or
+            [long]$archive.length -ne [long]$Closure.length -or
+            $null -eq $provenance -or
+            @($provenance.PSObject.Properties.Name).Count -ne 2 -or
+            $provenance.PSObject.Properties.Name -cnotcontains 'component' -or
+            $provenance.PSObject.Properties.Name -cnotcontains 'sourceCommit' -or
+            [string]$provenance.component -cne [string]$Closure.provenance.component -or
+            [string]$provenance.sourceCommit -ine [string]$Closure.provenance.sourceCommit) {
+            throw "source_assembly_application_closure_conflict:$($Component.id):$($Closure.fileName)"
+        }
+    }
+
+    if ($existing.Count -gt 0) {
+        $preserved.Add($existing[0])
+    } else {
+        $preserved.Add($Closure)
+    }
+    $Component.sourceArchives = @($preserved.ToArray())
+}
+Set-UniqueApplicationClosure -Component $app -Closure $appClosure
 
 foreach ($component in $lock.components) {
     $component.verificationStatus = 'NOT_VERIFIED'
@@ -103,7 +141,7 @@ foreach ($component in $lock.components) {
     if ($component.id -cin @('bit7z', 'nana', 'libpng', 'zlib', 'libjpeg-turbo', 'nlohmann-json')) {
         # The bundle retains the candidate dependency archive, modified source
         # trees and nlohmann transform; upstream baselines remain separate.
-        $component.sourceArchives = @($component.sourceArchives) + @($appClosure)
+        Set-UniqueApplicationClosure -Component $component -Closure $appClosure
     }
     if ($component.id -cin @('deno', 'ffmpeg', '7zip')) {
         $origins = @($component.sourceArchives)
