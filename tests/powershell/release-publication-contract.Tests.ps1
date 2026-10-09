@@ -1072,15 +1072,37 @@ Describe 'Final corresponding-source split transport' {
 
     It 'rejects a single runtime asset at the GitHub limit without allocating a huge file' {
         $case = New-PackagedPublicationCase 'split-runtime-limit'
-        $assetRoot = $case.Output
+        $script:KaronRuntimeLimitTestAssetRoot = $case.Output
         Mock Get-ChildItem {
             [pscustomobject]@{
                 Name = 'ytdlp-korean-interface-v2.19.1-karon.2-win-x64.zip'
-                FullName = Join-Path $assetRoot 'ytdlp-korean-interface-v2.19.1-karon.2-win-x64.zip'
+                FullName = Join-Path $script:KaronRuntimeLimitTestAssetRoot 'ytdlp-korean-interface-v2.19.1-karon.2-win-x64.zip'
                 PSIsContainer = $false; Attributes = [IO.FileAttributes]::Normal; Length = 2147483648L
             }
-        } -ParameterFilter { $LiteralPath -ceq $assetRoot }
+        } -ParameterFilter { $LiteralPath -ceq $script:KaronRuntimeLimitTestAssetRoot }
         (Get-TestFailure { Get-KaronPublishAssetInventory $case.Output }) | Should -Match 'publication_asset_inventory_invalid'
+    }
+
+    It 'reads the real <Schema> asset inventory after the runtime size-limit mock' -TestCases @(
+        @{ Schema = 'v4'; Waived = $false },
+        @{ Schema = 'v5'; Waived = $true }
+    ) {
+        param($Schema, $Waived)
+        $case = New-ReleaseContractCase ('split-inventory-after-limit-' + $Schema)
+        if ($Waived) {
+            $waiver = Set-TestOwnerGuiWaiver $case
+            [void](Invoke-TestPackage $case -WaiverPath $waiver)
+        }
+        else { [void](Invoke-TestPackage $case) }
+        $receipt = Get-Content -Raw $case.ReceiptPath | ConvertFrom-Json
+        $receipt.schemaVersion | Should -Be ('karon-release-receipt/' + $Schema)
+        $names = [string[]]@($receipt.publicAssets.fileName)
+        $inventory = Get-KaronPublishAssetInventory $case.Output $names
+        $inventory.Count | Should -Be $names.Count
+        foreach ($asset in $receipt.publicAssets) {
+            $inventory[$asset.fileName].Length | Should -Be $asset.length
+            $inventory[$asset.fileName].Sha256 | Should -Be $asset.sha256
+        }
     }
 
     It 'keeps a draft when a redownloaded part fails its checksum' {
