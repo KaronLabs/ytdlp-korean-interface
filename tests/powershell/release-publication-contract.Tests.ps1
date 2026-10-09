@@ -246,6 +246,7 @@ function New-ReleaseContractCase {
     }
     if ($NestedLocaleManifestPath -ne '') {
         $manifest.files += [ordered]@{ path = $NestedLocaleManifestPath; sha256 = Get-TestSha256 $localePath; length = [long](Get-Item $localePath).Length }
+        (@($manifest.files | Where-Object path -CEQ 'ffprobe.exe')[0]).sha256 = (Get-TestSha256 $ffprobePath).ToUpperInvariant()
     }
     Write-TestJson $manifestPath $manifest
 
@@ -1392,10 +1393,25 @@ Describe 'Exact package, GUI evidence, and receipt contract' {
         $case = New-ReleaseContractCase 'package-windows-locale' -NestedLocaleManifestPath 'locales\ko-KR.json'
         @($case.CandidateManifest.files | Where-Object path -CEQ 'locales\ko-KR.json').Count | Should -Be 1
         @($case.Lock.release.candidateFiles | Where-Object path -CEQ 'locales/ko-KR.json').Count | Should -Be 1
+        $manifestSha = @($case.CandidateManifest.files | Where-Object path -CEQ 'ffprobe.exe')[0].sha256
+        $lockSha = @($case.Lock.release.candidateFiles | Where-Object path -CEQ 'ffprobe.exe')[0].sha256
+        ($manifestSha -cne $lockSha) | Should -BeTrue
+        $manifestSha.ToLowerInvariant() | Should -Be $lockSha
+        $lockSha | Should -Be (Get-TestSha256 $case.FfprobePath)
         [void](Invoke-TestPackage $case)
         $zip = [IO.Compression.ZipFile]::OpenRead((Join-Path $case.Output $script:BinaryName))
         try { $zip.GetEntry('locales/ko-KR.json') | Should -Not -BeNullOrEmpty }
         finally { $zip.Dispose() }
+    }
+
+    It 'rejects a real nested candidate byte mismatch despite uppercase manifest SHA' {
+        $case = New-ReleaseContractCase 'package-uppercase-hash-tamper' -NestedLocaleManifestPath 'locales\ko-KR.json'
+        $localePath = Join-Path $case.Candidate 'locales\ko-KR.json'
+        $bytes = [IO.File]::ReadAllBytes($localePath)
+        $bytes[0] = $bytes[0] -bxor 1
+        [IO.File]::WriteAllBytes($localePath, $bytes)
+        (Get-TestFailure { Invoke-TestPackage $case }) | Should -Match '^package_candidate_'
+        @(Get-ChildItem -LiteralPath $case.Output -Force).Count | Should -Be 0
     }
 
     It 'rejects a traversal alias even when its file and canonical lock record exist' {

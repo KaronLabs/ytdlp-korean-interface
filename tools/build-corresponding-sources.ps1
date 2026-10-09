@@ -332,7 +332,7 @@ foreach ($relative in $inventory.Keys) {
     if ($relative -ieq 'candidate-manifest.json') { continue }
     if (-not $manifestFiles.ContainsKey($relative)) { throw 'source_candidate_manifest_inventory_mismatch' }
     $manifestEntry = $manifestFiles[$relative]
-    if ([string]$manifestEntry.sha256 -cne [string]$inventory[$relative].sha256) { throw "source_candidate_manifest_hash_mismatch: $relative" }
+    if (([string]$manifestEntry.sha256).ToLowerInvariant() -cne ([string]$inventory[$relative].sha256).ToLowerInvariant()) { throw "source_candidate_manifest_hash_mismatch: $relative" }
     $candidatePath = Get-ChildPath $candidate $relative 'source_candidate_manifest_inventory_mismatch'
     if ([long]$manifestEntry.length -ne (Get-Item -LiteralPath $candidatePath).Length) { throw "source_candidate_manifest_inventory_mismatch: $relative" }
 }

@@ -308,7 +308,7 @@ function Get-KaronPackageCandidateEntries {
         if (-not $manifestFiles.ContainsKey($relative) -or ([string]$manifestFiles[$relative].path).Replace('\', '/') -cne [string]$locked[$relative].path) {
             throw 'package_candidate_manifest_inventory_mismatch'
         }
-        if ([string]$manifestFiles[$relative].sha256 -cne ([string]$locked[$relative].sha256).ToLowerInvariant()) {
+        if (([string]$manifestFiles[$relative].sha256).ToLowerInvariant() -cne ([string]$locked[$relative].sha256).ToLowerInvariant()) {
             throw "package_candidate_manifest_hash_mismatch: $relative"
         }
         if ([long]$manifestFiles[$relative].length -ne [long]$actual[$relative].Length) {

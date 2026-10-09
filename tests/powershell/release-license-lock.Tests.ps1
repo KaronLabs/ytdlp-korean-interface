@@ -152,6 +152,7 @@ function New-TestFixture {
     }
     if ($WindowsNestedLocale) {
         $candidateFiles += [ordered]@{ path = 'locales\ko-KR.json'; length = [long](Get-Item $localePath).Length; sha256 = Get-TestSha256 $localePath }
+        (@($candidateFiles | Where-Object path -CEQ '7z.dll')[0]).sha256 = (Get-TestSha256 (Join-Path $candidate '7z.dll')).ToUpperInvariant()
     }
     $candidateManifestPath = Join-Path $candidate 'candidate-manifest.json'
     $candidateManifest = [ordered]@{
@@ -407,7 +408,7 @@ function New-TestFixture {
     foreach ($entry in $candidateFiles) {
         $canonicalPath = $entry.path.Replace('\', '/')
         $package = switch ($canonicalPath) { '7z.dll' { '7zip' }; 'deno.exe' { 'deno' }; 'ffmpeg.exe' { 'ffmpeg' }; 'ffprobe.exe' { 'ffmpeg' }; 'yt-dlp.exe' { 'yt-dlp' }; default { 'application' } }
-        $lockCandidateFiles += [ordered]@{ path = $canonicalPath; length = $entry.length; sha256 = $entry.sha256; package = $package; licenseConcluded = (@($components | Where-Object id -eq $package)[0].licenseConcluded) }
+        $lockCandidateFiles += [ordered]@{ path = $canonicalPath; length = $entry.length; sha256 = $entry.sha256.ToLowerInvariant(); package = $package; licenseConcluded = (@($components | Where-Object id -eq $package)[0].licenseConcluded) }
     }
     $lockCandidateFiles += [ordered]@{ path = 'candidate-manifest.json'; length = [long](Get-Item $candidateManifestPath).Length; sha256 = Get-TestSha256 $candidateManifestPath; package = 'release-metadata'; licenseConcluded = 'CC0-1.0' }
     $template = Join-Path $root 'license-template.json'
@@ -725,6 +726,11 @@ Describe 'source and SPDX assembly recovery checkpoint' {
         @($manifest.files | Where-Object path -CEQ 'locales\ko-KR.json').Count | Should -Be 1
         $template = Read-TestJson $fixture.Template
         @($template.release.candidateFiles | Where-Object path -CEQ 'locales/ko-KR.json').Count | Should -Be 1
+        $manifestSha = @($manifest.files | Where-Object path -CEQ '7z.dll')[0].sha256
+        $lockSha = @($template.release.candidateFiles | Where-Object path -CEQ '7z.dll')[0].sha256
+        ($manifestSha -cne $lockSha) | Should -BeTrue
+        $manifestSha.ToLowerInvariant() | Should -Be $lockSha
+        $lockSha | Should -Be (Get-TestSha256 (Join-Path $fixture.Candidate '7z.dll'))
         $arguments = Get-WaiverBuilderArguments $fixture (New-LicenseLockWaiver $fixture)
         [void]$arguments.Remove('CorrespondingSourcesPath')
         [void]$arguments.Remove('SpdxPath')
@@ -742,6 +748,33 @@ Describe 'source and SPDX assembly recovery checkpoint' {
             $spdx = Read-TestJson (Join-Path $output 'ytdlp-korean-interface-v2.19.1-karon.2.spdx.json')
             @($spdx.files | Where-Object fileName -CEQ './locales/ko-KR.json').Count | Should -Be 1
         }
+    }
+
+    It 'rejects changed 7z bytes despite case-only manifest SHA differences for <Kind>' -TestCases @(
+        @{ Kind = 'source' }, @{ Kind = 'spdx' }
+    ) {
+        param($Kind)
+        $fixture = New-TestFixture ('uppercase-hash-tamper-' + $Kind) -WindowsNestedLocale
+        $arguments = Get-WaiverBuilderArguments $fixture (New-LicenseLockWaiver $fixture)
+        [void]$arguments.Remove('CorrespondingSourcesPath')
+        [void]$arguments.Remove('SpdxPath')
+        $arguments.AssemblyOnly = $true
+        $arguments.OutputPath = Join-Path $fixture.Root 'assembly.json'
+        & $script:Builder @arguments | Out-Null
+        Write-TestText (Join-Path $fixture.Candidate '7z.dll') 'tampered candidate bytes'
+        $output = Join-Path $fixture.Root 'generated'
+        [void][IO.Directory]::CreateDirectory($output)
+        $failure = $null
+        try {
+            if ($Kind -eq 'source') {
+                & $script:SourcesConsumer -LockPath $arguments.OutputPath -SourceRoot $fixture.SourceRoot -CandidateRoot $fixture.Candidate -CacheDirectory $fixture.Cache -OutputDirectory $output | Out-Null
+            }
+            else {
+                & $script:SpdxConsumer -LockPath $arguments.OutputPath -SourceRoot $fixture.SourceRoot -CandidateRoot $fixture.Candidate -OutputDirectory $output | Out-Null
+            }
+        }
+        catch { $failure = $_.Exception.Message }
+        $failure | Should -Match '^(source|spdx)_candidate_hash_mismatch'
     }
 
     It 'constructs <Kind> from checked assembly without approving the lock' -TestCases @(
