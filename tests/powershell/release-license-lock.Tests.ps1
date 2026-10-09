@@ -708,6 +708,128 @@ function New-SwapInstrumentedBuilder {
     }
 }
 
+Describe 'source and SPDX assembly recovery checkpoint' {
+    It 'constructs <Kind> from checked assembly without approving the lock' -TestCases @(
+        @{ Kind = 'source' }, @{ Kind = 'spdx' }
+    ) {
+        param($Kind)
+        $fixture = New-TestFixture ('pending-assembly-' + $Kind)
+        $arguments = Get-WaiverBuilderArguments $fixture (New-LicenseLockWaiver $fixture)
+        [void]$arguments.Remove('CorrespondingSourcesPath')
+        [void]$arguments.Remove('SpdxPath')
+        $arguments.AssemblyOnly = $true
+        $arguments.OutputPath = Join-Path $fixture.Root 'assembly.json'
+        & $script:Builder @arguments | Out-Null
+        $before = Get-TestSha256 $arguments.OutputPath
+        $output = Join-Path $fixture.Root 'generated'
+        [void][IO.Directory]::CreateDirectory($output)
+        if ($Kind -eq 'source') {
+            & $script:SourcesConsumer -LockPath $arguments.OutputPath -SourceRoot $fixture.SourceRoot -CandidateRoot $fixture.Candidate -CacheDirectory $fixture.Cache -OutputDirectory $output | Out-Null
+            (Test-Path -LiteralPath (Join-Path $output 'ytdlp-korean-interface-v2.19.1-karon.2-corresponding-sources.zip')) | Should -Be $true
+        }
+        else {
+            & $script:SpdxConsumer -LockPath $arguments.OutputPath -SourceRoot $fixture.SourceRoot -CandidateRoot $fixture.Candidate -OutputDirectory $output | Out-Null
+            (Read-TestJson (Join-Path $output 'ytdlp-korean-interface-v2.19.1-karon.2.spdx.json')).spdxVersion | Should -Be 'SPDX-2.3'
+        }
+        (Get-TestSha256 $arguments.OutputPath) | Should -Be $before
+        $assembly = Read-TestJson $arguments.OutputPath
+        $assembly.release.verificationStatus | Should -Be 'NOT_VERIFIED'
+        $assembly.release.licenseApproval | Should -Be 'HOLD'
+        @($assembly.release.blockers).Count | Should -Be 0
+        @($assembly.release.PSObject.Properties.Name) | Should -Not -Contain 'receiptInputs'
+    }
+
+    It 'rejects an unassembled template at the <Kind> boundary' -TestCases @(
+        @{ Kind = 'source' }, @{ Kind = 'spdx' }
+    ) {
+        param($Kind)
+        $fixture = New-TestFixture ('unassembled-' + $Kind)
+        $output = Join-Path $fixture.Root 'generated'
+        [void][IO.Directory]::CreateDirectory($output)
+        if ($Kind -eq 'source') {
+            { & $script:SourcesConsumer -LockPath $fixture.Template -SourceRoot $fixture.SourceRoot -CandidateRoot $fixture.Candidate -CacheDirectory $fixture.Cache -OutputDirectory $output } | Should -Throw
+        }
+        else {
+            { & $script:SpdxConsumer -LockPath $fixture.Template -SourceRoot $fixture.SourceRoot -CandidateRoot $fixture.Candidate -OutputDirectory $output } | Should -Throw
+        }
+        @(Get-ChildItem -LiteralPath $output -File).Count | Should -Be 0
+    }
+
+    It 'rejects <Fault> candidate bindings before <Kind> generation' -TestCases @(
+        @{ Kind = 'source'; Fault = 'missing' }, @{ Kind = 'spdx'; Fault = 'missing' },
+        @{ Kind = 'source'; Fault = 'digest' }, @{ Kind = 'spdx'; Fault = 'digest' },
+        @{ Kind = 'source'; Fault = 'commit' }, @{ Kind = 'spdx'; Fault = 'commit' }
+    ) {
+        param($Kind, $Fault)
+        $fixture = New-TestFixture ('assembly-binding-' + $Kind + '-' + $Fault)
+        $arguments = Get-WaiverBuilderArguments $fixture (New-LicenseLockWaiver $fixture)
+        [void]$arguments.Remove('CorrespondingSourcesPath')
+        [void]$arguments.Remove('SpdxPath')
+        $arguments.AssemblyOnly = $true
+        & $script:Builder @arguments | Out-Null
+        $lock = Read-TestJson $fixture.Output
+        switch ($Fault) {
+            'missing' { $lock.release.integrationEvidence.PSObject.Properties.Remove('candidate') }
+            'digest' { $lock.release.integrationEvidence.candidate.manifest.sha256 = '0' * 64 }
+            'commit' { $lock.release.integrationEvidence.applicationSource.commit = '0' * 40 }
+        }
+        Write-TestJson $fixture.Output $lock
+        $output = Join-Path $fixture.Root 'generated'
+        [void][IO.Directory]::CreateDirectory($output)
+        if ($Kind -eq 'source') {
+            { & $script:SourcesConsumer -LockPath $fixture.Output -SourceRoot $fixture.SourceRoot -CandidateRoot $fixture.Candidate -CacheDirectory $fixture.Cache -OutputDirectory $output } | Should -Throw
+        }
+        else {
+            { & $script:SpdxConsumer -LockPath $fixture.Output -SourceRoot $fixture.SourceRoot -CandidateRoot $fixture.Candidate -OutputDirectory $output } | Should -Throw
+        }
+        @(Get-ChildItem -LiteralPath $output -File).Count | Should -Be 0
+    }
+
+    It 'preserves authentic <Kind> notice bytes containing readiness words or non-UTF8 bytes' -TestCases @(
+        @{ Kind = 'source'; Bytes = [Text.Encoding]::ASCII.GetBytes('Upstream TODO: explain UNKNOWN behavior; NOT_VERIFIED is a documented token.') },
+        @{ Kind = 'spdx'; Bytes = [Text.Encoding]::ASCII.GetBytes('Upstream TODO: explain UNKNOWN behavior; NOT_VERIFIED is a documented token.') },
+        @{ Kind = 'source'; Bytes = [byte[]]@(76, 71, 80, 76, 32, 224, 32, 169) },
+        @{ Kind = 'spdx'; Bytes = [byte[]]@(76, 71, 80, 76, 32, 224, 32, 169) }
+    ) {
+        param($Kind, $Bytes)
+        $path = Join-Path $TestDrive ([Guid]::NewGuid().ToString('N') + '.notice')
+        [IO.File]::WriteAllBytes($path, $Bytes)
+        $expected = Get-TestSha256 $path
+        $consumer = if ($Kind -eq 'source') { $script:SourcesConsumer } else { $script:SpdxConsumer }
+        $tokens = $null
+        $errors = $null
+        $ast = [Management.Automation.Language.Parser]::ParseFile($consumer, [ref]$tokens, [ref]$errors)
+        $definitions = @($ast.FindAll({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -in @('Get-Sha256', 'Get-FileDigest', 'Assert-Notice') }, $false))
+        & {
+            foreach ($definition in $definitions) { Invoke-Expression $definition.Extent.Text }
+            if ($Kind -eq 'source') { Assert-Notice $path $expected 'source' | Out-Null }
+            else { Assert-Notice $path $expected | Out-Null }
+        }
+        (Get-TestSha256 $path) | Should -Be $expected
+        [Convert]::ToBase64String([IO.File]::ReadAllBytes($path)) | Should -Be ([Convert]::ToBase64String($Bytes))
+    }
+
+    It 'still rejects notice digest mismatch in <Kind>' -TestCases @(
+        @{ Kind = 'source' }, @{ Kind = 'spdx' }
+    ) {
+        param($Kind)
+        $path = Join-Path $TestDrive ([Guid]::NewGuid().ToString('N') + '.notice')
+        Write-TestText $path 'authentic license text'
+        $consumer = if ($Kind -eq 'source') { $script:SourcesConsumer } else { $script:SpdxConsumer }
+        $tokens = $null
+        $errors = $null
+        $ast = [Management.Automation.Language.Parser]::ParseFile($consumer, [ref]$tokens, [ref]$errors)
+        $definitions = @($ast.FindAll({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -in @('Get-Sha256', 'Get-FileDigest', 'Assert-Notice') }, $false))
+        {
+            & {
+                foreach ($definition in $definitions) { Invoke-Expression $definition.Extent.Text }
+                if ($Kind -eq 'source') { Assert-Notice $path ('0' * 64) 'source' | Out-Null }
+                else { Assert-Notice $path ('0' * 64) | Out-Null }
+            }
+        } | Should -Throw
+    }
+}
+
 Describe 'final verified release license lock integrator' {
     It 'assembles real evidence before source and SPDX generation without placeholder artifacts' {
         $fixture = New-TestFixture 'assembly-artifacts-final-lock'
@@ -721,10 +843,12 @@ Describe 'final verified release license lock integrator' {
         $arguments.AssemblyOnly = $true
         & $script:Builder @arguments | Out-Null
         $assembly = Read-TestJson $assemblyPath
-        $assembly.release.verificationStatus | Should -Be 'verified'
+        $assembly.release.verificationStatus | Should -Be 'NOT_VERIFIED'
+        $assembly.release.licenseApproval | Should -Be 'HOLD'
+        $assembly.release.productionAssembly | Should -Be 'ASSEMBLED_PENDING_INDEPENDENT_VALIDATION'
         $assembly.release.integrationEvidence.gui.status | Should -Be 'WAIVED_BY_OWNER'
         @($assembly.release.PSObject.Properties.Name) | Should -Not -Contain 'receiptInputs'
-        @($assembly.components | Where-Object verificationStatus -ne 'verified').Count | Should -Be 0
+        @($assembly.components | Where-Object verificationStatus -ne 'NOT_VERIFIED').Count | Should -Be 0
 
         $sourcesOutput = Join-Path $fixture.Root 'sources-output'
         $spdxOutput = Join-Path $fixture.Root 'spdx-output'
@@ -739,8 +863,21 @@ Describe 'final verified release license lock integrator' {
         $arguments.OutputPath = $canonicalLock
         & $script:Builder @arguments | Out-Null
         $final = Read-TestJson $canonicalLock
+        $final.release.verificationStatus | Should -Be 'verified'
         $final.release.receiptInputs.correspondingSources.sha256 | Should -Be (Get-TestSha256 $fixture.CorrespondingSources)
         $final.release.receiptInputs.spdx.sha256 | Should -Be (Get-TestSha256 $fixture.Spdx)
+        $sourceZip = [IO.Compression.ZipFile]::OpenRead($fixture.CorrespondingSources)
+        try {
+            $embeddedLock = $sourceZip.GetEntry('ytdlp-korean-interface-v2.19.1-karon.2-corresponding-sources/release/dependencies/v2.19.1-karon.2.lock.json')
+            $embeddedLock | Should -Not -BeNullOrEmpty
+            $reader = [IO.StreamReader]::new($embeddedLock.Open(), [Text.UTF8Encoding]::new($false, $true))
+            try { $embeddedAssembly = $reader.ReadToEnd() | ConvertFrom-Json -Depth 64 }
+            finally { $reader.Dispose() }
+        }
+        finally { $sourceZip.Dispose() }
+        $embeddedAssembly.release.verificationStatus | Should -Be 'NOT_VERIFIED'
+        $embeddedAssembly.release.licenseApproval | Should -Be 'HOLD'
+        $embeddedAssembly.release.productionAssembly | Should -Be 'ASSEMBLED_PENDING_INDEPENDENT_VALIDATION'
         & git -c core.autocrlf=false -C $fixture.Repository add -- release
         & git -c core.autocrlf=false -c user.name='Karon Test' -c user.email='karon-test@example.invalid' -C $fixture.Repository commit -q -m packaging
         $packageOutput = Join-Path $fixture.Root 'package-output'

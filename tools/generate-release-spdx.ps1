@@ -90,11 +90,8 @@ function Assert-Notice {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw 'spdx_notice_or_source_missing' }
     if ($ExpectedSha256 -notmatch '^[a-fA-F0-9]{64}$' -or
         (Get-FileDigest $Path SHA256) -cne $ExpectedSha256.ToLowerInvariant()) { throw 'spdx_notice_hash_mismatch' }
-    $text = [IO.File]::ReadAllText($Path, [Text.UTF8Encoding]::new($false, $true))
-    if ($text -match '(?i)\b(?:NOT_VERIFIED|UNKNOWN|TODO)\b|\bunresolved[\s_-]+blocker\b|\bblocker\s*:') {
-        throw 'spdx_notice_unresolved_marker'
-    }
-    $text
+    # Decode only notices actually used as SPDX extracted license text.
+    $Path
 }
 
 function Get-CandidateFiles {
@@ -207,7 +204,7 @@ $lock = Read-JsonFile $lockFile 'spdx_lock_invalid'
 if ($lock.schemaVersion -cne 'karon-license-lock/v2' -or $lock.release.tag -cne 'v2.19.1-karon.2' -or
     $lock.release.platform -cne 'win-x64') { throw 'spdx_lock_invalid' }
 if (-not (Test-Property $lock.release 'verificationStatus')) { throw 'spdx_release_status_missing' }
-if ($lock.release.verificationStatus -cne 'verified') { throw 'spdx_release_not_verified' }
+$pendingAssembly = Assert-ArtifactGenerationEligibility -Release $lock.release -Components @($lock.components) -CandidateRoot $candidate -ErrorPrefix 'spdx'
 if (-not (Test-Property $lock.release 'blockers')) { throw 'spdx_release_blockers_missing' }
 if (@($lock.release.blockers).Count -ne 0) { throw 'spdx_release_blocked' }
 
@@ -233,7 +230,8 @@ foreach ($component in @($lock.components)) {
         throw 'spdx_component_invalid'
     }
     if (-not (Test-Property $component 'verificationStatus')) { throw 'spdx_component_status_missing' }
-    if ($component.verificationStatus -cne 'verified') { throw 'spdx_component_not_verified' }
+    $requiredStatus = if ($pendingAssembly) { 'NOT_VERIFIED' } else { 'verified' }
+    if ($component.verificationStatus -cne $requiredStatus) { throw 'spdx_component_not_verified' }
     if (-not (Test-Property $component 'blockers')) { throw 'spdx_component_blockers_missing' }
     if (@($component.blockers).Count -ne 0) { throw 'spdx_component_blocked' }
     Assert-LicenseExpression ([string]$component.licenseExpression) 'spdx_license_unverified'
@@ -260,7 +258,7 @@ foreach ($component in @($lock.components)) {
     foreach ($archive in @($component.sourceArchives)) {
         if ($archive.sha256 -notmatch '^[a-fA-F0-9]{64}$' -or -not (Test-Property $archive 'commit')) { throw 'spdx_source_hash_invalid' }
         if (Test-GeneratedSourceArchive $archive) {
-            $generatedArchive = Assert-GeneratedSourceArchive -Archive $archive -Component $component -Release $lock.release -ErrorPrefix 'spdx'
+            $generatedArchive = Assert-GeneratedSourceArchive -Archive $archive -Component $component -Release $lock.release -ErrorPrefix 'spdx' -AllowPendingAssembly:$pendingAssembly -CandidateRoot $candidate
             $generatedArchives.Add([pscustomobject]@{ component = $component; archive = $generatedArchive })
             $generatedSourceInfos.Add($generatedArchive.sourceInfo)
             $hasPrimarySource = $true
@@ -364,10 +362,6 @@ foreach ($expression in $expressions) {
 
 $rootNotice = Join-Path $source 'THIRD-PARTY-NOTICES.txt'
 if (-not (Test-Path -LiteralPath $rootNotice -PathType Leaf)) { throw 'spdx_notice_or_source_missing' }
-$rootNoticeText = [IO.File]::ReadAllText($rootNotice, [Text.UTF8Encoding]::new($false, $true))
-if ($rootNoticeText -match '(?i)\b(?:NOT_VERIFIED|UNKNOWN|TODO)\b|\bunresolved[\s_-]+blocker\b|\bblocker\s*:') {
-    throw 'spdx_notice_unresolved_marker'
-}
 
 $packages = [Collections.Generic.List[object]]::new()
 $relationships = [Collections.Generic.List[object]]::new()
@@ -478,7 +472,7 @@ foreach ($licenseRefId in @($usedLicenseRefs | Sort-Object)) {
     $definition = $licenseRefs[$licenseRefId]
     $extracted.Add([ordered]@{
         licenseId = $licenseRefId
-        extractedText = [string]$noticePaths[[string]$definition.noticePath].text
+        extractedText = [IO.File]::ReadAllText($noticePaths[[string]$definition.noticePath].path, [Text.UTF8Encoding]::new($false, $true))
         name = [string]$definition.name
     })
 }

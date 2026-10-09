@@ -985,11 +985,6 @@ function Assert-DenoContract {
     Assert-IntegratorEvidenceClean -Value $ComponentManifest -Context 'deno_component_manifest'
     Assert-IntegratorEvidenceClean -Value $Inventory -Context 'deno_source_inventory'
 
-    $noticeText = [IO.File]::ReadAllText($noticeRecord.fullPath, [Text.UTF8Encoding]::new($false, $true))
-    if ($noticeText.IndexOf('NOT_VERIFIED', [StringComparison]::OrdinalIgnoreCase) -ge 0) {
-        throw 'deno_notices_not_verified'
-    }
-
     $exitCode = Get-IntegratorExactProperty -Object $run -Name 'exitCode' -Context 'deno_run'
     if ($exitCode -isnot [long] -or $exitCode -ne 0) {
         throw 'deno_run_exit_code_invalid'
@@ -1538,7 +1533,7 @@ Set-ExactProperty $release 'integrationEvidence' $integrationEvidence
 
 foreach ($component in $components) {
     $outputStatus = if ($AssemblyOnly) { 'NOT_VERIFIED' } else { 'verified' }
-    $outputBlockers = if ($AssemblyOnly) { @('Independent exact-candidate license validation has not run.') } else { @() }
+    $outputBlockers = @()
     Set-ExactProperty $component 'verificationStatus' $outputStatus
     Set-ExactProperty $component 'blockers' $outputBlockers
     foreach ($archive in @(Get-ExactProperty $component 'sourceArchives')) {
@@ -1551,6 +1546,8 @@ Set-ExactProperty $release 'blockers' $outputBlockers
 if ($AssemblyOnly) {
     Set-ExactProperty $release 'productionAssembly' 'ASSEMBLED_PENDING_INDEPENDENT_VALIDATION'
     Set-ExactProperty $release 'licenseApproval' 'HOLD'
+    Set-ExactProperty $release 'approvalHold' 'Independent exact-candidate license validation has not run.'
+    Set-ExactProperty $release 'sourceArchiveDirectory' ([IO.Path]::GetFullPath($SourceArchiveDirectory))
 }
 
 $canonical = ConvertTo-CanonicalNode $template

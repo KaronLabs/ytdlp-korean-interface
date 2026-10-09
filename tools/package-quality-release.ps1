@@ -633,7 +633,8 @@ function Write-KaronPackageCanonicalJsonElement {
     param(
         [Parameter(Mandatory)] [Text.Json.Utf8JsonWriter] $Writer,
         [Parameter(Mandatory)] [Text.Json.JsonElement] $Element,
-        [Parameter(Mandatory)] [string] $Path
+        [Parameter(Mandatory)] [string] $Path,
+        [switch] $SourceAssemblyComparison
     )
     switch ($Element.ValueKind) {
         ([Text.Json.JsonValueKind]::Object) {
@@ -642,14 +643,17 @@ function Write-KaronPackageCanonicalJsonElement {
             [Array]::Sort($names, [StringComparer]::Ordinal)
             foreach ($name in $names) {
                 if ($Path -ceq '$.release' -and $name -ceq 'receiptInputs') { continue }
+                if ($SourceAssemblyComparison -and (
+                    ($Path -ceq '$.release' -and $name -cin @('verificationStatus', 'productionAssembly', 'licenseApproval', 'approvalHold', 'sourceArchiveDirectory')) -or
+                    ($Path -cin @('$.components[]', '$.components[].sourceArchives[]') -and $name -ceq 'verificationStatus'))) { continue }
                 $Writer.WritePropertyName($name)
-                Write-KaronPackageCanonicalJsonElement $Writer (Get-KaronPackageRawProperty $Element $name 'package_lock_projection_invalid') ($Path + '.' + $name)
+                Write-KaronPackageCanonicalJsonElement $Writer (Get-KaronPackageRawProperty $Element $name 'package_lock_projection_invalid') ($Path + '.' + $name) -SourceAssemblyComparison:$SourceAssemblyComparison
             }
             $Writer.WriteEndObject()
         }
         ([Text.Json.JsonValueKind]::Array) {
             $Writer.WriteStartArray()
-            foreach ($item in $Element.EnumerateArray()) { Write-KaronPackageCanonicalJsonElement $Writer $item ($Path + '[]') }
+            foreach ($item in $Element.EnumerateArray()) { Write-KaronPackageCanonicalJsonElement $Writer $item ($Path + '[]') -SourceAssemblyComparison:$SourceAssemblyComparison }
             $Writer.WriteEndArray()
         }
         ([Text.Json.JsonValueKind]::String) { $Writer.WriteStringValue($Element.GetString()) }
@@ -662,11 +666,11 @@ function Write-KaronPackageCanonicalJsonElement {
 }
 
 function Get-KaronPackageLockProjectionSha256 {
-    param([Parameter(Mandatory)] [Text.Json.JsonElement] $Root)
+    param([Parameter(Mandatory)] [Text.Json.JsonElement] $Root, [switch] $SourceAssemblyComparison)
     $stream = [IO.MemoryStream]::new()
     $writer = [Text.Json.Utf8JsonWriter]::new($stream, [Text.Json.JsonWriterOptions]@{ Indented = $false })
     try {
-        Write-KaronPackageCanonicalJsonElement $writer $Root '$'
+        Write-KaronPackageCanonicalJsonElement $writer $Root '$' -SourceAssemblyComparison:$SourceAssemblyComparison
         $writer.Flush()
         [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($stream.ToArray())).ToLowerInvariant()
     }
@@ -686,9 +690,10 @@ function Assert-KaronPackageRawStatus {
     param(
         [Text.Json.JsonElement] $Element,
         [string] $StatusName,
-        [string] $ErrorId
+        [string] $ErrorId,
+        [string] $ExpectedStatus = 'verified'
     )
-    if ((Get-KaronPackageRawString (Get-KaronPackageRawProperty $Element $StatusName $ErrorId) $ErrorId) -cne 'verified') {
+    if ((Get-KaronPackageRawString (Get-KaronPackageRawProperty $Element $StatusName $ErrorId) $ErrorId) -cne $ExpectedStatus) {
         throw $ErrorId
     }
     if (@(Get-KaronPackageRawArray (Get-KaronPackageRawProperty $Element 'blockers' $ErrorId) $ErrorId).Count -ne 0) {
@@ -712,14 +717,23 @@ function Assert-KaronPackageLockRawContract {
     param(
         [Parameter(Mandatory)] [Text.Json.JsonElement] $Root,
         [Parameter(Mandatory)] [bool] $RequireReceiptInputs,
-        [Parameter(Mandatory)] [string] $ErrorId
+        [Parameter(Mandatory)] [string] $ErrorId,
+        [switch] $PendingAssembly
     )
     if ($Root.ValueKind -ne [Text.Json.JsonValueKind]::Object -or
         (Get-KaronPackageRawString (Get-KaronPackageRawProperty $Root 'schemaVersion' $ErrorId) $ErrorId) -cne 'karon-license-lock/v2') { throw $ErrorId }
     $release = Get-KaronPackageRawProperty $Root 'release' $ErrorId
     if ((Get-KaronPackageRawString (Get-KaronPackageRawProperty $release 'tag' $ErrorId) $ErrorId) -cne $script:KaronPackageTag -or
         (Get-KaronPackageRawString (Get-KaronPackageRawProperty $release 'platform' $ErrorId) $ErrorId) -cne 'win-x64') { throw $ErrorId }
-    Assert-KaronPackageRawStatus $release 'verificationStatus' $ErrorId
+    $requiredStatus = if ($PendingAssembly) { 'NOT_VERIFIED' } else { 'verified' }
+    Assert-KaronPackageRawStatus $release 'verificationStatus' $ErrorId $requiredStatus
+    if ($PendingAssembly) {
+        if ($RequireReceiptInputs -or (Test-KaronPackageRawProperty $release 'receiptInputs') -or
+            (Get-KaronPackageRawString (Get-KaronPackageRawProperty $release 'productionAssembly' $ErrorId) $ErrorId) -cne 'ASSEMBLED_PENDING_INDEPENDENT_VALIDATION' -or
+            (Get-KaronPackageRawString (Get-KaronPackageRawProperty $release 'licenseApproval' $ErrorId) $ErrorId) -cne 'HOLD' -or
+            [string]::IsNullOrWhiteSpace((Get-KaronPackageRawString (Get-KaronPackageRawProperty $release 'approvalHold' $ErrorId) $ErrorId)) -or
+            [string]::IsNullOrWhiteSpace((Get-KaronPackageRawString (Get-KaronPackageRawProperty $release 'sourceArchiveDirectory' $ErrorId) $ErrorId))) { throw $ErrorId }
+    }
     if ((Get-KaronPackageRawProperty $release 'candidateFiles' $ErrorId).ValueKind -ne [Text.Json.JsonValueKind]::Array) { throw $ErrorId }
     foreach ($candidate in Get-KaronPackageRawArray (Get-KaronPackageRawProperty $release 'candidateFiles' $ErrorId) $ErrorId) {
         if ($candidate.ValueKind -ne [Text.Json.JsonValueKind]::Object) { throw $ErrorId }
@@ -738,7 +752,7 @@ function Assert-KaronPackageLockRawContract {
     if ($components.Count -eq 0) { throw $ErrorId }
     foreach ($component in $components) {
         if ($component.ValueKind -ne [Text.Json.JsonValueKind]::Object) { throw $ErrorId }
-        Assert-KaronPackageRawStatus $component 'verificationStatus' $ErrorId
+        Assert-KaronPackageRawStatus $component 'verificationStatus' $ErrorId $requiredStatus
         foreach ($name in @('id', 'name', 'version', 'sourceRepository', 'sourceCommit', 'licenseExpression', 'buildRecipe', 'licenseConcluded')) {
             [void](Get-KaronPackageRawString (Get-KaronPackageRawProperty $component $name $ErrorId) $ErrorId)
         }
@@ -752,7 +766,7 @@ function Assert-KaronPackageLockRawContract {
                     [void](Get-KaronPackageRawString (Get-KaronPackageRawProperty $item 'sha256' $ErrorId) $ErrorId)
                 }
                 else {
-                    Assert-KaronPackageRawStatus $item 'verificationStatus' $ErrorId
+                    Assert-KaronPackageRawStatus $item 'verificationStatus' $ErrorId $requiredStatus
                     foreach ($name in @('fileName', 'commit', 'url', 'sha256')) {
                         [void](Get-KaronPackageRawString (Get-KaronPackageRawProperty $item $name $ErrorId) $ErrorId)
                     }
@@ -1132,8 +1146,11 @@ function Assert-KaronPackageSourcesContract {
         $reader = [IO.StreamReader]::new($entries[$innerLockName].Open(), [Text.UTF8Encoding]::new($false, $true))
         try { $innerJson = ConvertFrom-KaronPackageJsonStrict $reader.ReadToEnd() 'package_sources_manifest_invalid' }
         finally { $reader.Dispose() }
-        Assert-KaronPackageLockRawContract $innerJson.Raw $false 'package_sources_manifest_invalid'
-        if ((Get-KaronPackageLockProjectionSha256 $innerJson.Raw) -cne (Get-KaronPackageLockProjectionSha256 $OuterLockRaw)) {
+        $innerRelease = Get-KaronPackageRawProperty $innerJson.Raw 'release' 'package_sources_manifest_invalid'
+        $pendingAssembly = (Get-KaronPackageRawString (Get-KaronPackageRawProperty $innerRelease 'verificationStatus' 'package_sources_manifest_invalid') 'package_sources_manifest_invalid') -ceq 'NOT_VERIFIED'
+        Assert-KaronPackageLockRawContract $innerJson.Raw $false 'package_sources_manifest_invalid' -PendingAssembly:$pendingAssembly
+        if ((Get-KaronPackageLockProjectionSha256 $innerJson.Raw -SourceAssemblyComparison:$pendingAssembly) -cne
+            (Get-KaronPackageLockProjectionSha256 $OuterLockRaw -SourceAssemblyComparison:$pendingAssembly)) {
             throw 'package_sources_manifest_mismatch'
         }
         $inner = $innerJson.Value

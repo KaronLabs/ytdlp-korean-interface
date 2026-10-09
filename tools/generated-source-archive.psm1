@@ -36,13 +36,74 @@ function Test-GeneratedSourceArchive {
     $null -ne $property -and $property.Value -ceq 'generated-source-closure'
 }
 
+function Assert-ArtifactGenerationEligibility {
+    param(
+        [Parameter(Mandatory)] [object] $Release,
+        [Parameter(Mandatory)] [object[]] $Components,
+        [Parameter(Mandatory)] [string] $CandidateRoot,
+        [string] $ErrorPrefix = 'source'
+    )
+    $errorId = $ErrorPrefix + '_assembly_binding_invalid'
+    $status = Get-GeneratedSourceProperty $Release 'verificationStatus' $errorId
+    if (@(Get-GeneratedSourceProperty $Release 'blockers' $errorId).Count -ne 0) { throw ($ErrorPrefix + '_release_blocked') }
+    if ($status -ceq 'verified') { return $false }
+    if ($status -cne 'NOT_VERIFIED' -or
+        (Get-GeneratedSourceProperty $Release 'productionAssembly' $errorId) -cne 'ASSEMBLED_PENDING_INDEPENDENT_VALIDATION' -or
+        (Get-GeneratedSourceProperty $Release 'licenseApproval' $errorId) -cne 'HOLD') { throw $errorId }
+    $integration = Get-GeneratedSourceProperty $Release 'integrationEvidence' $errorId
+    if ((Get-GeneratedSourceProperty $integration 'schemaVersion' $errorId) -cne 'karon-release-license-lock-integration/v1') { throw $errorId }
+    $binding = Get-GeneratedSourceProperty $integration 'candidate' $errorId
+    foreach ($spec in @(@('manifest', 'candidate-manifest.json'), @('executable', 'ytdlp-interface.exe'))) {
+        $record = Get-GeneratedSourceProperty $binding $spec[0] $errorId
+        $path = Join-Path $CandidateRoot $spec[1]
+        $item = Get-Item -LiteralPath $path -ErrorAction Stop
+        $digest = Get-GeneratedSourceProperty $record 'sha256' $errorId
+        if ($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+            $digest -notmatch '^[a-fA-F0-9]{64}$' -or
+            $item.Length -ne (Get-GeneratedSourceProperty $record 'length' $errorId) -or
+            (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ine $digest) { throw $errorId }
+    }
+    $manifest = [IO.File]::ReadAllText((Join-Path $CandidateRoot 'candidate-manifest.json'), [Text.UTF8Encoding]::new($false, $true)) | ConvertFrom-Json -Depth 64
+    $source = Get-GeneratedSourceProperty $integration 'applicationSource' $errorId
+    $commit = Get-GeneratedSourceProperty $source 'commit' $errorId
+    $tree = Get-GeneratedSourceProperty $source 'tree' $errorId
+    if ($commit -notmatch '^[a-fA-F0-9]{40}$' -or $tree -notmatch '^[a-fA-F0-9]{40}$' -or
+        $manifest.applicationSourceCommit -cne $commit -or $manifest.applicationSourceTree -cne $tree -or
+        (Get-GeneratedSourceProperty (Get-GeneratedSourceProperty $Release 'metadataPackage' $errorId) 'sourceCommit' $errorId) -cne $commit) { throw $errorId }
+    $application = @($Components | Where-Object { (Get-GeneratedSourceProperty $_ 'id' $errorId) -ceq 'application' })
+    if ($application.Count -gt 0 -and ($application.Count -ne 1 -or
+        (Get-GeneratedSourceProperty $application[0] 'sourceCommit' $errorId) -cne $commit)) { throw $errorId }
+    $archiveRoot = Get-GeneratedSourceProperty $Release 'sourceArchiveDirectory' $errorId
+    if (-not [IO.Path]::IsPathFullyQualified($archiveRoot)) { throw $errorId }
+    foreach ($component in $Components) {
+        if ((Get-GeneratedSourceProperty $component 'verificationStatus' $errorId) -cne 'NOT_VERIFIED' -or
+            @(Get-GeneratedSourceProperty $component 'blockers' $errorId).Count -ne 0) { throw $errorId }
+        foreach ($archive in @(Get-GeneratedSourceProperty $component 'sourceArchives' $errorId)) {
+            if ((Get-GeneratedSourceProperty $archive 'verificationStatus' $errorId) -cne 'NOT_VERIFIED' -or
+                @(Get-GeneratedSourceProperty $archive 'blockers' $errorId).Count -ne 0) { throw $errorId }
+            $name = Get-GeneratedSourceProperty $archive 'fileName' $errorId
+            if ($name -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*\.zip$') { throw $errorId }
+            $path = Join-Path $archiveRoot $name
+            $item = Get-Item -LiteralPath $path -ErrorAction Stop
+            $digest = Get-GeneratedSourceProperty $archive 'sha256' $errorId
+            if ($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+                $digest -notmatch '^[a-fA-F0-9]{64}$' -or
+                $item.Length -ne (Get-GeneratedSourceProperty $archive 'length' $errorId) -or
+                (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ine $digest) { throw $errorId }
+        }
+    }
+    return $true
+}
+
 function Assert-GeneratedSourceArchive {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)] [object] $Archive,
         [Parameter(Mandatory)] [object] $Component,
         [Parameter(Mandatory)] [object] $Release,
-        [string] $ErrorPrefix = 'source'
+        [string] $ErrorPrefix = 'source',
+        [switch] $AllowPendingAssembly,
+        [string] $CandidateRoot
     )
 
     $metadataError = $ErrorPrefix + '_generated_archive_metadata_invalid'
@@ -85,7 +146,10 @@ function Assert-GeneratedSourceArchive {
     if ($origin -isnot [string] -or [string]::IsNullOrWhiteSpace($origin)) { throw $metadataError }
 
     $releaseError = $ErrorPrefix + '_generated_archive_release_unverified'
-    if ((Get-GeneratedSourceProperty $Release 'verificationStatus' $releaseError) -cne 'verified') { throw $releaseError }
+    if ($AllowPendingAssembly) {
+        [void](Assert-ArtifactGenerationEligibility -Release $Release -Components @($Component) -CandidateRoot $CandidateRoot -ErrorPrefix $ErrorPrefix)
+    }
+    elseif ((Get-GeneratedSourceProperty $Release 'verificationStatus' $releaseError) -cne 'verified') { throw $releaseError }
     if (@(Get-GeneratedSourceProperty $Release 'blockers' $releaseError).Count -ne 0) {
         throw ($ErrorPrefix + '_generated_archive_release_blocked')
     }
@@ -129,4 +193,4 @@ function Assert-GeneratedSourceArchive {
     }
 }
 
-Export-ModuleMember -Function Test-GeneratedSourceArchive, Assert-GeneratedSourceArchive
+Export-ModuleMember -Function Test-GeneratedSourceArchive, Assert-GeneratedSourceArchive, Assert-ArtifactGenerationEligibility

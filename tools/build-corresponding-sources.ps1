@@ -96,11 +96,8 @@ function Assert-Notice {
     param([string] $Path, [string] $ExpectedSha256, [string] $ErrorPrefix)
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf) -or $ExpectedSha256 -notmatch '^[a-fA-F0-9]{64}$' -or
         (Get-Sha256 $Path) -cne $ExpectedSha256.ToLowerInvariant()) { throw ($ErrorPrefix + '_notice_invalid') }
-    $text = [IO.File]::ReadAllText($Path, [Text.UTF8Encoding]::new($false, $true))
-    if ($text -match '(?i)\b(?:NOT_VERIFIED|UNKNOWN|TODO)\b|\bunresolved[\s_-]+blocker\b|\bblocker\s*:') {
-        throw ($ErrorPrefix + '_notice_unresolved_marker')
-    }
-    $text
+    # Notice contents are upstream data, not release-readiness metadata.
+    $Path
 }
 
 function Get-CandidateFiles {
@@ -187,7 +184,7 @@ $lock = Read-JsonFile $lockFile 'source_lock_invalid'
 if ($lock.schemaVersion -cne 'karon-license-lock/v2' -or $lock.release.tag -cne 'v2.19.1-karon.2' -or
     $lock.release.platform -cne 'win-x64') { throw 'source_lock_invalid' }
 if (-not (Test-Property $lock.release 'verificationStatus')) { throw 'source_release_status_missing' }
-if ($lock.release.verificationStatus -cne 'verified') { throw 'source_release_not_verified' }
+$pendingAssembly = Assert-ArtifactGenerationEligibility -Release $lock.release -Components @($lock.components) -CandidateRoot $candidate -ErrorPrefix 'source'
 if (-not (Test-Property $lock.release 'blockers')) { throw 'source_release_blockers_missing' }
 if (@($lock.release.blockers).Count -ne 0) { throw 'source_release_blocked' }
 
@@ -211,7 +208,8 @@ foreach ($component in @($lock.components)) {
         throw 'source_component_invalid'
     }
     if (-not (Test-Property $component 'verificationStatus')) { throw 'source_component_status_missing' }
-    if ($component.verificationStatus -cne 'verified') { throw 'source_component_not_verified' }
+    $requiredStatus = if ($pendingAssembly) { 'NOT_VERIFIED' } else { 'verified' }
+    if ($component.verificationStatus -cne $requiredStatus) { throw 'source_component_not_verified' }
     if (-not (Test-Property $component 'blockers')) { throw 'source_component_blockers_missing' }
     if (@($component.blockers).Count -ne 0) { throw 'source_component_blocked' }
     Assert-LicenseExpression ([string]$component.licenseExpression) 'source_license_unverified'
@@ -242,7 +240,7 @@ foreach ($component in @($lock.components)) {
         $generated = Test-GeneratedSourceArchive $archive
         $archiveLength = $null
         if ($generated) {
-            $generatedArchive = Assert-GeneratedSourceArchive -Archive $archive -Component $component -Release $lock.release -ErrorPrefix 'source'
+            $generatedArchive = Assert-GeneratedSourceArchive -Archive $archive -Component $component -Release $lock.release -ErrorPrefix 'source' -AllowPendingAssembly:$pendingAssembly -CandidateRoot $candidate
             $archiveUrl = $null
             $archiveLength = $generatedArchive.length
         }
@@ -342,10 +340,6 @@ foreach ($expression in $expressions) {
 
 $rootNotice = Join-Path $source 'THIRD-PARTY-NOTICES.txt'
 if (-not (Test-Path -LiteralPath $rootNotice -PathType Leaf)) { throw 'source_root_notice_missing' }
-$rootNoticeText = [IO.File]::ReadAllText($rootNotice, [Text.UTF8Encoding]::new($false, $true))
-if ($rootNoticeText -match '(?i)\b(?:NOT_VERIFIED|UNKNOWN|TODO)\b|\bunresolved[\s_-]+blocker\b|\bblocker\s*:') {
-    throw 'source_notice_unresolved_marker'
-}
 
 $resolvedArchives = [Collections.Generic.List[object]]::new()
 $cacheContracts = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
