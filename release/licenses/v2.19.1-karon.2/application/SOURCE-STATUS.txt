@@ -19,17 +19,20 @@ Executable length: 4064256 bytes.
 The application source is MIT licensed. Static and separately shipped
 dependencies retain their individual licenses and source provenance.
 
-Status: NOT_VERIFIED.
-The exact-candidate non-runtime collector reports
-production_manifest_git_blob_mismatch and sevenzip_extractor_identity_mismatch.
-It binds a generated application ZIP with SHA-256
+Producer evidence: closed.
+The exact-candidate non-runtime inventory at
+.validation/karon2-release-20261005/non-runtime-evidence-07/source-cache-inventory.json
+records 15 verified artifacts and binds the component manifest at
+.validation/karon2-release-20261005/non-runtime-evidence-07/component-manifest.json
+with SHA-256 4dba01d3ef824458ad50a5a212700d4932f0240ff328075c097b68fa8c3388d6.
+The collector's generated application ZIP has SHA-256
 166f13da8a2b4bc857ced3e1674ee54b927f04cf1c8d74b922814a4974f47956
-and length 15883862; that ZIP is not the authoritative official archive above.
+and length 15883862 bytes. The authoritative official archive above is distinct.
 
-Updated working-tree license metadata postdates the sealed application source.
-Its source identity must be reconciled by the assembly owner; this task does
-not claim that the current lock/notices were embedded in the b80f594 archive.
-Final assembly and independent license adjudication remain outstanding.
+Release license status: NOT_VERIFIED / HOLD.
+Updated release metadata postdates the sealed application source. This record
+does not claim that current license metadata was embedded in the b80f594 archive.
+Fresh assembly, corresponding sources, SPDX, and independent license adjudication
+remain outstanding.
 
-Generated-source type/URL support and the final lock/SPDX/source-bundle cycle
-are pending assembly-owner action; manual GUI WAIVED_BY_OWNER is separate.
+Manual GUI validation is WAIVED_BY_OWNER and does not waive license checks.

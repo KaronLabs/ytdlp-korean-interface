@@ -13,10 +13,70 @@ $lockPath = Join-Path $RepositoryRoot 'release/dependencies/v2.19.1-karon.2.lock
 $lock = Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json -Depth 100
 if (Test-Path -LiteralPath $OutputDirectory) { throw 'source_assembly_output_exists' }
 $archives = Join-Path $OutputDirectory 'source-archives'
-[void][IO.Directory]::CreateDirectory($archives)
 $nonRuntime = Join-Path $EvidenceDirectory 'non-runtime-evidence-07'
-$inventory = Get-Content -LiteralPath (Join-Path $nonRuntime 'source-cache-inventory.json') -Raw | ConvertFrom-Json -Depth 100
-$pending = @('Independent exact-candidate license validation has not run.', 'Packaging metadata has not been sealed into a separate packaging commit.')
+$manifestPath = [IO.Path]::GetFullPath((Join-Path $nonRuntime 'component-manifest.json'))
+$inventoryPath = [IO.Path]::GetFullPath((Join-Path $nonRuntime 'source-cache-inventory.json'))
+$manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json -Depth 100
+$inventory = Get-Content -LiteralPath $inventoryPath -Raw | ConvertFrom-Json -Depth 100
+$app = @($lock.components | Where-Object id -CEQ 'application')[0]
+if ($inventory.status -cne 'closed' -or $inventory.release -cne 'v2.19.1-karon.2' -or
+    $manifest.release.tag -cne $inventory.release -or
+    $manifest.approvalProfile -cne $inventory.approvalProfile -or
+    [int]$manifest.release.expectedComponentCount -ne @($manifest.components).Count -or
+    $inventory.manifestSha256 -ine (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash -or
+    $inventory.applicationCommit -cne $app.sourceCommit -or
+    $lock.release.applicationSource.commit -cne $app.sourceCommit) { throw 'source_assembly_producer_evidence_invalid' }
+foreach ($artifact in $inventory.artifacts) {
+    if ($artifact.status -cne 'verified' -or $artifact.expectedSha256 -ine $artifact.actualSha256 -or
+        [long]$artifact.expectedLength -ne [long]$artifact.actualLength -or
+        @($inventory.artifacts | Where-Object id -CEQ $artifact.id).Count -ne 1) {
+        throw 'source_assembly_producer_evidence_invalid'
+    }
+}
+foreach ($definition in $manifest.components) {
+    if ($definition.id -ceq '7zip') { continue } # Its separate no-RAR producer evidence is preserved.
+    $matches = @($lock.components | Where-Object id -CEQ $definition.id)
+    if ($matches.Count -ne 1 -or $null -eq $matches[0].producerEvidence -or
+        $matches[0].producerEvidence.PSObject.Properties.Name -cnotcontains 'collectorInventoryPath') {
+        throw 'source_assembly_producer_evidence_invalid'
+    }
+    $component = $matches[0]
+    if ($definition.id -ceq 'application') {
+        if ($definition.sourceCommit -cne '$APPLICATION_RELEASE_COMMIT' -and
+            $definition.sourceCommit -cne $component.sourceCommit) { throw 'source_assembly_producer_evidence_invalid' }
+    }
+    elseif ($definition.sourceCommit -cne $component.sourceCommit) { throw 'source_assembly_producer_evidence_invalid' }
+    $artifacts = @($inventory.artifacts | Where-Object component -CEQ $definition.id)
+    if ($definition.id -ceq 'application') {
+        if ($artifacts.Count -ne 1 -or $artifacts[0].id -cne 'application-source') { throw 'source_assembly_producer_evidence_invalid' }
+    }
+    else {
+        $declared = @($definition.sourceArtifacts)
+        if ($declared.Count -eq 0 -or $declared.Count -ne $artifacts.Count) { throw 'source_assembly_producer_evidence_invalid' }
+        foreach ($record in $declared) {
+            $proof = @($artifacts | Where-Object id -CEQ $record.id)
+            if ($proof.Count -ne 1 -or $proof[0].expectedSha256 -ine $record.sha256 -or
+                [long]$proof[0].expectedLength -ne [long]$record.length) { throw 'source_assembly_producer_evidence_invalid' }
+        }
+    }
+    $component.producerEvidence.manifestPath = $manifestPath
+    $component.producerEvidence.collectorInventoryPath = $inventoryPath
+    $component.producerEvidence.PSObject.Properties.Remove('collectorBlockersPath')
+    $component.producerEvidence.status = 'verified'
+}
+$repositoryPath = [IO.Path]::GetFullPath($RepositoryRoot).TrimEnd('\', '/')
+$gitRoot = @(& git -C $RepositoryRoot rev-parse --show-toplevel 2>$null)
+if ($LASTEXITCODE -ne 0 -or $gitRoot.Count -ne 1 -or
+    -not ([IO.Path]::GetFullPath([string]$gitRoot[0]).TrimEnd('\', '/')).Equals($repositoryPath, [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'source_assembly_repository_invalid'
+}
+$head = @(& git -C $RepositoryRoot rev-parse --verify 'HEAD^{commit}' 2>$null)
+if ($LASTEXITCODE -ne 0 -or $head.Count -ne 1 -or [string]$head[0] -notmatch '^[a-fA-F0-9]{40}$' -or
+    [string]$head[0] -ieq $app.sourceCommit) { throw 'source_assembly_packaging_commit_invalid' }
+$dirty = @(& git -C $RepositoryRoot status --porcelain --untracked-files=no 2>$null)
+if ($LASTEXITCODE -ne 0 -or $dirty.Count -ne 0) { throw 'source_assembly_repository_dirty' }
+[void][IO.Directory]::CreateDirectory($archives)
+$pending = @('Independent exact-candidate license validation has not run.')
 
 # Copy original input files. Identity checks belong to the assembly operation;
 # this staging producer does not issue verification or approval verdicts.
@@ -26,7 +86,6 @@ foreach ($artifact in $inventory.artifacts) {
 }
 $official = $lock.release.applicationSource
 Copy-Item -LiteralPath $official.localPath -Destination (Join-Path $archives $official.fileName)
-$app = @($lock.components | Where-Object id -CEQ 'application')[0]
 $bundlePath = Join-Path $nonRuntime 'ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip'
 $bundleFile = Get-Item -LiteralPath $bundlePath
 $appClosure = [pscustomobject][ordered]@{
@@ -94,8 +153,8 @@ $lock.release.verificationStatus = 'NOT_VERIFIED'
 $lock.release | Add-Member -NotePropertyName sourceTransportSplitting -NotePropertyValue 'APPROVED_BY_OWNER' -Force
 $lock.release | Add-Member -NotePropertyName productionAssembly -NotePropertyValue 'NOT_RUN' -Force
 $lock.release | Add-Member -NotePropertyName licenseApproval -NotePropertyValue 'HOLD' -Force
-$lock.release.metadataPackage | Add-Member -NotePropertyName packagingCommit -NotePropertyValue $null -Force
-$lock.release.metadataPackage.bindingNote = 'Application source base only. Packaging metadata is unsealed and independent validation has not run.'
+$lock.release.metadataPackage | Add-Member -NotePropertyName packagingCommit -NotePropertyValue ([string]$head[0]).ToLowerInvariant() -Force
+$lock.release.metadataPackage.bindingNote = 'Application source base only. Packaging metadata is bound to committed HEAD; independent validation has not run.'
 foreach ($notice in $lock.release.metadataPackage.noticeFiles) {
     $path = Join-Path $RepositoryRoot $notice.path
     $notice.sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -104,6 +163,4 @@ foreach ($notice in $lock.release.metadataPackage.noticeFiles) {
 $templatePath = Join-Path $OutputDirectory 'source-closure-template.json'
 $bytes = $utf8.GetBytes(($lock | ConvertTo-Json -Depth 100) + "`n")
 [IO.File]::WriteAllBytes($templatePath, $bytes)
-# Refresh the root's untrusted template, never a verified license lock.
-[IO.File]::WriteAllBytes($lockPath, $bytes)
-[pscustomobject]@{ template = $templatePath; sourceArchives = $archives; verificationStatus = 'NOT_VERIFIED'; licenseApproval = 'HOLD' }
+[pscustomobject]@{ template = $templatePath; sourceArchives = $archives; packagingCommit = ([string]$head[0]).ToLowerInvariant(); verificationStatus = 'NOT_VERIFIED'; licenseApproval = 'HOLD' }

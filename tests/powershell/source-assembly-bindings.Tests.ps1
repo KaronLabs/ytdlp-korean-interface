@@ -48,3 +48,153 @@ Describe 'Modified static source closure bindings' {
         { Assert-KaronSourceArchiveMetadata $archive $component $application $appCommit } | Should -Throw
     }
 }
+
+function Write-AssemblyBindingJson {
+    param([string] $Path, [object] $Value)
+    [IO.File]::WriteAllText($Path, ($Value | ConvertTo-Json -Depth 100), [Text.UTF8Encoding]::new($false))
+}
+
+function New-AssemblyBindingArtifact {
+    param([string] $Id, [string] $Component, [string] $Path)
+    $sha = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
+    $length = (Get-Item -LiteralPath $Path).Length
+    [ordered]@{
+        id = $Id; component = $Component; fileName = [IO.Path]::GetFileName($Path)
+        expectedSha256 = $sha; actualSha256 = $sha
+        expectedLength = $length; actualLength = $length; status = 'verified'
+    }
+}
+
+function New-AssemblyBindingFixture {
+    $root = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
+    $repo = Join-Path $root 'repository'
+    $evidence = Join-Path $root 'evidence'
+    $nonRuntime = Join-Path $evidence 'non-runtime-evidence-07'
+    $sourceArchives = Join-Path $evidence 'source-archives'
+    $lockPath = Join-Path $repo 'release/dependencies/v2.19.1-karon.2.lock.json'
+    foreach ($directory in @($nonRuntime, $sourceArchives, (Split-Path -Parent $lockPath))) {
+        [void][IO.Directory]::CreateDirectory($directory)
+    }
+    $official = Join-Path $root 'official.zip'
+    $collectedApplication = Join-Path $sourceArchives 'collected-application.zip'
+    $cpmSource = Join-Path $sourceArchives 'cpm-source.zip'
+    $cpmBootstrap = Join-Path $sourceArchives 'CPM.cmake'
+    $bundle = Join-Path $nonRuntime 'ytdlp-korean-interface-v2.19.1-karon.2-non-runtime-component-evidence.zip'
+    [IO.File]::WriteAllBytes($official, [byte[]]@(1, 2, 3))
+    [IO.File]::WriteAllBytes($collectedApplication, [byte[]]@(4, 5, 6))
+    [IO.File]::WriteAllBytes($cpmSource, [byte[]]@(7, 8, 9))
+    [IO.File]::WriteAllBytes($cpmBootstrap, [byte[]]@(10, 11, 12))
+    [IO.File]::WriteAllBytes($bundle, [byte[]]@(13, 14, 15))
+    $appArtifact = New-AssemblyBindingArtifact 'application-source' 'application' $collectedApplication
+    $cpmArchive = New-AssemblyBindingArtifact 'cpm-source' 'cpm' $cpmSource
+    $cpmScript = New-AssemblyBindingArtifact 'cpm-bootstrap' 'cpm' $cpmBootstrap
+    $appCommit = 'a' * 40
+    $cpmCommit = 'b' * 40
+    $manifest = [ordered]@{
+        schemaVersion = 'karon-non-runtime-component-evidence/v1'; approvalProfile = 'fixture-profile'
+        release = [ordered]@{ tag = 'v2.19.1-karon.2'; expectedComponentCount = 2 }
+        components = @(
+            [ordered]@{ id = 'application'; sourceCommit = '$APPLICATION_RELEASE_COMMIT'; sourceArtifacts = @() },
+            [ordered]@{ id = 'cpm'; sourceCommit = $cpmCommit; sourceArtifacts = @(
+                [ordered]@{ id = $cpmArchive.id; sha256 = $cpmArchive.expectedSha256; length = $cpmArchive.expectedLength },
+                [ordered]@{ id = $cpmScript.id; sha256 = $cpmScript.expectedSha256; length = $cpmScript.expectedLength }
+            ) }
+        )
+    }
+    $manifestPath = Join-Path $nonRuntime 'component-manifest.json'
+    Write-AssemblyBindingJson $manifestPath $manifest
+    $inventory = [ordered]@{
+        schemaVersion = 'karon-source-cache-inventory/v1'; release = 'v2.19.1-karon.2'
+        approvalProfile = 'fixture-profile'; status = 'closed'; applicationCommit = $appCommit
+        manifestSha256 = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash
+        artifacts = @($appArtifact, $cpmArchive, $cpmScript)
+    }
+    $inventoryPath = Join-Path $nonRuntime 'source-cache-inventory.json'
+    Write-AssemblyBindingJson $inventoryPath $inventory
+    $oldProof = [ordered]@{
+        manifestPath = 'old-manifest.json'; collectorInventoryPath = 'evidence-02/inventory.json'
+        collectorBlockersPath = 'evidence-02/blockers.json'; status = 'blocked'
+    }
+    $lock = [ordered]@{
+        schemaVersion = 'karon-license-lock/v2'
+        release = [ordered]@{
+            applicationSource = [ordered]@{ fileName = 'official.zip'; localPath = $official; commit = $appCommit }
+            metadataPackage = [ordered]@{ noticeFiles = @(); bindingNote = 'unsealed'; packagingCommit = $null }
+            verificationStatus = 'NOT_VERIFIED'; blockers = @()
+        }
+        components = @(
+            [ordered]@{
+                id = 'application'; sourceCommit = $appCommit; sourceArchives = @()
+                verificationStatus = 'NOT_VERIFIED'; blockers = @()
+                producerEvidence = [ordered]@{
+                    manifestPath = $oldProof.manifestPath; collectorInventoryPath = $oldProof.collectorInventoryPath
+                    collectorBlockersPath = $oldProof.collectorBlockersPath; status = 'blocked'
+                    authoritativeSourceMetadataPath = 'source-authority.json'
+                }
+            },
+            [ordered]@{
+                id = 'cpm'; sourceCommit = $cpmCommit; sourceArchives = @()
+                verificationStatus = 'NOT_VERIFIED'; blockers = @()
+                producerEvidence = $oldProof
+            }
+        )
+    }
+    Write-AssemblyBindingJson $lockPath $lock
+    $originalLock = Get-Content -LiteralPath $lockPath -Raw
+    $null = & git -C $repo init -q
+    if ($LASTEXITCODE -ne 0) { throw 'fixture_git_init_failed' }
+    $null = & git -C $repo add -- 'release/dependencies/v2.19.1-karon.2.lock.json'
+    $null = & git -C $repo -c user.name=Fixture -c user.email=fixture@example.invalid commit -qm fixture
+    if ($LASTEXITCODE -ne 0) { throw 'fixture_git_commit_failed' }
+    $head = ((& git -C $repo rev-parse --verify 'HEAD^{commit}') | Out-String).Trim().ToLowerInvariant()
+    [pscustomobject]@{
+        Repository = $repo; Evidence = $evidence; Output = (Join-Path $root 'output')
+        ManifestPath = $manifestPath; InventoryPath = $inventoryPath; Inventory = $inventory
+        LockPath = $lockPath; OriginalLock = $originalLock; Head = $head
+    }
+}
+
+Describe 'Closed producer evidence in source assembly' {
+    BeforeEach {
+        $fixture = New-AssemblyBindingFixture
+        $prepare = Join-Path $repository 'tools/prepare-release-source-assembly.ps1'
+    }
+    It 'derives exact e07 proof paths and leaves the committed template untouched' {
+        & $prepare -RepositoryRoot $fixture.Repository -EvidenceDirectory $fixture.Evidence -OutputDirectory $fixture.Output | Out-Null
+        $result = Get-Content -LiteralPath (Join-Path $fixture.Output 'source-closure-template.json') -Raw | ConvertFrom-Json
+        foreach ($component in $result.components) {
+            $component.producerEvidence.manifestPath | Should -Be $fixture.ManifestPath
+            $component.producerEvidence.collectorInventoryPath | Should -Be $fixture.InventoryPath
+            $component.producerEvidence.status | Should -Be 'verified'
+            ($component.producerEvidence.PSObject.Properties.Name -contains 'collectorBlockersPath') | Should -BeFalse
+        }
+        $result.components[0].producerEvidence.authoritativeSourceMetadataPath | Should -Be 'source-authority.json'
+        $result.release.metadataPackage.packagingCommit | Should -Be $fixture.Head
+        $result.release.verificationStatus | Should -Be 'NOT_VERIFIED'
+        $result.release.licenseApproval | Should -Be 'HOLD'
+        (Get-Content -LiteralPath $fixture.LockPath -Raw) | Should -Be $fixture.OriginalLock
+    }
+    It 'refuses a component artifact whose recorded digest is not verified' {
+        $fixture.Inventory.artifacts[1].actualSha256 = 'f' * 64
+        Write-AssemblyBindingJson $fixture.InventoryPath $fixture.Inventory
+        $failure = $null
+        try { & $prepare -RepositoryRoot $fixture.Repository -EvidenceDirectory $fixture.Evidence -OutputDirectory $fixture.Output | Out-Null }
+        catch { $failure = $_.Exception.Message }
+        $failure | Should -Be 'source_assembly_producer_evidence_invalid'
+    }
+    It 'refuses a missing component proof instead of upgrading stale metadata' {
+        $fixture.Inventory.artifacts = @($fixture.Inventory.artifacts | Where-Object id -CNE 'cpm-bootstrap')
+        Write-AssemblyBindingJson $fixture.InventoryPath $fixture.Inventory
+        $failure = $null
+        try { & $prepare -RepositoryRoot $fixture.Repository -EvidenceDirectory $fixture.Evidence -OutputDirectory $fixture.Output | Out-Null }
+        catch { $failure = $_.Exception.Message }
+        $failure | Should -Be 'source_assembly_producer_evidence_invalid'
+    }
+    It 'requires the release metadata to be committed before assembly' {
+        [IO.File]::AppendAllText($fixture.LockPath, ' ')
+        $failure = $null
+        try { & $prepare -RepositoryRoot $fixture.Repository -EvidenceDirectory $fixture.Evidence -OutputDirectory $fixture.Output | Out-Null }
+        catch { $failure = $_.Exception.Message }
+        $failure | Should -Be 'source_assembly_repository_dirty'
+    }
+}

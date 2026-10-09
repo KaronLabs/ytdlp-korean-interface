@@ -222,8 +222,8 @@
         },
         {
           "path": "release/licenses/v2.19.1-karon.2/application/SOURCE-STATUS.txt",
-          "sha256": "e8dd114339ee1607069ce52dd6f3667c9ef8ad6662bd33a642ad91e59f455b85",
-          "length": 1799
+          "sha256": "a34a8e7011cd4fcc546fecd8a3a2d794cc6f3c72f80e09a607ce1978db6583b7",
+          "length": 1966
         }
       ],
       "sourceArchives": [
@@ -267,10 +267,9 @@
       "filesAnalyzed": false,
       "licenseConcluded": "MIT AND MPL-2.0 AND BSL-1.0 AND libpng-2.0 AND Zlib AND BSD-3-Clause AND IJG",
       "producerEvidence": {
-        "manifestPath": "release/evidence/v2.19.1-karon.2/non-runtime-components.json",
-        "collectorInventoryPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/non-runtime-evidence-02/source-cache-inventory.json",
-        "collectorBlockersPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/non-runtime-evidence-02/non-runtime-component-blockers.json",
-        "status": "blocked",
+        "manifestPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\non-runtime-evidence-07\\component-manifest.json",
+        "collectorInventoryPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\non-runtime-evidence-07\\source-cache-inventory.json",
+        "status": "verified",
         "authoritativeSourceMetadataPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/application-source.json"
       },
       "sourceTree": "541a9bef018b4b266ba0ca8469ecb2868ef1e6df",
@@ -347,10 +346,9 @@
       "staticLinkTarget": "application",
       "licenseConcluded": "MPL-2.0",
       "producerEvidence": {
-        "manifestPath": "release/evidence/v2.19.1-karon.2/non-runtime-components.json",
-        "collectorInventoryPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/non-runtime-evidence-02/source-cache-inventory.json",
-        "collectorBlockersPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/non-runtime-evidence-02/non-runtime-component-blockers.json",
-        "status": "blocked"
+        "manifestPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\non-runtime-evidence-07\\component-manifest.json",
+        "collectorInventoryPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\non-runtime-evidence-07\\source-cache-inventory.json",
+        "status": "verified"
       },
       "sourceTransforms": [
         {
@@ -424,9 +422,9 @@
       "licenseConcluded": "MIT",
       "usage": "build-input",
       "producerEvidence": {
-        "manifestPath": "release/evidence/v2.19.1-karon.2/non-runtime-components.json",
-        "collectorInventoryPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/non-runtime-evidence-02/source-cache-inventory.json",
-        "status": "blocked"
+        "manifestPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\non-runtime-evidence-07\\component-manifest.json",
+        "collectorInventoryPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\non-runtime-evidence-07\\source-cache-inventory.json",
+        "status": "verified"
       },
       "sourceArtifacts": [
         {
@@ -520,10 +518,9 @@
       "staticLinkTarget": "application",
       "licenseConcluded": "BSL-1.0",
       "producerEvidence": {
-        "manifestPath": "release/evidence/v2.19.1-karon.2/non-runtime-components.json",
-        "collectorInventoryPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/non-runtime-evidence-02/source-cache-inventory.json",
-        "collectorBlockersPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/non-runtime-evidence-02/non-runtime-component-blockers.json",
-        "status": "blocked"
+        "manifestPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\non-runtime-evidence-07\\component-manifest.json",
+        "collectorInventoryPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\non-runtime-evidence-07\\source-cache-inventory.json",
+        "status": "verified"
       },
       "sourceTag": "v1.7.4",
       "sourceTagObject": "324ab5bb2fdefe8be54b141dc12ba40a43c98815",
@@ -620,10 +617,9 @@
       "staticLinkTarget": "application",
       "licenseConcluded": "libpng-2.0",
       "producerEvidence": {
-        "manifestPath": "release/evidence/v2.19.1-karon.2/non-runtime-components.json",
-        "collectorInventoryPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/non-runtime-evidence-02/source-cache-inventory.json",
-        "collectorBlockersPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/non-runtime-evidence-02/non-runtime-component-blockers.json",
-        "status": "blocked"
+        "manifestPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\non-runtime-evidence-07\\component-manifest.json",
+        "collectorInventoryPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\non-runtime-evidence-07\\source-cache-inventory.json",
+        "status": "verified"
       },
       "sourceTransforms": [
         {
@@ -725,10 +721,9 @@
       "staticLinkTarget": "application",
       "licenseConcluded": "Zlib",
       "producerEvidence": {
-        "manifestPath": "release/evidence/v2.19.1-karon.2/non-runtime-components.json",
-        "collectorInventoryPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/non-runtime-evidence-02/source-cache-inventory.json",
-        "collectorBlockersPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/non-runtime-evidence-02/non-runtime-component-blockers.json",
-        "status": "blocked"
+        "manifestPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\non-runtime-evidence-07\\component-manifest.json",
+        "collectorInventoryPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\non-runtime-evidence-07\\source-cache-inventory.json",
+        "status": "verified"
       },
       "sourceArtifacts": [
         {
@@ -821,10 +816,9 @@
       "staticLinkTarget": "application",
       "licenseConcluded": "BSD-3-Clause AND IJG AND Zlib",
       "producerEvidence": {
-        "manifestPath": "release/evidence/v2.19.1-karon.2/non-runtime-components.json",
-        "collectorInventoryPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/non-runtime-evidence-02/source-cache-inventory.json",
-        "collectorBlockersPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/non-runtime-evidence-02/non-runtime-component-blockers.json",
-        "status": "blocked"
+        "manifestPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\non-runtime-evidence-07\\component-manifest.json",
+        "collectorInventoryPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\non-runtime-evidence-07\\source-cache-inventory.json",
+        "status": "verified"
       },
       "sourceArtifacts": [
         {
@@ -909,10 +903,9 @@
       "staticLinkTarget": "application",
       "licenseConcluded": "MIT",
       "producerEvidence": {
-        "manifestPath": "release/evidence/v2.19.1-karon.2/non-runtime-components.json",
-        "collectorInventoryPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/non-runtime-evidence-02/source-cache-inventory.json",
-        "collectorBlockersPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/non-runtime-evidence-02/non-runtime-component-blockers.json",
-        "status": "blocked"
+        "manifestPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\non-runtime-evidence-07\\component-manifest.json",
+        "collectorInventoryPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\non-runtime-evidence-07\\source-cache-inventory.json",
+        "status": "verified"
       },
       "sourceTransforms": [
         {
@@ -1181,10 +1174,9 @@
         }
       ],
       "producerEvidence": {
-        "manifestPath": "release/evidence/v2.19.1-karon.2/non-runtime-components.json",
-        "collectorInventoryPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/non-runtime-evidence-02/source-cache-inventory.json",
-        "collectorBlockersPath": "E:/03_AllWork/ytdlp-korean-interface/.validation/karon2-release-20261005/non-runtime-evidence-02/non-runtime-component-blockers.json",
-        "status": "blocked"
+        "manifestPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\non-runtime-evidence-07\\component-manifest.json",
+        "collectorInventoryPath": "E:\\03_AllWork\\ytdlp-korean-interface\\.validation\\karon2-release-20261005\\non-runtime-evidence-07\\source-cache-inventory.json",
+        "status": "verified"
       },
       "sourceArtifacts": [
         {
