@@ -19,10 +19,11 @@ $inventoryPath = [IO.Path]::GetFullPath((Join-Path $nonRuntime 'source-cache-inv
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json -Depth 100
 $inventory = Get-Content -LiteralPath $inventoryPath -Raw | ConvertFrom-Json -Depth 100
 $app = @($lock.components | Where-Object id -CEQ 'application')[0]
-$ytDlp = @($lock.components | Where-Object id -CEQ 'yt-dlp')[0]
-$mutagen = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'supplemental-sources/yt-dlp-mutagen-1.48.1.json') -Raw | ConvertFrom-Json
-$ytDlp.sourceArchives = @($ytDlp.sourceArchives | Where-Object fileName -CNE $mutagen.fileName) + @($mutagen)
-$ytDlp.licenseConcluded = 'GPL-3.0-or-later'
+foreach ($ytDlp in @($lock.components | Where-Object id -CEQ 'yt-dlp')) {
+    $mutagen = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'supplemental-sources/yt-dlp-mutagen-1.48.1.json') -Raw | ConvertFrom-Json
+    $ytDlp.sourceArchives = @($ytDlp.sourceArchives | Where-Object fileName -CNE $mutagen.fileName) + @($mutagen)
+    $ytDlp.licenseConcluded = 'GPL-3.0-or-later'
+}
 foreach ($candidateFile in $lock.release.candidateFiles) {
     if ($candidateFile.package -ceq 'yt-dlp') { $candidateFile.licenseConcluded = 'GPL-3.0-or-later' }
 }
