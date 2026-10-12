@@ -19,6 +19,13 @@ $inventoryPath = [IO.Path]::GetFullPath((Join-Path $nonRuntime 'source-cache-inv
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json -Depth 100
 $inventory = Get-Content -LiteralPath $inventoryPath -Raw | ConvertFrom-Json -Depth 100
 $app = @($lock.components | Where-Object id -CEQ 'application')[0]
+$ytDlp = @($lock.components | Where-Object id -CEQ 'yt-dlp')[0]
+$mutagen = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'supplemental-sources/yt-dlp-mutagen-1.48.1.json') -Raw | ConvertFrom-Json
+$ytDlp.sourceArchives = @($ytDlp.sourceArchives | Where-Object fileName -CNE $mutagen.fileName) + @($mutagen)
+$ytDlp.licenseConcluded = 'GPL-3.0-or-later'
+foreach ($candidateFile in $lock.release.candidateFiles) {
+    if ($candidateFile.package -ceq 'yt-dlp') { $candidateFile.licenseConcluded = 'GPL-3.0-or-later' }
+}
 if ($inventory.status -cne 'closed' -or $inventory.release -cne 'v2.19.1-karon.2' -or
     $manifest.release.tag -cne $inventory.release -or
     $manifest.approvalProfile -cne $inventory.approvalProfile -or
@@ -254,7 +261,7 @@ foreach ($component in $lock.components) {
     foreach ($archive in $component.sourceArchives) {
         $archive.verificationStatus = 'NOT_VERIFIED'
         $archive | Add-Member -NotePropertyName blockers -NotePropertyValue $pending -Force
-        $archive.localPath = Join-Path $archives $archive.fileName
+        $archive | Add-Member -NotePropertyName localPath -NotePropertyValue (Join-Path $archives $archive.fileName) -Force
     }
 }
 $lock.release.blockers = $pending

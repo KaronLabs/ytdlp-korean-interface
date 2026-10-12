@@ -68,6 +68,35 @@ function Assert-KaronSourceArchiveMetadata {
     $typeProperty = $Archive.PSObject.Properties['artifactType']
     if ($Archive -is [Collections.IDictionary]) { $type = $Archive['artifactType'] }
     else { $type = if ($null -ne $typeProperty) { $typeProperty.Value } else { $null } }
+    $hasSupplement = if ($Archive -is [Collections.IDictionary]) {
+        $Archive.Contains('supplementalSource')
+    } else { $null -ne $Archive.PSObject.Properties['supplementalSource'] }
+    if ($hasSupplement) {
+        # A separately identified upstream source, not a rewritten producer artifact
+        # or a claim that mutagen was built from the yt-dlp repository commit.
+        $supplement = Get-ProducerProperty $Archive 'supplementalSource'
+        $binary = Get-ProducerProperty $Component 'binaryProvenance'
+        if ($null -ne $type -or $id -cne 'yt-dlp' -or
+            (Get-ProducerProperty $Component 'version') -cne '2026.08.30.232658' -or
+            (Get-ProducerProperty $Component 'sourceRepository') -cne 'https://github.com/yt-dlp/yt-dlp' -or
+            $sourceCommit -cne 'bbc809a1161d3bfca51fa36f59dda35556ee85a0' -or
+            $commit -cne '452190d42ab2092577c77342d49157f8768d796f' -or
+            $fileName -cne ('mutagen-' + $commit + '.zip') -or
+            $url -cne ('https://github.com/quodlibet/mutagen/archive/' + $commit + '.zip') -or
+            (Get-ProducerProperty $supplement 'id') -cne 'mutagen' -or
+            (Get-ProducerProperty $supplement 'version') -cne '1.48.1' -or
+            (Get-ProducerProperty $supplement 'sourceRepository') -cne 'https://github.com/quodlibet/mutagen' -or
+            (Get-ProducerProperty $supplement 'relationship') -cne 'bundled-python-module' -or
+            (Get-ProducerProperty $supplement 'runtimePath') -cne 'yt-dlp.exe' -or
+            (Get-ProducerProperty $binary 'sourceCommit') -cne $sourceCommit) {
+            throw 'release_license_lock_supplemental_source_invalid'
+        }
+        Assert-ProducerRecord $Archive 'c0b3f5d55482631824176b22fb62859154dabc01a6db89eb1c35b38caa65db48' 1385806L
+        Assert-ProducerRecord $binary 'a3a504c66e91f6474cef0be83b16aedfb7b42b9400a962242d0d433e98f67a70' 17842860L
+        Assert-ProducerDigest (Get-ProducerProperty $supplement 'runtimeSha256') (Get-ProducerProperty $binary 'sha256')
+        Assert-ProducerLength (Get-ProducerProperty $supplement 'runtimeLength') (Get-ProducerProperty $binary 'length')
+        return
+    }
     if ($null -ne $type) {
         $provenance = Get-ProducerProperty $Archive 'provenance'
         $staticApplication = $id -cin @('bit7z', 'nana', 'libpng', 'zlib', 'libjpeg-turbo', 'nlohmann-json') -and

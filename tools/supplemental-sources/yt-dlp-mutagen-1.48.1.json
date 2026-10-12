@@ -1,0 +1,18 @@
+{
+  "fileName": "mutagen-452190d42ab2092577c77342d49157f8768d796f.zip",
+  "commit": "452190d42ab2092577c77342d49157f8768d796f",
+  "url": "https://github.com/quodlibet/mutagen/archive/452190d42ab2092577c77342d49157f8768d796f.zip",
+  "sha256": "c0b3f5d55482631824176b22fb62859154dabc01a6db89eb1c35b38caa65db48",
+  "length": 1385806,
+  "verificationStatus": "NOT_VERIFIED",
+  "blockers": [],
+  "supplementalSource": {
+    "id": "mutagen",
+    "version": "1.48.1",
+    "sourceRepository": "https://github.com/quodlibet/mutagen",
+    "relationship": "bundled-python-module",
+    "runtimePath": "yt-dlp.exe",
+    "runtimeSha256": "a3a504c66e91f6474cef0be83b16aedfb7b42b9400a962242d0d433e98f67a70",
+    "runtimeLength": 17842860
+  }
+}

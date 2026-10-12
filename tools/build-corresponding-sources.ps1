@@ -12,6 +12,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'generated-source-archive.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'release-license-producer-adapter.psm1') -Force
 
 function Get-Sha256 {
     param([Parameter(Mandatory)] [string] $Path)
@@ -239,6 +240,10 @@ foreach ($component in @($lock.components)) {
             -not (Test-Property $archive 'commit')) { throw 'source_archive_metadata_invalid' }
         $generated = Test-GeneratedSourceArchive $archive
         $archiveLength = $null
+        if (Test-Property $archive 'supplementalSource') {
+            Assert-KaronSourceArchiveMetadata -Archive $archive -Component $component
+            $archiveLength = $archive.length
+        }
         if ($generated) {
             $generatedArchive = Assert-GeneratedSourceArchive -Archive $archive -Component $component -Release $lock.release -ErrorPrefix 'source' -AllowPendingAssembly:$pendingAssembly -CandidateRoot $candidate
             $archiveUrl = $null
@@ -299,6 +304,16 @@ foreach ($file in @(Get-CandidateFiles $candidate)) {
 if ($actualPaths.Count -ne $inventory.Count) { throw 'source_candidate_inventory_missing' }
 
 foreach ($component in $componentById.Values) {
+    foreach ($archive in @($component.sourceArchives)) {
+        if (-not (Test-Property $archive 'supplementalSource')) { continue }
+        $binding = $archive.supplementalSource
+        if (-not $inventory.ContainsKey([string]$binding.runtimePath) -or
+            [string]$inventory[$binding.runtimePath].package -cne [string]$component.id -or
+            ([string]$inventory[$binding.runtimePath].sha256).ToLowerInvariant() -cne [string]$binding.runtimeSha256 -or
+            (Get-Item -LiteralPath (Get-ChildPath $candidate $binding.runtimePath 'source_supplemental_runtime_mismatch')).Length -ne $binding.runtimeLength) {
+            throw 'source_supplemental_runtime_mismatch'
+        }
+    }
     $count = $packageCounts[[string]$component.id]
     if ($component.filesAnalyzed) {
         if ($count -eq 0) { throw 'source_candidate_package_empty' }
@@ -369,7 +384,7 @@ foreach ($archive in $archiveRequests) {
             if (Test-Path -LiteralPath $downloadPartial) { Remove-Item -LiteralPath $downloadPartial -Force }
         }
     }
-    if ($archive.generated -and (Get-Item -LiteralPath $cachePath).Length -ne $archive.length) {
+    if ($null -ne $archive.length -and (Get-Item -LiteralPath $cachePath).Length -ne $archive.length) {
         throw 'source_generated_archive_length_mismatch'
     }
     if ((Get-Sha256 $cachePath) -cne $archive.sha256) { throw 'source_archive_hash_mismatch' }

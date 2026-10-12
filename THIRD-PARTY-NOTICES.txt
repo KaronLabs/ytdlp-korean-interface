@@ -75,9 +75,19 @@ yt-dlp.exe SHA-256: a3a504c66e91f6474cef0be83b16aedfb7b42b9400a962242d0d433e98f6
 The exact source LICENSE and THIRD_PARTY_LICENSES.txt bytes are preserved as
 yt-dlp/LICENSE.txt and yt-dlp/THIRD-PARTY-LICENSES.txt.
 The latter SHA-256 is 472aefe951c7db35e1657c1d13fd337140511ed6f2b329205105ad441c5a02b7.
-The pinned yt-dlp project source ZIP alone does not establish complete
-corresponding source for the bundled executable. Independent license
-adjudication and corresponding-source closure remain on HOLD.
+The corresponding-source package also includes Mutagen 1.48.1 source:
+https://github.com/quodlibet/mutagen/archive/452190d42ab2092577c77342d49157f8768d796f.zip
+SHA-256: c0b3f5d55482631824176b22fb62859154dabc01a6db89eb1c35b38caa65db48
+Length: 1,385,806 bytes. Mutagen source license: GPL-2.0-or-later.
+The exact upstream build instructions and dependency requirements are in:
+https://github.com/yt-dlp/yt-dlp/blob/bbc809a1161d3bfca51fa36f59dda35556ee85a0/.github/workflows/build.yml
+https://github.com/yt-dlp/yt-dlp/tree/bbc809a1161d3bfca51fa36f59dda35556ee85a0/bundle
+These pinned files document the Windows build, dependency versions/hashes,
+version generation, lazy extractor generation, and PyInstaller invocation.
+Corresponding sources and restoration instructions accompany the binary at:
+https://github.com/KaronLabs/ytdlp-korean-interface/releases/tag/v2.19.1-karon.2
+Source access is free of charge. Keep all source parts together and follow
+the included restoration instructions; the parts are not needed to run the app.
 
 Deno 2.7.14; MIT AND LicenseRef-Deno-Third-Party.
 Source commit: 2d674b25625bcc367853d00fe86f6e84390f88cb.
