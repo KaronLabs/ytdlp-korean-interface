@@ -143,6 +143,7 @@ function New-AssemblyBindingFixture {
         components = @(
             [ordered]@{
                 id = 'application'; sourceCommit = $appCommit; sourceArchives = @()
+                sourceRepository = 'https://github.com/KaronLabs/ytdlp-korean-interface'
                 verificationStatus = 'NOT_VERIFIED'; blockers = @()
                 producerEvidence = [ordered]@{
                     manifestPath = $oldProof.manifestPath; collectorInventoryPath = $oldProof.collectorInventoryPath
@@ -220,6 +221,8 @@ Describe 'Closed producer evidence in source assembly' {
         $deno.filesAnalyzed | Should -BeTrue
         (@($result.components | Where-Object id -CEQ 'cpm')[0]).filesAnalyzed | Should -BeFalse
         $result.release.metadataPackage.packagingCommit | Should -Be $fixture.Head
+        $result.release.metadataPackage.sourceCommit | Should -Be $fixture.Head
+        $result.release.metadataPackage.downloadLocation | Should -Be ('https://github.com/KaronLabs/ytdlp-korean-interface/archive/' + $fixture.Head + '.zip')
         $result.release.verificationStatus | Should -Be 'NOT_VERIFIED'
         $result.release.licenseApproval | Should -Be 'HOLD'
         (Get-Content -LiteralPath $fixture.LockPath -Raw) | Should -Be $fixture.OriginalLock
