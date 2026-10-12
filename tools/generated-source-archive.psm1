@@ -47,8 +47,9 @@ function Assert-ArtifactGenerationEligibility {
     $status = Get-GeneratedSourceProperty $Release 'verificationStatus' $errorId
     if (@(Get-GeneratedSourceProperty $Release 'blockers' $errorId).Count -ne 0) { throw ($ErrorPrefix + '_release_blocked') }
     if ($status -ceq 'verified') { return $false }
+    $assembly = Get-GeneratedSourceProperty $Release 'productionAssembly' ($ErrorPrefix + '_release_not_verified')
     if ($status -cne 'NOT_VERIFIED' -or
-        (Get-GeneratedSourceProperty $Release 'productionAssembly' $errorId) -cne 'ASSEMBLED_PENDING_INDEPENDENT_VALIDATION' -or
+        $assembly -cne 'ASSEMBLED_PENDING_INDEPENDENT_VALIDATION' -or
         (Get-GeneratedSourceProperty $Release 'licenseApproval' $errorId) -cne 'HOLD') { throw $errorId }
     $integration = Get-GeneratedSourceProperty $Release 'integrationEvidence' $errorId
     if ((Get-GeneratedSourceProperty $integration 'schemaVersion' $errorId) -cne 'karon-release-license-lock-integration/v1') { throw $errorId }
