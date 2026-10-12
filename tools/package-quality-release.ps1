@@ -352,7 +352,11 @@ function Add-KaronPackageNoticeEntries {
     if (-not $Entries.TryAdd($noticeEntry.EntryName, $noticeEntry)) { throw 'package_output_path_collision' }
 
     $expected = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
-    foreach ($component in (@($Lock.components) + @($Lock.release.metadataPackage))) {
+    $noticeOwners = @($Lock.components)
+    if (Test-KaronPackageProperty $Lock.release.metadataPackage 'noticeFiles') {
+        $noticeOwners += $Lock.release.metadataPackage
+    }
+    foreach ($component in $noticeOwners) {
         foreach ($notice in @($component.noticeFiles)) {
             $relative = [string]$notice.path
             if ($relative -ceq 'THIRD-PARTY-NOTICES.txt') { continue }
