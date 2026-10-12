@@ -911,7 +911,13 @@ function Get-KaronPackageApplicationProvenance {
         ':(exclude)tests/powershell/build-sevenzip-no-rar.Tests.ps1',
         ':(exclude)tools/run-karon2-powershell-contracts.ps1',
         ':(exclude)tests/powershell/gui-release-evidence-contract.Tests.ps1',
-        ':(exclude)tests/powershell/fixtures/should-throw-like.ps1'
+        ':(exclude)tests/powershell/fixtures/should-throw-like.ps1',
+        ':(exclude).gitignore', ':(exclude)README.md',
+        ':(exclude)docs/release-diet.md', ':(exclude)docs/superpowers/plans/2026-10-08-release-recovery.md',
+        ':(exclude)tests/powershell/source-assembly-bindings.Tests.ps1',
+        ':(exclude)tests/powershell/yt-dlp-supplemental-source.Tests.ps1',
+        ':(exclude)tests/run_ci_powershell_tests.ps1', ':(exclude)tools/prepare-release-source-assembly.ps1',
+        ':(exclude)tools/supplemental-sources/yt-dlp-mutagen-1.48.1.json'
     )
     $null = @(& git -C $RepositoryRoot diff --quiet --no-ext-diff --no-textconv $applicationSourceCommit $packaging -- @applicationPaths 2>&1)
     if ($LASTEXITCODE -eq 1) { throw 'package_application_source_delta_invalid' }
