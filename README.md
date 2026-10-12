@@ -31,7 +31,7 @@ Windows GUI의 직접적인 upstream은 [ErrorFlynn/ytdlp-interface]
 ![Platform](https://img.shields.io/badge/platform-Windows-blue)
 ![Language](https://img.shields.io/badge/language-C%2B%2B-00599C)
 ![Locale](https://img.shields.io/badge/locale-ko--KR-success)
-![License](https://img.shields.io/badge/license-MIT-green)
+![Application source license](https://img.shields.io/badge/application%20source-MIT-green)
 
 > **Upstream baseline:** `ErrorFlynn/ytdlp-interface v2.19.1`  
 > **Primary locale:** `ko-KR`  
@@ -555,9 +555,11 @@ ErrorFlynn이 개발한 Windows GUI 프로젝트이며 **이 저장소의 직접
 
 # License
 
-이 저장소는 MIT License를 사용합니다. 자세한 내용은 [`LICENSE`](LICENSE)를 참고하세요.
+이 저장소의 애플리케이션 소스는 MIT License를 사용합니다. 자세한 내용은 [`LICENSE`](LICENSE)를 참고하세요.
 
-third-party dependency는 각 프로젝트의 라이선스 조건을 따릅니다. 재배포 시 각 dependency의 라이선스도 함께 확인해 주세요.
+`v2.19.1-karon.2` 후보에 포함 예정인 PyInstaller 기반 `yt-dlp.exe` 결합 실행 파일은 GPL-3.0-or-later이며, yt-dlp 프로젝트 원본 소스는 Unlicense입니다. 이 실행 파일의 `--verbose`에는 `mutagen 1.48.1`이 보고되며, mutagen은 GPL-2.0-or-later입니다. 따라서 Windows 배포 ZIP 전체를 MIT 라이선스로 표시하지 않습니다. 다른 제3자 구성요소에도 각자의 라이선스가 적용됩니다.
+
+이 후보의 대응 소스 완비와 독립 라이선스 승인은 아직 확인되지 않았습니다. `v2.19.1-karon.2` 공개 릴리스는 면제되지 않은 조건이 충족될 때까지 HOLD입니다. 현재 고지는 [`THIRD-PARTY-NOTICES.txt`](THIRD-PARTY-NOTICES.txt)와 [`release/notes/v2.19.1-karon.2.md`](release/notes/v2.19.1-karon.2.md)를 참고하세요.
 
 ---
 
