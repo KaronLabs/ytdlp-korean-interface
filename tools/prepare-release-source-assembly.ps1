@@ -265,6 +265,7 @@ foreach ($component in $lock.components) {
     }
 }
 $lock.release.blockers = $pending
+$lock.release.PSObject.Properties.Remove('receiptInputs')
 $lock.release.verificationStatus = 'NOT_VERIFIED'
 $lock.release | Add-Member -NotePropertyName sourceTransportSplitting -NotePropertyValue 'APPROVED_BY_OWNER' -Force
 $lock.release | Add-Member -NotePropertyName productionAssembly -NotePropertyValue 'NOT_RUN' -Force
