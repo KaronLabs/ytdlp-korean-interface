@@ -352,9 +352,10 @@ function Add-KaronPackageNoticeEntries {
     if (-not $Entries.TryAdd($noticeEntry.EntryName, $noticeEntry)) { throw 'package_output_path_collision' }
 
     $expected = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
-    foreach ($component in @($Lock.components)) {
+    foreach ($component in (@($Lock.components) + @($Lock.release.metadataPackage))) {
         foreach ($notice in @($component.noticeFiles)) {
             $relative = [string]$notice.path
+            if ($relative -ceq 'THIRD-PARTY-NOTICES.txt') { continue }
             Assert-KaronPackageRelativePath -Path $relative -ErrorId 'package_license_path_invalid'
             if (-not $relative.StartsWith($script:KaronPackageLicensePrefix, [StringComparison]::Ordinal)) {
                 throw 'package_license_path_invalid'
@@ -367,6 +368,7 @@ function Add-KaronPackageNoticeEntries {
 
     $licenseRoot = Join-Path $SourceRoot 'release\licenses\v2.19.1-karon.2'
     $actual = Get-KaronPackageSafeInventory -Root $licenseRoot -ErrorPrefix 'package_license'
+    [void]$actual.Remove('.gitattributes')
     if ($actual.Count -ne $expected.Count) { throw 'package_license_inventory_mismatch' }
     foreach ($relative in $expected.Keys) {
         $corpusRelative = $relative.Substring($script:KaronPackageLicensePrefix.Length)
