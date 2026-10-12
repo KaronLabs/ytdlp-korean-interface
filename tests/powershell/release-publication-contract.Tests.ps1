@@ -515,12 +515,19 @@ function Rebuild-TestCorrespondingSources {
     param([Parameter(Mandatory)] [object] $Case)
     Write-TestJson $Case.InnerLockPath $Case.InnerLock
     if (Test-Path -LiteralPath $Case.SourcesPath) { Remove-Item -LiteralPath $Case.SourcesPath -Force }
-    New-TestZip $Case.SourcesPath @{
+    $sourceEntries = @{
         ($Case.SourcePrefix + 'release/dependencies/v2.19.1-karon.2.lock.json') = $Case.InnerLockPath
         ($Case.SourcePrefix + 'THIRD-PARTY-NOTICES.txt') = $Case.NoticePath
         ($Case.SourcePrefix + 'release/licenses/v2.19.1-karon.2/application/LICENSE.txt') = $Case.LicensePath
         ($Case.SourcePrefix + 'sources/application/application-source.zip') = $Case.SourceArchive
     }
+    foreach ($archive in $Case.InnerLock.components[0].sourceArchives) {
+        $hasType = if ($archive -is [Collections.IDictionary]) { $archive.Contains('artifactType') } else { $null -ne $archive.PSObject.Properties['artifactType'] }
+        if ($hasType -and $archive.artifactType -ceq 'generated-source-closure') {
+            $sourceEntries[$Case.SourcePrefix + 'sources/application/' + $archive.fileName] = Join-Path (Split-Path -Parent $Case.SourceArchive) $archive.fileName
+        }
+    }
+    New-TestZip $Case.SourcesPath $sourceEntries
     Refresh-TestInputRecord $Case 'correspondingSources' $Case.SourcesPath $script:SourcesName
 }
 
@@ -1418,7 +1425,7 @@ function Add-TestGeneratedApplicationClosure {
             blockers = @()
             provenance = [ordered]@{ component = 'application'; sourceCommit = $commit }
         })
-        $lock.release['integrationEvidence'] = [ordered]@{
+        $lock.release | Add-Member -NotePropertyName integrationEvidence -NotePropertyValue ([ordered]@{
             schemaVersion = 'karon-release-license-lock-integration/v1'
             nonRuntime = [ordered]@{
                 applicationSourceArchive = [ordered]@{
@@ -1427,7 +1434,7 @@ function Add-TestGeneratedApplicationClosure {
                     sha256 = $sha256
                 }
             }
-        }
+        }) -Force
     }
 
     $sourcePackageId = 'SPDXRef-Source-application-' + $sha256
