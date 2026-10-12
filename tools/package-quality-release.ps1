@@ -17,6 +17,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'gui-release-waiver.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'generated-source-archive.psm1') -Force
 
 $script:KaronPackageTag = 'v2.19.1-karon.2'
 $script:KaronPackageBinaryName = 'ytdlp-korean-interface-v2.19.1-karon.2-win-x64.zip'
@@ -767,9 +768,15 @@ function Assert-KaronPackageLockRawContract {
                 }
                 else {
                     Assert-KaronPackageRawStatus $item 'verificationStatus' $ErrorId $requiredStatus
-                    foreach ($name in @('fileName', 'commit', 'url', 'sha256')) {
+                    foreach ($name in @('fileName', 'commit', 'sha256')) {
                         [void](Get-KaronPackageRawString (Get-KaronPackageRawProperty $item $name $ErrorId) $ErrorId)
                     }
+                    $url = Get-KaronPackageRawProperty $item 'url' $ErrorId
+                    if ((Test-KaronPackageRawProperty $item 'artifactType') -and
+                        (Get-KaronPackageRawString (Get-KaronPackageRawProperty $item 'artifactType' $ErrorId) $ErrorId) -ceq 'generated-source-closure') {
+                        if ($url.ValueKind -ne [Text.Json.JsonValueKind]::Null) { throw $ErrorId }
+                    }
+                    else { [void](Get-KaronPackageRawString $url $ErrorId) }
                     if ((Get-KaronPackageRawInt64 (Get-KaronPackageRawProperty $item 'length' $ErrorId) $ErrorId) -le 0) { throw $ErrorId }
                 }
             }
@@ -879,8 +886,8 @@ function Get-KaronPackageApplicationProvenance {
     if ($applicationComponents.Count -ne 1) { throw 'package_application_source_invalid' }
     $metadataCommit = ([string]$Lock.release.metadataPackage.sourceCommit).ToLowerInvariant()
     $componentCommit = ([string]$applicationComponents[0].sourceCommit).ToLowerInvariant()
-    if ($metadataCommit -ceq $packaging -or $componentCommit -ceq $packaging -or $applicationSourceCommit -ceq $packaging) { throw 'package_provenance_self_reference' }
-    if ($metadataCommit -cne $applicationSourceCommit -or $componentCommit -cne $applicationSourceCommit) { throw 'package_application_source_mismatch' }
+    if ($componentCommit -ceq $packaging -or $applicationSourceCommit -ceq $packaging) { throw 'package_provenance_self_reference' }
+    if ($componentCommit -cne $applicationSourceCommit) { throw 'package_application_source_mismatch' }
     $resolved = @(& git -C $RepositoryRoot rev-parse --verify ($applicationSourceCommit + '^{commit}') 2>&1)
     if ($LASTEXITCODE -ne 0 -or (($resolved | Out-String).Trim()).ToLowerInvariant() -cne $applicationSourceCommit) { throw 'package_application_source_object_invalid' }
     $null = @(& git -C $RepositoryRoot merge-base --is-ancestor $applicationSourceCommit $packaging 2>&1)
@@ -1239,16 +1246,43 @@ function Assert-KaronPackageSpdxContract {
     }
 
     $expectedPackages = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+    $generatedRelationships = [Collections.Generic.List[string]]::new()
     foreach ($component in @($Lock.components)) {
-        $primary = @($component.sourceArchives | Where-Object { [string]$_.commit -ceq [string]$component.sourceCommit })
-        if ($primary.Count -ne 1) { throw 'package_spdx_package_contract_mismatch' }
+        $primary = @($component.sourceArchives | Where-Object {
+            -not (Test-GeneratedSourceArchive $_) -and [string]$_.commit -ceq [string]$component.sourceCommit
+        })
+        if ($primary.Count -gt 1) { throw 'package_spdx_package_contract_mismatch' }
+        $generatedSourceInfos = [Collections.Generic.List[string]]::new()
+        foreach ($archive in @($component.sourceArchives | Where-Object { Test-GeneratedSourceArchive $_ })) {
+            $generated = Assert-GeneratedSourceArchive -Archive $archive -Component $component -Release $Lock.release -ErrorPrefix 'package'
+            $sourceId = 'SPDXRef-Source-' + [string]$component.id + '-' + $generated.sha256
+            $expectedPackages.Add($sourceId, [pscustomobject]@{
+                Name = [string]$component.name + ' generated corresponding sources'
+                Version = $generated.commit
+                Declared = [string]$component.licenseExpression
+                Concluded = [string]$component.licenseConcluded
+                Download = 'NOASSERTION'
+                FilesAnalyzed = $false
+                FileName = $generated.fileName
+                SourceInfo = $generated.sourceInfo
+                SourceSha256 = $generated.sha256
+            })
+            $generatedSourceInfos.Add($generated.sourceInfo)
+            $generatedRelationships.Add('SPDXRef-Package-' + [string]$component.id + '|GENERATED_FROM|' + $sourceId)
+        }
+        if ($primary.Count -eq 0 -and $generatedSourceInfos.Count -eq 0) { throw 'package_spdx_package_contract_mismatch' }
+        $download = if ($primary.Count -eq 1) { [string]$primary[0].url }
+            elseif (($component.PSObject.Properties.Name -ccontains 'downloadLocation') -and $null -ne $component.downloadLocation) { [string]$component.downloadLocation }
+            else { 'NOASSERTION' }
         $expectedPackages.Add('SPDXRef-Package-' + [string]$component.id, [pscustomobject]@{
             Name = [string]$component.name
             Version = [string]$component.version
             Declared = [string]$component.licenseExpression
             Concluded = [string]$component.licenseConcluded
-            Download = [string]$primary[0].url
+            Download = $download
             FilesAnalyzed = [bool]$component.filesAnalyzed
+            SourceInfo = if ($generatedSourceInfos.Count -gt 0) { $generatedSourceInfos -join "`n" } else { $null }
+            SourceSha256 = $null
         })
     }
     $metadata = $Lock.release.metadataPackage
@@ -1259,6 +1293,8 @@ function Assert-KaronPackageSpdxContract {
         Concluded = [string]$metadata.licenseConcluded
         Download = [string]$metadata.downloadLocation
         FilesAnalyzed = $true
+        SourceInfo = $null
+        SourceSha256 = $null
     })
     $packages = @(Get-KaronPackageRawArray (Get-KaronPackageRawProperty $json.Raw 'packages' 'package_spdx_invalid') 'package_spdx_invalid')
     if ($packages.Count -ne $expectedPackages.Count) { throw 'package_spdx_package_inventory_invalid' }
@@ -1275,6 +1311,22 @@ function Assert-KaronPackageSpdxContract {
             (Get-KaronPackageRawString (Get-KaronPackageRawProperty $package 'downloadLocation' 'package_spdx_invalid') 'package_spdx_invalid') -cne $expected.Download -or
             (Get-KaronPackageRawBoolean (Get-KaronPackageRawProperty $package 'filesAnalyzed' 'package_spdx_invalid') 'package_spdx_invalid') -ne $expected.FilesAnalyzed) {
             throw 'package_spdx_package_contract_mismatch'
+        }
+        if ($null -ne $expected.SourceInfo -and
+            ((-not (Test-KaronPackageRawProperty $package 'sourceInfo')) -or
+            (Get-KaronPackageRawString (Get-KaronPackageRawProperty $package 'sourceInfo' 'package_spdx_invalid') 'package_spdx_invalid') -cne $expected.SourceInfo)) {
+            throw 'package_spdx_package_contract_mismatch'
+        }
+        if ($null -ne $expected.SourceSha256) {
+            if ((Get-KaronPackageRawString (Get-KaronPackageRawProperty $package 'packageFileName' 'package_spdx_invalid') 'package_spdx_invalid') -cne $expected.FileName) {
+                throw 'package_spdx_package_contract_mismatch'
+            }
+            $checksums = @(Get-KaronPackageRawArray (Get-KaronPackageRawProperty $package 'checksums' 'package_spdx_invalid') 'package_spdx_invalid')
+            if ($checksums.Count -ne 1 -or
+                (Get-KaronPackageRawString (Get-KaronPackageRawProperty $checksums[0] 'algorithm' 'package_spdx_invalid') 'package_spdx_invalid') -cne 'SHA256' -or
+                (Get-KaronPackageRawString (Get-KaronPackageRawProperty $checksums[0] 'checksumValue' 'package_spdx_invalid') 'package_spdx_invalid').ToLowerInvariant() -cne $expected.SourceSha256) {
+                throw 'package_spdx_package_contract_mismatch'
+            }
         }
     }
     $described = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
@@ -1325,6 +1377,7 @@ function Assert-KaronPackageSpdxContract {
     foreach ($relative in $expectedFiles.Keys) {
         [void]$expectedRelationships.Add($expectedFiles[$relative].Package + '|CONTAINS|' + $expectedFiles[$relative].SpdxId)
     }
+    foreach ($relationship in $generatedRelationships) { [void]$expectedRelationships.Add($relationship) }
     foreach ($component in @($Lock.components | Where-Object { -not [bool]$_.filesAnalyzed })) {
         if (($component.PSObject.Properties.Name -ccontains 'usage') -and [string]$component.usage -ceq 'build-input') {
             [void]$expectedRelationships.Add(('SPDXRef-Package-' + [string]$component.id + '|BUILD_TOOL_OF|SPDXRef-Package-application'))

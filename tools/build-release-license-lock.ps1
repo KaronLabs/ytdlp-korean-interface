@@ -1441,10 +1441,17 @@ foreach ($component in $components) {
 
 $candidate = Get-CandidateContract $RepositoryRoot $CandidateDirectory
 Assert-LockCandidateFiles $release $candidate.Records
-$metadata = Get-ExactProperty $release 'metadataPackage'
-Set-ExactProperty $metadata 'sourceCommit' $candidate.Commit
 $applicationComponent = Get-UniqueById $components 'application' 'release_license_lock_nonruntime_binding_mismatch'
 if ([string](Get-ExactProperty $applicationComponent 'sourceCommit') -cne $candidate.Commit) { throw 'release_license_lock_nonruntime_binding_mismatch' }
+$packagingCommit = ((& git -C $RepositoryRoot rev-parse --verify HEAD 2>$null) | Out-String).Trim().ToLowerInvariant()
+if ($LASTEXITCODE -ne 0 -or $packagingCommit -notmatch $script:CommitPattern) { throw 'release_license_lock_metadata_provenance_mismatch' }
+$metadata = Get-ExactProperty $release 'metadataPackage'
+$metadataSourceUrl = ([string](Get-ExactProperty $applicationComponent 'sourceRepository')).TrimEnd('/') + '/archive/' + $packagingCommit + '.zip'
+if ([string](Get-ExactProperty $metadata 'sourceCommit') -cne $packagingCommit -or
+    [string](Get-ExactProperty $metadata 'packagingCommit') -cne $packagingCommit -or
+    [string](Get-ExactProperty $metadata 'downloadLocation') -cne $metadataSourceUrl) {
+    throw 'release_license_lock_metadata_provenance_mismatch'
+}
 $sourceRoot = Split-Path -Parent ([IO.Path]::GetFullPath($RootThirdPartyNoticesPath))
 Assert-NoticeAndSourceArchives $components $sourceRoot $SourceArchiveDirectory
 

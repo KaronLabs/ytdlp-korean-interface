@@ -263,6 +263,8 @@ $lock.release | Add-Member -NotePropertyName sourceTransportSplitting -NotePrope
 $lock.release | Add-Member -NotePropertyName productionAssembly -NotePropertyValue 'NOT_RUN' -Force
 $lock.release | Add-Member -NotePropertyName licenseApproval -NotePropertyValue 'HOLD' -Force
 $lock.release.metadataPackage | Add-Member -NotePropertyName packagingCommit -NotePropertyValue ([string]$head[0]).ToLowerInvariant() -Force
+$lock.release.metadataPackage.sourceCommit = ([string]$head[0]).ToLowerInvariant()
+$lock.release.metadataPackage.downloadLocation = ([string]$app.sourceRepository).TrimEnd('/') + '/archive/' + ([string]$head[0]).ToLowerInvariant() + '.zip'
 $lock.release.metadataPackage.bindingNote = 'Application source base only. Packaging metadata is bound to committed HEAD; independent validation has not run.'
 foreach ($notice in $lock.release.metadataPackage.noticeFiles) {
     $path = Join-Path $RepositoryRoot $notice.path

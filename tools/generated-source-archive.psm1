@@ -68,8 +68,7 @@ function Assert-ArtifactGenerationEligibility {
     $commit = Get-GeneratedSourceProperty $source 'commit' $errorId
     $tree = Get-GeneratedSourceProperty $source 'tree' $errorId
     if ($commit -notmatch '^[a-fA-F0-9]{40}$' -or $tree -notmatch '^[a-fA-F0-9]{40}$' -or
-        $manifest.applicationSourceCommit -cne $commit -or $manifest.applicationSourceTree -cne $tree -or
-        (Get-GeneratedSourceProperty (Get-GeneratedSourceProperty $Release 'metadataPackage' $errorId) 'sourceCommit' $errorId) -cne $commit) { throw $errorId }
+        $manifest.applicationSourceCommit -cne $commit -or $manifest.applicationSourceTree -cne $tree) { throw $errorId }
     $application = @($Components | Where-Object { (Get-GeneratedSourceProperty $_ 'id' $errorId) -ceq 'application' })
     if ($application.Count -gt 0 -and ($application.Count -ne 1 -or
         (Get-GeneratedSourceProperty $application[0] 'sourceCommit' $errorId) -cne $commit)) { throw $errorId }

@@ -1388,6 +1388,121 @@ Describe 'Canonical producer GUI schema handshake' {
     }
 }
 
+function Add-TestGeneratedApplicationClosure {
+    param([Parameter(Mandatory)] $Case)
+
+    $closureName = 'application-source-closure.zip'
+    $closurePath = Join-Path (Split-Path -Parent $Case.SourceArchive) $closureName
+    Copy-Item -LiteralPath $Case.SourceArchive -Destination $closurePath
+    $sha256 = (Get-TestSha256 $closurePath).ToLowerInvariant()
+    $length = (Get-Item -LiteralPath $closurePath).Length
+    $commit = [string]$Case.ApplicationSourceCommit
+    $origin = [string]$Case.Lock.components[0].sourceRepository
+    if ([string]::IsNullOrWhiteSpace($origin)) {
+        $origin = 'https://github.com/KaronLabs/ytdlp-korean-interface'
+    }
+    $evidencePath = 'release.integrationEvidence.nonRuntime.applicationSourceArchive'
+    $sourceInfo = "Origin: $origin; baseline commit: $commit; closure owner: application; source commit: $commit; locally generated source closure: $closureName; length: $length; SHA256: $sha256; producer evidence: $evidencePath."
+
+    foreach ($lock in @($Case.Lock, $Case.InnerLock)) {
+        $component = @($lock.components | Where-Object { $_.id -eq 'application' })[0]
+        $component.sourceRepository = $origin
+        $component.sourceArchives = @($component.sourceArchives) + @([ordered]@{
+            artifactType = 'generated-source-closure'
+            fileName = $closureName
+            commit = $commit
+            url = $null
+            sha256 = $sha256
+            length = $length
+            verificationStatus = 'verified'
+            blockers = @()
+            provenance = [ordered]@{ component = 'application'; sourceCommit = $commit }
+        })
+        $lock.release['integrationEvidence'] = [ordered]@{
+            schemaVersion = 'karon-release-license-lock-integration/v1'
+            nonRuntime = [ordered]@{
+                applicationSourceArchive = [ordered]@{
+                    fileName = $closureName
+                    length = $length
+                    sha256 = $sha256
+                }
+            }
+        }
+    }
+
+    $sourcePackageId = 'SPDXRef-Source-application-' + $sha256
+    $componentPackage = @($Case.Spdx.packages | Where-Object { $_.SPDXID -eq 'SPDXRef-Package-application' })[0]
+    $componentPackage['sourceInfo'] = $sourceInfo
+    $Case.Spdx['packages'] = @($Case.Spdx.packages) + @([ordered]@{
+        name = 'Fixture application generated corresponding sources'
+        SPDXID = $sourcePackageId
+        versionInfo = $commit
+        packageFileName = $closureName
+        downloadLocation = 'NOASSERTION'
+        filesAnalyzed = $false
+        checksums = @([ordered]@{ algorithm = 'SHA256'; checksumValue = $sha256 })
+        sourceInfo = $sourceInfo
+        licenseConcluded = $componentPackage.licenseConcluded
+        licenseDeclared = $componentPackage.licenseDeclared
+        copyrightText = 'Copyright and attribution are identified in the component notice files recorded by the release lock.'
+    })
+    $Case.Spdx['documentDescribes'] = @($Case.Spdx.documentDescribes) + @($sourcePackageId)
+    $Case.Spdx['relationships'] = @($Case.Spdx.relationships) + @(
+        [ordered]@{ spdxElementId = 'SPDXRef-DOCUMENT'; relatedSpdxElement = $sourcePackageId; relationshipType = 'DESCRIBES' },
+        [ordered]@{ spdxElementId = 'SPDXRef-Package-application'; relatedSpdxElement = $sourcePackageId; relationshipType = 'GENERATED_FROM' }
+    )
+    return $sourcePackageId
+}
+
+Describe 'Generated source closure publication contract' {
+    It 'accepts a null-URL closure with its source package, checksum, sourceInfo, and GENERATED_FROM relationship' {
+        $case = New-ReleaseContractCase 'generated-source-closure'
+        $sourcePackageId = Add-TestGeneratedApplicationClosure $case
+        Rebuild-TestCorrespondingSources $case
+        Save-TestSpdx $case
+
+        $sourcePackage = @($case.Spdx.packages | Where-Object { $_.SPDXID -eq $sourcePackageId })[0]
+        $sourcePackage.downloadLocation | Should -Be 'NOASSERTION'
+        $sourcePackage.checksums[0].checksumValue | Should -Be $case.Lock.components[0].sourceArchives[-1].sha256
+        $sourcePackage.sourceInfo | Should -Match 'producer evidence: release\.integrationEvidence\.nonRuntime\.applicationSourceArchive\.'
+        @($case.Spdx.relationships | Where-Object {
+            $_.spdxElementId -eq 'SPDXRef-Package-application' -and
+            $_.relationshipType -eq 'GENERATED_FROM' -and
+            $_.relatedSpdxElement -eq $sourcePackageId
+        }).Count | Should -Be 1
+        (Invoke-TestPackage $case -PlanOnly).Mode | Should -Be 'plan'
+    }
+
+    It 'rejects a null archive URL without the generated closure marker' {
+        $case = New-ReleaseContractCase 'null-source-url-without-marker'
+        $case.Lock.components[0].sourceArchives[0].url = $null
+        $case.InnerLock.components[0].sourceArchives[0].url = $null
+        $failure = Get-TestFailure { Rebuild-TestCorrespondingSources $case; Save-TestSpdx $case; Invoke-TestPackage $case -PlanOnly }
+        $failure | Should -Not -Be 'test_expected_failure_but_action_succeeded'
+    }
+
+    It 'rejects an omitted generated source SPDX package' {
+        $case = New-ReleaseContractCase 'missing-generated-source-package'
+        $sourcePackageId = Add-TestGeneratedApplicationClosure $case
+        $case.Spdx['packages'] = @($case.Spdx.packages | Where-Object { $_.SPDXID -ne $sourcePackageId })
+        Rebuild-TestCorrespondingSources $case
+        Save-TestSpdx $case
+
+        (Get-TestFailure { Invoke-TestPackage $case -PlanOnly }) | Should -Match '^package_spdx_'
+    }
+
+    It 'rejects a generated source SPDX package with a different checksum' {
+        $case = New-ReleaseContractCase 'tampered-generated-source-checksum'
+        $sourcePackageId = Add-TestGeneratedApplicationClosure $case
+        $sourcePackage = @($case.Spdx.packages | Where-Object { $_.SPDXID -eq $sourcePackageId })[0]
+        $sourcePackage.checksums[0]['checksumValue'] = '0' * 64
+        Rebuild-TestCorrespondingSources $case
+        Save-TestSpdx $case
+
+        (Get-TestFailure { Invoke-TestPackage $case -PlanOnly }) | Should -Match '^package_spdx_'
+    }
+}
+
 Describe 'Exact package, GUI evidence, and receipt contract' {
     It 'packages a nested Windows-separator manifest entry under its canonical ZIP path' {
         $case = New-ReleaseContractCase 'package-windows-locale' -NestedLocaleManifestPath 'locales\ko-KR.json'

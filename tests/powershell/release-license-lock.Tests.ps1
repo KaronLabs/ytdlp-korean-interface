@@ -411,12 +411,16 @@ function New-TestFixture {
         $lockCandidateFiles += [ordered]@{ path = $canonicalPath; length = $entry.length; sha256 = $entry.sha256.ToLowerInvariant(); package = $package; licenseConcluded = (@($components | Where-Object id -eq $package)[0].licenseConcluded) }
     }
     $lockCandidateFiles += [ordered]@{ path = 'candidate-manifest.json'; length = [long](Get-Item $candidateManifestPath).Length; sha256 = Get-TestSha256 $candidateManifestPath; package = 'release-metadata'; licenseConcluded = 'CC0-1.0' }
+    Write-TestText (Join-Path $repo 'release\packaging-documents.txt') "packaging documents for the sealed candidate`n"
+    & git -c core.autocrlf=false -C $repo add -- release/packaging-documents.txt
+    & git -c core.autocrlf=false -c user.name='Karon Test' -c user.email='karon-test@example.invalid' -C $repo commit -q -m packaging
+    $packagingCommit = ((& git -C $repo rev-parse HEAD) | Out-String).Trim().ToLowerInvariant()
     $template = Join-Path $root 'license-template.json'
     Write-TestJson $template ([ordered]@{
         schemaVersion = 'karon-license-lock/v2'
         release = [ordered]@{
             tag = $script:Tag; platform = 'win-x64'; verificationStatus = 'NOT_VERIFIED'; blockers = @('stale-lock-is-not-authority')
-            metadataPackage = [ordered]@{ id = 'release-metadata'; name = 'Karon release metadata'; version = '2.19.1-karon.2'; licenseExpression = 'CC0-1.0'; licenseConcluded = 'CC0-1.0'; sourceCommit = $applicationCommit; downloadLocation = ('https://example.test/application/archive/' + $applicationCommit + '.zip') }
+            metadataPackage = [ordered]@{ id = 'release-metadata'; name = 'Karon release metadata'; version = '2.19.1-karon.2'; licenseExpression = 'CC0-1.0'; licenseConcluded = 'CC0-1.0'; sourceCommit = $packagingCommit; packagingCommit = $packagingCommit; downloadLocation = ('https://example.test/application/archive/' + $packagingCommit + '.zip') }
             candidateFiles = $lockCandidateFiles
         }
         components = $components
@@ -433,7 +437,7 @@ function New-TestFixture {
         SevenZipRuntime = $sevenZipRuntime; SevenZipSource = $sevenZipSource; SevenZipWrapper = $sevenZipConsumerSource; SevenZipVerification = $sevenZipVerification
         GuiSummary = $guiSummary; GuiEvidence = $guiEvidence; GuiSchema = $guiSchema
         CorrespondingSources = $prebuiltSources; Spdx = $prebuiltSpdx; RootNotices = $rootNotices; ReleaseNotes = $releaseNotes
-        ApplicationCommit = $applicationCommit; ApplicationTree = $applicationTree
+        ApplicationCommit = $applicationCommit; ApplicationTree = $applicationTree; PackagingCommit = $packagingCommit
     }
 }
 
@@ -1135,6 +1139,25 @@ Describe 'final verified release license lock integrator' {
         $fixture = New-TestFixture 'deno-case-collision-remand' -DenoCaseCollision
         Assert-TestRejected $fixture 'release_license_lock_deno_case_collision'
     }
+    It 'binds release metadata to the committed packaging document rather than the sealed application source' {
+        $fixture = New-TestFixture 'metadata-packaging-commit'
+        $fixture.PackagingCommit | Should -Not -Be $fixture.ApplicationCommit
+        Invoke-TestBuilder $fixture | Out-Null
+        $lock = Read-TestJson $fixture.Output
+        $lock.release.metadataPackage.sourceCommit | Should -Be $fixture.PackagingCommit
+        $lock.release.metadataPackage.packagingCommit | Should -Be $fixture.PackagingCommit
+        $lock.release.metadataPackage.downloadLocation | Should -Be ('https://example.test/application/archive/' + $fixture.PackagingCommit + '.zip')
+        @($lock.components | Where-Object id -eq 'application')[0].sourceCommit | Should -Be $fixture.ApplicationCommit
+    }
+
+    It 'rejects the candidate-source URL as the packaging metadata download location' {
+        $fixture = New-TestFixture 'metadata-candidate-url'
+        $template = Read-TestJson $fixture.Template
+        $template.release.metadataPackage.downloadLocation = 'https://example.test/application/archive/' + $fixture.ApplicationCommit + '.zip'
+        Write-TestJson $fixture.Template $template
+        Assert-TestRejected $fixture 'release_license_lock_metadata_provenance_mismatch'
+    }
+
     It 'writes deterministic canonical UTF-8 only after deriving verified status' {
         $fixture = New-TestFixture 'happy'
         $second = Join-Path $fixture.Root 'generated-license-lock-second.json'
