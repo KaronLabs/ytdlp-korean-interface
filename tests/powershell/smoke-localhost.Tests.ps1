@@ -13,14 +13,22 @@ function New-FixtureRoot { $path = Join-Path ([IO.Path]::GetTempPath()) ('localh
 
 function New-FixtureBuildAttestation {
     return [ordered]@{
-        source = [ordered]@{ commit = ('1' * 40); dirty = $false; treeSha256 = ('2' * 64); trackedFileCount = 1 }
+        source = [ordered]@{ commit = ('1' * 40); tree = ('2' * 40); dirty = $false; treeSha256 = ('2' * 64); trackedFileCount = 1 }
         dependencyArchive = [ordered]@{
-            name = 'ytdlp-interface dependencies.7z'; sha256 = '41004108B9FC41454A97B97850C4E41D537F226A27255E8213ABD14BFFFFEBD3'
+            name = 'ytdlp-interface dependencies.7z'; sha256 = 'F2CF2203E0F9DA8F4E3BB84977DB85F3FCA3C4EA14BE2E7913FEB42CF28CED85'
             bit7zSource = [ordered]@{
                 version = '4.1.0'; commit = 'c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742'; license = 'MPL-2.0'
                 sourceUrl = 'https://github.com/rikyoz/bit7z/archive/c81c6c1cbf44e148cd4b06f4bb69d7ea1e299742.zip'
                 sourceSha256 = '6AF52B2E1B9895E8F1193728880206326161940E7A961E3162EC39752DBB3379'
                 sourceTreeStatus = 'MPL-2.0-permitted modified subset'; provenancePath = 'bit7z/KARON_DEPENDENCY_PROVENANCE.json'
+                cpmBootstrap = [ordered]@{
+                    version = '0.42.3'; tag = 'v0.42.3'; commit = '49acea0d775087ace0522ee4cc5de45e3da094a8'
+                    sourceUrl = 'https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.42.3/CPM.cmake'
+                    sourceSha256 = 'A609E875FD532B067174250F6ABBC3DAC22FE2D64869783FB1E80BDA1625C844'
+                    path = 'cmake/CPM_0.42.3.cmake'
+                    repositoryRawUrl = 'https://raw.githubusercontent.com/cpm-cmake/CPM.cmake/49acea0d775087ace0522ee4cc5de45e3da094a8/cmake/CPM.cmake'
+                    repositoryRawSha256 = '3DD51370ACE79FE042E3A223B1EF98FB37D98D93ABA97B72F7CBBCC11D1B38FE'
+                }
             }
         }
         linkerInputs = @(
@@ -44,7 +52,7 @@ function New-FixtureBuildAttestation {
             $executable = if ($_ -like 'libjpeg-turbo*' -or $_ -like 'bit7z*') { 'cmake.exe' } else { 'MSBuild.exe' }
             $msbuild = @('/m', '/t:Build', '/p:Configuration=Release', '/p:Platform=x64', '/p:PlatformToolset=v143', '/p:ImportDirectoryBuildProps=false', '/p:ImportDirectoryBuildTargets=false', '/p:UserRootDir=<hermetic-user-root>\', '/p:VCToolsVersion=14.40.1', '/p:WindowsTargetPlatformVersion=10.0.1')
             $arguments = switch ($_) {
-                'bit7z Release x64 configure' { @('-S', '<source>\bit7z', '-B', '<source>\bit7z\out\build\x64-Release', '-G', 'Visual Studio 17 2022', '-A', 'x64', '-T', 'v143', '-DCMAKE_VS_GLOBALS=ImportDirectoryBuildProps=false;ImportDirectoryBuildTargets=false;UserRootDir=<hermetic-user-root>\;VCToolsVersion=14.40.1;WindowsTargetPlatformVersion=10.0.1', '-DBIT7Z_CUSTOM_7ZIP_PATH=<source>\bit7z\lib\7zSDK', '-DBIT7Z_USE_NATIVE_STRING=ON', '-DBIT7Z_PATH_SANITIZATION=ON', '-DBIT7Z_REGEX_MATCHING=ON', '-DBIT7Z_STATIC_RUNTIME=ON', '-DCMAKE_CXX_FLAGS=/utf-8', '-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE=<source>\bit7z\bin\x64') }
+                'bit7z Release x64 configure' { @('-S', '<source>\bit7z', '-B', '<source>\bit7z\out\build\x64-Release', '-G', 'Visual Studio 17 2022', '-A', 'x64', '-T', 'v143', '-DCMAKE_VS_GLOBALS=ImportDirectoryBuildProps=false;ImportDirectoryBuildTargets=false;UserRootDir=<hermetic-user-root>\;VCToolsVersion=14.40.1;WindowsTargetPlatformVersion=10.0.1', '-DBIT7Z_CUSTOM_7ZIP_PATH=<source>\bit7z\lib\7zSDK', '-DCPM_DOWNLOAD_LOCATION=<source>\bit7z\cmake\CPM_0.42.3.cmake', '-DBIT7Z_USE_NATIVE_STRING=ON', '-DBIT7Z_PATH_SANITIZATION=ON', '-DBIT7Z_REGEX_MATCHING=ON', '-DBIT7Z_STATIC_RUNTIME=ON', '-DCMAKE_CXX_FLAGS=/utf-8', '-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE=<source>\bit7z\bin\x64') }
                 'bit7z Release x64 build' { @('--build', '<source>\bit7z\out\build\x64-Release', '--config', 'Release', '--target', 'bit7z', '--', '/m', '/p:PlatformToolset=v143') }
                 'Nana Release x64 build' { @('<source>\nana\build\vc2022\nana.sln') + $msbuild }
                 'libpng Release x64 build' { @('<source>\libpng\libpng.sln') + $msbuild + @('/p:OutDir=<source>\libpng\x64\Release\') }
@@ -74,12 +82,14 @@ function New-MinimalSealedCandidate {
     $manifest = [ordered]@{
         schemaVersion = 1
         createdAtUtc = '2026-08-14T00:00:00.0000000Z'
+        applicationSourceCommit = ('1' * 40)
+        applicationSourceTree = ('2' * 40)
         attestation = New-FixtureBuildAttestation
         versions = [ordered]@{ product = '2.19.1.0'; ytdlp = '2026.08.13'; ffmpeg = 'fixture'; ffprobe = 'fixture'; deno = 'fixture' }
         files = @([ordered]@{ path = 'ytdlp-interface.json'; sha256 = (Get-FileHash -LiteralPath $settingsPath -Algorithm SHA256).Hash; length = $item.Length })
     }
     $manifestPath = Join-Path $candidate 'candidate-manifest.json'
-    [IO.File]::WriteAllText($manifestPath, ($manifest | ConvertTo-Json -Depth 5), [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($manifestPath, ($manifest | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
     return [pscustomobject]@{ Root = $candidate; SettingsPath = $settingsPath; ManifestPath = $manifestPath; Manifest = $manifest }
 }
 
@@ -299,7 +309,7 @@ function Test-SmokeExecutionCopyPreservesSealedCandidate {
         $settingsPath = Join-Path $candidate 'ytdlp-interface.json'
         [IO.File]::WriteAllText($settingsPath, '{"outpath":"C:\\old","proxy":"preserve"}', [Text.UTF8Encoding]::new($false))
         $file = Get-Item -LiteralPath $settingsPath
-        $manifest = [ordered]@{ schemaVersion = 1; createdAtUtc = '2026-08-14T00:00:00.0000000Z'; attestation = New-FixtureBuildAttestation; versions = [ordered]@{ product = '2.19.1.0'; ytdlp = '2026.08.13'; ffmpeg = 'fixture'; ffprobe = 'fixture'; deno = 'fixture' }; files = @([ordered]@{ path = 'ytdlp-interface.json'; sha256 = (Get-FileHash -LiteralPath $settingsPath -Algorithm SHA256).Hash; length = $file.Length }) }
+        $manifest = [ordered]@{ schemaVersion = 1; createdAtUtc = '2026-08-14T00:00:00.0000000Z'; applicationSourceCommit = ('1' * 40); applicationSourceTree = ('2' * 40); attestation = New-FixtureBuildAttestation; versions = [ordered]@{ product = '2.19.1.0'; ytdlp = '2026.08.13'; ffmpeg = 'fixture'; ffprobe = 'fixture'; deno = 'fixture' }; files = @([ordered]@{ path = 'ytdlp-interface.json'; sha256 = (Get-FileHash -LiteralPath $settingsPath -Algorithm SHA256).Hash; length = $file.Length }) }
         $manifestPath = Join-Path $candidate 'candidate-manifest.json'
         [IO.File]::WriteAllText($manifestPath, ($manifest | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
         $sealedHash = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash
@@ -335,7 +345,7 @@ function Test-SmokeWorkspaceUsesDownloadsContainedRunRoot {
 function Test-DependencyArchiveAndRuntimeVerificationBoundaries {
     $manifest = Get-Content -LiteralPath (Join-Path $repositoryRoot 'tools/dependency-archives.json') -Raw | ConvertFrom-Json
     Assert-Equal 'ytdlp-interface dependencies.7z' $manifest.archives[0].name 'The reviewed dependency archive name must be fixed.'
-    Assert-Equal '41004108B9FC41454A97B97850C4E41D537F226A27255E8213ABD14BFFFFEBD3' $manifest.archives[0].sha256 'The reviewed dependency archive hash must be fixed.'
+    Assert-Equal 'F2CF2203E0F9DA8F4E3BB84977DB85F3FCA3C4EA14BE2E7913FEB42CF28CED85' $manifest.archives[0].sha256 'The reviewed dependency archive hash must be fixed.'
     Assert-True (Test-ArchiveEntrySafe -Entry 'nana/include/nana/gui.hpp' -ExpectedRoots @('bit7z', 'nana', 'libpng', 'libjpeg-turbo-3.1.2')) 'Expected dependency paths must be accepted.'
     Assert-False (Test-ArchiveEntrySafe -Entry '..\parent\overwrite' -ExpectedRoots @('bit7z')) 'Archive traversal must be rejected.'
     Assert-False (Test-ArchiveEntrySafe -Entry 'C:\absolute\overwrite' -ExpectedRoots @('bit7z')) 'Absolute archive paths must be rejected.'
@@ -364,14 +374,23 @@ function Test-IsolatedBuildSourceExcludesExistingDependencyRoots {
         $source = Join-Path $root 'source'; $workspace = Join-Path $root 'workspace'
         [IO.Directory]::CreateDirectory($source) | Out-Null
         [IO.File]::WriteAllText((Join-Path $source 'tracked.txt'), 'trusted-source', [Text.Encoding]::ASCII)
-        foreach ($name in @('bit7z', 'nana', 'libpng', 'libjpeg-turbo-3.1.2', '.git')) {
+        foreach ($name in @('bit7z', 'nana', 'libpng', 'libjpeg-turbo-3.1.2')) {
             $path = Join-Path $source $name; [IO.Directory]::CreateDirectory($path) | Out-Null
             [IO.File]::WriteAllText((Join-Path $path 'untrusted.txt'), 'must-not-copy', [Text.Encoding]::ASCII)
         }
         $command = Get-Command -Name New-IsolatedBuildSource -ErrorAction SilentlyContinue
         Assert-True ($null -ne $command) 'Candidate build must construct an isolated source tree before dependency extraction.'
         if ($null -ne $command) {
-            $isolated = New-IsolatedBuildSource -SourceRoot $source -WorkspaceRoot $workspace -DependencyRoots @('bit7z', 'nana', 'libpng', 'libjpeg-turbo-3.1.2') -TrackedPaths @('tracked.txt')
+            $git = (Get-Command git.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+            & $git -C $source init --quiet
+            if ($LASTEXITCODE -ne 0) { throw 'fixture_git_init_failed' }
+            & $git -C $source add -- tracked.txt
+            if ($LASTEXITCODE -ne 0) { throw 'fixture_git_add_failed' }
+            & $git -C $source -c user.name=Fixture -c user.email=fixture@example.invalid -c core.hooksPath=NUL commit --quiet -m fixture
+            if ($LASTEXITCODE -ne 0) { throw 'fixture_git_commit_failed' }
+            $commit = (& $git -C $source rev-parse HEAD).Trim()
+            if ($LASTEXITCODE -ne 0) { throw 'fixture_git_revision_failed' }
+            $isolated = New-IsolatedBuildSource -SourceRoot $source -WorkspaceRoot $workspace -DependencyRoots @('bit7z', 'nana', 'libpng', 'libjpeg-turbo-3.1.2') -Commit $commit -GitPath $git
             Assert-True (Test-Path -LiteralPath (Join-Path $isolated 'tracked.txt')) 'The isolated source tree must retain tracked source inputs.'
             foreach ($name in @('bit7z', 'nana', 'libpng', 'libjpeg-turbo-3.1.2', '.git')) { Assert-False (Test-Path -LiteralPath (Join-Path $isolated $name)) "The isolated source tree must exclude pre-existing $name." }
         }
@@ -435,7 +454,7 @@ function Test-SourceAttestationBindsGitRevisionAndWorktreeState {
             Assert-True (-not [string]::IsNullOrWhiteSpace($attestation.commit)) 'Source attestation must record a verified Git commit.'
             Assert-True $attestation.Contains('dirty') 'Source attestation must classify whether the worktree is dirty.'
             Assert-False ([bool]$attestation.dirty) 'A clean source attestation must record dirty=false.'
-            Assert-True ([string]$attestation.treeSha256 -match '^[A-F0-9]{64}$') 'Source attestation must bind exact tracked input bytes.'
+            Assert-Equal '0123456789012345678901234567890123456789' $attestation.tree 'Source attestation must bind the exact Git tree.'
         }
     }
     finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
@@ -1057,9 +1076,19 @@ function Test-BuildSourceMaterializesTrackedFilesOnly {
         [IO.File]::WriteAllText((Join-Path $source 'tracked.cpp'), 'tracked-source', [Text.Encoding]::ASCII)
         [IO.File]::WriteAllText((Join-Path $source 'ignored.obj'), 'ignored-build-artifact', [Text.Encoding]::ASCII)
         $command = Get-Command -Name New-IsolatedBuildSource -ErrorAction Stop
-        Assert-True ($command.Parameters.ContainsKey('TrackedPaths')) 'Build source materialization must accept the exact Git-tracked path set.'
-        if (-not $command.Parameters.ContainsKey('TrackedPaths')) { return }
-        $isolated = New-IsolatedBuildSource -SourceRoot $source -WorkspaceRoot $workspace -DependencyRoots @('dependencies') -TrackedPaths @('tracked.cpp')
+        Assert-True ($command.Parameters.ContainsKey('Commit')) 'Build source materialization must accept an immutable Git commit.'
+        Assert-True ($command.Parameters.ContainsKey('GitPath')) 'Build source materialization must use the selected Git executable.'
+        if (-not $command.Parameters.ContainsKey('Commit') -or -not $command.Parameters.ContainsKey('GitPath')) { return }
+        $git = (Get-Command git.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+        & $git -C $source init --quiet
+        if ($LASTEXITCODE -ne 0) { throw 'fixture_git_init_failed' }
+        & $git -C $source add -- tracked.cpp
+        if ($LASTEXITCODE -ne 0) { throw 'fixture_git_add_failed' }
+        & $git -C $source -c user.name=Fixture -c user.email=fixture@example.invalid -c core.hooksPath=NUL commit --quiet -m fixture
+        if ($LASTEXITCODE -ne 0) { throw 'fixture_git_commit_failed' }
+        $commit = (& $git -C $source rev-parse HEAD).Trim()
+        if ($LASTEXITCODE -ne 0) { throw 'fixture_git_revision_failed' }
+        $isolated = New-IsolatedBuildSource -SourceRoot $source -WorkspaceRoot $workspace -DependencyRoots @('dependencies') -Commit $commit -GitPath $git
         Assert-True (Test-Path -LiteralPath (Join-Path $isolated 'tracked.cpp')) 'Tracked source must be materialized.'
         Assert-False (Test-Path -LiteralPath (Join-Path $isolated 'ignored.obj')) 'Ignored build artifacts must not enter the isolated source tree.'
     }
