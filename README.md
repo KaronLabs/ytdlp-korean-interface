@@ -1,600 +1,170 @@
-# ytdlp-korean-interface 🇰🇷
+# ytdlp-korean-interface
 
-**`ytdlp-interface` v2.19.1 기반의 한국어 UI 복구·개선 프로젝트입니다.** 
-```text
-실제 다운로드 엔진은 [yt-dlp](https://github.com/yt-dlp/yt-dlp), 
-Windows GUI의 직접적인 upstream은 [ErrorFlynn/ytdlp-interface]
-(https://github.com/ErrorFlynn/ytdlp-interface)입니다.
-```
+**명령어 대신 클릭으로. 한국어로 사용하는 Windows용 영상·음악 다운로더.**
 
-## 먼저 다운로드하세요
+yt-dlp를 한국어 화면에서 사용할 수 있도록 만든 Windows용 GUI입니다.
+영상 주소를 넣고 화질을 고르면 다운로드와 필요한 영상·음성 병합을 처리합니다.
 
-일반 사용자께서는 **[기존 `v2.19.1-karon.1` 안정 릴리스](https://github.com/KaronLabs/ytdlp-korean-interface/releases/tag/v2.19.1-karon.1)**의 Assets에서 **`*-win-x64.zip`**을 선택해 주세요. **폴더 전체를 압축 해제**한 뒤 그 안의 **`ytdlp-interface.exe`**를 실행해 주세요.
+## 다운로드
 
-앱 실행용으로는 `corresponding-sources` 묶음, `SPDX` 파일, GitHub의 **Source code (zip)** 또는 **Code → Download ZIP**을 받지 마세요. **약 2.5GB 소스 묶음은 앱 실행용 ZIP이 아닙니다.** 제3자 소스·라이선스 자료는 개발·재배포용으로 별도 제공되며, 일반 사용자께서 앱 실행을 위해 따로 받으실 필요는 없습니다.
+### [Windows x64 실행용 ZIP 다운로드 — 약 188MB](https://github.com/KaronLabs/ytdlp-korean-interface/releases/download/v2.19.1-karon.2/ytdlp-korean-interface-v2.19.1-karon.2-win-x64.zip)
 
-**다음 버전 `v2.19.1-karon.2`: 준비 / HOLD (아직 공개되지 않았습니다).** 면제되지 않은 릴리스 검증·승인 조건을 충족한 뒤 공개할 예정입니다.
+**Download for Windows (x64)** · 현재 공개 버전: **`v2.19.1-karon.2`**
 
-[![윈도우 실행판 바로 다운로드](docs/win-downlaod-here.png)](https://github.com/KaronLabs/ytdlp-korean-interface/releases/download/v2.19.1-karon.1/ytdlp-korean-interface-v2.19.1-karon.1-win-x64.zip)
+**일반 사용자는 이 ZIP 하나만 받으시면 됩니다.**
 
+파일 이름: `ytdlp-korean-interface-v2.19.1-karon.2-win-x64.zip`
 
-🌞🌞🌞
+[릴리즈 안내 및 SHA-256 확인](https://github.com/KaronLabs/ytdlp-korean-interface/releases/tag/v2.19.1-karon.2)
 
-**Download for Windows (x64)**  
-[`ytdlp-korean-interface-v2.19.1-karon.1-win-x64.zip`](https://github.com/KaronLabs/ytdlp-korean-interface/releases/download/v2.19.1-karon.1/ytdlp-korean-interface-v2.19.1-karon.1-win-x64.zip)  
-[Release notes & SHA-256](https://github.com/KaronLabs/ytdlp-korean-interface/releases/tag/v2.19.1-karon.1)
+> `corresponding-sources`, `SPDX`, GitHub의 **Source code (zip)** 및 **Code → Download ZIP**은 실행용이 아닙니다.
+> 소스 묶음까지 받으실 필요는 없습니다. 프로그램 대신 개발 창고를 받게 됩니다.
 
-> ⚠️ GitHub의 **Code → Download ZIP**은 약 8.8MB의 **소스 코드**입니다. 바로 실행할 Windows 버전은 위 **큰 배너**를 누르세요.
->
-> ✅ 사용 방법: **배너 클릭 → 압축 해제 → `ytdlp-interface.exe` 실행**
+## 처음 사용하는 방법
 
-![Platform](https://img.shields.io/badge/platform-Windows-blue)
-![Language](https://img.shields.io/badge/language-C%2B%2B-00599C)
-![Locale](https://img.shields.io/badge/locale-ko--KR-success)
-![Application source license](https://img.shields.io/badge/application%20source-MIT-green)
+1. 위 **Windows x64 실행용 ZIP**을 다운로드합니다.
+2. ZIP **전체를 한 폴더에 압축 해제**합니다. 압축 파일 안에서 바로 실행하지 마세요.
+3. 폴더 안의 **`ytdlp-interface.exe`**를 실행합니다.
+4. 다운로드할 영상 주소를 입력합니다.
+5. 다운로드 종류와 화질, 저장 위치를 선택합니다. 처음이라면 **동영상 / 최대 1080p**부터 사용해 보세요.
+6. **다운로드 예정 화질**을 확인한 뒤 다운로드를 시작합니다. 완료된 파일은 선택한 저장 위치에서 확인합니다.
 
-> **Upstream baseline:** `ErrorFlynn/ytdlp-interface v2.19.1`  
-> **Primary locale:** `ko-KR`  
-> **Fallback locale:** `en-US`
+FFmpeg·ffprobe·Deno 등 실행에 필요한 구성요소가 함께 들어 있습니다.
+**EXE만 따로 옮기지 말고 압축을 푼 폴더 전체를 유지해 주세요.**
 
-## 화질 프리셋 개선 (다음 릴리스 후보)
+## 주요 기능
 
-이 브랜치는 개별 영상과 대기열에 **동영상 / 오디오 / 고급** 선택과 **최대 1080p / 최대 720p / 최고 화질** 프리셋을 추가합니다. 위 다운로드 링크의 기존 `v2.19.1-karon.1` 배포본에는 이 기능이 포함되지 않습니다. 새 실행 파일은 독립 검증을 통과한 뒤 게시합니다.
-
-| 선택 | 동작 |
+| 기능 | 이렇게 사용합니다 |
 | --- | --- |
-| 동영상 / 최대 1080p | 현재 접근 가능한 형식에서 1080p 이하 영상과 음성을 선택합니다. |
-| 동영상 / 최대 720p | 현재 접근 가능한 형식에서 720p 이하 영상과 음성을 선택합니다. |
-| 동영상 / 최고 화질 | 해상도 상한 없이 영상과 음성을 선택합니다. |
-| 오디오 | 기존 MP3 변환 기능을 사용합니다. |
-| 고급 | 기존 수동 형식, 사용자 지정 인수, 외부 yt-dlp 설정을 사용합니다. |
+| 한국어 인터페이스 | 메뉴와 설정을 한국어로 사용합니다. 영어도 지원합니다. |
+| 간단한 화질 선택 | 최대 1080p, 최대 720p, 최고 화질 중 선택합니다. |
+| 음악만 저장 | 오디오 모드에서 MP3로 변환합니다. |
+| 영상·음성 병합 | 따로 제공되는 영상과 음성을 동봉된 FFmpeg로 합칩니다. |
+| 다운로드 대기열 | 여러 작업을 등록하고 작업별 다운로드 정책을 유지합니다. |
+| 고급 설정 | 형식 직접 선택, 사용자 지정 인수, 외부 yt-dlp 설정 등 기존 기능을 사용합니다. |
 
-- 신규 사용자는 동영상 / 최대 1080p가 기본입니다. 기존 사용자는 설정을 바꾸지 않는 고급 모드로 복원하며, 기본 모드로 직접 전환할 수 있습니다.
-- 기본 모드는 외부 설정과 사용자 지정 인수를 적용하지 않습니다. 기존 인수를 삭제하지 않으며 고급 모드에서 다시 사용할 수 있습니다.
-- 고화질 영상과 음성이 따로 제공되면 FFmpeg로 합칩니다. MP4만 강제하지 않고 코덱에 맞는 저장 형식을 자동으로 선택하므로 WebM 또는 MKV가 나올 수도 있습니다.
-- 화질 숫자는 가로와 세로 중 작은 변을 기준으로 합니다. 제공되지 않는 해상도로 확대하거나 영상을 자동 재인코딩하지 않습니다.
-- 화면의 다운로드 예정 화질을 확인하세요. 일부 형식만 조회된 상태를 원본의 최대 화질이라고 단정하지 않습니다.
-- 재생목록과 라이브는 1차 프리셋 적용 범위 밖이며 기존 고급 기능으로 이용합니다.
+## 어떤 화질을 고르면 되나요?
 
-자세한 변경 범위와 검증 조건은 [화질 프리셋 구현 계획](docs/superpowers/plans/2026-09-16-quality-presets.md)을 참고하세요.
+| 선택 | 추천 상황 | 동작 |
+| --- | --- | --- |
+| **최대 1080p** | 처음 사용하거나 일반적인 영상 감상 | 현재 접근 가능한 형식에서 1080p 이하의 영상과 음성을 선택합니다. 신규 사용자 기본값입니다. |
+| **최대 720p** | 파일 용량을 줄이고 싶을 때 | 현재 접근 가능한 형식에서 720p 이하의 영상과 음성을 선택합니다. |
+| **최고 화질** | 해상도 상한 없이 받고 싶을 때 | 현재 접근 가능한 형식 중 최고 화질을 선택합니다. 파일이 커질 수 있습니다. |
+| **오디오 / MP3** | 음악이나 강의의 소리만 필요할 때 | 영상을 저장하는 대신 음성을 MP3로 변환합니다. |
+| **고급** | 형식과 옵션을 직접 지정하고 싶을 때 | 기존 수동 선택과 사용자 지정 설정을 사용합니다. |
 
----
+**1080p가 없는 영상이 1080p로 만들어지는 것은 아닙니다.**
+원하는 해상도보다 낮은 형식만 확인되면 그에 맞는 예정 화질이 표시됩니다.
+상한을 초과하는 형식이나 필요한 음성을 확인할 수 없는 경우에는 안내를 확인하고 선택을 바꿔 주세요.
+화질 숫자는 가로·세로 중 작은 변을 기준으로 하며, 해상도를 높이기 위한 자동 재인코딩은 하지 않습니다.
+
+기본 모드는 화면에서 선택한 설정을 사용하며, 사용자 지정 인수와 외부 yt-dlp 설정은 적용하지 않습니다.
+기존 사용자 설정은 고급 모드로 보존됩니다. 기본 프리셋을 사용하려면 직접 기본 모드로 전환해 주세요.
+
+## 자주 묻는 질문
+
+### 파일이 많은데 무엇을 받아야 하나요?
+
+이름이 **`-win-x64.zip`**으로 끝나는 파일만 받으시면 됩니다.
+대응 소스는 개발·재배포용이고, SPDX는 구성요소와 라이선스 정보입니다. 일반적인 실행에는 필요하지 않습니다.
+
+### 형식 목록에 360p만 보이는 것 같은데요?
+
+영상과 음성이 **한 파일로 합쳐진 형식**에는 낮은 해상도만 있을 수 있습니다.
+더 높은 화질이 **영상 전용 형식**으로 따로 제공되는 경우도 있습니다.
+목록의 첫 줄만 보고 최대 화질로 생각하지 마시고, 기본 모드에서 프리셋을 선택한 뒤 **다운로드 예정 화질**을 확인해 주세요.
+
+원하는 화질이 조회되지 않는 이유는 영상 자체의 제공 형식, 접근 권한, 사이트 변경 등으로 달라질 수 있습니다.
+항상 1080p 이상을 보장하지는 않습니다.
+
+### MP4가 아니라 WebM이나 MKV가 저장됐어요.
+
+정상일 수 있습니다. 화질을 낮춰 MP4에 맞추는 대신, 선택한 영상·음성 코덱에 적합한 저장 형식을 사용합니다.
+MP4만 항상 생성되는 것은 아니며, 모든 재생기에서 같은 코덱을 지원하는 것도 아닙니다.
+
+### 다운로드가 100%인데 아직 처리 중이에요.
+
+영상·음성 병합, MP3 변환 또는 최종 파일 확인이 남아 있을 수 있습니다.
+특히 긴 영상의 오디오 변환은 시간이 걸립니다. 출력 로그의 진행 상태를 확인해 주세요.
+
+### EXE만 바탕화면으로 옮겨도 되나요?
+
+실행에 필요한 다른 파일을 찾지 못할 수 있습니다. **폴더 전체를 유지하고 EXE의 바로가기를 만드시는 편이 좋습니다.**
+
+### 특정 사이트나 영상에서 다운로드가 실패해요.
+
+사이트 변경, 네트워크, 로그인·접근 제한 등 여러 원인이 있을 수 있습니다.
+오류가 나면 주소와 선택한 모드, 출력 로그의 오류 내용을 확인해 주세요.
+문제를 제보할 때 쿠키·인증 정보·개인 경로 등 민감한 내용은 지워 주세요.
+
+[문제 제보하기](https://github.com/KaronLabs/ytdlp-korean-interface/issues)
 
 ## 이 프로젝트는 무엇인가요?
 
-이 저장소는 `yt-dlp`를 새로 구현한 프로젝트가 아닙니다.
+세 프로젝트의 역할은 다음과 같습니다.
 
-구조를 단순하게 보면 이렇습니다.
+| 프로젝트 | 역할 |
+| --- | --- |
+| [yt-dlp](https://github.com/yt-dlp/yt-dlp) | 사이트 분석과 미디어 다운로드를 담당하는 엔진 |
+| [ErrorFlynn/ytdlp-interface](https://github.com/ErrorFlynn/ytdlp-interface) | yt-dlp를 화면에서 조작하는 Windows GUI. 이 저장소의 직접적인 upstream |
+| **KaronLabs/ytdlp-korean-interface** | `ytdlp-interface v2.19.1`을 기반으로 한국어 UI와 화질 선택, 설정·대기열 흐름을 개선한 파생 프로젝트 |
 
-```text
-yt-dlp
-└─ 실제 사이트 분석 / 미디어 다운로드 엔진
+**yt-dlp 엔진을 새로 만든 프로젝트가 아니며, yt-dlp 또는 ErrorFlynn의 공식 배포판도 아닙니다.**
+원본 개발자와 기여자들의 작업을 바탕으로 유지보수합니다.
 
-ErrorFlynn/ytdlp-interface
-└─ yt-dlp를 편하게 쓰기 위한 Windows C++ GUI
+## 알아두실 점
 
-KaronLabs/ytdlp-korean-interface
-└─ ytdlp-interface v2.19.1 기반
-   ├─ 기존 한국어 UI 동작을 유지보수 가능한 C++ 소스로 복구
-   ├─ ko-KR localization catalog
-   ├─ 번역 문자열과 내부 상태 로직 분리
-   ├─ 안전한 English fallback
-   ├─ 설정 복구 / 마이그레이션
-   ├─ 검증 가능한 yt-dlp 업데이트 + rollback
-   └─ Windows GUI / localhost E2E 검증 도구
-```
+- 배포 대상은 **Windows x64**입니다. macOS·Linux용 GUI는 제공하지 않습니다.
+- 한국어(`ko-KR`)와 영어(`en-US`)를 지원합니다.
+- 새 기본 화질 프리셋은 개별 영상과 대기열 작업에 적용합니다. **재생목록과 라이브**는 기존 고급 기능으로 이용해 주세요.
+- 이용할 권한이 있는 콘텐츠에 사용해 주세요.
+- 이번 릴리즈는 자동 계약 테스트와 배포 자산의 다운로드 일치 확인을 완료했습니다.
+- **한국어·영어 및 100%·150%·200% 배율의 GUI 전체 수동검증은 소유자 결정으로 생략했습니다(`WAIVED_BY_OWNER`).** 전체 GUI 검증 완료를 의미하지 않습니다.
 
-이 프로젝트의 출발점은 **이미 존재하던 한국어 커스텀 실행 파일의 동작을 그냥 바이너리로만 보존하지 말고, 앞으로 수정·빌드·검증할 수 있는 소스 형태로 복구하자**는 것이었습니다.
+## 라이선스와 개발 정보
 
-현재 소스 기준선은 다음과 같습니다.
+**애플리케이션 소스는 MIT License**입니다. [LICENSE](LICENSE)를 확인해 주세요.
 
-- **Upstream:** `ErrorFlynn/ytdlp-interface`
-- **Baseline:** `v2.19.1`
-- **Upstream commit:** `2173316ebb5e50af49a2a4e939693fa8c3a3459c`
-- **Primary locale:** `ko-KR`
-- **Fallback locale:** `en-US`
+함께 배포되는 제3자 구성요소에는 각각의 라이선스가 적용됩니다.
+이번 릴리즈의 PyInstaller 기반 `yt-dlp.exe` 결합 실행 파일은 **GPL-3.0-or-later**이며, yt-dlp 원본 소스는 Unlicense입니다.
+실행용 ZIP 전체에 MIT만 적용되는 것으로 보시면 안 됩니다.
 
-프로젝트 이름은 단순한 “한글판”처럼 생겼는데, 작업하다 보니 번역 파일 하나 때문에 테스트와 rollback과 provenance가 줄줄이 따라왔습니다. 작은 일이었는데 작지 않게 됐습니다.
+[제3자 구성요소 고지](THIRD-PARTY-NOTICES.txt) · [현재 릴리즈와 대응 소스](https://github.com/KaronLabs/ytdlp-korean-interface/releases/tag/v2.19.1-karon.2)
 
----
+대응 소스가 필요한 개발·재배포 사용자는 릴리즈의 `corresponding-sources.zip.part0001`부터 모든 분할 파일과 `.restore.ps1`, `.restore.txt`, `.transport.json`을 함께 받으신 뒤, 동봉된 복원 안내를 따라 주세요.
 
-## 주요 변경점
+<details>
+<summary>개발·기여 및 프로젝트 기록</summary>
 
-단순히 영어 문자열을 찾아서 한국어로 치환한 버전은 아닙니다.
+### 원본과 기여 기록
 
-### 🇰🇷 한국어 UI 복구
+- [NOTICE](NOTICE): 원본 프로젝트와 계보 안내
+- [PROVENANCE.md](PROVENANCE.md): upstream 기준선과 프로젝트 이력
+- [ATTRIBUTION.md](ATTRIBUTION.md): 기여 표기 안내
+- [CITATION.cff](CITATION.cff): 인용 메타데이터
+- [원산지 기록 정정 절차](docs/provenance-dispute-response.md)
 
-기존 한국어 배포판에서 확인된 **524개 번역 키**를 기준으로 UI 문자열을 복구했습니다.
+### 개발과 검증
 
-번역 catalog는 다음 파일에서 관리합니다.
+Visual Studio 솔루션은 `ytdlp-interface/ytdlp-interface.sln`이며, 빌드 대상은 **Release / x64**입니다.
+의존성 구성은 [직접 upstream의 안내](https://github.com/ErrorFlynn/ytdlp-interface)와 저장소의 빌드 도구를 참고하세요.
 
-```text
-locales/ko-KR.json
-```
+- [설정 복구 및 yt-dlp 유지보수 도구](docs/runtime-maintenance.md)
+- [화질 프리셋 설계와 구현 범위](docs/superpowers/plans/2026-09-16-quality-presets.md)
+- [현재 릴리즈 상세 안내](release/notes/v2.19.1-karon.2.md)
+- [GUI 수동검증 안내](release/validation/v2.19.1-karon.2/MANUAL-GUI-EVIDENCE-GUIDE.md)
+- [자동 검증 워크플로](https://github.com/KaronLabs/ytdlp-korean-interface/actions)
 
-주요 적용 범위:
-
-- 메인 화면
-- 설정
-- 다운로드 형식 선택
-- 재생목록
-- 자막
-- 구간 다운로드
-- 다운로드 큐
-- 출력 로그
-- 메시지 박스
-- 업데이트 관련 메시지
-
-영어 원문은 C++ call site에 fallback으로 남겨 둡니다. 따라서 한국어 catalog가 없거나 문제가 생겨도 UI 전체가 같이 쓰러지지 않습니다.
-
----
-
-### 🛡️ 번역 파일도 일단 의심합니다
-
-한국어 catalog를 무조건 신뢰하지 않습니다.
-
-로딩 과정에서 다음 항목을 검증합니다.
-
-- JSON 형식
-- UTF-8 유효성
-- `schemaVersion`
-- `ko-KR` locale
-- 번역 key 형식
-- 빈 문자열
-- placeholder 일치 여부
-- Nana GUI markup 구조
-
-예를 들어 영어 원문이:
-
-```text
-{current} of {total}
-```
-
-인데 번역자가 실수로 `{total}`을 없애버렸다면 잘못된 한국어 문자열을 그대로 사용하지 않습니다.
-
-```text
-Korean translation
-        ↓
-    validation
-   ┌────┴────┐
- valid      invalid
-   ↓           ↓
-한국어 표시   English fallback
-```
-
-번역 한 줄 잘못 썼다고 GUI 전체가 커널 패닉을 일으키는 것은 너무 억울하니까요.
-
----
-
-## 표시 문자열과 프로그램 상태를 분리했습니다
-
-로컬라이제이션에서 은근히 위험한 패턴 중 하나는 **화면에 보여주는 문자열을 프로그램 내부의 상태값으로도 사용하는 것**입니다.
-
-예를 들어 프로그램 판단이 이런 문자열에 의존한다면:
-
-```text
-done
-queue
-Audio only
-Video only
-```
-
-`done`을 `완료`로 번역한 순간 다운로드는 끝났는데 프로그램 혼자 “완료가 누구시죠?” 하고 멈출 수 있습니다.
-
-이 프로젝트에서는 이런 부분을 안정적인 내부 상태값으로 분리합니다.
-
-```cpp
-queue_item_state::queued
-queue_item_state::active
-queue_item_state::done
-queue_item_state::error
-```
-
-즉:
-
-```text
-화면에 보이는 글자
-        ≠
-프로그램이 판단하는 내부 상태
-```
-
-한국어 문구를 고쳤다고 다운로드 큐가 갑자기 자아를 잃어버리지 않게 하는 것이 목표입니다.
-
----
-
-## 🔄 Runtime maintenance
-
-저장소에는 `yt-dlp.exe`와 기존 설정을 안전하게 관리하기 위한 PowerShell 도구도 포함되어 있습니다.
-
-```text
-tools/runtime-maintenance.psm1
-```
-
-### `RepairSettings`
-
-오래된 환경에서 남아 있을 수 있는 다운로드 경로를 현재 Windows 사용자의 실제 Downloads Known Folder 기준으로 복구합니다.
-
-수정 범위는 의도적으로 좁게 잡혀 있으며, 관련 없는 설정까지 초기화하지 않도록 설계되어 있습니다.
-
-### `UpdateYtDlp`
-
-공식 `yt-dlp` nightly build를 대상으로 업데이트를 수행합니다.
-
-대략적인 흐름:
-
-```text
-공식 release 확인
-        ↓
-staging 다운로드
-        ↓
-SHA-256 검증
-        ↓
-버전 검증
-        ↓
-기존 executable 백업
-        ↓
-교체
-        ↓
-재검증
-        ↓
-provenance 기록
-```
-
-교체 이후 문제가 확인되면 이전 실행 파일로 rollback할 수 있도록 구성되어 있습니다.
-
-다운로더 하나 업데이트하는데 왜 금융감사 수준으로 확인하냐고 물으시면 할 말은 없습니다. 다만 금요일 밤에 깨진 `yt-dlp.exe`를 맨손으로 복구하는 것보다는 싸게 먹힙니다.
-
-자세한 내용은 [`docs/runtime-maintenance.md`](docs/runtime-maintenance.md)를 참고하세요.
-
----
-
-# 다운로드
-
-## ✅ KaronLabs Windows x64 Release
-
-첫 KaronLabs 공개 바이너리 릴리스가 나왔습니다.
-
-### [v2.19.1-karon.1 — GitHub Release](https://github.com/KaronLabs/ytdlp-korean-interface/releases/tag/v2.19.1-karon.1)
-
-Windows x64 사용자는 Release의 아래 ZIP을 받아 압축을 풀고 `ytdlp-interface.exe`를 실행하면 됩니다.
-
-```text
-ytdlp-korean-interface-v2.19.1-karon.1-win-x64.zip
-```
-
-이 릴리스는 정확히 다음 KaronLabs source commit에서 빌드되었습니다.
-
-```text
-c053c1edf5508b05beac1da27ddfcdbefd1bc2bd
-```
-
-공개 ZIP SHA-256:
-
-```text
-271664db6378be9ffe513b62f91cf90b849ab13bb9532a45096cee72bdaf9cc2
-```
-
-Release에는 `SHA256SUMS.txt`도 함께 제공됩니다. ZIP 내부의 `release-manifest.json`은 최종 배포 파일 전체의 SHA-256/크기, source/upstream 정보, 빌드 시점의 정확한 `yt-dlp` nightly identity를 기록합니다. 그보다 앞 단계의 sealed build provenance는 `candidate-manifest.json`에 남습니다.
-
-릴리스 파이프라인은 Windows x64 build, candidate seal, `127.0.0.1` 기반 MP3 artifact/runtime smoke, release package inventory, ZIP 구조, SHA-256을 모두 검증한 뒤에만 GitHub Release를 발행하도록 구성되어 있습니다. 발행 뒤에는 공개된 ZIP과 checksum 파일을 다시 내려받아 바이트 단위 checksum도 재확인합니다.
-
-예전 README에는 ErrorFlynn upstream의 실행 파일 링크가 이 프로젝트의 다운로드처럼 붙어 있었는데, 그 파일은 **KaronLabs 한국어 빌드가 아니라 upstream 원본 바이너리**였습니다. 이제 KaronLabs 바이너리는 위 canonical Release에서 별도로 배포합니다.
-
-### 원본 ytdlp-interface가 필요한 경우
-
-- [ErrorFlynn/ytdlp-interface](https://github.com/ErrorFlynn/ytdlp-interface)
-- [Upstream v2.19.1 Release](https://github.com/ErrorFlynn/ytdlp-interface/releases/tag/v2.19.1)
-
-> **주의**  
-> ErrorFlynn의 Release는 공식 upstream 빌드이고, 위 KaronLabs `v2.19.1-karon.1`은 그 upstream을 기반으로 한국어 복구·하드닝 작업을 포함해 별도로 빌드한 KaronLabs Release입니다.
-
----
-
-# 빌드
-
-이 프로젝트는 Windows C++ 프로젝트이며 Visual Studio solution을 포함하고 있습니다.
-
-```text
-ytdlp-interface/ytdlp-interface.sln
-```
-
-기본 검증 대상은 **Release / x64**입니다.
-
-## 주요 의존성
-
-- [Nana C++ GUI library](https://github.com/cnjinhao/nana)
-- [libjpeg-turbo](https://github.com/libjpeg-turbo/libjpeg-turbo)
-- libpng
-- [bit7z](https://github.com/rikyoz/bit7z)
-- [JSON for Modern C++](https://github.com/nlohmann/json)
-
-기존 upstream 프로젝트는 수정된 Nana 라이브러리를 사용하며 필요한 dependency archive가 이 저장소에도 포함되어 있습니다.
-
-```text
-ytdlp-interface dependencies.7z
-```
-
-archive를 `ytdlp-interface`와 같은 상위 디렉터리에 풀면 대략 다음 구조가 됩니다.
-
-```text
-workspace/
-├─ bit7z/
-├─ libjpeg-turbo-3.1.2/
-├─ libpng/
-├─ nana/
-└─ ytdlp-interface/
-```
-
-Visual Studio 프로젝트의 dependency 경로는 이 구조를 기준으로 합니다.
-
-upstream 빌드 절차와 dependency 구성은 [ErrorFlynn/ytdlp-interface](https://github.com/ErrorFlynn/ytdlp-interface)의 안내도 함께 참고하세요.
-
----
-
-# 테스트
-
-이 저장소에는 localization뿐 아니라 복구·빌드·runtime maintenance 동작을 확인하기 위한 여러 계층의 테스트가 포함되어 있습니다.
-
-처음엔 한국어 문자열 몇 개 고치려던 일이었는데 어느 순간 테스트 디렉터리가 본체를 감시하기 시작했습니다.
-
-## Repository contract tests
+저장소 계약 테스트:
 
 ```bash
 python tests/run_contract_tests.py
 ```
 
-주요 검증 항목:
+Native C++ 테스트는 `tests/native/`, PowerShell 테스트는 `tests/powershell/`에 있습니다.
 
-- `ko-KR.json` 구조
-- 번역 key 구성
-- 빈 번역 탐지
-- placeholder 일치
-- 번역 catalog와 C++ source reference 관계
-- runtime artifact가 source tree 경계를 침범하는지 여부
-- provenance 문서와 canonical repository/upstream 정보의 일관성
+### 이전 버전
 
-## Native C++ tests
-
-```text
-tests/native/
-```
-
-주요 검증 항목:
-
-- 정상 `ko-KR` catalog 로딩
-- 파일 없음 / 잘못된 JSON
-- 잘못된 UTF-8
-- 잘못된 locale / schema
-- placeholder mismatch
-- Nana markup 오류
-- English fallback
-- queue state persistence
-- 번역 문자열과 내부 상태 분리
-- 자막 fallback
-
-## PowerShell tests
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/run_powershell_tests.ps1
-```
-
-주요 대상:
-
-```text
-tools/runtime-maintenance.psm1
-tools/build-candidate.ps1
-tools/smoke-localhost.ps1
-```
-
----
-
-# Localhost E2E smoke test
-
-실제 YouTube 같은 외부 서비스 상태에 테스트 결과가 끌려다니지 않도록 localhost 기반 smoke test가 포함되어 있습니다.
-
-대략적인 흐름:
-
-```text
-FFmpeg로 테스트 영상 생성
-        ↓
-127.0.0.1 local HTTP server
-        ↓
-GUI에 URL 추가
-        ↓
-yt-dlp metadata 확인
-        ↓
-다운로드
-        ↓
-MP3 변환
-        ↓
-FFprobe 검증
-```
-
-검증 대상에는 다음이 포함됩니다.
-
-- GUI 시작
-- 한국어 UI 표시
-- metadata lookup
-- queue 처리
-- 다운로드
-- MP3 extraction
-- FFmpeg / FFprobe 처리
-- 최종 파일 생성
-- 임시 `.part` 파일 잔존 여부
-
-유튜브가 기침했다고 테스트가 같이 쓰러지면 어느 쪽 버그인지 알 수 없으니까 외부 인터넷은 가능한 한 재판에서 제외했습니다.
-
----
-
-# 저장소 구조
-
-```text
-.
-├─ locales/
-│  └─ ko-KR.json
-│
-├─ ytdlp-interface/
-│  ├─ i18n.cpp
-│  ├─ i18n.hpp
-│  ├─ state_tokens.hpp
-│  ├─ subtitle_entry.hpp
-│  ├─ gui.cpp
-│  ├─ queue.cpp
-│  ├─ forms/
-│  └─ ...
-│
-├─ tests/
-│  ├─ contract/
-│  ├─ native/
-│  ├─ powershell/
-│  └─ fixtures/
-│
-├─ tools/
-│  ├─ build-candidate.ps1
-│  ├─ candidate-manifest.psm1
-│  ├─ runtime-maintenance.psm1
-│  └─ smoke-localhost.ps1
-│
-├─ docs/
-│  └─ ...
-│
-└─ review/
-   └─ evidence/
-```
-
-`review/evidence`에는 복구 및 GUI 검증 과정에서 생성된 로그, manifest, screenshot 등의 검토 자료가 포함되어 있습니다.
-
-본체는 유튜브 다운로더 GUI인데 `review/evidence`만 보면 사건번호가 붙어 있어야 할 것 같은 분위기입니다. 정상입니다.
-
----
-
-# 스크린샷
-
-## 한국어 GUI
-
-![Korean GUI](review/evidence/gui-final-F5263136-startup.jpg)
-
-## 설정
-
-![Korean Settings](review/evidence/gui-final-F5263136-settings.jpg)
-
-## 다운로드 형식
-
-![Format Dialog](review/evidence/gui-final-F5263136-format-dialog.jpg)
-
----
-
-# 범위와 제한
-
-현재 프로젝트의 주요 목표:
-
-- Windows 환경
-- `en-US` / `ko-KR`
-- upstream `v2.19.1` 기반 동작 유지
-- 한국어 UI를 유지보수 가능한 소스로 복구
-- 번역 변경이 기존 프로그램 로직에 영향을 주지 않도록 보호
-- 재현 가능하고 검증 가능한 빌드 / 업데이트 / smoke 흐름 유지
-
-현재 주요 목표가 아닌 것:
-
-- `yt-dlp` 자체 재구현
-- macOS / Linux GUI 포팅
-- 모든 언어를 지원하는 범용 localization framework 개발
-- upstream 전체 구조 리팩터링
-- 기존 한국어 실행 파일의 byte-for-byte 복제
-
-기능 욕심이 생겨도 일단 원래 프로그램을 다운로드 프로그램으로 남겨두는 것을 중요하게 생각합니다. 갑자기 Kubernetes control plane이 되면 곤란합니다.
-
----
-
-# Reuse & Attribution
-
-이 저장소는 계속 **MIT License 기반 오픈소스**로 유지합니다.
-
-포크, 수정, 재배포, 상업적 사용, 유료 강의에서의 사용을 막기 위한 문서가 아닙니다. 실제 사용 권리는 [`LICENSE`](LICENSE)가 정합니다.
-
-다만 이 저장소가 어디에서 왔고, upstream과 KaronLabs의 작업 경계가 어디인지 확인하기 쉽도록 provenance 기록을 함께 유지합니다.
-
-- [NOTICE](NOTICE) — 짧은 원산지/계보 안내
-- [PROVENANCE.md](PROVENANCE.md) — upstream baseline, commit SHA, KaronLabs repository history, 검증 절차
-- [ATTRIBUTION.md](ATTRIBUTION.md) — 파생 프로젝트를 정확하게 소개하는 방법과 오해를 부르는 표현의 예
-- [`CITATION.cff`](CITATION.cff) — 기계가 읽을 수 있는 citation metadata
-- [`docs/provenance-dispute-response.md`](docs/provenance-dispute-response.md) — 원산지 주장이 충돌했을 때의 evidence-first 대응 절차
-
-> **코드는 가져가셔도 됩니다. 족보까지 새로 쓰지는 말아주세요.**
-
-KaronLabs 역시 `ErrorFlynn/ytdlp-interface`와 `yt-dlp` 위에서 작업하고 있으므로 upstream 저작/기여 관계도 그대로 보존합니다. 반대로 제3자 파생물이 KaronLabs 공식 릴리스·공식 강의·공식 제품인 것처럼 표시되는 것은 일반적인 MIT 코드 재사용과 별개의 provenance/identity 문제입니다.
-
-이 문서들은 새로운 소프트웨어 사용 제한을 추가하기 위한 것이 아니라, **오픈소스 자유는 유지하면서 기록된 역사를 확인하기 쉽게 만들기 위한 것**입니다.
-
----
-
-# Upstream과의 관계
-
-이 프로젝트는 다음 오픈소스 프로젝트 위에서 동작합니다.
-
-### yt-dlp
-
-https://github.com/yt-dlp/yt-dlp
-
-실제 사이트 분석 및 미디어 다운로드 기능을 제공합니다.
-
-### ytdlp-interface
-
-https://github.com/ErrorFlynn/ytdlp-interface
-
-ErrorFlynn이 개발한 Windows GUI 프로젝트이며 **이 저장소의 직접적인 upstream**입니다.
-
-**KaronLabs는 `yt-dlp` 또는 `ErrorFlynn/ytdlp-interface`의 공식 프로젝트가 아닙니다.**
-
-이 저장소는 해당 프로젝트들을 기반으로 한 독립적인 한국어 복구·개선 프로젝트입니다.
-
-원 프로젝트 개발자와 contributor들의 작업에 감사드립니다.
-
----
-
-# License
-
-이 저장소의 애플리케이션 소스는 MIT License를 사용합니다. 자세한 내용은 [`LICENSE`](LICENSE)를 참고하세요.
-
-`v2.19.1-karon.2` 후보에 포함 예정인 PyInstaller 기반 `yt-dlp.exe` 결합 실행 파일은 GPL-3.0-or-later이며, yt-dlp 프로젝트 원본 소스는 Unlicense입니다. 이 실행 파일의 `--verbose`에는 `mutagen 1.48.1`이 보고되며, mutagen은 GPL-2.0-or-later입니다. 따라서 Windows 배포 ZIP 전체를 MIT 라이선스로 표시하지 않습니다. 다른 제3자 구성요소에도 각자의 라이선스가 적용됩니다.
-
-이 후보의 대응 소스 완비와 독립 라이선스 승인은 아직 확인되지 않았습니다. `v2.19.1-karon.2` 공개 릴리스는 면제되지 않은 조건이 충족될 때까지 HOLD입니다. 현재 고지는 [`THIRD-PARTY-NOTICES.txt`](THIRD-PARTY-NOTICES.txt)와 [`release/notes/v2.19.1-karon.2.md`](release/notes/v2.19.1-karon.2.md)를 참고하세요.
-
----
-
-<details>
-<summary><strong>💸 개발자 노트 — GPT 쿼타가 사라진 날</strong></summary>
-
-<br>
-
-이 README가 정리되기 전 저장소 맨 위에는 실제로 대충 이런 내용이 적혀 있었습니다.
-
-> README는 나도 뭔말인지 모름.  
-> codex-spark가 원본 레포랑 비교 분석해서 쓴 거예요.  
-> GPT-5.6 쿼타 오링남. 거지임.  
-> 급한 거 끝나면 나중에 고칠게요.
-
-코드는 UTF-8 검증하고,
-
-placeholder 검증하고,
-
-SHA-256 검증하고,
-
-rollback 만들고,
-
-candidate manifest 만들고,
-
-localhost E2E smoke test까지 돌리는데...
-
-**README만 파산보호 신청 상태였습니다.**
-
-그래서 README도 최소한 사람이 읽을 수 있게 정리했습니다.
-
-다만 쿼타는 여전히 소중합니다.
-
-아껴 씁시다.
-
-— KaronLabs
+- [v2.19.1-karon.1](https://github.com/KaronLabs/ytdlp-korean-interface/releases/tag/v2.19.1-karon.1): 최초 KaronLabs 공개 릴리즈. 현재 다운로드는 위의 `karon.2`를 사용해 주세요.
 
 </details>
