@@ -921,6 +921,7 @@ function Get-KaronPackageApplicationProvenance {
         ':(exclude).gitignore', ':(exclude)README.md',
         ':(exclude)docs/release-diet.md', ':(exclude)docs/superpowers/plans/2026-10-08-release-recovery.md',
         ':(exclude)tests/powershell/source-assembly-bindings.Tests.ps1',
+        ':(exclude)tests/powershell/smoke-localhost.Tests.ps1',
         ':(exclude)tests/powershell/yt-dlp-supplemental-source.Tests.ps1',
         ':(exclude)tests/run_ci_powershell_tests.ps1', ':(exclude)tools/prepare-release-source-assembly.ps1',
         ':(exclude)tools/supplemental-sources/yt-dlp-mutagen-1.48.1.json'
